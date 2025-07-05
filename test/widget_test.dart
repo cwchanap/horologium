@@ -11,20 +11,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+  testWidgets('Main menu displays correctly', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const HorologiumApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Wait for initial animations to load
+    await tester.pump(const Duration(seconds: 1));
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Verify that our main menu elements are present.
+    expect(find.text('HOROLOGIUM'), findsOneWidget);
+    expect(find.text('STELLAR EXPLORER'), findsOneWidget);
+    expect(find.text('START EXPEDITION'), findsOneWidget);
+    expect(find.text('STELLAR MAP'), findsOneWidget);
+    expect(find.text('RESEARCH LAB'), findsOneWidget);
+    expect(find.text('SETTINGS'), findsOneWidget);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Test that the buttons are tappable
+    final startButton = find.text('START EXPEDITION');
+    expect(startButton, findsOneWidget);
+    
+    // Just verify the button exists and is tappable (without actually navigating)
+    final widget = tester.widget<ElevatedButton>(find.ancestor(
+      of: startButton,
+      matching: find.byType(ElevatedButton),
+    ));
+    expect(widget.onPressed, isNotNull);
   });
 }
