@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:flame/game.dart';
@@ -254,9 +255,23 @@ class _MainMenuState extends State<MainMenu>
   }
 
   void _startGame() {
+    final game = GameScene();
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => GameWidget(game: GameScene()),
+        builder: (context) => RawGestureDetector(
+          gestures: {
+            ScaleGestureRecognizer:
+                GestureRecognizerFactoryWithHandlers<ScaleGestureRecognizer>(
+              () => ScaleGestureRecognizer(),
+              (ScaleGestureRecognizer instance) {
+                instance.onUpdate = (details) {
+                  game.onScaleUpdate(details);
+                };
+              },
+            ),
+          },
+          child: GameWidget(game: game),
+        ),
       ),
     );
   }

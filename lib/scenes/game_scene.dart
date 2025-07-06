@@ -1,16 +1,27 @@
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 class GameScene extends FlameGame {
   final int gridSize;
+  double _zoom = 1.0;
 
   GameScene({this.gridSize = 10});
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    add(Grid(gridSize: gridSize)..size = size);
+    final camera = CameraComponent.withFixedResolution(width: 800, height: 600);
+    camera.viewfinder.anchor = Anchor.center;
+    world.add(camera);
+    world.add(Grid(gridSize: gridSize)..size = size);
+  }
+
+  void onScaleUpdate(ScaleUpdateDetails details) {
+    final newZoom = _zoom * details.scale;
+    _zoom = newZoom.clamp(1.0, 4.0);
+    camera.viewfinder.zoom = _zoom;
   }
 }
 
