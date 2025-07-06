@@ -7,7 +7,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:horologium/main.dart';
 
 void main() {
@@ -15,8 +14,9 @@ void main() {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const HorologiumApp());
 
-    // Wait for initial animations to load
-    await tester.pump(const Duration(seconds: 1));
+    // pumpAndSettle will time out because of the repeating star animation,
+    // so we pump for a few seconds to let the other animations finish.
+    await tester.pump(const Duration(seconds: 3));
 
     // Verify that our main menu elements are present.
     expect(find.text('HOROLOGIUM'), findsOneWidget);
@@ -29,7 +29,7 @@ void main() {
     // Test that the buttons are tappable
     final startButton = find.text('START EXPEDITION');
     expect(startButton, findsOneWidget);
-    
+
     // Just verify the button exists and is tappable (without actually navigating)
     final widget = tester.widget<ElevatedButton>(find.ancestor(
       of: startButton,
@@ -38,3 +38,4 @@ void main() {
     expect(widget.onPressed, isNotNull);
   });
 }
+

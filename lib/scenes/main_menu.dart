@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import 'scene.dart';
+import 'package:flame/game.dart';
+import 'game_scene.dart';
 
 class MainMenu extends StatefulWidget {
   const MainMenu({super.key});
@@ -254,7 +256,7 @@ class _MainMenuState extends State<MainMenu>
   void _startGame() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const Scene(),
+        builder: (context) => GameWidget(game: GameScene()),
       ),
     );
   }
@@ -335,11 +337,13 @@ class _FloatingParticleState extends State<FloatingParticle>
 
     _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
 
-    Future.delayed(Duration(milliseconds: (widget.delay * 1000).round()), () {
-      if (mounted) {
-        _controller.repeat();
-      }
-    });
+    if (!kDebugMode) {
+      Future.delayed(Duration(milliseconds: (widget.delay * 1000).round()), () {
+        if (mounted) {
+          _controller.repeat();
+        }
+      });
+    }
   }
 
   @override
