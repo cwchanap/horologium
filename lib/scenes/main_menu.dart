@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:flame/game.dart';
 import 'game_scene.dart';
+import 'game_screen.dart';
 
 class MainMenu extends StatefulWidget {
   const MainMenu({super.key});
@@ -255,23 +256,9 @@ class _MainMenuState extends State<MainMenu>
   }
 
   void _startGame() {
-    final game = GameScene();
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => RawGestureDetector(
-          gestures: {
-            ScaleGestureRecognizer:
-                GestureRecognizerFactoryWithHandlers<ScaleGestureRecognizer>(
-              () => ScaleGestureRecognizer(),
-              (ScaleGestureRecognizer instance) {
-                instance.onUpdate = (details) {
-                  game.onScaleUpdate(details);
-                };
-              },
-            ),
-          },
-          child: GameWidget(game: game),
-        ),
+        builder: (context) => const GameScreen(),
       ),
     );
   }
