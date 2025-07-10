@@ -4,6 +4,11 @@ import 'package:flame/game.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+const double gridWidth = 2000;
+const double gridHeight = 2000;
+const double cellWidth = 100;
+const double cellHeight = 100;
+
 enum BuildingType {
   powerPlant,
   factory,
@@ -66,38 +71,42 @@ class Building {
 
 class GameScene extends FlameGame with TapCallbacks {
   final int gridSize;
-  double _zoom = 1.0;
   late Grid _grid;
   Function(int, int)? onGridCellTapped;
 
+  static const double _minZoom = 1.0;
+  static const double _maxZoom = 4.0;
+
+  double _startZoom = _minZoom;
+
   GameScene({this.gridSize = 10});
-  
+
   Grid get grid => _grid;
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    final camera = CameraComponent.withFixedResolution(width: 800, height: 600);
     camera.viewfinder.anchor = Anchor.center;
-    world.add(camera);
-    _grid = Grid(gridSize: gridSize)..size = size;
+    camera.viewfinder.zoom = _startZoom;
+    _grid = Grid(gridSize: gridSize)
+      ..size = Vector2(gridSize * cellWidth, gridSize * cellHeight)
+      ..anchor = Anchor.center;
     world.add(_grid);
   }
 
   @override
-  void onTapDown(TapDownEvent event) {
-    final tapPosition = event.localPosition;
-    final gridPosition = _grid.getGridPosition(tapPosition);
-    
+  void onTapUp(TapUpEvent event) {
+    final gridPosition = _grid.getGridPosition(event.localPosition);
+
     if (gridPosition != null) {
       onGridCellTapped?.call(gridPosition.x.toInt(), gridPosition.y.toInt());
     }
   }
 
-  void onScaleUpdate(ScaleUpdateDetails details) {
-    final newZoom = _zoom * details.scale;
-    _zoom = newZoom.clamp(1.0, 4.0);
-    camera.viewfinder.zoom = _zoom;
+  
+
+  void clampZoom() {
+    camera.viewfinder.zoom = camera.viewfinder.zoom.clamp(_minZoom, _maxZoom);
   }
 }
 
@@ -107,16 +116,15 @@ class Grid extends PositionComponent {
 
   Grid({this.gridSize = 10});
 
-  Vector2? getGridPosition(Vector2 worldPosition) {
-    if (worldPosition.x < 0 || worldPosition.y < 0 || 
-        worldPosition.x >= size.x || worldPosition.y >= size.y) {
+  Vector2? getGridPosition(Vector2 screenPosition) {
+    if (screenPosition.x < 0 || screenPosition.y < 0 ||
+        screenPosition.x >= size.x || screenPosition.y >= size.y) {
       return null;
     }
-    
-    final cellSize = size.x / gridSize;
-    final gridX = (worldPosition.x / cellSize).floor();
-    final gridY = (worldPosition.y / cellSize).floor();
-    
+
+    final gridX = (screenPosition.x / cellWidth).floor();
+    final gridY = (screenPosition.y / cellHeight).floor();
+
     return Vector2(gridX.toDouble(), gridY.toDouble());
   }
 
@@ -138,16 +146,14 @@ class Grid extends PositionComponent {
       ..color = Colors.white.withValues(alpha: 0.2)
       ..style = PaintingStyle.stroke;
 
-    final cellSize = size.x / gridSize;
-
     // Draw grid lines
     for (var i = 0; i <= gridSize; i++) {
-      final double x = i * cellSize;
+      final double x = i * cellWidth;
       canvas.drawLine(Offset(x, 0), Offset(x, size.y), paint);
     }
 
     for (var i = 0; i <= gridSize; i++) {
-      final double y = i * cellSize;
+      final double y = i * cellHeight;
       canvas.drawLine(Offset(0, y), Offset(size.x, y), paint);
     }
 
@@ -162,10 +168,10 @@ class Grid extends PositionComponent {
         ..style = PaintingStyle.fill;
       
       final rect = Rect.fromLTWH(
-        x * cellSize + 2,
-        y * cellSize + 2,
-        cellSize - 4,
-        cellSize - 4,
+        x * cellWidth + 2,
+        y * cellHeight + 2,
+        cellWidth - 4,
+        cellHeight - 4,
       );
       
       canvas.drawRRect(

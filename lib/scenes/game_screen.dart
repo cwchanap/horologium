@@ -55,21 +55,18 @@ class _GameScreenState extends State<GameScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          RawGestureDetector(
-            gestures: {
-              ScaleGestureRecognizer:
-                  GestureRecognizerFactoryWithHandlers<ScaleGestureRecognizer>(
-                () => ScaleGestureRecognizer(),
-                (ScaleGestureRecognizer instance) {
-                  instance.onUpdate = (details) {
-                    _game.onScaleUpdate(details);
-                  };
-                },
-              ),
+          Listener(
+            onPointerSignal: (pointerSignal) {
+              if (pointerSignal is PointerScrollEvent) {
+                final newZoom = _game.camera.viewfinder.zoom -
+                    pointerSignal.scrollDelta.dy / 100;
+                _game.camera.viewfinder.zoom = newZoom.clamp(0.5, 2.0);
+              }
             },
-            child: GameWidget(game: _game),
+            child: GameWidget(
+              game: _game,
+            ),
           ),
-          
           // Top UI Bar
           SafeArea(
             child: Padding(
@@ -85,7 +82,8 @@ class _GameScreenState extends State<GameScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.7),
                       borderRadius: BorderRadius.circular(20),
@@ -100,7 +98,8 @@ class _GameScreenState extends State<GameScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.green.withValues(alpha: 0.8),
                       borderRadius: BorderRadius.circular(15),
@@ -118,7 +117,7 @@ class _GameScreenState extends State<GameScreen> {
               ),
             ),
           ),
-          
+
           // Building Selection Popup
           if (_showBuildingSelection)
             Positioned(
@@ -158,13 +157,14 @@ class _GameScreenState extends State<GameScreen> {
                         ],
                       ),
                     ),
-                    
+
                     // Building List
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: GridView.builder(
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
                             childAspectRatio: 2.5,
                             crossAxisSpacing: 12,
