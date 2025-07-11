@@ -3,6 +3,7 @@ import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'building.dart';
 import 'grid.dart';
@@ -15,7 +16,7 @@ class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
   static const double _minZoom = 1.0;
   static const double _maxZoom = 4.0;
 
-  double _startZoom = _minZoom;
+  final double _startZoom = _minZoom;
 
   MainGame({this.gridSize = 10});
 
@@ -30,6 +31,26 @@ class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
       ..size = Vector2(gridSize * cellWidth, gridSize * cellHeight)
       ..anchor = Anchor.center;
     world.add(_grid);
+    await loadBuildings();
+  }
+
+  Future<void> loadBuildings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final buildingData = prefs.getStringList('buildings');
+    if (buildingData == null) {
+      return;
+    }
+
+    for (final data in buildingData) {
+      final parts = data.split(',');
+      final x = int.parse(parts[0]);
+      final y = int.parse(parts[1]);
+      final buildingName = parts[2];
+
+      final building = Building.availableBuildings
+          .firstWhere((b) => b.name == buildingName);
+      _grid.placeBuilding(x, y, building);
+    }
   }
 
   @override
@@ -39,7 +60,9 @@ class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
 
   @override
   void onTapUp(TapUpEvent event) {
-    final gridPosition = _grid.getGridPosition(event.localPosition);
+    final worldPosition = camera.globalToLocal(event.canvasPosition);
+    final localPosition = _grid.toLocal(worldPosition);
+    final gridPosition = _grid.getGridPosition(localPosition);
 
     if (gridPosition != null) {
       onGridCellTapped?.call(gridPosition.x.toInt(), gridPosition.y.toInt());
@@ -126,14 +149,14 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back, color: Colors.white),
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.black.withOpacity(0.5),
+                      backgroundColor: Colors.black.withAlpha((255 * 0.5).round()),
                     ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
+                      color: Colors.black.withAlpha((255 * 0.7).round()),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(
@@ -149,7 +172,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.8),
+                      color: Colors.green.withAlpha((255 * 0.8).round()),
                       borderRadius: BorderRadius.circular(15),
                     ),
                     child: const Text(
@@ -175,7 +198,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
               child: Container(
                 height: 200,
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.9),
+                  color: Colors.black.withAlpha((255 * 0.9).round()),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20),
                     topRight: Radius.circular(20),
@@ -237,16 +260,14 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   }
 
   Widget _buildBuildingCard(Building building) {
-    final canAfford = true; // TODO: Implement resource checking
-
     return GestureDetector(
-      onTap: canAfford ? () => _onBuildingSelected(building) : null,
+      onTap: () => _onBuildingSelected(building),
       child: Container(
         decoration: BoxDecoration(
-          color: building.color.withOpacity(0.2),
+          color: building.color.withAlpha((255 * 0.2).round()),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: canAfford ? building.color : Colors.grey,
+            color: building.color,
             width: 2,
           ),
         ),
@@ -256,7 +277,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
             children: [
               Icon(
                 building.icon,
-                color: canAfford ? building.color : Colors.grey,
+                color: building.color,
                 size: 24,
               ),
               const SizedBox(width: 12),
@@ -267,16 +288,16 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                   children: [
                     Text(
                       building.name,
-                      style: TextStyle(
-                        color: canAfford ? Colors.white : Colors.grey,
+                      style: const TextStyle(
+                        color: Colors.white,
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
                       '${building.cost} credits',
-                      style: TextStyle(
-                        color: canAfford ? Colors.white70 : Colors.grey,
+                      style: const TextStyle(
+                        color: Colors.white70,
                         fontSize: 12,
                       ),
                     ),

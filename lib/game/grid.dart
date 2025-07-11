@@ -1,5 +1,6 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'building.dart';
 
@@ -12,23 +13,36 @@ class Grid extends PositionComponent {
 
   Grid({this.gridSize = 10});
 
-  Vector2? getGridPosition(Vector2 screenPosition) {
-    if (screenPosition.x < 0 ||
-        screenPosition.y < 0 ||
-        screenPosition.x >= size.x ||
-        screenPosition.y >= size.y) {
+  Vector2? getGridPosition(Vector2 localPosition) {
+    if (localPosition.x < 0 ||
+        localPosition.y < 0 ||
+        localPosition.x >= size.x ||
+        localPosition.y >= size.y) {
       return null;
     }
 
-    final gridX = (screenPosition.x / cellWidth).floor();
-    final gridY = (screenPosition.y / cellHeight).floor();
+    final gridX = (localPosition.x / cellWidth).floor();
+    final gridY = (localPosition.y / cellHeight).floor();
 
     return Vector2(gridX.toDouble(), gridY.toDouble());
+  }
+
+  Future<void> saveBuildings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final buildingData = _buildings.entries.map((entry) {
+      final coords = entry.key.split(',');
+      final x = coords[0];
+      final y = coords[1];
+      final building = entry.value;
+      return '$x,$y,${building.name}';
+    }).toList();
+    await prefs.setStringList('buildings', buildingData);
   }
 
   void placeBuilding(int x, int y, Building building) {
     final key = '$x,$y';
     _buildings[key] = building;
+    saveBuildings();
   }
 
   bool isCellOccupied(int x, int y) {
@@ -41,7 +55,7 @@ class Grid extends PositionComponent {
     super.render(canvas);
 
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.2)
+      ..color = Colors.white.withAlpha((255 * 0.2).round())
       ..style = PaintingStyle.stroke;
 
     // Draw grid lines
@@ -62,7 +76,7 @@ class Grid extends PositionComponent {
       final y = int.parse(coords[1]);
 
       final buildingPaint = Paint()
-        ..color = building.color.withOpacity(0.8)
+        ..color = building.color.withAlpha((255 * 0.8).round())
         ..style = PaintingStyle.fill;
 
       final rect = Rect.fromLTWH(
