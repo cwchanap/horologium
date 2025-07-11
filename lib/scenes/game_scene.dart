@@ -69,7 +69,7 @@ class Building {
   ];
 }
 
-class GameScene extends FlameGame with TapCallbacks {
+class GameScene extends FlameGame with TapCallbacks, DragCallbacks {
   final int gridSize;
   late Grid _grid;
   Function(int, int)? onGridCellTapped;
@@ -92,6 +92,11 @@ class GameScene extends FlameGame with TapCallbacks {
       ..size = Vector2(gridSize * cellWidth, gridSize * cellHeight)
       ..anchor = Anchor.center;
     world.add(_grid);
+  }
+
+  @override
+  void onDragUpdate(DragUpdateEvent event) {
+    camera.viewfinder.position -= event.canvasDelta / camera.viewfinder.zoom;
   }
 
   @override
