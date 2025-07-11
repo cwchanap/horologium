@@ -3,8 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:flame/game.dart';
-import 'game_scene.dart';
-import 'game_screen.dart';
+import 'game/scene.dart';
 
 class MainMenu extends StatefulWidget {
   const MainMenu({super.key});
@@ -258,7 +257,7 @@ class _MainMenuState extends State<MainMenu>
   void _startGame() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const GameScreen(),
+        builder: (context) => const MainGameWidget(),
       ),
     );
   }

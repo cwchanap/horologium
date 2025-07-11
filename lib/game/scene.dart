@@ -1,17 +1,65 @@
+import 'package:flame/components.dart';
+import 'package:flame/events.dart';
+import 'package:flame/game.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flame/game.dart';
-import 'game_scene.dart';
 
-class GameScreen extends StatefulWidget {
-  const GameScreen({super.key});
+import 'building.dart';
+import 'grid.dart';
+
+class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
+  final int gridSize;
+  late Grid _grid;
+  Function(int, int)? onGridCellTapped;
+
+  static const double _minZoom = 1.0;
+  static const double _maxZoom = 4.0;
+
+  double _startZoom = _minZoom;
+
+  MainGame({this.gridSize = 10});
+
+  Grid get grid => _grid;
 
   @override
-  State<GameScreen> createState() => _GameScreenState();
+  Future<void> onLoad() async {
+    await super.onLoad();
+    camera.viewfinder.anchor = Anchor.center;
+    camera.viewfinder.zoom = _startZoom;
+    _grid = Grid(gridSize: gridSize)
+      ..size = Vector2(gridSize * cellWidth, gridSize * cellHeight)
+      ..anchor = Anchor.center;
+    world.add(_grid);
+  }
+
+  @override
+  void onDragUpdate(DragUpdateEvent event) {
+    camera.viewfinder.position -= event.canvasDelta / camera.viewfinder.zoom;
+  }
+
+  @override
+  void onTapUp(TapUpEvent event) {
+    final gridPosition = _grid.getGridPosition(event.localPosition);
+
+    if (gridPosition != null) {
+      onGridCellTapped?.call(gridPosition.x.toInt(), gridPosition.y.toInt());
+    }
+  }
+
+  void clampZoom() {
+    camera.viewfinder.zoom = camera.viewfinder.zoom.clamp(_minZoom, _maxZoom);
+  }
 }
 
-class _GameScreenState extends State<GameScreen> {
-  late GameScene _game;
+class MainGameWidget extends StatefulWidget {
+  const MainGameWidget({super.key});
+
+  @override
+  State<MainGameWidget> createState() => _MainGameWidgetState();
+}
+
+class _MainGameWidgetState extends State<MainGameWidget> {
+  late MainGame _game;
   int? _selectedGridX;
   int? _selectedGridY;
   bool _showBuildingSelection = false;
@@ -19,7 +67,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    _game = GameScene();
+    _game = MainGame();
     _game.onGridCellTapped = _onGridCellTapped;
   }
 
@@ -78,14 +126,14 @@ class _GameScreenState extends State<GameScreen> {
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back, color: Colors.white),
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.black.withValues(alpha: 0.5),
+                      backgroundColor: Colors.black.withOpacity(0.5),
                     ),
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.7),
+                      color: Colors.black.withOpacity(0.7),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(
@@ -98,10 +146,10 @@ class _GameScreenState extends State<GameScreen> {
                     ),
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.8),
+                      color: Colors.green.withOpacity(0.8),
                       borderRadius: BorderRadius.circular(15),
                     ),
                     child: const Text(
@@ -127,7 +175,7 @@ class _GameScreenState extends State<GameScreen> {
               child: Container(
                 height: 200,
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.9),
+                  color: Colors.black.withOpacity(0.9),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20),
                     topRight: Radius.circular(20),
@@ -172,7 +220,8 @@ class _GameScreenState extends State<GameScreen> {
                           ),
                           itemCount: Building.availableBuildings.length,
                           itemBuilder: (context, index) {
-                            final building = Building.availableBuildings[index];
+                            final building =
+                                Building.availableBuildings[index];
                             return _buildBuildingCard(building);
                           },
                         ),
@@ -189,12 +238,12 @@ class _GameScreenState extends State<GameScreen> {
 
   Widget _buildBuildingCard(Building building) {
     final canAfford = true; // TODO: Implement resource checking
-    
+
     return GestureDetector(
       onTap: canAfford ? () => _onBuildingSelected(building) : null,
       child: Container(
         decoration: BoxDecoration(
-          color: building.color.withValues(alpha: 0.2),
+          color: building.color.withOpacity(0.2),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: canAfford ? building.color : Colors.grey,

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'scenes/main_menu.dart';
+import 'main_menu.dart';
 
 void main() {
   runApp(const HorologiumApp());
