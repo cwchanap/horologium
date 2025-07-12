@@ -4,7 +4,7 @@ enum BuildingType {
   powerPlant,
   factory,
   researchLab,
-  habitat,
+  house,
 }
 
 class Building {
@@ -14,6 +14,8 @@ class Building {
   final IconData icon;
   final Color color;
   final int cost;
+  final Map<String, int> generation;
+  final int population;
 
   const Building({
     required this.type,
@@ -22,6 +24,8 @@ class Building {
     required this.icon,
     required this.color,
     required this.cost,
+    this.generation = const {},
+    this.population = 0,
   });
 
   static const List<Building> availableBuildings = [
@@ -32,6 +36,7 @@ class Building {
       icon: Icons.bolt,
       color: Colors.yellow,
       cost: 100,
+      generation: {'electricity': 1},
     ),
     Building(
       type: BuildingType.factory,
@@ -50,12 +55,14 @@ class Building {
       cost: 200,
     ),
     Building(
-      type: BuildingType.habitat,
-      name: 'Habitat',
-      description: 'Houses colonists and crew',
+      type: BuildingType.house,
+      name: 'House',
+      description: 'Increases population and generates money',
       icon: Icons.home,
       color: Colors.green,
       cost: 120,
+      population: 5,
+      generation: {'money': 1, 'electricity': -1},
     ),
   ];
 }

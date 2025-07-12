@@ -56,6 +56,14 @@ class Grid extends PositionComponent {
     saveBuildings();
   }
 
+  int countBuildingsOfType(BuildingType type) {
+    return _buildings.values.where((b) => b.type == type).length;
+  }
+
+  List<Building> getAllBuildings() {
+    return _buildings.values.toList();
+  }
+
   bool isCellOccupied(int x, int y) {
     final key = '$x,$y';
     return _buildings.containsKey(key);

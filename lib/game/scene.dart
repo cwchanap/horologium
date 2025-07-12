@@ -1,8 +1,11 @@
+import 'dart:async' as async;
+
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:horologium/game/resources.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'building.dart';
@@ -86,21 +89,46 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   int? _selectedGridX;
   int? _selectedGridY;
   bool _showBuildingSelection = false;
-  int _money = 1000;
+  final Resources _resources = Resources();
+  async.Timer? _resourceTimer;
 
   @override
   void initState() {
     super.initState();
     _game = MainGame();
     _game.onGridCellTapped = _onGridCellTapped;
-    _loadMoney();
+    _loadSavedData();
+    _startResourceGeneration();
   }
 
-  Future<void> _loadMoney() async {
+  @override
+  void dispose() {
+    _resourceTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startResourceGeneration() {
+    _resourceTimer = async.Timer.periodic(const Duration(seconds: 1), (timer) {
+      final buildings = _game.grid.getAllBuildings();
+      setState(() {
+        _resources.update(buildings);
+        _saveResources();
+      });
+    });
+  }
+
+  Future<void> _loadSavedData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _money = prefs.getInt('money') ?? 1000;
+      _resources.money = prefs.getInt('money') ?? 1000;
+      _resources.population = prefs.getInt('population') ?? 0;
     });
+  }
+
+  Future<void> _saveResources() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('money', _resources.money);
+    await prefs.setInt('population', _resources.population);
   }
 
   void _onGridCellTapped(int x, int y) {
@@ -131,8 +159,11 @@ class _MainGameWidgetState extends State<MainGameWidget> {
             onPressed: () {
               _game.grid.removeBuilding(x, y);
               setState(() {
-                _money += building.cost;
-                _saveMoney();
+                _resources.money += building.cost;
+                if (building.type == BuildingType.house) {
+                  _resources.population -= building.population;
+                }
+                _saveResources();
               });
               Navigator.pop(context);
             },
@@ -145,11 +176,14 @@ class _MainGameWidgetState extends State<MainGameWidget> {
 
   void _onBuildingSelected(Building building) {
     if (_selectedGridX != null && _selectedGridY != null) {
-      if (_money >= building.cost) {
+      if (_resources.money >= building.cost) {
         _game.grid.placeBuilding(_selectedGridX!, _selectedGridY!, building);
         setState(() {
-          _money -= building.cost;
-          _saveMoney();
+          _resources.money -= building.cost;
+          if (building.type == BuildingType.house) {
+            _resources.population += building.population;
+          }
+          _saveResources();
           _showBuildingSelection = false;
           _selectedGridX = null;
           _selectedGridY = null;
@@ -163,11 +197,6 @@ class _MainGameWidgetState extends State<MainGameWidget> {
         );
       }
     }
-  }
-
-  Future<void> _saveMoney() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('money', _money);
   }
 
   void _closeBuildingSelection() {
@@ -225,21 +254,60 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                       ),
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withAlpha((255 * 0.8).round()),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Text(
-                      'Money: $_money',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withAlpha((255 * 0.8).round()),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Text(
+                          'Money: ${_resources.money}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withAlpha((255 * 0.8).round()),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Text(
+                          'Electricity: ${_resources.electricity}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withAlpha((255 * 0.8).round()),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Text(
+                          'Population: ${_resources.population}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
