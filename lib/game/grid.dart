@@ -45,6 +45,17 @@ class Grid extends PositionComponent {
     saveBuildings();
   }
 
+  Building? getBuildingAt(int x, int y) {
+    final key = '$x,$y';
+    return _buildings[key];
+  }
+
+  void removeBuilding(int x, int y) {
+    final key = '$x,$y';
+    _buildings.remove(key);
+    saveBuildings();
+  }
+
   bool isCellOccupied(int x, int y) {
     final key = '$x,$y';
     return _buildings.containsKey(key);

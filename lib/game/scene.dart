@@ -86,31 +86,88 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   int? _selectedGridX;
   int? _selectedGridY;
   bool _showBuildingSelection = false;
+  int _money = 1000;
 
   @override
   void initState() {
     super.initState();
     _game = MainGame();
     _game.onGridCellTapped = _onGridCellTapped;
+    _loadMoney();
+  }
+
+  Future<void> _loadMoney() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _money = prefs.getInt('money') ?? 1000;
+    });
   }
 
   void _onGridCellTapped(int x, int y) {
-    setState(() {
-      _selectedGridX = x;
-      _selectedGridY = y;
-      _showBuildingSelection = true;
-    });
+    final building = _game.grid.getBuildingAt(x, y);
+    if (building != null) {
+      _showDeleteConfirmationDialog(x, y, building);
+    } else {
+      setState(() {
+        _selectedGridX = x;
+        _selectedGridY = y;
+        _showBuildingSelection = true;
+      });
+    }
+  }
+
+  void _showDeleteConfirmationDialog(int x, int y, Building building) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete ${building.name}?'),
+        content: Text('This will refund ${building.cost} money.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              _game.grid.removeBuilding(x, y);
+              setState(() {
+                _money += building.cost;
+                _saveMoney();
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onBuildingSelected(Building building) {
     if (_selectedGridX != null && _selectedGridY != null) {
-      _game.grid.placeBuilding(_selectedGridX!, _selectedGridY!, building);
-      setState(() {
-        _showBuildingSelection = false;
-        _selectedGridX = null;
-        _selectedGridY = null;
-      });
+      if (_money >= building.cost) {
+        _game.grid.placeBuilding(_selectedGridX!, _selectedGridY!, building);
+        setState(() {
+          _money -= building.cost;
+          _saveMoney();
+          _showBuildingSelection = false;
+          _selectedGridX = null;
+          _selectedGridY = null;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Insufficient funds!'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  }
+
+  Future<void> _saveMoney() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('money', _money);
   }
 
   void _closeBuildingSelection() {
@@ -175,9 +232,9 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                       color: Colors.green.withAlpha((255 * 0.8).round()),
                       borderRadius: BorderRadius.circular(15),
                     ),
-                    child: const Text(
-                      'Credits: 1000',
-                      style: TextStyle(
+                    child: Text(
+                      'Money: $_money',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -295,7 +352,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                       ),
                     ),
                     Text(
-                      '${building.cost} credits',
+                      '${building.cost} money',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,
