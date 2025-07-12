@@ -6,6 +6,8 @@ enum BuildingType {
   researchLab,
   house,
   goldMine,
+  woodFactory,
+  coalMine,
 }
 
 class Building {
@@ -16,7 +18,9 @@ class Building {
   final Color color;
   final int cost;
   final Map<String, double> generation;
+  final Map<String, double> consumption;
   final int population;
+  final List<Building> upgrades;
 
   const Building({
     required this.type,
@@ -26,8 +30,21 @@ class Building {
     required this.color,
     required this.cost,
     this.generation = const {},
+    this.consumption = const {},
     this.population = 0,
+    this.upgrades = const [],
   });
+
+  static const Building powerPlant2 = Building(
+    type: BuildingType.powerPlant,
+    name: 'Power Plant Lvl. 2',
+    description: 'Generates more energy for your colony',
+    icon: Icons.bolt,
+    color: Colors.yellow,
+    cost: 200,
+    generation: {'electricity': 2},
+    consumption: {'coal': 1},
+  );
 
   static const List<Building> availableBuildings = [
     Building(
@@ -38,6 +55,8 @@ class Building {
       color: Colors.yellow,
       cost: 100,
       generation: {'electricity': 1},
+      consumption: {'coal': 1},
+      upgrades: [powerPlant2],
     ),
     Building(
       type: BuildingType.factory,
@@ -73,6 +92,24 @@ class Building {
       color: Colors.amber,
       cost: 300,
       generation: {'gold': 0.1},
+    ),
+    Building(
+      type: BuildingType.woodFactory,
+      name: 'Wood Factory',
+      description: 'Produces wood',
+      icon: Icons.park,
+      color: Colors.brown,
+      cost: 80,
+      generation: {'wood': 1},
+    ),
+    Building(
+      type: BuildingType.coalMine,
+      name: 'Coal Mine',
+      description: 'Produces coal',
+      icon: Icons.fireplace,
+      color: Colors.grey,
+      cost: 90,
+      generation: {'coal': 1},
     ),
   ];
 }

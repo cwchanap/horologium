@@ -14,6 +14,8 @@ import 'grid.dart';
 class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
   late Grid _grid;
   Function(int, int)? onGridCellTapped;
+  Function(int, int)? onGridCellLongTapped;
+  Function(int, int)? onGridCellSecondaryTapped;
 
   static const double _minZoom = 1.0;
   static const double _maxZoom = 4.0;
@@ -50,7 +52,9 @@ class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
       final buildingName = parts[2];
 
       final building = Building.availableBuildings
-          .firstWhere((b) => b.name == buildingName);
+          .firstWhere((b) => b.name == buildingName, orElse: () {
+        return Building.powerPlant2;
+      });
       _grid.placeBuilding(x, y, building);
     }
   }
@@ -68,6 +72,28 @@ class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
 
     if (gridPosition != null) {
       onGridCellTapped?.call(gridPosition.x.toInt(), gridPosition.y.toInt());
+    }
+  }
+
+  @override
+  void onLongTapDown(TapDownEvent event) {
+    final worldPosition = camera.globalToLocal(event.canvasPosition);
+    final localPosition = _grid.toLocal(worldPosition);
+    final gridPosition = _grid.getGridPosition(localPosition);
+
+    if (gridPosition != null) {
+      onGridCellLongTapped?.call(gridPosition.x.toInt(), gridPosition.y.toInt());
+    }
+  }
+
+  @override
+  void onSecondaryTapUp(TapUpEvent event) {
+    final worldPosition = camera.globalToLocal(event.canvasPosition);
+    final localPosition = _grid.toLocal(worldPosition);
+    final gridPosition = _grid.getGridPosition(localPosition);
+
+    if (gridPosition != null) {
+      onGridCellSecondaryTapped?.call(gridPosition.x.toInt(), gridPosition.y.toInt());
     }
   }
 
@@ -96,6 +122,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     super.initState();
     _game = MainGame();
     _game.onGridCellTapped = _onGridCellTapped;
+    _game.onGridCellLongTapped = _onGridCellLongTapped;
+    _game.onGridCellSecondaryTapped = _onGridCellSecondaryTapped;
     _loadSavedData();
     _startResourceGeneration();
   }
@@ -122,6 +150,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
       _resources.money = prefs.getDouble('money') ?? 1000.0;
       _resources.population = prefs.getInt('population') ?? 0;
       _resources.gold = prefs.getDouble('gold') ?? 0.0;
+      _resources.wood = prefs.getDouble('wood') ?? 0.0;
+      _resources.coal = prefs.getDouble('coal') ?? 0.0;
     });
   }
 
@@ -130,12 +160,22 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     await prefs.setDouble('money', _resources.money);
     await prefs.setInt('population', _resources.population);
     await prefs.setDouble('gold', _resources.gold);
+    await prefs.setDouble('wood', _resources.wood);
+    await prefs.setDouble('coal', _resources.coal);
   }
 
   void _onGridCellTapped(int x, int y) {
     final building = _game.grid.getBuildingAt(x, y);
     if (building != null) {
-      _showDeleteConfirmationDialog(x, y, building);
+      if (building.upgrades.isNotEmpty) {
+        _showUpgradeDialog(x, y, building);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No upgrades available for this building.'),
+          ),
+        );
+      }
     } else {
       setState(() {
         _selectedGridX = x;
@@ -143,6 +183,62 @@ class _MainGameWidgetState extends State<MainGameWidget> {
         _showBuildingSelection = true;
       });
     }
+  }
+
+  void _onGridCellLongTapped(int x, int y) {
+    final building = _game.grid.getBuildingAt(x, y);
+    if (building != null) {
+      _showDeleteConfirmationDialog(x, y, building);
+    }
+  }
+
+  void _onGridCellSecondaryTapped(int x, int y) {
+    final building = _game.grid.getBuildingAt(x, y);
+    if (building != null) {
+      _showDeleteConfirmationDialog(x, y, building);
+    }
+  }
+
+  void _showUpgradeDialog(int x, int y, Building building) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Upgrade ${building.name}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: building.upgrades.map((upgrade) {
+            return ListTile(
+              title: Text(upgrade.name),
+              subtitle: Text('Cost: ${upgrade.cost}'),
+              onTap: () {
+                if (_resources.money >= upgrade.cost) {
+                  setState(() {
+                    _resources.money -= upgrade.cost;
+                    _game.grid.placeBuilding(x, y, upgrade);
+                    _saveResources();
+                  });
+                  Navigator.of(context).pop();
+                } else {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Not enough money to upgrade.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showDeleteConfirmationDialog(int x, int y, Building building) {
@@ -181,9 +277,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
         _game.grid.placeBuilding(_selectedGridX!, _selectedGridY!, building);
         setState(() {
           _resources.money -= building.cost;
-          if (building.type == BuildingType.house) {
-            _resources.population += building.population;
-          }
+          _resources.population += building.population;
           _saveResources();
           _showBuildingSelection = false;
           _selectedGridX = null;
@@ -303,6 +397,40 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                         ),
                         child: Text(
                           'Gold: ${_resources.gold.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.brown.withAlpha((255 * 0.8).round()),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Text(
+                          'Wood: ${_resources.wood.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withAlpha((255 * 0.8).round()),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Text(
+                          'Coal: ${_resources.coal.toStringAsFixed(0)}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
