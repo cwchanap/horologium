@@ -5,6 +5,7 @@ enum BuildingType {
   factory,
   researchLab,
   house,
+  goldMine,
 }
 
 class Building {
@@ -14,7 +15,7 @@ class Building {
   final IconData icon;
   final Color color;
   final int cost;
-  final Map<String, int> generation;
+  final Map<String, double> generation;
   final int population;
 
   const Building({
@@ -63,6 +64,15 @@ class Building {
       cost: 120,
       population: 5,
       generation: {'money': 1, 'electricity': -1},
+    ),
+    Building(
+      type: BuildingType.goldMine,
+      name: 'Gold Mine',
+      description: 'Generates gold',
+      icon: Icons.attach_money,
+      color: Colors.amber,
+      cost: 300,
+      generation: {'gold': 0.1},
     ),
   ];
 }

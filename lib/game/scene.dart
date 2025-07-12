@@ -12,7 +12,6 @@ import 'building.dart';
 import 'grid.dart';
 
 class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
-  final int gridSize;
   late Grid _grid;
   Function(int, int)? onGridCellTapped;
 
@@ -21,7 +20,7 @@ class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
 
   final double _startZoom = _minZoom;
 
-  MainGame({this.gridSize = 10});
+  MainGame();
 
   Grid get grid => _grid;
 
@@ -30,9 +29,9 @@ class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
     await super.onLoad();
     camera.viewfinder.anchor = Anchor.center;
     camera.viewfinder.zoom = _startZoom;
-    _grid = Grid(gridSize: gridSize)
-      ..size = Vector2(gridSize * cellWidth, gridSize * cellHeight)
-      ..anchor = Anchor.center;
+    _grid = Grid();
+    _grid.size = Vector2(_grid.gridSize * cellWidth, _grid.gridSize * cellHeight);
+    _grid.anchor = Anchor.center;
     world.add(_grid);
     await loadBuildings();
   }
@@ -120,15 +119,17 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   Future<void> _loadSavedData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _resources.money = prefs.getInt('money') ?? 1000;
+      _resources.money = prefs.getDouble('money') ?? 1000.0;
       _resources.population = prefs.getInt('population') ?? 0;
+      _resources.gold = prefs.getDouble('gold') ?? 0.0;
     });
   }
 
   Future<void> _saveResources() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('money', _resources.money);
+    await prefs.setDouble('money', _resources.money);
     await prefs.setInt('population', _resources.population);
+    await prefs.setDouble('gold', _resources.gold);
   }
 
   void _onGridCellTapped(int x, int y) {
@@ -238,22 +239,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                       backgroundColor: Colors.black.withAlpha((255 * 0.5).round()),
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withAlpha((255 * 0.7).round()),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'Colony Builder',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                  const Spacer(),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -265,7 +251,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                           borderRadius: BorderRadius.circular(15),
                         ),
                         child: Text(
-                          'Money: ${_resources.money}',
+                          'Money: ${_resources.money.toStringAsFixed(0)}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -282,7 +268,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                           borderRadius: BorderRadius.circular(15),
                         ),
                         child: Text(
-                          'Electricity: ${_resources.electricity}',
+                          'Electricity: ${_resources.electricity.toStringAsFixed(0)}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -300,6 +286,23 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                         ),
                         child: Text(
                           'Population: ${_resources.population}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.yellow.withAlpha((255 * 0.8).round()),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Text(
+                          'Gold: ${_resources.gold.toStringAsFixed(2)}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,

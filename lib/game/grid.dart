@@ -4,14 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'building.dart';
 
-const double cellWidth = 100;
-const double cellHeight = 100;
+const double cellWidth = 50;
+const double cellHeight = 50;
 
 class Grid extends PositionComponent {
   final int gridSize;
   final Map<String, Building> _buildings = {};
 
-  Grid({this.gridSize = 10});
+  Grid({this.gridSize = 50});
 
   Vector2? getGridPosition(Vector2 localPosition) {
     if (localPosition.x < 0 ||
