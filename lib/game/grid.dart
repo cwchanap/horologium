@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,9 +9,17 @@ import 'building.dart';
 const double cellWidth = 50;
 const double cellHeight = 50;
 
+class PlacedBuilding {
+  final Building building;
+  final int x;
+  final int y;
+
+  PlacedBuilding(this.building, this.x, this.y);
+}
+
 class Grid extends PositionComponent {
   final int gridSize;
-  final Map<String, Building> _buildings = {};
+  final Map<String, PlacedBuilding> _buildings = {};
 
   Grid({this.gridSize = 50});
 
@@ -29,39 +39,73 @@ class Grid extends PositionComponent {
 
   Future<void> saveBuildings() async {
     final prefs = await SharedPreferences.getInstance();
-    final buildingData = _buildings.entries.map((entry) {
-      final coords = entry.key.split(',');
-      final x = coords[0];
-      final y = coords[1];
-      final building = entry.value;
-      return '$x,$y,${building.name}';
+    final buildingData = _buildings.values.toSet().map((placedBuilding) {
+      return '${placedBuilding.x},${placedBuilding.y},${placedBuilding.building.name}';
     }).toList();
     await prefs.setStringList('buildings', buildingData);
   }
 
+  bool isAreaAvailable(int x, int y, int size) {
+    final buildingSize = sqrt(size).toInt();
+    if (x + buildingSize > gridSize || y + buildingSize > gridSize) {
+      return false;
+    }
+    for (var i = 0; i < buildingSize; i++) {
+      for (var j = 0; j < buildingSize; j++) {
+        if (isCellOccupied(x + i, y + j)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   void placeBuilding(int x, int y, Building building) {
-    final key = '$x,$y';
-    _buildings[key] = building;
+    final buildingSize = sqrt(building.gridSize).toInt();
+    final placedBuilding = PlacedBuilding(building, x, y);
+    for (var i = 0; i < buildingSize; i++) {
+      for (var j = 0; j < buildingSize; j++) {
+        final key = '${x + i},${y + j}';
+        _buildings[key] = placedBuilding;
+      }
+    }
     saveBuildings();
   }
 
-  Building? getBuildingAt(int x, int y) {
+  PlacedBuilding? getPlacedBuildingAt(int x, int y) {
     final key = '$x,$y';
     return _buildings[key];
   }
 
+  Building? getBuildingAt(int x, int y) {
+    return getPlacedBuildingAt(x, y)?.building;
+  }
+
   void removeBuilding(int x, int y) {
-    final key = '$x,$y';
-    _buildings.remove(key);
+    final placedBuilding = getPlacedBuildingAt(x, y);
+    if (placedBuilding == null) {
+      return;
+    }
+
+    final buildingSize = sqrt(placedBuilding.building.gridSize).toInt();
+    for (var i = 0; i < buildingSize; i++) {
+      for (var j = 0; j < buildingSize; j++) {
+        final key = '${placedBuilding.x + i},${placedBuilding.y + j}';
+        _buildings.remove(key);
+      }
+    }
     saveBuildings();
   }
 
   int countBuildingsOfType(BuildingType type) {
-    return _buildings.values.where((b) => b.type == type).length;
+    return _buildings.values
+        .toSet()
+        .where((b) => b.building.type == type)
+        .length;
   }
 
   List<Building> getAllBuildings() {
-    return _buildings.values.toList();
+    return _buildings.values.toSet().map((b) => b.building).toList();
   }
 
   bool isCellOccupied(int x, int y) {
@@ -89,10 +133,16 @@ class Grid extends PositionComponent {
     }
 
     // Draw buildings
-    _buildings.forEach((key, building) {
-      final coords = key.split(',');
-      final x = int.parse(coords[0]);
-      final y = int.parse(coords[1]);
+    final drawnBuildings = <PlacedBuilding>{};
+    _buildings.forEach((key, placedBuilding) {
+      if (drawnBuildings.contains(placedBuilding)) {
+        return;
+      }
+
+      final building = placedBuilding.building;
+      final x = placedBuilding.x;
+      final y = placedBuilding.y;
+      final buildingSize = sqrt(building.gridSize).toInt();
 
       final buildingPaint = Paint()
         ..color = building.color.withAlpha((255 * 0.8).round())
@@ -101,8 +151,8 @@ class Grid extends PositionComponent {
       final rect = Rect.fromLTWH(
         x * cellWidth + 2,
         y * cellHeight + 2,
-        cellWidth - 4,
-        cellHeight - 4,
+        cellWidth * buildingSize - 4,
+        cellHeight * buildingSize - 4,
       );
 
       canvas.drawRRect(
@@ -120,6 +170,8 @@ class Grid extends PositionComponent {
         RRect.fromRectAndRadius(rect, const Radius.circular(4)),
         borderPaint,
       );
+
+      drawnBuildings.add(placedBuilding);
     });
   }
 }

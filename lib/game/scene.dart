@@ -1,7 +1,8 @@
 import 'dart:async' as async;
+import 'dart:math';
 
 import 'package:flame/components.dart';
-import 'package:flame/events.dart';
+import 'package:flame/events.dart' as flame_events;
 import 'package:flame/game.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -11,16 +12,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'building.dart';
 import 'grid.dart';
 
-class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
+class MainGame extends FlameGame
+    with
+        flame_events.TapCallbacks,
+        flame_events.DragCallbacks,
+        flame_events.PointerMoveCallbacks {
   late Grid _grid;
   Function(int, int)? onGridCellTapped;
   Function(int, int)? onGridCellLongTapped;
   Function(int, int)? onGridCellSecondaryTapped;
+  Function(Vector2)? onPointerMoveCallback;
 
   static const double _minZoom = 1.0;
   static const double _maxZoom = 4.0;
 
   final double _startZoom = _minZoom;
+
+  Building? buildingToPlace;
+  final PlacementPreview placementPreview = PlacementPreview();
 
   MainGame();
 
@@ -32,7 +41,8 @@ class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
     camera.viewfinder.anchor = Anchor.center;
     camera.viewfinder.zoom = _startZoom;
     _grid = Grid();
-    _grid.size = Vector2(_grid.gridSize * cellWidth, _grid.gridSize * cellHeight);
+    _grid.size =
+        Vector2(_grid.gridSize * cellWidth, _grid.gridSize * cellHeight);
     _grid.anchor = Anchor.center;
     world.add(_grid);
     await loadBuildings();
@@ -60,12 +70,18 @@ class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
   }
 
   @override
-  void onDragUpdate(DragUpdateEvent event) {
+  void onDragUpdate(flame_events.DragUpdateEvent event) {
     camera.viewfinder.position -= event.canvasDelta / camera.viewfinder.zoom;
   }
 
   @override
-  void onTapUp(TapUpEvent event) {
+  void onPointerMove(flame_events.PointerMoveEvent event) {
+    super.onPointerMove(event);
+    onPointerMoveCallback?.call(event.canvasPosition);
+  }
+
+  @override
+  void onTapUp(flame_events.TapUpEvent event) {
     final worldPosition = camera.globalToLocal(event.canvasPosition);
     final localPosition = _grid.toLocal(worldPosition);
     final gridPosition = _grid.getGridPosition(localPosition);
@@ -76,29 +92,78 @@ class MainGame extends FlameGame with TapCallbacks, DragCallbacks {
   }
 
   @override
-  void onLongTapDown(TapDownEvent event) {
+  void onLongTapDown(flame_events.TapDownEvent event) {
     final worldPosition = camera.globalToLocal(event.canvasPosition);
     final localPosition = _grid.toLocal(worldPosition);
     final gridPosition = _grid.getGridPosition(localPosition);
 
     if (gridPosition != null) {
-      onGridCellLongTapped?.call(gridPosition.x.toInt(), gridPosition.y.toInt());
+      onGridCellLongTapped?.call(
+          gridPosition.x.toInt(), gridPosition.y.toInt());
     }
   }
 
   @override
-  void onSecondaryTapUp(TapUpEvent event) {
+  void onSecondaryTapUp(flame_events.TapUpEvent event) {
     final worldPosition = camera.globalToLocal(event.canvasPosition);
     final localPosition = _grid.toLocal(worldPosition);
     final gridPosition = _grid.getGridPosition(localPosition);
 
     if (gridPosition != null) {
-      onGridCellSecondaryTapped?.call(gridPosition.x.toInt(), gridPosition.y.toInt());
+      onGridCellSecondaryTapped?.call(
+          gridPosition.x.toInt(), gridPosition.y.toInt());
     }
   }
 
   void clampZoom() {
     camera.viewfinder.zoom = camera.viewfinder.zoom.clamp(_minZoom, _maxZoom);
+  }
+
+  void showPlacementPreview(Building building, int x, int y) {
+    if (!world.contains(placementPreview)) {
+      world.add(placementPreview);
+    }
+    placementPreview.updatePreview(
+        building, x, y, _grid.isAreaAvailable(x, y, building.gridSize));
+  }
+
+  void hidePlacementPreview() {
+    if (world.contains(placementPreview)) {
+      world.remove(placementPreview);
+    }
+  }
+}
+
+class PlacementPreview extends PositionComponent {
+  Building? building;
+  bool isValid = false;
+
+  void updatePreview(Building building, int gridX, int gridY, bool isValid) {
+    this.building = building;
+    this.isValid = isValid;
+    x = (gridX * cellWidth).toDouble();
+    y = (gridY * cellHeight).toDouble();
+  }
+
+  @override
+  void render(Canvas canvas) {
+    super.render(canvas);
+    if (building == null) {
+      return;
+    }
+
+    final buildingSize = sqrt(building!.gridSize).toInt();
+    final paint = Paint()
+      ..color = (isValid ? Colors.green : Colors.red).withAlpha(100)
+      ..style = PaintingStyle.fill;
+
+    final rect = Rect.fromLTWH(
+      0,
+      0,
+      (cellWidth * buildingSize).toDouble(),
+      (cellHeight * buildingSize).toDouble(),
+    );
+    canvas.drawRect(rect, paint);
   }
 }
 
@@ -117,6 +182,9 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   final Resources _resources = Resources();
   async.Timer? _resourceTimer;
 
+  Building? _buildingToPlace;
+  bool get _isInPlacementMode => _buildingToPlace != null;
+
   @override
   void initState() {
     super.initState();
@@ -124,6 +192,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     _game.onGridCellTapped = _onGridCellTapped;
     _game.onGridCellLongTapped = _onGridCellLongTapped;
     _game.onGridCellSecondaryTapped = _onGridCellSecondaryTapped;
+    _game.onPointerMoveCallback = _onPointerMove;
     _loadSavedData();
     _startResourceGeneration();
   }
@@ -164,24 +233,68 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     await prefs.setDouble('coal', _resources.coal);
   }
 
+  void _onPointerMove(Vector2 canvasPosition) {
+    if (_isInPlacementMode) {
+      final worldPosition = _game.camera.globalToLocal(canvasPosition);
+      final localPosition = _game.grid.toLocal(worldPosition);
+      final gridPosition = _game.grid.getGridPosition(localPosition);
+
+      if (gridPosition != null) {
+        _game.showPlacementPreview(
+            _buildingToPlace!, gridPosition.x.toInt(), gridPosition.y.toInt());
+      } else {
+        _game.hidePlacementPreview();
+      }
+    }
+  }
+
   void _onGridCellTapped(int x, int y) {
-    final building = _game.grid.getBuildingAt(x, y);
-    if (building != null) {
-      if (building.upgrades.isNotEmpty) {
-        _showUpgradeDialog(x, y, building);
+    if (_isInPlacementMode) {
+      if (_game.grid.isAreaAvailable(x, y, _buildingToPlace!.gridSize)) {
+        if (_resources.money >= _buildingToPlace!.cost) {
+          _game.grid.placeBuilding(x, y, _buildingToPlace!);
+          setState(() {
+            _resources.money -= _buildingToPlace!.cost;
+            _resources.population += _buildingToPlace!.population;
+            _saveResources();
+            _buildingToPlace = null;
+            _game.hidePlacementPreview();
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Insufficient funds!'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No upgrades available for this building.'),
+            content: Text('This area is occupied!'),
+            backgroundColor: Colors.red,
           ),
         );
       }
     } else {
-      setState(() {
-        _selectedGridX = x;
-        _selectedGridY = y;
-        _showBuildingSelection = true;
-      });
+      final building = _game.grid.getBuildingAt(x, y);
+      if (building != null) {
+        if (building.upgrades.isNotEmpty) {
+          _showUpgradeDialog(x, y, building);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No upgrades available for this building.'),
+            ),
+          );
+        }
+      } else {
+        setState(() {
+          _selectedGridX = x;
+          _selectedGridY = y;
+          _showBuildingSelection = true;
+        });
+      }
     }
   }
 
@@ -272,26 +385,10 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   }
 
   void _onBuildingSelected(Building building) {
-    if (_selectedGridX != null && _selectedGridY != null) {
-      if (_resources.money >= building.cost) {
-        _game.grid.placeBuilding(_selectedGridX!, _selectedGridY!, building);
-        setState(() {
-          _resources.money -= building.cost;
-          _resources.population += building.population;
-          _saveResources();
-          _showBuildingSelection = false;
-          _selectedGridX = null;
-          _selectedGridY = null;
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Insufficient funds!'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+    setState(() {
+      _buildingToPlace = building;
+      _showBuildingSelection = false;
+    });
   }
 
   void _closeBuildingSelection() {
@@ -299,6 +396,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
       _showBuildingSelection = false;
       _selectedGridX = null;
       _selectedGridY = null;
+      _buildingToPlace = null;
+      _game.hidePlacementPreview();
     });
   }
 
@@ -307,17 +406,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     return Scaffold(
       body: Stack(
         children: [
-          Listener(
-            onPointerSignal: (pointerSignal) {
-              if (pointerSignal is PointerScrollEvent) {
-                final newZoom = _game.camera.viewfinder.zoom -
-                    pointerSignal.scrollDelta.dy / 100;
-                _game.camera.viewfinder.zoom = newZoom.clamp(0.5, 2.0);
-              }
-            },
-            child: GameWidget(
-              game: _game,
-            ),
+          GameWidget(
+            game: _game,
           ),
           // Top UI Bar
           SafeArea(
@@ -327,8 +417,19 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () {
+                      if (_isInPlacementMode) {
+                        setState(() {
+                          _buildingToPlace = null;
+                          _game.hidePlacementPreview();
+                        });
+                      } else {
+                        Navigator.pop(context);
+                      }
+                    },
+                    icon: Icon(
+                        _isInPlacementMode ? Icons.close : Icons.arrow_back,
+                        color: Colors.white),
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.black.withAlpha((255 * 0.5).round()),
                     ),

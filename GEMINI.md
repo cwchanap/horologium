@@ -16,11 +16,17 @@ Horologium is a Flutter-based mobile application that appears to be a game with 
 - `flutter`: The core Flutter framework.
 - `flame`: A 2D game engine for Flutter.
 - `cupertino_icons`: For iOS-style icons.
+- `shared_preferences`: For storing simple data.
 
 ## Project Structure
 
 - `lib/main.dart`: The entry point of the application. It sets up the `MaterialApp` and defines the overall theme.
-- `lib/scenes/main_menu.dart`: The main menu of the game.
+- `lib/main_menu.dart`: The main menu of the game.
+- `lib/game/`: Contains the core game logic.
+  - `lib/game/building.dart`: Defines the building logic.
+  - `lib/game/grid.dart`: Defines the grid system for the game.
+  - `lib/game/resources.dart`: Manages game resources.
+  - `lib/game/scene.dart`: Manages the game scene.
 - `android/`: Android-specific project files.
 - `ios/`: iOS-specific project files.
 - `test/`: Contains the widget tests.

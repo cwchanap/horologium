@@ -21,8 +21,9 @@ class Building {
   final Map<String, double> consumption;
   final int population;
   final List<Building> upgrades;
+  final int gridSize;
 
-  const Building({
+  Building({
     required this.type,
     required this.name,
     required this.description,
@@ -33,9 +34,10 @@ class Building {
     this.consumption = const {},
     this.population = 0,
     this.upgrades = const [],
+    this.gridSize = 4,
   });
 
-  static const Building powerPlant2 = Building(
+  static final Building powerPlant2 = Building(
     type: BuildingType.powerPlant,
     name: 'Power Plant Lvl. 2',
     description: 'Generates more energy for your colony',
@@ -46,7 +48,7 @@ class Building {
     consumption: {'coal': 1},
   );
 
-  static const List<Building> availableBuildings = [
+  static final List<Building> availableBuildings = [
     Building(
       type: BuildingType.powerPlant,
       name: 'Power Plant',
