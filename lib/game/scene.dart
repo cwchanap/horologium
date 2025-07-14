@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart' as flame_events;
 import 'package:flame/game.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:horologium/game/resources.dart';
@@ -21,7 +22,6 @@ class MainGame extends FlameGame
   Function(int, int)? onGridCellTapped;
   Function(int, int)? onGridCellLongTapped;
   Function(int, int)? onGridCellSecondaryTapped;
-  Function(Vector2)? onPointerMoveCallback;
 
   static const double _minZoom = 1.0;
   static const double _maxZoom = 4.0;
@@ -77,7 +77,10 @@ class MainGame extends FlameGame
   @override
   void onPointerMove(flame_events.PointerMoveEvent event) {
     super.onPointerMove(event);
-    onPointerMoveCallback?.call(event.canvasPosition);
+    if (buildingToPlace != null) {
+      final worldPosition = camera.globalToLocal(event.canvasPosition);
+      showPlacementPreview(buildingToPlace!, worldPosition);
+    }
   }
 
   @override
@@ -119,12 +122,23 @@ class MainGame extends FlameGame
     camera.viewfinder.zoom = camera.viewfinder.zoom.clamp(_minZoom, _maxZoom);
   }
 
-  void showPlacementPreview(Building building, int x, int y) {
+  void showPlacementPreview(Building building, Vector2 position) {
+    placementPreview.building = building;
+    placementPreview.position = position;
+
+    final localPosition = grid.toLocal(position);
+    final gridPosition = grid.getGridPosition(localPosition);
+
+    if (gridPosition != null) {
+      placementPreview.isValid = grid.isAreaAvailable(
+          gridPosition.x.toInt(), gridPosition.y.toInt(), building.gridSize);
+    } else {
+      placementPreview.isValid = false;
+    }
+
     if (!world.contains(placementPreview)) {
       world.add(placementPreview);
     }
-    placementPreview.updatePreview(
-        building, x, y, _grid.isAreaAvailable(x, y, building.gridSize));
   }
 
   void hidePlacementPreview() {
@@ -138,13 +152,6 @@ class PlacementPreview extends PositionComponent {
   Building? building;
   bool isValid = false;
 
-  void updatePreview(Building building, int gridX, int gridY, bool isValid) {
-    this.building = building;
-    this.isValid = isValid;
-    x = (gridX * cellWidth).toDouble();
-    y = (gridY * cellHeight).toDouble();
-  }
-
   @override
   void render(Canvas canvas) {
     super.render(canvas);
@@ -153,15 +160,18 @@ class PlacementPreview extends PositionComponent {
     }
 
     final buildingSize = sqrt(building!.gridSize).toInt();
+    final width = (cellWidth * buildingSize).toDouble();
+    final height = (cellHeight * buildingSize).toDouble();
+
     final paint = Paint()
       ..color = (isValid ? Colors.green : Colors.red).withAlpha(100)
       ..style = PaintingStyle.fill;
 
     final rect = Rect.fromLTWH(
-      0,
-      0,
-      (cellWidth * buildingSize).toDouble(),
-      (cellHeight * buildingSize).toDouble(),
+      -width / 2,
+      -height / 2,
+      width,
+      height,
     );
     canvas.drawRect(rect, paint);
   }
@@ -182,9 +192,6 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   final Resources _resources = Resources();
   async.Timer? _resourceTimer;
 
-  Building? _buildingToPlace;
-  bool get _isInPlacementMode => _buildingToPlace != null;
-
   @override
   void initState() {
     super.initState();
@@ -192,7 +199,6 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     _game.onGridCellTapped = _onGridCellTapped;
     _game.onGridCellLongTapped = _onGridCellLongTapped;
     _game.onGridCellSecondaryTapped = _onGridCellSecondaryTapped;
-    _game.onPointerMoveCallback = _onPointerMove;
     _loadSavedData();
     _startResourceGeneration();
   }
@@ -233,31 +239,16 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     await prefs.setDouble('coal', _resources.coal);
   }
 
-  void _onPointerMove(Vector2 canvasPosition) {
-    if (_isInPlacementMode) {
-      final worldPosition = _game.camera.globalToLocal(canvasPosition);
-      final localPosition = _game.grid.toLocal(worldPosition);
-      final gridPosition = _game.grid.getGridPosition(localPosition);
-
-      if (gridPosition != null) {
-        _game.showPlacementPreview(
-            _buildingToPlace!, gridPosition.x.toInt(), gridPosition.y.toInt());
-      } else {
-        _game.hidePlacementPreview();
-      }
-    }
-  }
-
   void _onGridCellTapped(int x, int y) {
-    if (_isInPlacementMode) {
-      if (_game.grid.isAreaAvailable(x, y, _buildingToPlace!.gridSize)) {
-        if (_resources.money >= _buildingToPlace!.cost) {
-          _game.grid.placeBuilding(x, y, _buildingToPlace!);
+    if (_game.buildingToPlace != null) {
+      if (_game.placementPreview.isValid) {
+        if (_resources.money >= _game.buildingToPlace!.cost) {
+          _game.grid.placeBuilding(x, y, _game.buildingToPlace!);
           setState(() {
-            _resources.money -= _buildingToPlace!.cost;
-            _resources.population += _buildingToPlace!.population;
+            _resources.money -= _game.buildingToPlace!.cost;
+            _resources.population += _game.buildingToPlace!.population;
             _saveResources();
-            _buildingToPlace = null;
+            _game.buildingToPlace = null;
             _game.hidePlacementPreview();
           });
         } else {
@@ -386,7 +377,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
 
   void _onBuildingSelected(Building building) {
     setState(() {
-      _buildingToPlace = building;
+      _game.buildingToPlace = building;
       _showBuildingSelection = false;
     });
   }
@@ -396,7 +387,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
       _showBuildingSelection = false;
       _selectedGridX = null;
       _selectedGridY = null;
-      _buildingToPlace = null;
+      _game.buildingToPlace = null;
       _game.hidePlacementPreview();
     });
   }
@@ -418,9 +409,9 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                 children: [
                   IconButton(
                     onPressed: () {
-                      if (_isInPlacementMode) {
+                      if (_game.buildingToPlace != null) {
                         setState(() {
-                          _buildingToPlace = null;
+                          _game.buildingToPlace = null;
                           _game.hidePlacementPreview();
                         });
                       } else {
@@ -428,7 +419,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                       }
                     },
                     icon: Icon(
-                        _isInPlacementMode ? Icons.close : Icons.arrow_back,
+                        _game.buildingToPlace != null ? Icons.close : Icons.arrow_back,
                         color: Colors.white),
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.black.withAlpha((255 * 0.5).round()),

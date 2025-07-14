@@ -37,6 +37,13 @@ class Grid extends PositionComponent {
     return Vector2(gridX.toDouble(), gridY.toDouble());
   }
 
+  Vector2 getGridCenterPosition(int x, int y) {
+    return Vector2(
+      (x * cellWidth) + (cellWidth / 2),
+      (y * cellHeight) + (cellHeight / 2),
+    );
+  }
+
   Future<void> saveBuildings() async {
     final prefs = await SharedPreferences.getInstance();
     final buildingData = _buildings.values.toSet().map((placedBuilding) {
