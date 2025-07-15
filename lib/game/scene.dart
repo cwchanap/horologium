@@ -124,15 +124,28 @@ class MainGame extends FlameGame
 
   void showPlacementPreview(Building building, Vector2 position) {
     placementPreview.building = building;
-    placementPreview.position = position;
-
+    
     final localPosition = grid.toLocal(position);
     final gridPosition = grid.getGridPosition(localPosition);
 
     if (gridPosition != null) {
+      // Snap preview to grid center position in world coordinates
+      final snappedLocalPosition = grid.getGridCenterPosition(
+        gridPosition.x.toInt(), 
+        gridPosition.y.toInt()
+      );
+      // Since grid is anchored at center, we need to offset by half the grid size
+      final gridCenterOffset = Vector2(grid.size.x / 2, grid.size.y / 2);
+      final finalPosition = grid.position + snappedLocalPosition - gridCenterOffset;
+      placementPreview.position = finalPosition;
+      
+      print('DEBUG: gridPos: $gridPosition, snapped: $snappedLocalPosition, offset: $gridCenterOffset, final: $finalPosition');
+      
       placementPreview.isValid = grid.isAreaAvailable(
           gridPosition.x.toInt(), gridPosition.y.toInt(), building.gridSize);
     } else {
+      // Hide preview when outside grid bounds
+      placementPreview.position = Vector2(-10000, -10000);
       placementPreview.isValid = false;
     }
 
@@ -382,6 +395,21 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     });
   }
 
+  void _handlePointerEvent(Offset globalPosition, String source) {
+    if (_game.buildingToPlace != null) {
+      try {
+        final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
+        if (renderBox != null) {
+          final localPosition = renderBox.globalToLocal(globalPosition);
+          final worldPosition = _game.camera.globalToLocal(Vector2(localPosition.dx, localPosition.dy));
+          _game.showPlacementPreview(_game.buildingToPlace!, worldPosition);
+        }
+      } catch (e) {
+        // Silently handle errors
+      }
+    }
+  }
+
   void _closeBuildingSelection() {
     setState(() {
       _showBuildingSelection = false;
@@ -395,214 +423,129 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          GameWidget(
-            game: _game,
-          ),
-          // Top UI Bar
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    onPressed: () {
-                      if (_game.buildingToPlace != null) {
-                        setState(() {
-                          _game.buildingToPlace = null;
-                          _game.hidePlacementPreview();
-                        });
-                      } else {
-                        Navigator.pop(context);
-                      }
-                    },
-                    icon: Icon(
-                        _game.buildingToPlace != null ? Icons.close : Icons.arrow_back,
-                        color: Colors.white),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.black.withAlpha((255 * 0.5).round()),
-                    ),
-                  ),
-                  const Spacer(),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withAlpha((255 * 0.8).round()),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Text(
-                          'Money: ${_resources.money.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withAlpha((255 * 0.8).round()),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Text(
-                          'Electricity: ${_resources.electricity.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.purple.withAlpha((255 * 0.8).round()),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Text(
-                          'Population: ${_resources.population}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.yellow.withAlpha((255 * 0.8).round()),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Text(
-                          'Gold: ${_resources.gold.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.brown.withAlpha((255 * 0.8).round()),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Text(
-                          'Wood: ${_resources.wood.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.withAlpha((255 * 0.8).round()),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Text(
-                          'Coal: ${_resources.coal.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+      body: MouseRegion(
+        onHover: (event) {
+          _handlePointerEvent(event.position, 'MouseRegion onHover');
+        },
+        child: Stack(
+          children: [
+            GameWidget(
+              game: _game,
             ),
-          ),
-
-          // Building Selection Popup
-          if (_showBuildingSelection)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  color: Colors.black.withAlpha((255 * 0.9).round()),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                  border: Border.all(color: Colors.cyanAccent, width: 1),
-                ),
-                child: Column(
+            // Top UI Bar
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Header
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Select Building ($_selectedGridX, $_selectedGridY)',
+                    IconButton(
+                      onPressed: () {
+                        if (_game.buildingToPlace != null) {
+                          setState(() {
+                            _game.buildingToPlace = null;
+                            _game.hidePlacementPreview();
+                          });
+                        } else {
+                          Navigator.pop(context);
+                        }
+                      },
+                      icon: Icon(
+                          _game.buildingToPlace != null ? Icons.close : Icons.arrow_back,
+                          color: Colors.white),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.black.withAlpha((255 * 0.5).round()),
+                      ),
+                    ),
+                    const Spacer(),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Money: ${_resources.money.toStringAsFixed(0)}',
                             style: const TextStyle(
-                              color: Colors.cyanAccent,
-                              fontSize: 18,
+                              color: Colors.white,
+                              fontSize: 14,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          IconButton(
-                            onPressed: _closeBuildingSelection,
-                            icon: const Icon(Icons.close, color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Building List
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: GridView.builder(
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 2.5,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
-                          itemCount: Building.availableBuildings.length,
-                          itemBuilder: (context, index) {
-                            final building =
-                                Building.availableBuildings[index];
-                            return _buildBuildingCard(building);
-                          },
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
-        ],
+            // Building Selection Popup
+            if (_showBuildingSelection)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha((255 * 0.9).round()),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                    border: Border.all(color: Colors.cyanAccent, width: 1),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Select Building ($_selectedGridX, $_selectedGridY)',
+                              style: const TextStyle(
+                                color: Colors.cyanAccent,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: _closeBuildingSelection,
+                              icon: const Icon(Icons.close, color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: GridView.builder(
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 2.5,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                            ),
+                            itemCount: Building.availableBuildings.length,
+                            itemBuilder: (context, index) {
+                              final building = Building.availableBuildings[index];
+                              return _buildBuildingCard(building);
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
