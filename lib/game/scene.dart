@@ -4,9 +4,8 @@ import 'dart:math';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart' as flame_events;
 import 'package:flame/game.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:horologium/game/resources.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -91,6 +90,11 @@ class MainGame extends FlameGame
 
     if (gridPosition != null) {
       onGridCellTapped?.call(gridPosition.x.toInt(), gridPosition.y.toInt());
+    } else {
+      // Clicked outside grid - cancel building placement if active
+      if (buildingToPlace != null) {
+        onGridCellTapped?.call(-1, -1); // Special coordinates to indicate cancel
+      }
     }
   }
 
@@ -106,7 +110,6 @@ class MainGame extends FlameGame
     }
   }
 
-  @override
   void onSecondaryTapUp(flame_events.TapUpEvent event) {
     final worldPosition = camera.globalToLocal(event.canvasPosition);
     final localPosition = _grid.toLocal(worldPosition);
@@ -129,20 +132,20 @@ class MainGame extends FlameGame
     final gridPosition = grid.getGridPosition(localPosition);
 
     if (gridPosition != null) {
-      // Snap preview to grid center position in world coordinates
-      final snappedLocalPosition = grid.getGridCenterPosition(
-        gridPosition.x.toInt(), 
-        gridPosition.y.toInt()
-      );
-      // Since grid is anchored at center, we need to offset by half the grid size
-      final gridCenterOffset = Vector2(grid.size.x / 2, grid.size.y / 2);
-      final finalPosition = grid.position + snappedLocalPosition - gridCenterOffset;
-      placementPreview.position = finalPosition;
+      // Use the same positioning logic as the grid's render method
+      final gridX = gridPosition.x.toInt();
+      final gridY = gridPosition.y.toInt();
       
-      print('DEBUG: gridPos: $gridPosition, snapped: $snappedLocalPosition, offset: $gridCenterOffset, final: $finalPosition');
+      // Calculate position relative to grid's local coordinate system (top-left corner like buildings)
+      final localX = gridX * cellWidth;
+      final localY = gridY * cellHeight;
       
-      placementPreview.isValid = grid.isAreaAvailable(
-          gridPosition.x.toInt(), gridPosition.y.toInt(), building.gridSize);
+      // Since grid is centered at world (0,0), local coordinates are already relative to world center
+      final worldPosition = Vector2(localX - grid.size.x / 2, localY - grid.size.y / 2);
+      placementPreview.position = worldPosition;
+      
+      
+      placementPreview.isValid = grid.isAreaAvailable(gridX, gridY, building.gridSize);
     } else {
       // Hide preview when outside grid bounds
       placementPreview.position = Vector2(-10000, -10000);
@@ -181,10 +184,10 @@ class PlacementPreview extends PositionComponent {
       ..style = PaintingStyle.fill;
 
     final rect = Rect.fromLTWH(
-      -width / 2,
-      -height / 2,
-      width,
-      height,
+      2,
+      2,
+      width - 4,
+      height - 4,
     );
     canvas.drawRect(rect, paint);
   }
@@ -253,6 +256,17 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   }
 
   void _onGridCellTapped(int x, int y) {
+    // Handle cancel case (clicked outside grid)
+    if (x == -1 && y == -1) {
+      if (_game.buildingToPlace != null) {
+        setState(() {
+          _game.buildingToPlace = null;
+          _game.hidePlacementPreview();
+        });
+      }
+      return;
+    }
+
     if (_game.buildingToPlace != null) {
       if (_game.placementPreview.isValid) {
         if (_resources.money >= _game.buildingToPlace!.cost) {
@@ -273,12 +287,11 @@ class _MainGameWidgetState extends State<MainGameWidget> {
           );
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('This area is occupied!'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Cancel placement when clicking on invalid position
+        setState(() {
+          _game.buildingToPlace = null;
+          _game.hidePlacementPreview();
+        });
       }
     } else {
       final building = _game.grid.getBuildingAt(x, y);
@@ -423,15 +436,28 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: MouseRegion(
-        onHover: (event) {
-          _handlePointerEvent(event.position, 'MouseRegion onHover');
+      body: KeyboardListener(
+        focusNode: FocusNode()..requestFocus(),
+        autofocus: true,
+        onKeyEvent: (event) {
+          if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.escape) {
+            if (_game.buildingToPlace != null) {
+              setState(() {
+                _game.buildingToPlace = null;
+                _game.hidePlacementPreview();
+              });
+            }
+          }
         },
-        child: Stack(
-          children: [
-            GameWidget(
-              game: _game,
-            ),
+        child: MouseRegion(
+          onHover: (event) {
+            _handlePointerEvent(event.position, 'MouseRegion onHover');
+          },
+          child: Stack(
+            children: [
+              GameWidget(
+                game: _game,
+              ),
             // Top UI Bar
             SafeArea(
               child: Padding(
@@ -453,6 +479,9 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                       icon: Icon(
                           _game.buildingToPlace != null ? Icons.close : Icons.arrow_back,
                           color: Colors.white),
+                      tooltip: _game.buildingToPlace != null 
+                          ? 'Cancel (ESC or click outside)'
+                          : 'Back',
                       style: IconButton.styleFrom(
                         backgroundColor: Colors.black.withAlpha((255 * 0.5).round()),
                       ),
@@ -544,7 +573,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                   ),
                 ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );
