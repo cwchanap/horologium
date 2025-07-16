@@ -242,7 +242,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
       _resources.population = prefs.getInt('population') ?? 0;
       _resources.gold = prefs.getDouble('gold') ?? 0.0;
       _resources.wood = prefs.getDouble('wood') ?? 0.0;
-      _resources.coal = prefs.getDouble('coal') ?? 0.0;
+      _resources.coal = prefs.getDouble('coal') ?? 10.0;
+      _resources.electricity = prefs.getDouble('electricity') ?? 0.0;
     });
   }
 
@@ -253,6 +254,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     await prefs.setDouble('gold', _resources.gold);
     await prefs.setDouble('wood', _resources.wood);
     await prefs.setDouble('coal', _resources.coal);
+    await prefs.setDouble('electricity', _resources.electricity);
   }
 
   void _onGridCellTapped(int x, int y) {
@@ -501,7 +503,92 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                             'Money: ${_resources.money.toStringAsFixed(0)}',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 14,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Gold: ${_resources.gold.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.brown.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Coal: ${_resources.coal.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.yellow.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Electricity: ${_resources.electricity.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Wood: ${_resources.wood.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Population: ${_resources.population}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

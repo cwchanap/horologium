@@ -84,7 +84,8 @@ class Building {
       color: Colors.green,
       cost: 120,
       population: 5,
-      generation: {'money': 1, 'electricity': -1},
+      generation: {'money': 1},
+      consumption: {'electricity': 1},
     ),
     Building(
       type: BuildingType.goldMine,

@@ -6,38 +6,45 @@ class Resources {
     'money': 1000,
     'gold': 0,
     'wood': 0,
-    'coal': 0,
+    'coal': 10,
   };
   int population = 0;
 
   void update(List<Building> buildings) {
-    final generation = <String, double>{};
-    final consumption = <String, double>{};
-
+    // First, generate resources from buildings that don't require consumption
     for (final building in buildings) {
-      building.generation.forEach((key, value) {
-        generation.update(key, (v) => v + value, ifAbsent: () => value);
-      });
-      building.consumption.forEach((key, value) {
-        consumption.update(key, (v) => v + value, ifAbsent: () => value);
-      });
+      if (building.consumption.isEmpty) {
+        // Buildings with no consumption always generate
+        building.generation.forEach((key, value) {
+          resources.update(key, (v) => v + value, ifAbsent: () => value);
+        });
+      }
     }
 
-    bool canProduce = true;
-    consumption.forEach((key, value) {
-      if ((resources[key] ?? 0) < value) {
-        canProduce = false;
+    // Then, handle buildings with consumption requirements
+    for (final building in buildings) {
+      if (building.consumption.isNotEmpty) {
+        bool canProduce = true;
+        
+        // Check if this building can consume what it needs
+        building.consumption.forEach((key, value) {
+          if ((resources[key] ?? 0) < value) {
+            canProduce = false;
+          }
+        });
+
+        if (canProduce) {
+          // Consume resources
+          building.consumption.forEach((key, value) {
+            resources.update(key, (v) => v - value, ifAbsent: () => -value);
+          });
+          
+          // Generate resources
+          building.generation.forEach((key, value) {
+            resources.update(key, (v) => v + value, ifAbsent: () => value);
+          });
+        }
       }
-    });
-
-    if (canProduce) {
-      consumption.forEach((key, value) {
-        resources.update(key, (v) => v - value);
-      });
-
-      generation.forEach((key, value) {
-        resources.update(key, (v) => v + value, ifAbsent: () => value);
-      });
     }
   }
 
