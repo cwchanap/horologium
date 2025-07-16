@@ -244,6 +244,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
       _resources.wood = prefs.getDouble('wood') ?? 0.0;
       _resources.coal = prefs.getDouble('coal') ?? 10.0;
       _resources.electricity = prefs.getDouble('electricity') ?? 0.0;
+      _resources.research = prefs.getDouble('research') ?? 0.0;
+      _resources.water = prefs.getDouble('water') ?? 0.0;
     });
   }
 
@@ -255,6 +257,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     await prefs.setDouble('wood', _resources.wood);
     await prefs.setDouble('coal', _resources.coal);
     await prefs.setDouble('electricity', _resources.electricity);
+    await prefs.setDouble('research', _resources.research);
+    await prefs.setDouble('water', _resources.water);
   }
 
   void _onGridCellTapped(int x, int y) {
@@ -586,6 +590,40 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                           ),
                           child: Text(
                             'Population: ${_resources.population}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Research: ${_resources.research.toInt()}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.cyan.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Water: ${_resources.water.toStringAsFixed(0)}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 12,

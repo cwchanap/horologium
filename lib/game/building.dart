@@ -8,6 +8,7 @@ enum BuildingType {
   goldMine,
   woodFactory,
   coalMine,
+  waterTreatment,
 }
 
 class Building {
@@ -75,6 +76,8 @@ class Building {
       icon: Icons.science,
       color: Colors.blue,
       cost: 200,
+      generation: {'research': 0.1},
+      consumption: {'electricity': 1},
     ),
     Building(
       type: BuildingType.house,
@@ -85,7 +88,7 @@ class Building {
       cost: 120,
       population: 5,
       generation: {'money': 1},
-      consumption: {'electricity': 1},
+      consumption: {'electricity': 1, 'water': 1},
     ),
     Building(
       type: BuildingType.goldMine,
@@ -113,6 +116,15 @@ class Building {
       color: Colors.grey,
       cost: 90,
       generation: {'coal': 1},
+    ),
+    Building(
+      type: BuildingType.waterTreatment,
+      name: 'Water Treatment Plant',
+      description: 'Produces clean water',
+      icon: Icons.water_drop,
+      color: Colors.lightBlue,
+      cost: 150,
+      generation: {'water': 2},
     ),
   ];
 }
