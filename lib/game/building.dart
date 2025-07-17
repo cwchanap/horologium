@@ -78,7 +78,6 @@ class Building {
       color: Colors.blue,
       cost: 200,
       generation: {'research': 0.1},
-      consumption: {'electricity': 1},
     ),
     Building(
       type: BuildingType.house,
