@@ -11,6 +11,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'building.dart';
 import 'grid.dart';
+import 'research.dart';
+import '../pages/research_tree_page.dart';
+import '../pages/resources_page.dart';
 
 class MainGame extends FlameGame
     with
@@ -205,7 +208,9 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   int? _selectedGridX;
   int? _selectedGridY;
   bool _showBuildingSelection = false;
+  bool _showHamburgerMenu = false;
   final Resources _resources = Resources();
+  final ResearchManager _researchManager = ResearchManager();
   async.Timer? _resourceTimer;
 
   @override
@@ -246,6 +251,10 @@ class _MainGameWidgetState extends State<MainGameWidget> {
       _resources.electricity = prefs.getDouble('electricity') ?? 0.0;
       _resources.research = prefs.getDouble('research') ?? 0.0;
       _resources.water = prefs.getDouble('water') ?? 0.0;
+      
+      // Load research progress
+      final completedResearch = prefs.getStringList('completed_research') ?? [];
+      _researchManager.loadFromList(completedResearch);
     });
   }
 
@@ -259,6 +268,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     await prefs.setDouble('electricity', _resources.electricity);
     await prefs.setDouble('research', _resources.research);
     await prefs.setDouble('water', _resources.water);
+    await prefs.setStringList('completed_research', _researchManager.completedResearch.toList());
   }
 
   void _onGridCellTapped(int x, int y) {
@@ -302,15 +312,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     } else {
       final building = _game.grid.getBuildingAt(x, y);
       if (building != null) {
-        if (building.upgrades.isNotEmpty) {
-          _showUpgradeDialog(x, y, building);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No upgrades available for this building.'),
-            ),
-          );
-        }
+        _showBuildingDetailsDialog(x, y, building);
       } else {
         setState(() {
           _selectedGridX = x;
@@ -333,6 +335,94 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     if (building != null) {
       _showDeleteConfirmationDialog(x, y, building);
     }
+  }
+
+  void _showBuildingDetailsDialog(int x, int y, Building building) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(building.icon, color: building.color, size: 24),
+            const SizedBox(width: 8),
+            Text(building.name),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                building.description,
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              
+              // Cost
+              _buildDetailRow('Cost', '${building.cost} money', Colors.green),
+              
+              // Population
+              if (building.population > 0)
+                _buildDetailRow('Population', '+${building.population}', Colors.blue),
+              
+              const SizedBox(height: 8),
+              
+              // Generation
+              if (building.generation.isNotEmpty) ...[
+                const Text(
+                  'Generation:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 4),
+                ...building.generation.entries.map((entry) {
+                  return _buildDetailRow(
+                    _capitalizeResource(entry.key), 
+                    '+${entry.value}/sec', 
+                    Colors.green
+                  );
+                }),
+                const SizedBox(height: 8),
+              ],
+              
+              // Consumption
+              if (building.consumption.isNotEmpty) ...[
+                const Text(
+                  'Consumption:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 4),
+                ...building.consumption.entries.map((entry) {
+                  return _buildDetailRow(
+                    _capitalizeResource(entry.key), 
+                    '-${entry.value}/sec', 
+                    Colors.red
+                  );
+                }),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          if (building.upgrades.isNotEmpty)
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _showUpgradeDialog(x, y, building);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: building.color,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Upgrade'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showUpgradeDialog(int x, int y, Building building) {
@@ -637,6 +727,100 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                 ),
               ),
             ),
+            // Hamburger Menu Button
+            Positioned(
+              bottom: 20,
+              right: 20,
+              child: FloatingActionButton(
+                onPressed: () {
+                  setState(() {
+                    _showHamburgerMenu = !_showHamburgerMenu;
+                  });
+                },
+                backgroundColor: Colors.purple.withAlpha((255 * 0.8).round()),
+                child: const Icon(Icons.menu, color: Colors.white),
+              ),
+            ),
+            // Hamburger Menu
+            if (_showHamburgerMenu)
+              Positioned(
+                bottom: 80,
+                right: 20,
+                child: Container(
+                  width: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha((255 * 0.9).round()),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.purple, width: 1),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.science, color: Colors.purple),
+                        title: const Text(
+                          'Research Tree',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        onTap: () {
+                          setState(() {
+                            _showHamburgerMenu = false;
+                          });
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ResearchTreePage(
+                                researchManager: _researchManager,
+                                resources: _resources,
+                                onResourcesChanged: () {
+                                  setState(() {
+                                    _saveResources();
+                                  });
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const Divider(color: Colors.grey, height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.bar_chart, color: Colors.cyan),
+                        title: const Text(
+                          'Resources',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        onTap: () {
+                          setState(() {
+                            _showHamburgerMenu = false;
+                          });
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ResourcesPage(
+                                resources: _resources,
+                                grid: _game.grid,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const Divider(color: Colors.grey, height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.close, color: Colors.white),
+                        title: const Text(
+                          'Close',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        onTap: () {
+                          setState(() {
+                            _showHamburgerMenu = false;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             // Building Selection Popup
             if (_showBuildingSelection)
               Positioned(
@@ -686,9 +870,9 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 12,
                             ),
-                            itemCount: Building.availableBuildings.length,
+                            itemCount: _getAvailableBuildings().length,
                             itemBuilder: (context, index) {
-                              final building = Building.availableBuildings[index];
+                              final building = _getAvailableBuildings()[index];
                               return _buildBuildingCard(building);
                             },
                           ),
@@ -703,6 +887,69 @@ class _MainGameWidgetState extends State<MainGameWidget> {
         ),
       ),
     );
+  }
+
+  List<Building> _getAvailableBuildings() {
+    final unlockedBuildings = _researchManager.getUnlockedBuildings();
+    return Building.availableBuildings.where((building) {
+      // Always allow basic buildings (not behind research)
+      if (building.type == BuildingType.factory ||
+          building.type == BuildingType.researchLab ||
+          building.type == BuildingType.house ||
+          building.type == BuildingType.largeHouse ||
+          building.type == BuildingType.woodFactory ||
+          building.type == BuildingType.coalMine ||
+          building.type == BuildingType.waterTreatment) {
+        return true;
+      }
+      // Check if building is unlocked by research
+      return unlockedBuildings.contains(building.type);
+    }).toList();
+  }
+
+
+  Widget _buildDetailRow(String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 14),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _capitalizeResource(String resource) {
+    switch (resource) {
+      case 'money':
+        return 'Money';
+      case 'electricity':
+        return 'Electricity';
+      case 'coal':
+        return 'Coal';
+      case 'water':
+        return 'Water';
+      case 'wood':
+        return 'Wood';
+      case 'gold':
+        return 'Gold';
+      case 'research':
+        return 'Research';
+      default:
+        return resource[0].toUpperCase() + resource.substring(1);
+    }
   }
 
   Widget _buildBuildingCard(Building building) {
