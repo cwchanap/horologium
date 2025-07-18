@@ -61,11 +61,11 @@ class Resources {
 
     // Handle research point accumulation (1 point every 10 seconds per active lab)
     if (activeResearchLabs > 0) {
-      _researchAccumulator += activeResearchLabs; // Add 1 second per lab
+      _researchAccumulator += 1.0; // Add 1 second of time
       if (_researchAccumulator >= 10) {
-        int pointsToAdd = (_researchAccumulator / 10).floor();
+        int pointsToAdd = activeResearchLabs; // 1 point per lab every 10 seconds
         resources.update('research', (v) => v + pointsToAdd, ifAbsent: () => pointsToAdd.toDouble());
-        _researchAccumulator -= pointsToAdd * 10;
+        _researchAccumulator = 0; // Reset accumulator
       }
     }
   }

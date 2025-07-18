@@ -157,6 +157,66 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
                   ],
                 ),
               ),
+              if (!isCompleted)
+                ElevatedButton(
+                  onPressed: (canResearch && hasEnoughResources) ? () {
+                    setState(() {
+                      widget.resources.research -= research.cost;
+                      widget.researchManager.completeResearch(research.id);
+                      widget.onResourcesChanged();
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Research completed: ${research.name}'),
+                        backgroundColor: Colors.green,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  } : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: research.color,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    canResearch && hasEnoughResources 
+                        ? 'Research'
+                        : !hasEnoughResources 
+                            ? 'Not Enough'
+                            : 'Locked',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withAlpha((255 * 0.2).round()),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green, width: 1),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green, size: 16),
+                      SizedBox(width: 8),
+                      Text(
+                        'Completed',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -212,74 +272,6 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
                 ),
             ],
           ),
-          
-          if (!isCompleted) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: (canResearch && hasEnoughResources) ? () {
-                  setState(() {
-                    widget.resources.research -= research.cost;
-                    widget.researchManager.completeResearch(research.id);
-                    widget.onResourcesChanged();
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Research completed: ${research.name}'),
-                      backgroundColor: Colors.green,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                } : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: research.color,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(
-                  canResearch && hasEnoughResources 
-                      ? 'Research Now'
-                      : !hasEnoughResources 
-                          ? 'Insufficient Research Points'
-                          : 'Prerequisites Not Met',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ] else ...[
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.green.withAlpha((255 * 0.2).round()),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green, width: 1),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Research Completed',
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );

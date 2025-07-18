@@ -18,12 +18,13 @@ class Building {
   final String description;
   final IconData icon;
   final Color color;
-  final int cost;
-  final Map<String, double> generation;
-  final Map<String, double> consumption;
-  final int population;
-  final List<Building> upgrades;
+  final int baseCost;
+  final Map<String, double> baseGeneration;
+  final Map<String, double> baseConsumption;
+  final int basePopulation;
+  final int maxLevel;
   final int gridSize;
+  int level;
 
   Building({
     required this.type,
@@ -31,24 +32,31 @@ class Building {
     required this.description,
     required this.icon,
     required this.color,
-    required this.cost,
-    this.generation = const {},
-    this.consumption = const {},
-    this.population = 0,
-    this.upgrades = const [],
+    required this.baseCost,
+    this.baseGeneration = const {},
+    this.baseConsumption = const {},
+    this.basePopulation = 0,
+    this.maxLevel = 5,
     this.gridSize = 4,
+    this.level = 1,
   });
 
-  static final Building powerPlant2 = Building(
-    type: BuildingType.powerPlant,
-    name: 'Power Plant Lvl. 2',
-    description: 'Generates more energy for your colony',
-    icon: Icons.bolt,
-    color: Colors.yellow,
-    cost: 200,
-    generation: {'electricity': 2},
-    consumption: {'coal': 1},
-  );
+  // Getters for level-scaled values
+  int get cost => baseCost * level;
+  Map<String, double> get generation => baseGeneration.map((key, value) => MapEntry(key, value * level));
+  Map<String, double> get consumption => baseConsumption.map((key, value) => MapEntry(key, value * level));
+  int get population => basePopulation * level;
+  
+  // Upgrade cost is the cost of the next level
+  int get upgradeCost => baseCost * (level + 1);
+  
+  bool get canUpgrade => level < maxLevel;
+  
+  void upgrade() {
+    if (canUpgrade) {
+      level++;
+    }
+  }
 
   static final List<Building> availableBuildings = [
     Building(
@@ -57,10 +65,10 @@ class Building {
       description: 'Generates energy for your colony',
       icon: Icons.bolt,
       color: Colors.yellow,
-      cost: 100,
-      generation: {'electricity': 1},
-      consumption: {'coal': 1},
-      upgrades: [powerPlant2],
+      baseCost: 100,
+      baseGeneration: {'electricity': 1},
+      baseConsumption: {'coal': 1},
+      maxLevel: 5,
     ),
     Building(
       type: BuildingType.factory,
@@ -68,7 +76,8 @@ class Building {
       description: 'Produces resources and materials',
       icon: Icons.factory,
       color: Colors.orange,
-      cost: 150,
+      baseCost: 150,
+      maxLevel: 5,
     ),
     Building(
       type: BuildingType.researchLab,
@@ -76,8 +85,9 @@ class Building {
       description: 'Unlocks new technologies',
       icon: Icons.science,
       color: Colors.blue,
-      cost: 200,
-      generation: {'research': 0.1},
+      baseCost: 200,
+      baseGeneration: {'research': 0.1},
+      maxLevel: 5,
     ),
     Building(
       type: BuildingType.house,
@@ -85,10 +95,11 @@ class Building {
       description: 'Increases population and generates money',
       icon: Icons.home,
       color: Colors.green,
-      cost: 120,
-      population: 2,
-      generation: {'money': 1},
-      consumption: {'wood': 1, 'water': 1},
+      baseCost: 120,
+      basePopulation: 2,
+      baseGeneration: {'money': 1},
+      baseConsumption: {'wood': 1, 'water': 1},
+      maxLevel: 5,
     ),
     Building(
       type: BuildingType.largeHouse,
@@ -96,10 +107,11 @@ class Building {
       description: 'Modern housing with more population and money generation',
       icon: Icons.apartment,
       color: Colors.lightGreen,
-      cost: 250,
-      population: 8,
-      generation: {'money': 3},
-      consumption: {'electricity': 1, 'water': 2},
+      baseCost: 250,
+      basePopulation: 8,
+      baseGeneration: {'money': 3},
+      baseConsumption: {'electricity': 1, 'water': 2},
+      maxLevel: 5,
     ),
     Building(
       type: BuildingType.goldMine,
@@ -107,8 +119,9 @@ class Building {
       description: 'Generates gold',
       icon: Icons.attach_money,
       color: Colors.amber,
-      cost: 300,
-      generation: {'gold': 0.1},
+      baseCost: 300,
+      baseGeneration: {'gold': 0.1},
+      maxLevel: 5,
     ),
     Building(
       type: BuildingType.woodFactory,
@@ -116,8 +129,9 @@ class Building {
       description: 'Produces wood',
       icon: Icons.park,
       color: Colors.brown,
-      cost: 80,
-      generation: {'wood': 1},
+      baseCost: 80,
+      baseGeneration: {'wood': 1},
+      maxLevel: 5,
     ),
     Building(
       type: BuildingType.coalMine,
@@ -125,8 +139,9 @@ class Building {
       description: 'Produces coal',
       icon: Icons.fireplace,
       color: Colors.grey,
-      cost: 90,
-      generation: {'coal': 1},
+      baseCost: 90,
+      baseGeneration: {'coal': 1},
+      maxLevel: 5,
     ),
     Building(
       type: BuildingType.waterTreatment,
@@ -134,8 +149,9 @@ class Building {
       description: 'Produces clean water',
       icon: Icons.water_drop,
       color: Colors.lightBlue,
-      cost: 150,
-      generation: {'water': 2},
+      baseCost: 150,
+      baseGeneration: {'water': 2},
+      maxLevel: 5,
     ),
   ];
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../game/resources.dart';
 import '../game/building.dart';
@@ -20,11 +21,19 @@ class ResourcesPage extends StatefulWidget {
 class _ResourcesPageState extends State<ResourcesPage> {
   Map<String, double> _productionRates = {};
   Map<String, double> _consumptionRates = {};
+  Timer? _updateTimer;
 
   @override
   void initState() {
     super.initState();
     _calculateRates();
+    _startResourceUpdates();
+  }
+
+  void _startResourceUpdates() {
+    _updateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _calculateRates();
+    });
   }
 
   void _calculateRates() {
@@ -54,6 +63,12 @@ class _ResourcesPageState extends State<ResourcesPage> {
       _productionRates = production;
       _consumptionRates = consumption;
     });
+  }
+
+  @override
+  void dispose() {
+    _updateTimer?.cancel();
+    super.dispose();
   }
 
   @override

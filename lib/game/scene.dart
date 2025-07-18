@@ -65,7 +65,7 @@ class MainGame extends FlameGame
 
       final building = Building.availableBuildings
           .firstWhere((b) => b.name == buildingName, orElse: () {
-        return Building.powerPlant2;
+        return Building.availableBuildings.first; // Fallback to first building
       });
       _grid.placeBuilding(x, y, building);
     }
@@ -345,7 +345,26 @@ class _MainGameWidgetState extends State<MainGameWidget> {
           children: [
             Icon(building.icon, color: building.color, size: 24),
             const SizedBox(width: 8),
-            Text(building.name),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    building.name,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Level ${building.level}/${building.maxLevel}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.normal,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -404,17 +423,27 @@ class _MainGameWidgetState extends State<MainGameWidget> {
           ),
         ),
         actions: [
-          if (building.upgrades.isNotEmpty)
+          if (building.canUpgrade)
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop();
-                _showUpgradeDialog(x, y, building);
+                if (_resources.money >= building.upgradeCost) {
+                  setState(() {
+                    _resources.money -= building.upgradeCost;
+                    building.upgrade();
+                    _saveResources();
+                  });
+                  Navigator.of(context).pop();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Not enough money!')),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: building.color,
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Upgrade'),
+              child: Text('Upgrade (\$${building.upgradeCost})'),
             ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -425,47 +454,6 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     );
   }
 
-  void _showUpgradeDialog(int x, int y, Building building) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Upgrade ${building.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: building.upgrades.map((upgrade) {
-            return ListTile(
-              title: Text(upgrade.name),
-              subtitle: Text('Cost: ${upgrade.cost}'),
-              onTap: () {
-                if (_resources.money >= upgrade.cost) {
-                  setState(() {
-                    _resources.money -= upgrade.cost;
-                    _game.grid.placeBuilding(x, y, upgrade);
-                    _saveResources();
-                  });
-                  Navigator.of(context).pop();
-                } else {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Not enough money to upgrade.'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              },
-            );
-          }).toList(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showDeleteConfirmationDialog(int x, int y, Building building) {
     showDialog(
