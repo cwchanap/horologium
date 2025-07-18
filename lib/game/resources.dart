@@ -10,22 +10,44 @@ class Resources {
     'research': 0,
     'water': 0,
   };
-  int population = 0;
+  int population = 20; // Starting population
+  int availableWorkers = 20; // Workers not assigned to buildings
   
   // Track research accumulation (seconds)
   double _researchAccumulator = 0;
 
   void update(List<Building> buildings) {
+    // Calculate accommodation capacity and update population
+    int totalAccommodation = 0;
+    for (final building in buildings) {
+      if (building.type == BuildingType.house || building.type == BuildingType.largeHouse) {
+        totalAccommodation += building.accommodationCapacity;
+      }
+    }
+    
+    // Population can't exceed accommodation capacity
+    if (population > totalAccommodation && totalAccommodation > 0) {
+      population = totalAccommodation;
+    }
+    
+    // Update available workers (total population minus assigned workers)
+    int totalAssignedWorkers = 0;
+    for (final building in buildings) {
+      totalAssignedWorkers += building.assignedWorkers;
+    }
+    availableWorkers = population - totalAssignedWorkers;
     // Count active research labs for time-based generation
     int activeResearchLabs = 0;
     
     // First, generate resources from buildings that don't require consumption
     for (final building in buildings) {
       if (building.consumption.isEmpty) {
-        // Buildings with no consumption always generate
-        building.generation.forEach((key, value) {
-          resources.update(key, (v) => v + value, ifAbsent: () => value);
-        });
+        // Buildings with no consumption generate if they have workers (except houses)
+        if (building.type == BuildingType.house || building.type == BuildingType.largeHouse || building.hasWorkers) {
+          building.generation.forEach((key, value) {
+            resources.update(key, (v) => v + value, ifAbsent: () => value);
+          });
+        }
       }
     }
 
@@ -41,7 +63,7 @@ class Resources {
           }
         });
 
-        if (canProduce) {
+        if (canProduce && building.hasWorkers) {
           // Consume resources
           building.consumption.forEach((key, value) {
             resources.update(key, (v) => v - value, ifAbsent: () => -value);
@@ -85,4 +107,23 @@ class Resources {
   set coal(double value) => resources['coal'] = value;
   set research(double value) => resources['research'] = value;
   set water(double value) => resources['water'] = value;
+  
+  // Helper methods for worker management
+  bool canAssignWorkerTo(Building building) {
+    return availableWorkers > 0 && building.canAssignWorker;
+  }
+  
+  void assignWorkerTo(Building building) {
+    if (canAssignWorkerTo(building)) {
+      building.assignWorker();
+      availableWorkers--;
+    }
+  }
+  
+  void unassignWorkerFrom(Building building) {
+    if (building.assignedWorkers > 0) {
+      building.unassignWorker();
+      availableWorkers++;
+    }
+  }
 }

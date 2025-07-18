@@ -41,6 +41,23 @@ class Research {
       cost: 10,
       unlocksBuildings: [BuildingType.goldMine],
     ),
+    Research(
+      id: 'expansion_planning',
+      name: 'Expansion Planning',
+      description: 'Increases building limits by 2 for all building types',
+      icon: Icons.business,
+      color: Colors.orange,
+      cost: 15,
+    ),
+    Research(
+      id: 'advanced_construction',
+      name: 'Advanced Construction',
+      description: 'Further increases building limits by 3 for all building types',
+      icon: Icons.engineering,
+      color: Colors.purple,
+      cost: 25,
+      prerequisites: ['expansion_planning'],
+    ),
   ];
 }
 

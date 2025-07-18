@@ -63,9 +63,9 @@ class MainGame extends FlameGame
       final y = int.parse(parts[1]);
       final buildingName = parts[2];
 
-      final building = Building.availableBuildings
+      final building = BuildingRegistry.availableBuildings
           .firstWhere((b) => b.name == buildingName, orElse: () {
-        return Building.availableBuildings.first; // Fallback to first building
+        return BuildingRegistry.availableBuildings.first; // Fallback to first building
       });
       _grid.placeBuilding(x, y, building);
     }
@@ -211,6 +211,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   bool _showHamburgerMenu = false;
   final Resources _resources = Resources();
   final ResearchManager _researchManager = ResearchManager();
+  final BuildingLimitManager _buildingLimitManager = BuildingLimitManager();
   async.Timer? _resourceTimer;
 
   @override
@@ -285,11 +286,24 @@ class _MainGameWidgetState extends State<MainGameWidget> {
 
     if (_game.buildingToPlace != null) {
       if (_game.placementPreview.isValid) {
-        if (_resources.money >= _game.buildingToPlace!.cost) {
+        final buildingType = _game.buildingToPlace!.type;
+        final currentCount = _game.grid.countBuildingsOfType(buildingType);
+        final limit = _buildingLimitManager.getBuildingLimit(buildingType);
+        
+        if (currentCount >= limit) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Building limit reached! Maximum $limit ${_game.buildingToPlace!.name}s allowed.')),
+          );
+        } else if (_resources.money >= _game.buildingToPlace!.cost) {
           _game.grid.placeBuilding(x, y, _game.buildingToPlace!);
           setState(() {
             _resources.money -= _game.buildingToPlace!.cost;
-            _resources.population += _game.buildingToPlace!.population;
+            
+            // Auto-assign worker if the building requires one and workers are available
+            if (_game.buildingToPlace!.requiredWorkers > 0) {
+              _resources.assignWorkerTo(_game.buildingToPlace!);
+            }
+            
             _saveResources();
             _game.buildingToPlace = null;
             _game.hidePlacementPreview();
@@ -382,8 +396,10 @@ class _MainGameWidgetState extends State<MainGameWidget> {
               _buildDetailRow('Cost', '${building.cost} money', Colors.green),
               
               // Population
-              if (building.population > 0)
-                _buildDetailRow('Population', '+${building.population}', Colors.blue),
+              if (building.accommodationCapacity > 0)
+                _buildDetailRow('Accommodation', '${building.accommodationCapacity}', Colors.blue),
+              if (building.requiredWorkers > 0)
+                _buildDetailRow('Workers', '${building.assignedWorkers}/${building.requiredWorkers}', building.hasWorkers ? Colors.green : Colors.red),
               
               const SizedBox(height: 8),
               
@@ -472,7 +488,10 @@ class _MainGameWidgetState extends State<MainGameWidget> {
               setState(() {
                 _resources.money += building.cost;
                 if (building.type == BuildingType.house) {
-                  _resources.population -= building.population;
+                  // Unassign workers when building is removed
+                  for (int i = 0; i < building.assignedWorkers; i++) {
+                    _resources.unassignWorkerFrom(building);
+                  }
                 }
                 _saveResources();
               });
@@ -666,13 +685,31 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                             color: Colors.blue.withAlpha((255 * 0.8).round()),
                             borderRadius: BorderRadius.circular(15),
                           ),
-                          child: Text(
-                            'Population: ${_resources.population}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.people, color: Colors.blue, size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Pop: ${_resources.population}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              const Icon(Icons.work, color: Colors.orange, size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Workers: ${_resources.availableWorkers}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -760,6 +797,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                               builder: (context) => ResearchTreePage(
                                 researchManager: _researchManager,
                                 resources: _resources,
+                                buildingLimitManager: _buildingLimitManager,
                                 onResourcesChanged: () {
                                   setState(() {
                                     _saveResources();
@@ -879,7 +917,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
 
   List<Building> _getAvailableBuildings() {
     final unlockedBuildings = _researchManager.getUnlockedBuildings();
-    return Building.availableBuildings.where((building) {
+    return BuildingRegistry.availableBuildings.where((building) {
       // Always allow basic buildings (not behind research)
       if (building.type == BuildingType.factory ||
           building.type == BuildingType.researchLab ||
@@ -980,6 +1018,16 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      '${_game.grid.countBuildingsOfType(building.type)}/${_buildingLimitManager.getBuildingLimit(building.type)}',
+                      style: TextStyle(
+                        color: _game.grid.countBuildingsOfType(building.type) >= _buildingLimitManager.getBuildingLimit(building.type) 
+                            ? Colors.red 
+                            : Colors.green,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],

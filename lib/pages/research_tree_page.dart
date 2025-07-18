@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import '../game/research.dart';
 import '../game/resources.dart';
+import '../game/building.dart';
 
 class ResearchTreePage extends StatefulWidget {
   final ResearchManager researchManager;
   final Resources resources;
   final Function() onResourcesChanged;
+  final BuildingLimitManager? buildingLimitManager;
 
   const ResearchTreePage({
     super.key,
     required this.researchManager,
     required this.resources,
     required this.onResourcesChanged,
+    this.buildingLimitManager,
   });
 
   @override
@@ -163,6 +166,22 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
                     setState(() {
                       widget.resources.research -= research.cost;
                       widget.researchManager.completeResearch(research.id);
+                      
+                      // Handle building limit upgrades
+                      if (widget.buildingLimitManager != null) {
+                        if (research.id == 'expansion_planning') {
+                          // Increase all building limits by 2
+                          for (final buildingType in BuildingType.values) {
+                            widget.buildingLimitManager!.increaseBuildingLimit(buildingType, 2);
+                          }
+                        } else if (research.id == 'advanced_construction') {
+                          // Increase all building limits by 3
+                          for (final buildingType in BuildingType.values) {
+                            widget.buildingLimitManager!.increaseBuildingLimit(buildingType, 3);
+                          }
+                        }
+                      }
+                      
                       widget.onResourcesChanged();
                     });
                     ScaffoldMessenger.of(context).showSnackBar(

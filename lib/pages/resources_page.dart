@@ -314,6 +314,15 @@ class _ResourcesPageState extends State<ResourcesPage> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  'Available Workers: ${widget.resources.availableWorkers}',
+                  style: const TextStyle(
+                    color: Colors.orange,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           ),
