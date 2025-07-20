@@ -1063,7 +1063,11 @@ class _MainGameWidgetState extends State<MainGameWidget> {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              _buildBuildingImage(building, size: 24),
+              // Per your request, the building menu should always show an icon.
+              Icon(
+                building.icon,
+                color: building.color,
+                size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1105,35 +1109,25 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     );
   }
 
+  // This widget is now used for the details dialog.
   Widget _buildBuildingImage(Building building, {double size = 24}) {
-    if (building.image.startsWith('assets/')) {
+    // If the building has a specific asset path, it's a custom image.
+    if (building.assetPath != null) {
       return Image.asset(
-        building.image,
+        // Flame's loader uses a prefix, but Image.asset needs the full path.
+        'assets/images/${building.assetPath!}',
         width: size,
         height: size,
-        color: building.color,
+        // Note: The `color` property tints the image, which is usually not
+        // desired for full-color assets. It's been removed here.
       );
     } else {
-      // A bit of a hack to parse the string back to an IconData
-      final iconName = building.image.split('.').last;
-      final iconData = _iconMap[iconName];
+      // Otherwise, fall back to the material icon defined for the building.
       return Icon(
-        iconData,
+        building.icon,
         color: building.color,
         size: size,
       );
     }
   }
-
-  static const Map<String, IconData> _iconMap = {
-    'bolt': Icons.bolt,
-    'factory': Icons.factory,
-    'science': Icons.science,
-    'home': Icons.home,
-    'apartment': Icons.apartment,
-    'attach_money': Icons.attach_money,
-    'park': Icons.park,
-    'fireplace': Icons.fireplace,
-    'water_drop': Icons.water_drop,
-  };
 }

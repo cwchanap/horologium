@@ -131,9 +131,10 @@ class Grid extends PositionComponent with HasGameReference {
 
   Future<void> _loadBuildingSprites() async {
     for (final building in BuildingRegistry.availableBuildings) {
-      if (building.image.startsWith('assets/')) {
-        final image = await game.images.load(building.image);
-        _spriteCache[building.image] = Sprite(image);
+      // Use assetPath to load sprites for buildings that have one.
+      if (building.assetPath != null) {
+        final image = await game.images.load(building.assetPath!);
+        _spriteCache[building.assetPath!] = Sprite(image);
       }
     }
   }
@@ -182,8 +183,9 @@ class Grid extends PositionComponent with HasGameReference {
       cellHeight * buildingSize - 4,
     );
 
-    if (building.image.startsWith('assets/')) {
-      final sprite = _spriteCache[building.image];
+    // If the building has a sprite asset, render it.
+    if (building.assetPath != null) {
+      final sprite = _spriteCache[building.assetPath!];
       if (sprite != null) {
         sprite.render(canvas, position: rect.topLeft.toVector2(), size: rect.size.toVector2());
       }

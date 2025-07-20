@@ -17,7 +17,8 @@ class Building {
   final BuildingType type;
   final String name;
   final String description;
-  final String image;
+  final IconData icon;
+  final String? assetPath;
   final Color color;
   final int baseCost;
   final Map<String, double> baseGeneration;
@@ -34,7 +35,8 @@ class Building {
     required this.type,
     required this.name,
     required this.description,
-    required this.image,
+    required this.icon,
+    this.assetPath,
     required this.color,
     required this.baseCost,
     this.baseGeneration = const {},
@@ -120,7 +122,7 @@ class BuildingRegistry {
       type: BuildingType.powerPlant,
       name: 'Power Plant',
       description: 'Generates energy for your colony',
-      image: 'Icons.bolt',
+      icon: Icons.bolt,
       color: Colors.yellow,
       baseCost: 100,
       baseGeneration: {'electricity': 1},
@@ -132,7 +134,7 @@ class BuildingRegistry {
       type: BuildingType.factory,
       name: 'Factory',
       description: 'Produces resources and materials',
-      image: 'Icons.factory',
+      icon: Icons.factory,
       color: Colors.orange,
       baseCost: 150,
       maxLevel: 5,
@@ -142,7 +144,7 @@ class BuildingRegistry {
       type: BuildingType.researchLab,
       name: 'Research Lab',
       description: 'Unlocks new technologies',
-      image: 'Icons.science',
+      icon: Icons.science,
       color: Colors.blue,
       baseCost: 200,
       baseGeneration: {'research': 0.1},
@@ -153,7 +155,8 @@ class BuildingRegistry {
       type: BuildingType.house,
       name: 'House',
       description: 'Accommodates population and generates money',
-      image: Assets.house,
+      icon: Icons.house,
+      assetPath: Assets.house,
       color: Colors.green,
       baseCost: 120,
       basePopulation: 2,
@@ -166,7 +169,7 @@ class BuildingRegistry {
       type: BuildingType.largeHouse,
       name: 'Large House',
       description: 'Modern housing with more population accommodation and money generation',
-      image: 'Icons.apartment',
+      icon: Icons.apartment,
       color: Colors.lightGreen,
       baseCost: 250,
       basePopulation: 8,
@@ -179,7 +182,7 @@ class BuildingRegistry {
       type: BuildingType.goldMine,
       name: 'Gold Mine',
       description: 'Generates gold',
-      image: 'Icons.attach_money',
+      icon: Icons.attach_money,
       color: Colors.amber,
       baseCost: 300,
       baseGeneration: {'gold': 0.1},
@@ -190,7 +193,7 @@ class BuildingRegistry {
       type: BuildingType.woodFactory,
       name: 'Wood Factory',
       description: 'Produces wood',
-      image: 'Icons.park',
+      icon: Icons.park,
       color: Colors.brown,
       baseCost: 80,
       baseGeneration: {'wood': 1},
@@ -201,7 +204,7 @@ class BuildingRegistry {
       type: BuildingType.coalMine,
       name: 'Coal Mine',
       description: 'Produces coal',
-      image: 'Icons.fireplace',
+      icon: Icons.fireplace,
       color: Colors.grey,
       baseCost: 90,
       baseGeneration: {'coal': 1},
@@ -212,7 +215,7 @@ class BuildingRegistry {
       type: BuildingType.waterTreatment,
       name: 'Water Treatment Plant',
       description: 'Produces clean water',
-      image: 'Icons.water_drop',
+      icon: Icons.water_drop,
       color: Colors.lightBlue,
       baseCost: 150,
       baseGeneration: {'water': 2},
