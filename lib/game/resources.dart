@@ -12,24 +12,26 @@ class Resources {
   };
   int population = 20; // Starting population
   int availableWorkers = 20; // Workers not assigned to buildings
-  
+  int unshelteredPopulation = 20;
+
   // Track research accumulation (seconds)
   double _researchAccumulator = 0;
 
   void update(List<Building> buildings) {
-    // Calculate accommodation capacity and update population
+    // Calculate accommodation capacity
     int totalAccommodation = 0;
     for (final building in buildings) {
       if (building.type == BuildingType.house || building.type == BuildingType.largeHouse) {
         totalAccommodation += building.accommodationCapacity;
       }
     }
-    
-    // Population can't exceed accommodation capacity
-    if (population > totalAccommodation && totalAccommodation > 0) {
-      population = totalAccommodation;
+
+    // Update unsheltered population
+    unshelteredPopulation = population - totalAccommodation;
+    if (unshelteredPopulation < 0) {
+      unshelteredPopulation = 0;
     }
-    
+
     // Update available workers (total population minus assigned workers)
     int totalAssignedWorkers = 0;
     for (final building in buildings) {

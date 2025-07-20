@@ -1,6 +1,8 @@
 import 'dart:math';
 
 import 'package:flame/components.dart';
+import 'package:flame/extensions.dart';
+import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,9 +19,10 @@ class PlacedBuilding {
   PlacedBuilding(this.building, this.x, this.y);
 }
 
-class Grid extends PositionComponent {
+class Grid extends PositionComponent with HasGameReference {
   final int gridSize;
   final Map<String, PlacedBuilding> _buildings = {};
+  final Map<String, Sprite> _spriteCache = {};
 
   Grid({this.gridSize = 50});
 
@@ -121,6 +124,21 @@ class Grid extends PositionComponent {
   }
 
   @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    await _loadBuildingSprites();
+  }
+
+  Future<void> _loadBuildingSprites() async {
+    for (final building in BuildingRegistry.availableBuildings) {
+      if (building.image.startsWith('assets/')) {
+        final image = await game.images.load(building.image);
+        _spriteCache[building.image] = Sprite(image);
+      }
+    }
+  }
+
+  @override
   void render(Canvas canvas) {
     super.render(canvas);
 
@@ -146,21 +164,33 @@ class Grid extends PositionComponent {
         return;
       }
 
-      final building = placedBuilding.building;
-      final x = placedBuilding.x;
-      final y = placedBuilding.y;
-      final buildingSize = sqrt(building.gridSize).toInt();
+      _renderBuilding(canvas, placedBuilding);
+      drawnBuildings.add(placedBuilding);
+    });
+  }
 
+  void _renderBuilding(Canvas canvas, PlacedBuilding placedBuilding) {
+    final building = placedBuilding.building;
+    final x = placedBuilding.x;
+    final y = placedBuilding.y;
+    final buildingSize = sqrt(building.gridSize).toInt();
+
+    final rect = Rect.fromLTWH(
+      x * cellWidth + 2,
+      y * cellHeight + 2,
+      cellWidth * buildingSize - 4,
+      cellHeight * buildingSize - 4,
+    );
+
+    if (building.image.startsWith('assets/')) {
+      final sprite = _spriteCache[building.image];
+      if (sprite != null) {
+        sprite.render(canvas, position: rect.topLeft.toVector2(), size: rect.size.toVector2());
+      }
+    } else {
       final buildingPaint = Paint()
         ..color = building.color.withAlpha((255 * 0.8).round())
         ..style = PaintingStyle.fill;
-
-      final rect = Rect.fromLTWH(
-        x * cellWidth + 2,
-        y * cellHeight + 2,
-        cellWidth * buildingSize - 4,
-        cellHeight * buildingSize - 4,
-      );
 
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect, const Radius.circular(4)),
@@ -177,8 +207,6 @@ class Grid extends PositionComponent {
         RRect.fromRectAndRadius(rect, const Radius.circular(4)),
         borderPaint,
       );
-
-      drawnBuildings.add(placedBuilding);
-    });
+    }
   }
 }

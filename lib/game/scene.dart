@@ -245,14 +245,15 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _resources.money = prefs.getDouble('money') ?? 1000.0;
-      _resources.population = prefs.getInt('population') ?? 0;
+      _resources.population = prefs.getInt('population') ?? 20;
+      _resources.availableWorkers = prefs.getInt('availableWorkers') ?? _resources.population;
       _resources.gold = prefs.getDouble('gold') ?? 0.0;
       _resources.wood = prefs.getDouble('wood') ?? 0.0;
       _resources.coal = prefs.getDouble('coal') ?? 10.0;
       _resources.electricity = prefs.getDouble('electricity') ?? 0.0;
       _resources.research = prefs.getDouble('research') ?? 0.0;
       _resources.water = prefs.getDouble('water') ?? 0.0;
-      
+
       // Load research progress
       final completedResearch = prefs.getStringList('completed_research') ?? [];
       _researchManager.loadFromList(completedResearch);
@@ -263,6 +264,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('money', _resources.money);
     await prefs.setInt('population', _resources.population);
+    await prefs.setInt('availableWorkers', _resources.availableWorkers);
     await prefs.setDouble('gold', _resources.gold);
     await prefs.setDouble('wood', _resources.wood);
     await prefs.setDouble('coal', _resources.coal);
@@ -295,13 +297,13 @@ class _MainGameWidgetState extends State<MainGameWidget> {
             SnackBar(content: Text('Building limit reached! Maximum $limit ${_game.buildingToPlace!.name}s allowed.')),
           );
         } else if (_resources.money >= _game.buildingToPlace!.cost) {
-          _game.grid.placeBuilding(x, y, _game.buildingToPlace!);
+          _game.grid.placeBuilding(x, y, _game.buildingToPlace!); 
           setState(() {
             _resources.money -= _game.buildingToPlace!.cost;
             
             // Auto-assign worker if the building requires one and workers are available
             if (_game.buildingToPlace!.requiredWorkers > 0) {
-              _resources.assignWorkerTo(_game.buildingToPlace!);
+              _resources.assignWorkerTo(_game.buildingToPlace!); 
             }
             
             _saveResources();
@@ -354,119 +356,188 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   void _showBuildingDetailsDialog(int x, int y, Building building) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(building.icon, color: building.color, size: 24),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            bool meetsConsumptionRequirements = true;
+            if (building.consumption.isNotEmpty) {
+              building.consumption.forEach((key, value) {
+                if ((_resources.resources[key] ?? 0) < value) {
+                  meetsConsumptionRequirements = false;
+                }
+              });
+            }
+
+            return AlertDialog(
+              title: Row(
                 children: [
-                  Text(
-                    building.name,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    'Level ${building.level}/${building.maxLevel}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.normal,
-                      color: Colors.grey,
+                  _buildBuildingImage(building, size: 24),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          building.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'Level ${building.level}/${building.maxLevel}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.normal,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                building.description,
-                style: const TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              
-              // Cost
-              _buildDetailRow('Cost', '${building.cost} money', Colors.green),
-              
-              // Population
-              if (building.accommodationCapacity > 0)
-                _buildDetailRow('Accommodation', '${building.accommodationCapacity}', Colors.blue),
-              if (building.requiredWorkers > 0)
-                _buildDetailRow('Workers', '${building.assignedWorkers}/${building.requiredWorkers}', building.hasWorkers ? Colors.green : Colors.red),
-              
-              const SizedBox(height: 8),
-              
-              // Generation
-              if (building.generation.isNotEmpty) ...[
-                const Text(
-                  'Generation:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      building.description,
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Cost
+                    _buildDetailRow('Cost', '${building.cost} money', Colors.green),
+
+                    // Population
+                    if (building.accommodationCapacity > 0)
+                      _buildDetailRow(
+                          'Accommodation', '${building.accommodationCapacity}', Colors.blue),
+                    if (building.requiredWorkers > 0)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Workers',
+                              style: TextStyle(fontSize: 14),
+                            ),
+                            Row(
+                              children: [
+                                Visibility(
+                                  visible: building.assignedWorkers > 0,
+                                  child: IconButton(
+                                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                    onPressed: () {
+                                      setState(() {
+                                        _resources.unassignWorkerFrom(building);
+                                      });
+                                    },
+                                  ),
+                                ),
+                                Text(
+                                  '${building.assignedWorkers}/${building.requiredWorkers}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: building.hasWorkers ? Colors.green : Colors.red,
+                                  ),
+                                ),
+                                Visibility(
+                                  visible: _resources.canAssignWorkerTo(building),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                                    onPressed: () {
+                                      setState(() {
+                                        _resources.assignWorkerTo(building);
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    const SizedBox(height: 8),
+
+                    // Generation
+                    if (building.generation.isNotEmpty) ...[
+                      const Text(
+                        'Generation:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(height: 4),
+                      ...building.generation.entries.map((entry) {
+                        return _buildDetailRow(
+                            _capitalizeResource(entry.key), '+${entry.value}/sec', Colors.green);
+                      }),
+                      const SizedBox(height: 8),
+                    ],
+
+                    // Consumption
+                    if (building.consumption.isNotEmpty) ...[
+                      Row(
+                        children: [
+                          const Text(
+                            'Consumption:',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          if (!meetsConsumptionRequirements)
+                            const Padding(
+                              padding: EdgeInsets.only(left: 8.0),
+                              child: Icon(Icons.warning, color: Colors.red, size: 16),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      ...building.consumption.entries.map((entry) {
+                        final hasEnough = (_resources.resources[entry.key] ?? 0) >= entry.value;
+                        return _buildDetailRow(
+                          _capitalizeResource(entry.key),
+                          '-${entry.value}/sec',
+                          !hasEnough ? Colors.red : Colors.grey,
+                        );
+                      }),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 4),
-                ...building.generation.entries.map((entry) {
-                  return _buildDetailRow(
-                    _capitalizeResource(entry.key), 
-                    '+${entry.value}/sec', 
-                    Colors.green
-                  );
-                }),
-                const SizedBox(height: 8),
-              ],
-              
-              // Consumption
-              if (building.consumption.isNotEmpty) ...[
-                const Text(
-                  'Consumption:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const SizedBox(height: 4),
-                ...building.consumption.entries.map((entry) {
-                  return _buildDetailRow(
-                    _capitalizeResource(entry.key), 
-                    '-${entry.value}/sec', 
-                    Colors.red
-                  );
-                }),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          if (building.canUpgrade)
-            ElevatedButton(
-              onPressed: () {
-                if (_resources.money >= building.upgradeCost) {
-                  setState(() {
-                    _resources.money -= building.upgradeCost;
-                    building.upgrade();
-                    _saveResources();
-                  });
-                  Navigator.of(context).pop();
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Not enough money!')),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: building.color,
-                foregroundColor: Colors.white,
               ),
-              child: Text('Upgrade (\$${building.upgradeCost})'),
-            ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+              actions: [
+                if (building.canUpgrade)
+                  ElevatedButton(
+                    onPressed: () {
+                      if (_resources.money >= building.upgradeCost) {
+                        setState(() {
+                          _resources.money -= building.upgradeCost;
+                          building.upgrade();
+                          _saveResources();
+                        });
+                        Navigator.of(context).pop();
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Not enough money!')),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: building.color,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Text('Upgrade (${building.upgradeCost})'),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -487,11 +558,9 @@ class _MainGameWidgetState extends State<MainGameWidget> {
               _game.grid.removeBuilding(x, y);
               setState(() {
                 _resources.money += building.cost;
-                if (building.type == BuildingType.house) {
-                  // Unassign workers when building is removed
-                  for (int i = 0; i < building.assignedWorkers; i++) {
-                    _resources.unassignWorkerFrom(building);
-                  }
+                // Unassign all workers when a building is removed
+                while (building.assignedWorkers > 0) {
+                  _resources.unassignWorkerFrom(building);
                 }
                 _saveResources();
               });
@@ -691,7 +760,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                               const Icon(Icons.people, color: Colors.blue, size: 16),
                               const SizedBox(width: 4),
                               Text(
-                                'Pop: ${_resources.population}',
+                                'Pop: ${_resources.population} (Unsheltered: ${_resources.unshelteredPopulation})',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 12,
@@ -854,7 +923,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                 left: 0,
                 right: 0,
                 child: Container(
-                  height: 200,
+                  height: MediaQuery.of(context).size.height * 0.5, // 50% of screen height
                   decoration: BoxDecoration(
                     color: Colors.black.withAlpha((255 * 0.9).round()),
                     borderRadius: const BorderRadius.only(
@@ -994,11 +1063,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              Icon(
-                building.icon,
-                color: building.color,
-                size: 24,
-              ),
+              _buildBuildingImage(building, size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1039,4 +1104,36 @@ class _MainGameWidgetState extends State<MainGameWidget> {
       ),
     );
   }
+
+  Widget _buildBuildingImage(Building building, {double size = 24}) {
+    if (building.image.startsWith('assets/')) {
+      return Image.asset(
+        building.image,
+        width: size,
+        height: size,
+        color: building.color,
+      );
+    } else {
+      // A bit of a hack to parse the string back to an IconData
+      final iconName = building.image.split('.').last;
+      final iconData = _iconMap[iconName];
+      return Icon(
+        iconData,
+        color: building.color,
+        size: size,
+      );
+    }
+  }
+
+  static const Map<String, IconData> _iconMap = {
+    'bolt': Icons.bolt,
+    'factory': Icons.factory,
+    'science': Icons.science,
+    'home': Icons.home,
+    'apartment': Icons.apartment,
+    'attach_money': Icons.attach_money,
+    'park': Icons.park,
+    'fireplace': Icons.fireplace,
+    'water_drop': Icons.water_drop,
+  };
 }
