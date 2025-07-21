@@ -118,6 +118,8 @@ class _ResourcesPageState extends State<ResourcesPage> {
                   _buildResourceCard('Wood', widget.resources.wood, Colors.brown, Icons.park),
                   _buildResourceCard('Water', widget.resources.water, Colors.cyan, Icons.water_drop),
                   _buildResourceCard('Research', widget.resources.research, Colors.purple, Icons.science),
+                  _buildResourceCard('Planks', widget.resources.planks, Colors.brown, Icons.construction),
+                  _buildResourceCard('Stone', widget.resources.stone, Colors.grey, Icons.terrain),
                   const SizedBox(height: 16),
                   _buildPopulationCard(),
                 ],

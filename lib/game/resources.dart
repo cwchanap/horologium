@@ -9,6 +9,8 @@ class Resources {
     'coal': 10,
     'research': 0,
     'water': 0,
+    'planks': 0,
+    'stone': 0,
   };
   int population = 20; // Starting population
   int availableWorkers = 20; // Workers not assigned to buildings
@@ -101,6 +103,8 @@ class Resources {
   double get coal => resources['coal']!;
   double get research => resources['research']!;
   double get water => resources['water']!;
+  double get planks => resources['planks']!;
+  double get stone => resources['stone']!;
 
   set money(double value) => resources['money'] = value;
   set electricity(double value) => resources['electricity'] = value;
@@ -109,6 +113,8 @@ class Resources {
   set coal(double value) => resources['coal'] = value;
   set research(double value) => resources['research'] = value;
   set water(double value) => resources['water'] = value;
+  set planks(double value) => resources['planks'] = value;
+  set stone(double value) => resources['stone'] = value;
   
   // Helper methods for worker management
   bool canAssignWorkerTo(Building building) {

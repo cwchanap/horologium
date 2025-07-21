@@ -11,6 +11,8 @@ enum BuildingType {
   woodFactory,
   coalMine,
   waterTreatment,
+  sawmill,
+  quarry,
 }
 
 class Building {
@@ -220,6 +222,27 @@ class BuildingRegistry {
       baseCost: 150,
       baseGeneration: {'water': 2},
       maxLevel: 5,
+      requiredWorkers: 1,
+    ),
+    Building(
+      type: BuildingType.sawmill,
+      name: 'Sawmill',
+      description: 'Converts wood into planks',
+      icon: Icons.home_work,
+      color: Colors.brown,
+      baseCost: 100,
+      baseConsumption: {'wood': 10},
+      baseGeneration: {'planks': 1},
+      requiredWorkers: 1,
+    ),
+    Building(
+      type: BuildingType.quarry,
+      name: 'Quarry',
+      description: 'Produces stone',
+      icon: Icons.landscape,
+      color: Colors.grey,
+      baseCost: 150,
+      baseGeneration: {'stone': 1},
       requiredWorkers: 1,
     ),
   ];

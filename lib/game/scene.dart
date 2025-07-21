@@ -554,6 +554,40 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
+                            color: Colors.grey.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Planks: ${_resources.resources['planks']?.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Stone: ${_resources.resources['stone']?.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
                             color: Colors.blue.withAlpha((255 * 0.8).round()),
                             borderRadius: BorderRadius.circular(15),
                           ),
@@ -797,7 +831,9 @@ class _MainGameWidgetState extends State<MainGameWidget> {
           building.type == BuildingType.largeHouse ||
           building.type == BuildingType.woodFactory ||
           building.type == BuildingType.coalMine ||
-          building.type == BuildingType.waterTreatment) {
+          building.type == BuildingType.waterTreatment ||
+          building.type == BuildingType.sawmill ||
+          building.type == BuildingType.quarry) {
         return true;
       }
       // Check if building is unlocked by research
