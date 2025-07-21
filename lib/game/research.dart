@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'building.dart';
+import 'building/building.dart';
 
 class Research {
   final String id;

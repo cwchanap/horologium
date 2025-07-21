@@ -6,7 +6,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'building.dart';
+import 'building/building.dart';
 
 const double cellWidth = 50;
 const double cellHeight = 50;

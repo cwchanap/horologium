@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../game/resources.dart';
-import '../game/building.dart';
+import '../game/building/building.dart';
 import '../game/grid.dart';
 
 class ResourcesPage extends StatefulWidget {

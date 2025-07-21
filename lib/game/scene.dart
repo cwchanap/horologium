@@ -9,7 +9,8 @@ import 'package:flutter/services.dart';
 import 'package:horologium/game/resources.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'building.dart';
+import 'building/building.dart';
+import 'building/menu.dart';
 import 'grid.dart';
 import 'research.dart';
 import '../pages/research_tree_page.dart';
@@ -297,13 +298,13 @@ class _MainGameWidgetState extends State<MainGameWidget> {
             SnackBar(content: Text('Building limit reached! Maximum $limit ${_game.buildingToPlace!.name}s allowed.')),
           );
         } else if (_resources.money >= _game.buildingToPlace!.cost) {
-          _game.grid.placeBuilding(x, y, _game.buildingToPlace!); 
+          _game.grid.placeBuilding(x, y, _game.buildingToPlace!);
           setState(() {
             _resources.money -= _game.buildingToPlace!.cost;
             
             // Auto-assign worker if the building requires one and workers are available
             if (_game.buildingToPlace!.requiredWorkers > 0) {
-              _resources.assignWorkerTo(_game.buildingToPlace!); 
+              _resources.assignWorkerTo(_game.buildingToPlace!);
             }
             
             _saveResources();
@@ -328,7 +329,28 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     } else {
       final building = _game.grid.getBuildingAt(x, y);
       if (building != null) {
-        _showBuildingDetailsDialog(x, y, building);
+        BuildingMenu.showBuildingDetailsDialog(
+          context: context,
+          x: x,
+          y: y,
+          building: building,
+          resources: _resources,
+          onResourcesChanged: () {
+            setState(() {
+              _saveResources();
+            });
+          },
+          onBuildingUpgraded: () {
+            setState(() {
+              _saveResources();
+            });
+          },
+          onBuildingDeleted: () {
+            setState(() {
+              _saveResources();
+            });
+          },
+        );
       } else {
         setState(() {
           _selectedGridX = x;
@@ -353,225 +375,6 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     }
   }
 
-  void _showBuildingDetailsDialog(int x, int y, Building building) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            bool meetsConsumptionRequirements = true;
-            if (building.consumption.isNotEmpty) {
-              building.consumption.forEach((key, value) {
-                if ((_resources.resources[key] ?? 0) < value) {
-                  meetsConsumptionRequirements = false;
-                }
-              });
-            }
-
-            return AlertDialog(
-              title: Row(
-                children: [
-                  _buildBuildingImage(building, size: 24),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          building.name,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          'Level ${building.level}/${building.maxLevel}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.normal,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      building.description,
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Cost
-                    _buildDetailRow('Cost', '${building.cost} money', Colors.green),
-
-                    // Population
-                    if (building.accommodationCapacity > 0)
-                      _buildDetailRow(
-                          'Accommodation', '${building.accommodationCapacity}', Colors.blue),
-                    if (building.requiredWorkers > 0)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Workers',
-                              style: TextStyle(fontSize: 14),
-                            ),
-                            Row(
-                              children: [
-                                Visibility(
-                                  visible: building.assignedWorkers > 0,
-                                  child: IconButton(
-                                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                                    onPressed: () {
-                                      setState(() {
-                                        _resources.unassignWorkerFrom(building);
-                                      });
-                                    },
-                                  ),
-                                ),
-                                Text(
-                                  '${building.assignedWorkers}/${building.requiredWorkers}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: building.hasWorkers ? Colors.green : Colors.red,
-                                  ),
-                                ),
-                                Visibility(
-                                  visible: _resources.canAssignWorkerTo(building),
-                                  child: IconButton(
-                                    icon: const Icon(Icons.add_circle_outline, color: Colors.green),
-                                    onPressed: () {
-                                      setState(() {
-                                        _resources.assignWorkerTo(building);
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    const SizedBox(height: 8),
-
-                    // Generation
-                    if (building.generation.isNotEmpty) ...[
-                      const Text(
-                        'Generation:',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      const SizedBox(height: 4),
-                      ...building.generation.entries.map((entry) {
-                        return _buildDetailRow(
-                            _capitalizeResource(entry.key), '+${entry.value}/sec', Colors.green);
-                      }),
-                      const SizedBox(height: 8),
-                    ],
-
-                    // Consumption
-                    if (building.consumption.isNotEmpty) ...[
-                      Row(
-                        children: [
-                          const Text(
-                            'Consumption:',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                          if (!meetsConsumptionRequirements)
-                            const Padding(
-                              padding: EdgeInsets.only(left: 8.0),
-                              child: Icon(Icons.warning, color: Colors.red, size: 16),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      ...building.consumption.entries.map((entry) {
-                        final hasEnough = (_resources.resources[entry.key] ?? 0) >= entry.value;
-                        return _buildDetailRow(
-                          _capitalizeResource(entry.key),
-                          '-${entry.value}/sec',
-                          !hasEnough ? Colors.red : Colors.grey,
-                        );
-                      }),
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                if (building.canUpgrade)
-                  ElevatedButton(
-                    onPressed: () {
-                      if (_resources.money >= building.upgradeCost) {
-                        setState(() {
-                          _resources.money -= building.upgradeCost;
-                          building.upgrade();
-                          _saveResources();
-                        });
-                        Navigator.of(context).pop();
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Not enough money!')),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: building.color,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: Text('Upgrade (${building.upgradeCost})'),
-                  ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Close'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-
-  void _showDeleteConfirmationDialog(int x, int y, Building building) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete ${building.name}?'),
-        content: Text('This will refund ${building.cost} money.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              _game.grid.removeBuilding(x, y);
-              setState(() {
-                _resources.money += building.cost;
-                // Unassign all workers when a building is removed
-                while (building.assignedWorkers > 0) {
-                  _resources.unassignWorkerFrom(building);
-                }
-                _saveResources();
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _onBuildingSelected(Building building) {
     setState(() {
@@ -1003,48 +806,35 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   }
 
 
-  Widget _buildDetailRow(String label, String value, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 14),
+  void _showDeleteConfirmationDialog(int x, int y, Building building) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete ${building.name}?'),
+        content: Text('This will refund ${building.cost} money.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+          TextButton(
+            onPressed: () {
+              _game.grid.removeBuilding(x, y);
+              setState(() {
+                _resources.money += building.cost;
+                // Unassign all workers when a building is removed
+                while (building.assignedWorkers > 0) {
+                  _resources.unassignWorkerFrom(building);
+                }
+                _saveResources();
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
-  }
-
-  String _capitalizeResource(String resource) {
-    switch (resource) {
-      case 'money':
-        return 'Money';
-      case 'electricity':
-        return 'Electricity';
-      case 'coal':
-        return 'Coal';
-      case 'water':
-        return 'Water';
-      case 'wood':
-        return 'Wood';
-      case 'gold':
-        return 'Gold';
-      case 'research':
-        return 'Research';
-      default:
-        return resource[0].toUpperCase() + resource.substring(1);
-    }
   }
 
   Widget _buildBuildingCard(Building building) {
@@ -1092,8 +882,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                     Text(
                       '${_game.grid.countBuildingsOfType(building.type)}/${_buildingLimitManager.getBuildingLimit(building.type)}',
                       style: TextStyle(
-                        color: _game.grid.countBuildingsOfType(building.type) >= _buildingLimitManager.getBuildingLimit(building.type) 
-                            ? Colors.red 
+                        color: _game.grid.countBuildingsOfType(building.type) >= _buildingLimitManager.getBuildingLimit(building.type)
+                            ? Colors.red
                             : Colors.green,
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -1107,27 +897,5 @@ class _MainGameWidgetState extends State<MainGameWidget> {
         ),
       ),
     );
-  }
-
-  // This widget is now used for the details dialog.
-  Widget _buildBuildingImage(Building building, {double size = 24}) {
-    // If the building has a specific asset path, it's a custom image.
-    if (building.assetPath != null) {
-      return Image.asset(
-        // Flame's loader uses a prefix, but Image.asset needs the full path.
-        'assets/images/${building.assetPath!}',
-        width: size,
-        height: size,
-        // Note: The `color` property tints the image, which is usually not
-        // desired for full-color assets. It's been removed here.
-      );
-    } else {
-      // Otherwise, fall back to the material icon defined for the building.
-      return Icon(
-        building.icon,
-        color: building.color,
-        size: size,
-      );
-    }
   }
 }

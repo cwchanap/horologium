@@ -1,4 +1,4 @@
-import 'package:horologium/game/building.dart';
+import 'package:horologium/game/building/building.dart';
 
 class Resources {
   Map<String, double> resources = {

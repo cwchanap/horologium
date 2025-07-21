@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../game/research.dart';
 import '../game/resources.dart';
-import '../game/building.dart';
+import '../game/building/building.dart';
 
 class ResearchTreePage extends StatefulWidget {
   final ResearchManager researchManager;
