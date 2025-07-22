@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../game/resources.dart';
-import '../game/building/building.dart';
 import '../game/grid.dart';
+import '../widgets/cards/cards.dart';
 
 class ResourcesPage extends StatefulWidget {
   final Resources resources;
@@ -111,246 +111,88 @@ class _ResourcesPageState extends State<ResourcesPage> {
             Expanded(
               child: ListView(
                 children: [
-                  _buildResourceCard('Money', widget.resources.money, Colors.green, Icons.attach_money),
-                  _buildResourceCard('Gold', widget.resources.gold, Colors.amber, Icons.star),
-                  _buildResourceCard('Coal', widget.resources.coal, Colors.grey, Icons.fireplace),
-                  _buildResourceCard('Electricity', widget.resources.electricity, Colors.yellow, Icons.bolt),
-                  _buildResourceCard('Wood', widget.resources.wood, Colors.brown, Icons.park),
-                  _buildResourceCard('Water', widget.resources.water, Colors.cyan, Icons.water_drop),
-                  _buildResourceCard('Research', widget.resources.research, Colors.purple, Icons.science),
-                  _buildResourceCard('Planks', widget.resources.planks, Colors.brown, Icons.construction),
-                  _buildResourceCard('Stone', widget.resources.stone, Colors.grey, Icons.terrain),
+                  ResourceCard(
+                    name: 'Money',
+                    amount: widget.resources.money,
+                    color: Colors.green,
+                    icon: Icons.attach_money,
+                    productionRate: _productionRates['money'] ?? 0.0,
+                    consumptionRate: _consumptionRates['money'] ?? 0.0,
+                  ),
+                  ResourceCard(
+                    name: 'Gold',
+                    amount: widget.resources.gold,
+                    color: Colors.amber,
+                    icon: Icons.star,
+                    productionRate: _productionRates['gold'] ?? 0.0,
+                    consumptionRate: _consumptionRates['gold'] ?? 0.0,
+                  ),
+                  ResourceCard(
+                    name: 'Coal',
+                    amount: widget.resources.coal,
+                    color: Colors.grey,
+                    icon: Icons.fireplace,
+                    productionRate: _productionRates['coal'] ?? 0.0,
+                    consumptionRate: _consumptionRates['coal'] ?? 0.0,
+                  ),
+                  ResourceCard(
+                    name: 'Electricity',
+                    amount: widget.resources.electricity,
+                    color: Colors.yellow,
+                    icon: Icons.bolt,
+                    productionRate: _productionRates['electricity'] ?? 0.0,
+                    consumptionRate: _consumptionRates['electricity'] ?? 0.0,
+                  ),
+                  ResourceCard(
+                    name: 'Wood',
+                    amount: widget.resources.wood,
+                    color: Colors.brown,
+                    icon: Icons.park,
+                    productionRate: _productionRates['wood'] ?? 0.0,
+                    consumptionRate: _consumptionRates['wood'] ?? 0.0,
+                  ),
+                  ResourceCard(
+                    name: 'Water',
+                    amount: widget.resources.water,
+                    color: Colors.cyan,
+                    icon: Icons.water_drop,
+                    productionRate: _productionRates['water'] ?? 0.0,
+                    consumptionRate: _consumptionRates['water'] ?? 0.0,
+                  ),
+                  ResourceCard(
+                    name: 'Research',
+                    amount: widget.resources.research,
+                    color: Colors.purple,
+                    icon: Icons.science,
+                    productionRate: _productionRates['research'] ?? 0.0,
+                    consumptionRate: _consumptionRates['research'] ?? 0.0,
+                  ),
+                  ResourceCard(
+                    name: 'Planks',
+                    amount: widget.resources.planks,
+                    color: Colors.brown,
+                    icon: Icons.construction,
+                    productionRate: _productionRates['planks'] ?? 0.0,
+                    consumptionRate: _consumptionRates['planks'] ?? 0.0,
+                  ),
+                  ResourceCard(
+                    name: 'Stone',
+                    amount: widget.resources.stone,
+                    color: Colors.grey,
+                    icon: Icons.terrain,
+                    productionRate: _productionRates['stone'] ?? 0.0,
+                    consumptionRate: _consumptionRates['stone'] ?? 0.0,
+                  ),
                   const SizedBox(height: 16),
-                  _buildPopulationCard(),
+                  PopulationCard(
+                    population: widget.resources.population,
+                    availableWorkers: widget.resources.availableWorkers,
+                  ),
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildResourceCard(String name, double amount, Color color, IconData icon) {
-    final productionRate = _productionRates[name.toLowerCase()] ?? 0.0;
-    final consumptionRate = _consumptionRates[name.toLowerCase()] ?? 0.0;
-    final netRate = productionRate - consumptionRate;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.withAlpha((255 * 0.1).round()),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withAlpha((255 * 0.3).round()), width: 1),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withAlpha((255 * 0.2).round()),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      name == 'Research' ? '${amount.toInt()}' : amount.toStringAsFixed(1),
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (netRate != 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: (netRate > 0 ? Colors.green : Colors.red).withAlpha((255 * 0.2).round()),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            netRate > 0 ? Icons.trending_up : Icons.trending_down,
-                            color: netRate > 0 ? Colors.green : Colors.red,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${netRate > 0 ? '+' : ''}${name == 'Research' ? (netRate * 10).toStringAsFixed(1) : netRate.toStringAsFixed(1)}/s',
-                            style: TextStyle(
-                              color: netRate > 0 ? Colors.green : Colors.red,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-          if (productionRate > 0 || consumptionRate > 0) ...[
-            const SizedBox(height: 12),
-            const Divider(color: Colors.grey, height: 1),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                if (productionRate > 0)
-                  Expanded(
-                    child: _buildRateInfo(
-                      'Production',
-                      name == 'Research' ? '${(productionRate * 10).toStringAsFixed(1)}/s' : '${productionRate.toStringAsFixed(1)}/s',
-                      Colors.green,
-                      Icons.add_circle_outline,
-                    ),
-                  ),
-                if (productionRate > 0 && consumptionRate > 0)
-                  const SizedBox(width: 16),
-                if (consumptionRate > 0)
-                  Expanded(
-                    child: _buildRateInfo(
-                      'Consumption',
-                      '${consumptionRate.toStringAsFixed(1)}/s',
-                      Colors.red,
-                      Icons.remove_circle_outline,
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRateInfo(String label, String rate, Color color, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 16),
-        const SizedBox(width: 4),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.grey,
-                fontSize: 10,
-              ),
-            ),
-            Text(
-              rate,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPopulationCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.withAlpha((255 * 0.1).round()),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withAlpha((255 * 0.3).round()), width: 1),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.blue.withAlpha((255 * 0.2).round()),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.people, color: Colors.blue, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Population',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  '${widget.resources.population}',
-                  style: const TextStyle(
-                    color: Colors.blue,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Available Workers: ${widget.resources.availableWorkers}',
-                  style: const TextStyle(
-                    color: Colors.orange,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.blue.withAlpha((255 * 0.2).round()),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.home, color: Colors.blue, size: 16),
-                SizedBox(width: 4),
-                Text(
-                  'Citizens',
-                  style: TextStyle(
-                    color: Colors.blue,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

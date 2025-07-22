@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:horologium/game/resources.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../widgets/cards/building_card.dart';
 
 import 'building/building.dart';
 import 'building/menu.dart';
@@ -805,7 +806,12 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                             itemCount: _getAvailableBuildings().length,
                             itemBuilder: (context, index) {
                               final building = _getAvailableBuildings()[index];
-                              return _buildBuildingCard(building);
+                              return BuildingCard(
+                                building: building,
+                                onTap: () => _onBuildingSelected(building),
+                                currentCount: _game.grid.countBuildingsOfType(building.type),
+                                maxCount: _buildingLimitManager.getBuildingLimit(building.type),
+                              );
                             },
                           ),
                         ),
@@ -869,68 +875,6 @@ class _MainGameWidgetState extends State<MainGameWidget> {
             child: const Text('Delete'),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBuildingCard(Building building) {
-    return GestureDetector(
-      onTap: () => _onBuildingSelected(building),
-      child: Container(
-        decoration: BoxDecoration(
-          color: building.color.withAlpha((255 * 0.2).round()),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: building.color,
-            width: 2,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // Per your request, the building menu should always show an icon.
-              Icon(
-                building.icon,
-                color: building.color,
-                size: 24),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      building.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      '${building.cost} money',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
-                    ),
-                    Text(
-                      '${_game.grid.countBuildingsOfType(building.type)}/${_buildingLimitManager.getBuildingLimit(building.type)}',
-                      style: TextStyle(
-                        color: _game.grid.countBuildingsOfType(building.type) >= _buildingLimitManager.getBuildingLimit(building.type)
-                            ? Colors.red
-                            : Colors.green,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
