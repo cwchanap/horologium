@@ -18,6 +18,7 @@ import 'research.dart';
 import '../pages/research_tree_page.dart';
 import '../pages/resources_page.dart';
 import '../pages/trade_page.dart';
+import 'building/category.dart';
 
 class MainGame extends FlameGame
     with
@@ -414,7 +415,6 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     });
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: KeyboardListener(
@@ -819,27 +819,57 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                         ),
                       ),
                       Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: GridView.builder(
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              childAspectRatio: 2.5,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                            ),
-                            itemCount: _getAvailableBuildings().length,
-                            itemBuilder: (context, index) {
-                              final building = _getAvailableBuildings()[index];
-                              return BuildingCard(
-                                building: building,
-                                onTap: () => _onBuildingSelected(building),
-                                currentCount: _game.grid.countBuildingsOfType(building.type),
-                                maxCount: _buildingLimitManager.getBuildingLimit(building.type),
-                              );
-                            },
-                          ),
+                        child: ListView.builder(
+                          itemCount: BuildingCategory.values.length,
+                          itemBuilder: (context, index) {
+                            final category = BuildingCategory.values[index];
+                            final buildings = _getAvailableBuildings()
+                                .where((b) => b.category == category)
+                                .toList();
+                            if (buildings.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
+                                  child: Text(
+                                    category.toString().split('.').last,
+                                    style: const TextStyle(
+                                      color: Colors.cyanAccent,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    childAspectRatio: 2.5,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                  ),
+                                  itemCount: buildings.length,
+                                  itemBuilder: (context, index) {
+                                    final building = buildings[index];
+                                    return BuildingCard(
+                                      building: building,
+                                      onTap: () => _onBuildingSelected(building),
+                                      currentCount: _game.grid
+                                          .countBuildingsOfType(building.type),
+                                      maxCount: _buildingLimitManager
+                                          .getBuildingLimit(building.type),
+                                    );
+                                  },
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ),
                     ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:horologium/constants/assets_path.dart';
+import 'package:horologium/game/building/category.dart';
 
 enum BuildingType {
   powerPlant,
@@ -29,6 +30,7 @@ class Building {
   final int gridSize;
   final int baseBuildingLimit;
   final int requiredWorkers;
+  final BuildingCategory category;
   int level;
   int assignedWorkers;
 
@@ -47,6 +49,7 @@ class Building {
     this.gridSize = 4,
     this.baseBuildingLimit = 4,
     this.requiredWorkers = 1,
+    required this.category,
     this.level = 1,
   }) : assignedWorkers = 0;
 
@@ -130,6 +133,7 @@ class BuildingRegistry {
       baseConsumption: {'coal': 1},
       maxLevel: 5,
       requiredWorkers: 1,
+      category: BuildingCategory.services,
     ),
     Building(
       type: BuildingType.researchLab,
@@ -142,6 +146,7 @@ class BuildingRegistry {
       baseGeneration: {'research': 0.1},
       maxLevel: 5,
       requiredWorkers: 1,
+      category: BuildingCategory.services,
     ),
     Building(
       type: BuildingType.house,
@@ -156,6 +161,7 @@ class BuildingRegistry {
       baseConsumption: {'wood': 1, 'water': 1},
       maxLevel: 5,
       requiredWorkers: 0,
+      category: BuildingCategory.residential,
     ),
     Building(
       type: BuildingType.largeHouse,
@@ -169,6 +175,7 @@ class BuildingRegistry {
       baseConsumption: {'electricity': 1, 'water': 2},
       maxLevel: 5,
       requiredWorkers: 0,
+      category: BuildingCategory.residential,
     ),
     Building(
       type: BuildingType.goldMine,
@@ -181,6 +188,7 @@ class BuildingRegistry {
       baseGeneration: {'gold': 0.1},
       maxLevel: 5,
       requiredWorkers: 1,
+      category: BuildingCategory.rawMaterials,
     ),
     Building(
       type: BuildingType.woodFactory,
@@ -193,6 +201,7 @@ class BuildingRegistry {
       baseGeneration: {'wood': 1},
       maxLevel: 5,
       requiredWorkers: 1,
+      category: BuildingCategory.rawMaterials,
     ),
     Building(
       type: BuildingType.coalMine,
@@ -205,6 +214,7 @@ class BuildingRegistry {
       baseGeneration: {'coal': 1},
       maxLevel: 5,
       requiredWorkers: 1,
+      category: BuildingCategory.rawMaterials,
     ),
     Building(
       type: BuildingType.waterTreatment,
@@ -217,6 +227,7 @@ class BuildingRegistry {
       baseGeneration: {'water': 2},
       maxLevel: 5,
       requiredWorkers: 1,
+      category: BuildingCategory.foodResources,
     ),
     Building(
       type: BuildingType.sawmill,
@@ -228,6 +239,7 @@ class BuildingRegistry {
       baseConsumption: {'wood': 10},
       baseGeneration: {'planks': 1},
       requiredWorkers: 1,
+      category: BuildingCategory.primaryFactory,
     ),
     Building(
       type: BuildingType.quarry,
@@ -239,6 +251,7 @@ class BuildingRegistry {
       baseCost: 150,
       baseGeneration: {'stone': 1},
       requiredWorkers: 1,
+      category: BuildingCategory.rawMaterials,
     ),
   ];
 }
