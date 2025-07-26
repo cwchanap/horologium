@@ -3,7 +3,6 @@ import 'package:horologium/constants/assets_path.dart';
 
 enum BuildingType {
   powerPlant,
-  factory,
   researchLab,
   house,
   largeHouse,
@@ -129,16 +128,6 @@ class BuildingRegistry {
       baseCost: 100,
       baseGeneration: {'electricity': 1},
       baseConsumption: {'coal': 1},
-      maxLevel: 5,
-      requiredWorkers: 1,
-    ),
-    Building(
-      type: BuildingType.factory,
-      name: 'Factory',
-      description: 'Produces resources and materials',
-      icon: Icons.factory,
-      color: Colors.orange,
-      baseCost: 150,
       maxLevel: 5,
       requiredWorkers: 1,
     ),

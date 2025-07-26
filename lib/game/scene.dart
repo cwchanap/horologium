@@ -6,6 +6,7 @@ import 'package:flame/events.dart' as flame_events;
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:horologium/game/resource_type.dart';
 import 'package:horologium/game/resources.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/cards/building_card.dart';
@@ -16,6 +17,7 @@ import 'grid.dart';
 import 'research.dart';
 import '../pages/research_tree_page.dart';
 import '../pages/resources_page.dart';
+import '../pages/trade_page.dart';
 
 class MainGame extends FlameGame
     with
@@ -199,7 +201,9 @@ class PlacementPreview extends PositionComponent {
 }
 
 class MainGameWidget extends StatefulWidget {
-  const MainGameWidget({super.key});
+  final Resources resources;
+
+  const MainGameWidget({super.key, required this.resources});
 
   @override
   State<MainGameWidget> createState() => _MainGameWidgetState();
@@ -211,7 +215,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   int? _selectedGridY;
   bool _showBuildingSelection = false;
   bool _showHamburgerMenu = false;
-  final Resources _resources = Resources();
+  late final Resources _resources;
   final ResearchManager _researchManager = ResearchManager();
   final BuildingLimitManager _buildingLimitManager = BuildingLimitManager();
   async.Timer? _resourceTimer;
@@ -219,6 +223,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   @override
   void initState() {
     super.initState();
+    _resources = widget.resources;
     _game = MainGame();
     _game.onGridCellTapped = _onGridCellTapped;
     _game.onGridCellLongTapped = _onGridCellLongTapped;
@@ -559,7 +564,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                             borderRadius: BorderRadius.circular(15),
                           ),
                           child: Text(
-                            'Planks: ${_resources.resources['planks']?.toStringAsFixed(0)}',
+                            'Planks: ${_resources.resources[ResourceType.planks]?.toStringAsFixed(0)}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -576,7 +581,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                             borderRadius: BorderRadius.circular(15),
                           ),
                           child: Text(
-                            'Stone: ${_resources.resources['stone']?.toStringAsFixed(0)}',
+                            'Stone: ${_resources.resources[ResourceType.stone]?.toStringAsFixed(0)}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -739,6 +744,27 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                       ),
                       const Divider(color: Colors.grey, height: 1),
                       ListTile(
+                        leading: const Icon(Icons.swap_horiz, color: Colors.green),
+                        title: const Text(
+                          'Trade',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        onTap: () {
+                          setState(() {
+                            _showHamburgerMenu = false;
+                          });
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TradePage(
+                                resources: _resources,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const Divider(color: Colors.grey, height: 1),
+                      ListTile(
                         leading: const Icon(Icons.close, color: Colors.white),
                         title: const Text(
                           'Close',
@@ -831,8 +857,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     final unlockedBuildings = _researchManager.getUnlockedBuildings();
     return BuildingRegistry.availableBuildings.where((building) {
       // Always allow basic buildings (not behind research)
-      if (building.type == BuildingType.factory ||
-          building.type == BuildingType.researchLab ||
+      if (building.type == BuildingType.researchLab ||
           building.type == BuildingType.house ||
           building.type == BuildingType.largeHouse ||
           building.type == BuildingType.woodFactory ||

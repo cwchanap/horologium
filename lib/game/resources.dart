@@ -1,16 +1,17 @@
 import 'package:horologium/game/building/building.dart';
+import 'package:horologium/game/resource_type.dart';
 
 class Resources {
-  Map<String, double> resources = {
-    'electricity': 0,
-    'money': 1000,
-    'gold': 0,
-    'wood': 0,
-    'coal': 10,
-    'research': 0,
-    'water': 0,
-    'planks': 0,
-    'stone': 0,
+  Map<ResourceType, double> resources = {
+    ResourceType.electricity: 0,
+    ResourceType.money: 1000,
+    ResourceType.gold: 0,
+    ResourceType.wood: 0,
+    ResourceType.coal: 10,
+    ResourceType.research: 0,
+    ResourceType.water: 0,
+    ResourceType.planks: 0,
+    ResourceType.stone: 0,
   };
   int population = 20; // Starting population
   int availableWorkers = 20; // Workers not assigned to buildings
@@ -49,7 +50,8 @@ class Resources {
         // Buildings with no consumption generate if they have workers (except houses)
         if (building.type == BuildingType.house || building.type == BuildingType.largeHouse || building.hasWorkers) {
           building.generation.forEach((key, value) {
-            resources.update(key, (v) => v + value, ifAbsent: () => value);
+            final resourceType = ResourceType.values.firstWhere((e) => e.toString() == 'ResourceType.$key');
+            resources.update(resourceType, (v) => v + value, ifAbsent: () => value);
           });
         }
       }
@@ -62,7 +64,8 @@ class Resources {
         
         // Check if this building can consume what it needs
         building.consumption.forEach((key, value) {
-          if ((resources[key] ?? 0) < value) {
+          final resourceType = ResourceType.values.firstWhere((e) => e.toString() == 'ResourceType.$key');
+          if ((resources[resourceType] ?? 0) < value) {
             canProduce = false;
           }
         });
@@ -70,15 +73,17 @@ class Resources {
         if (canProduce && building.hasWorkers) {
           // Consume resources
           building.consumption.forEach((key, value) {
-            resources.update(key, (v) => v - value, ifAbsent: () => -value);
+            final resourceType = ResourceType.values.firstWhere((e) => e.toString() == 'ResourceType.$key');
+            resources.update(resourceType, (v) => v - value, ifAbsent: () => -value);
           });
           
           // Generate resources and count research labs
           building.generation.forEach((key, value) {
+            final resourceType = ResourceType.values.firstWhere((e) => e.toString() == 'ResourceType.$key');
             if (key == 'research') {
               activeResearchLabs++;
             } else {
-              resources.update(key, (v) => v + value, ifAbsent: () => value);
+              resources.update(resourceType, (v) => v + value, ifAbsent: () => value);
             }
           });
         }
@@ -90,31 +95,31 @@ class Resources {
       _researchAccumulator += 1.0; // Add 1 second of time
       if (_researchAccumulator >= 10) {
         int pointsToAdd = activeResearchLabs; // 1 point per lab every 10 seconds
-        resources.update('research', (v) => v + pointsToAdd, ifAbsent: () => pointsToAdd.toDouble());
+        resources.update(ResourceType.research, (v) => v + pointsToAdd, ifAbsent: () => pointsToAdd.toDouble());
         _researchAccumulator = 0; // Reset accumulator
       }
     }
   }
 
-  double get money => resources['money']!;
-  double get electricity => resources['electricity']!;
-  double get gold => resources['gold']!;
-  double get wood => resources['wood']!;
-  double get coal => resources['coal']!;
-  double get research => resources['research']!;
-  double get water => resources['water']!;
-  double get planks => resources['planks']!;
-  double get stone => resources['stone']!;
+  double get money => resources[ResourceType.money]!;
+  double get electricity => resources[ResourceType.electricity]!;
+  double get gold => resources[ResourceType.gold]!;
+  double get wood => resources[ResourceType.wood]!;
+  double get coal => resources[ResourceType.coal]!;
+  double get research => resources[ResourceType.research]!;
+  double get water => resources[ResourceType.water]!;
+  double get planks => resources[ResourceType.planks]!;
+  double get stone => resources[ResourceType.stone]!;
 
-  set money(double value) => resources['money'] = value;
-  set electricity(double value) => resources['electricity'] = value;
-  set gold(double value) => resources['gold'] = value;
-  set wood(double value) => resources['wood'] = value;
-  set coal(double value) => resources['coal'] = value;
-  set research(double value) => resources['research'] = value;
-  set water(double value) => resources['water'] = value;
-  set planks(double value) => resources['planks'] = value;
-  set stone(double value) => resources['stone'] = value;
+  set money(double value) => resources[ResourceType.money] = value;
+  set electricity(double value) => resources[ResourceType.electricity] = value;
+  set gold(double value) => resources[ResourceType.gold] = value;
+  set wood(double value) => resources[ResourceType.wood] = value;
+set coal(double value) => resources[ResourceType.coal] = value;
+  set research(double value) => resources[ResourceType.research] = value;
+  set water(double value) => resources[ResourceType.water] = value;
+  set planks(double value) => resources[ResourceType.planks] = value;
+  set stone(double value) => resources[ResourceType.stone] = value;
   
   // Helper methods for worker management
   bool canAssignWorkerTo(Building building) {
@@ -132,6 +137,24 @@ class Resources {
     if (building.assignedWorkers > 0) {
       building.unassignWorker();
       availableWorkers++;
+    }
+  }
+
+  void trade(ResourceType from, ResourceType to, double amount) {
+    final fromResource = ResourceRegistry.find(from);
+    final toResource = ResourceRegistry.find(to);
+
+    if (fromResource == null || toResource == null) {
+      return;
+    }
+
+    final fromValue = fromResource.value;
+    final toValue = toResource.value;
+
+    if ((resources[from] ?? 0) >= amount) {
+      resources.update(from, (v) => v - amount);
+      final amountToAdd = amount * fromValue * 0.8 / toValue;
+      resources.update(to, (v) => v + amountToAdd, ifAbsent: () => amountToAdd);
     }
   }
 }

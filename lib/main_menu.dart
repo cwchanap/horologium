@@ -3,6 +3,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:flame/game.dart';
+import 'package:horologium/game/resources.dart';
+import 'package:horologium/pages/trade_page.dart';
 import 'game/scene.dart';
 
 class MainMenu extends StatefulWidget {
@@ -19,6 +21,7 @@ class _MainMenuState extends State<MainMenu>
   late AnimationController _buttonController;
   late Animation<double> _titleAnimation;
   late Animation<double> _buttonAnimation;
+  final Resources _resources = Resources();
 
   @override
   void initState() {
@@ -158,6 +161,12 @@ class _MainMenuState extends State<MainMenu>
                                   ),
                                   const SizedBox(height: 20),
                                   _buildMenuButton(
+                                    'TRADE',
+                                    Icons.swap_horiz,
+                                    () => _openTradePage(),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _buildMenuButton(
                                     'STELLAR MAP',
                                     Icons.public,
                                     () => _openStellarMap(),
@@ -257,7 +266,15 @@ class _MainMenuState extends State<MainMenu>
   void _startGame() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const MainGameWidget(),
+        builder: (context) => MainGameWidget(resources: _resources),
+      ),
+    );
+  }
+
+  void _openTradePage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => TradePage(resources: _resources),
       ),
     );
   }
