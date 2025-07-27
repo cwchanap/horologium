@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../game/research.dart';
-import '../../game/resources.dart';
+import '../../game/resources/resources.dart';
 import '../../game/building/building.dart';
 import '../../pages/research_tree_page.dart';
 import '../../pages/resources_page.dart';

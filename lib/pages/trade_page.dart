@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:horologium/game/resource_type.dart';
-import 'package:horologium/game/resources.dart';
+import 'package:horologium/game/resources/resource_type.dart';
+import 'package:horologium/game/resources/resources.dart';
 
 class TradePage extends StatefulWidget {
   final Resources resources;

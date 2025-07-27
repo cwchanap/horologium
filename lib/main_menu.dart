@@ -3,7 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:flame/game.dart';
-import 'package:horologium/game/resources.dart';
+import 'package:horologium/game/resources/resources.dart';
 import 'package:horologium/pages/trade_page.dart';
 import 'game/scene_widget.dart';
 

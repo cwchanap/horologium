@@ -1,5 +1,5 @@
 import '../building/building.dart';
-import '../resources.dart';
+import '../resources/resources.dart';
 
 class ResourceService {
   static void updateResources(Resources resources, List<Building> buildings) {

@@ -1,5 +1,5 @@
 import 'package:horologium/game/building/building.dart';
-import 'package:horologium/game/resource_type.dart';
+import 'package:horologium/game/resources/resource_type.dart';
 
 class Resources {
   Map<ResourceType, double> resources = {

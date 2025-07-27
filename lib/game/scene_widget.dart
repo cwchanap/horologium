@@ -13,7 +13,7 @@ import 'managers/game_state_manager.dart';
 import 'managers/input_handler.dart';
 import 'managers/persistence_manager.dart';
 import 'services/resource_service.dart';
-import 'resources.dart';
+import 'resources/resources.dart';
 
 class MainGameWidget extends StatefulWidget {
   final Resources resources;

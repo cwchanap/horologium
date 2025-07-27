@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../building/building.dart';
 import '../research.dart';
-import '../resources.dart';
+import '../resources/resources.dart';
 import '../services/resource_service.dart';
 
 class GameStateManager {

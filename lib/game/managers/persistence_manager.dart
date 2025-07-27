@@ -1,5 +1,5 @@
 import '../research.dart';
-import '../resources.dart';
+import '../resources/resources.dart';
 import '../services/save_service.dart';
 
 /// Legacy wrapper for SaveService - use SaveService directly for new code

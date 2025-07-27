@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../building/building.dart';
 import '../building/menu.dart';
 import '../main_game.dart';
-import '../resources.dart';
+import '../resources/resources.dart';
 import 'building_placement_manager.dart';
 
 class InputHandler {

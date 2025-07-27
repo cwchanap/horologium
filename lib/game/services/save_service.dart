@@ -1,7 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../research.dart';
-import '../resources.dart';
+import '../resources/resources.dart';
 
 class SaveService {
   static const String _keyMoney = 'money';

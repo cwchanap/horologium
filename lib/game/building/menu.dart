@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/building/crop_type.dart';
-import 'package:horologium/game/resources.dart';
+import 'package:horologium/game/resources/resources.dart';
 
 class BuildingMenu {
   static void showBuildingDetailsDialog({

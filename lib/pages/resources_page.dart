@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../game/resources.dart';
+import '../game/resources/resources.dart';
 import '../game/grid.dart';
 import '../widgets/cards/cards.dart';
 
