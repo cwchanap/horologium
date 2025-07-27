@@ -5,7 +5,7 @@ import 'dart:math' as math;
 import 'package:flame/game.dart';
 import 'package:horologium/game/resources.dart';
 import 'package:horologium/pages/trade_page.dart';
-import 'game/scene.dart';
+import 'game/scene_widget.dart';
 
 class MainMenu extends StatefulWidget {
   const MainMenu({super.key});
