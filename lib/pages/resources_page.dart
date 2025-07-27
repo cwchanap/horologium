@@ -112,14 +112,6 @@ class _ResourcesPageState extends State<ResourcesPage> {
               child: ListView(
                 children: [
                   ResourceCard(
-                    name: 'Money',
-                    amount: widget.resources.money,
-                    color: Colors.green,
-                    icon: Icons.attach_money,
-                    productionRate: _productionRates['money'] ?? 0.0,
-                    consumptionRate: _consumptionRates['money'] ?? 0.0,
-                  ),
-                  ResourceCard(
                     name: 'Gold',
                     amount: widget.resources.gold,
                     color: Colors.amber,
@@ -160,14 +152,6 @@ class _ResourcesPageState extends State<ResourcesPage> {
                     consumptionRate: _consumptionRates['water'] ?? 0.0,
                   ),
                   ResourceCard(
-                    name: 'Research',
-                    amount: widget.resources.research,
-                    color: Colors.purple,
-                    icon: Icons.science,
-                    productionRate: _productionRates['research'] ?? 0.0,
-                    consumptionRate: _consumptionRates['research'] ?? 0.0,
-                  ),
-                  ResourceCard(
                     name: 'Planks',
                     amount: widget.resources.planks,
                     color: Colors.brown,
@@ -183,10 +167,37 @@ class _ResourcesPageState extends State<ResourcesPage> {
                     productionRate: _productionRates['stone'] ?? 0.0,
                     consumptionRate: _consumptionRates['stone'] ?? 0.0,
                   ),
-                  const SizedBox(height: 16),
-                  PopulationCard(
-                    population: widget.resources.population,
-                    availableWorkers: widget.resources.availableWorkers,
+                  ResourceCard(
+                    name: 'Wheat',
+                    amount: widget.resources.wheat,
+                    color: Colors.orange,
+                    icon: Icons.grass,
+                    productionRate: _productionRates['wheat'] ?? 0.0,
+                    consumptionRate: _consumptionRates['wheat'] ?? 0.0,
+                  ),
+                  ResourceCard(
+                    name: 'Corn',
+                    amount: widget.resources.corn,
+                    color: Colors.yellow,
+                    icon: Icons.eco,
+                    productionRate: _productionRates['corn'] ?? 0.0,
+                    consumptionRate: _consumptionRates['corn'] ?? 0.0,
+                  ),
+                  ResourceCard(
+                    name: 'Rice',
+                    amount: widget.resources.rice,
+                    color: Colors.lightGreen,
+                    icon: Icons.grain,
+                    productionRate: _productionRates['rice'] ?? 0.0,
+                    consumptionRate: _consumptionRates['rice'] ?? 0.0,
+                  ),
+                  ResourceCard(
+                    name: 'Barley',
+                    amount: widget.resources.barley,
+                    color: Colors.amber,
+                    icon: Icons.agriculture,
+                    productionRate: _productionRates['barley'] ?? 0.0,
+                    consumptionRate: _consumptionRates['barley'] ?? 0.0,
                   ),
                 ],
               ),

@@ -6,6 +6,7 @@ import '../widgets/game/game_controls.dart';
 import '../widgets/game/game_overlay.dart';
 import '../widgets/game/hamburger_menu.dart';
 import '../widgets/game/delete_confirmation_dialog.dart';
+import '../widgets/game/resource_display.dart';
 import 'building/building.dart';
 import 'main_game.dart';
 import 'managers/building_placement_manager.dart';
@@ -163,6 +164,16 @@ class _MainGameWidgetState extends State<MainGameWidget> {
               game: _game,
               onBackPressed: _handleBackPressed,
             ),
+            
+            // Resource Display (upper right)
+            if (_game.hasLoaded)
+              Positioned(
+                top: 20,
+                right: 20,
+                child: ResourceDisplay(
+                  resources: widget.resources,
+                ),
+              ),
             
             // Hamburger Menu Button
             Positioned(

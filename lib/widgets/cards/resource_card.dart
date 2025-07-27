@@ -100,35 +100,30 @@ class ResourceCard extends StatelessWidget {
               ),
             ],
           ),
-          if (productionRate > 0 || consumptionRate > 0) ...[
-            const SizedBox(height: 12),
-            const Divider(color: Colors.grey, height: 1),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                if (productionRate > 0)
-                  Expanded(
-                    child: _buildRateInfo(
-                      'Production',
-                      name == 'Research' ? '${(productionRate * 10).toStringAsFixed(1)}/s' : '${productionRate.toStringAsFixed(1)}/s',
-                      Colors.green,
-                      Icons.add_circle_outline,
-                    ),
-                  ),
-                if (productionRate > 0 && consumptionRate > 0)
-                  const SizedBox(width: 16),
-                if (consumptionRate > 0)
-                  Expanded(
-                    child: _buildRateInfo(
-                      'Consumption',
-                      '${consumptionRate.toStringAsFixed(1)}/s',
-                      Colors.red,
-                      Icons.remove_circle_outline,
-                    ),
-                  ),
-              ],
-            ),
-          ],
+          const SizedBox(height: 12),
+          const Divider(color: Colors.grey, height: 1),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildRateInfo(
+                  'Production',
+                  name == 'Research' ? '${(productionRate * 10).toStringAsFixed(1)}/s' : '${productionRate.toStringAsFixed(1)}/s',
+                  productionRate > 0 ? Colors.green : Colors.grey,
+                  Icons.add_circle_outline,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildRateInfo(
+                  'Consumption',
+                  '${consumptionRate.toStringAsFixed(1)}/s',
+                  consumptionRate > 0 ? Colors.red : Colors.grey,
+                  Icons.remove_circle_outline,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
