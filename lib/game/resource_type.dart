@@ -1,4 +1,3 @@
-
 import 'package:collection/collection.dart';
 
 enum ResourceType {
@@ -13,6 +12,10 @@ enum ResourceType {
   water,
   planks,
   stone,
+  wheat,
+  corn,
+  rice,
+  barley,
 }
 
 class Resource {
@@ -38,6 +41,10 @@ class ResourceRegistry {
     Resource(type: ResourceType.water, name: 'Water', value: 0.5),
     Resource(type: ResourceType.planks, name: 'Planks', value: 10),
     Resource(type: ResourceType.stone, name: 'Stone', value: 1),
+    Resource(type: ResourceType.wheat, name: 'Wheat', value: 1),
+    Resource(type: ResourceType.corn, name: 'Corn', value: 1),
+    Resource(type: ResourceType.rice, name: 'Rice', value: 1),
+    Resource(type: ResourceType.barley, name: 'Barley', value: 1),
   ];
 
   static Resource? find(ResourceType type) {

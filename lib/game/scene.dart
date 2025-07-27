@@ -210,7 +210,7 @@ class MainGameWidget extends StatefulWidget {
   State<MainGameWidget> createState() => _MainGameWidgetState();
 }
 
-class _MainGameWidgetState extends State<MainGameWidget> {
+class _MainGameWidgetState extends State<MainGameWidget> with TickerProviderStateMixin {
   late MainGame _game;
   int? _selectedGridX;
   int? _selectedGridY;
@@ -220,6 +220,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   final ResearchManager _researchManager = ResearchManager();
   final BuildingLimitManager _buildingLimitManager = BuildingLimitManager();
   async.Timer? _resourceTimer;
+  late TabController _tabController;
 
   @override
   void initState() {
@@ -231,11 +232,13 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     _game.onGridCellSecondaryTapped = _onGridCellSecondaryTapped;
     _loadSavedData();
     _startResourceGeneration();
+    _tabController = TabController(length: BuildingCategory.values.length, vsync: this);
   }
 
   @override
   void dispose() {
     _resourceTimer?.cancel();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -415,6 +418,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     });
   }
 
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: KeyboardListener(
@@ -658,6 +662,74 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.lightGreen.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Wheat: ${_resources.wheat.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.yellow.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Corn: ${_resources.corn.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Rice: ${_resources.rice.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.brown.withAlpha((255 * 0.8).round()),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Barley: ${_resources.barley.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -818,58 +890,50 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                           ],
                         ),
                       ),
+                      TabBar(
+                        controller: _tabController,
+                        isScrollable: true,
+                        tabs: BuildingCategory.values
+                            .map((category) => Tab(text: category.toString().split('.').last))
+                            .toList(),
+                      ),
                       Expanded(
-                        child: ListView.builder(
-                          itemCount: BuildingCategory.values.length,
-                          itemBuilder: (context, index) {
-                            final category = BuildingCategory.values[index];
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: BuildingCategory.values.map((category) {
                             final buildings = _getAvailableBuildings()
                                 .where((b) => b.category == category)
                                 .toList();
                             if (buildings.isEmpty) {
-                              return const SizedBox.shrink();
+                              return const Center(
+                                child: Text(
+                                  'No buildings in this category',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              );
                             }
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 8),
-                                  child: Text(
-                                    category.toString().split('.').last,
-                                    style: const TextStyle(
-                                      color: Colors.cyanAccent,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                GridView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    childAspectRatio: 2.5,
-                                    crossAxisSpacing: 12,
-                                    mainAxisSpacing: 12,
-                                  ),
-                                  itemCount: buildings.length,
-                                  itemBuilder: (context, index) {
-                                    final building = buildings[index];
-                                    return BuildingCard(
-                                      building: building,
-                                      onTap: () => _onBuildingSelected(building),
-                                      currentCount: _game.grid
-                                          .countBuildingsOfType(building.type),
-                                      maxCount: _buildingLimitManager
-                                          .getBuildingLimit(building.type),
-                                    );
-                                  },
-                                ),
-                              ],
+                            return GridView.builder(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 2.5,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
+                              itemCount: buildings.length,
+                              itemBuilder: (context, index) {
+                                final building = buildings[index];
+                                return BuildingCard(
+                                  building: building,
+                                  onTap: () => _onBuildingSelected(building),
+                                  currentCount: _game.grid
+                                      .countBuildingsOfType(building.type),
+                                  maxCount: _buildingLimitManager
+                                      .getBuildingLimit(building.type),
+                                );
+                              },
                             );
-                          },
+                          }).toList(),
                         ),
                       ),
                     ],
@@ -894,7 +958,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
           building.type == BuildingType.coalMine ||
           building.type == BuildingType.waterTreatment ||
           building.type == BuildingType.sawmill ||
-          building.type == BuildingType.quarry) {
+          building.type == BuildingType.quarry ||
+          building.type == BuildingType.field) {
         return true;
       }
       // Check if building is unlocked by research

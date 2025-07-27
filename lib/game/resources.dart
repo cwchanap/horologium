@@ -12,6 +12,10 @@ class Resources {
     ResourceType.water: 0,
     ResourceType.planks: 0,
     ResourceType.stone: 0,
+    ResourceType.wheat: 0,
+    ResourceType.corn: 0,
+    ResourceType.rice: 0,
+    ResourceType.barley: 0,
   };
   int population = 20; // Starting population
   int availableWorkers = 20; // Workers not assigned to buildings
@@ -110,16 +114,24 @@ class Resources {
   double get water => resources[ResourceType.water]!;
   double get planks => resources[ResourceType.planks]!;
   double get stone => resources[ResourceType.stone]!;
+  double get wheat => resources[ResourceType.wheat]!;
+  double get corn => resources[ResourceType.corn]!;
+  double get rice => resources[ResourceType.rice]!;
+  double get barley => resources[ResourceType.barley]!;
 
   set money(double value) => resources[ResourceType.money] = value;
   set electricity(double value) => resources[ResourceType.electricity] = value;
   set gold(double value) => resources[ResourceType.gold] = value;
   set wood(double value) => resources[ResourceType.wood] = value;
-set coal(double value) => resources[ResourceType.coal] = value;
+  set coal(double value) => resources[ResourceType.coal] = value;
   set research(double value) => resources[ResourceType.research] = value;
   set water(double value) => resources[ResourceType.water] = value;
   set planks(double value) => resources[ResourceType.planks] = value;
   set stone(double value) => resources[ResourceType.stone] = value;
+  set wheat(double value) => resources[ResourceType.wheat] = value;
+  set corn(double value) => resources[ResourceType.corn] = value;
+  set rice(double value) => resources[ResourceType.rice] = value;
+  set barley(double value) => resources[ResourceType.barley] = value;
   
   // Helper methods for worker management
   bool canAssignWorkerTo(Building building) {

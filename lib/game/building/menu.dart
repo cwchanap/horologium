@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:horologium/game/building/building.dart';
+import 'package:horologium/game/building/crop_type.dart';
 import 'package:horologium/game/resources.dart';
 
 class BuildingMenu {
@@ -163,6 +164,30 @@ class BuildingMenu {
                           !hasEnough ? Colors.red : Colors.grey,
                         );
                       }),
+                    ],
+                    if (building is Field) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Crop Type:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      DropdownButton<CropType>(
+                        value: (building as Field).cropType,
+                        onChanged: (CropType? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              (building as Field).cropType = newValue;
+                            });
+                          }
+                        },
+                        items: CropType.values
+                            .map<DropdownMenuItem<CropType>>((CropType value) {
+                          return DropdownMenuItem<CropType>(
+                            value: value,
+                            child: Text(value.toString().split('.').last),
+                          );
+                        }).toList(),
+                      ),
                     ],
                   ],
                 ),

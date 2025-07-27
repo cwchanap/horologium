@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:horologium/constants/assets_path.dart';
 import 'package:horologium/game/building/category.dart';
+import 'package:horologium/game/building/crop_type.dart';
 
 enum BuildingType {
   powerPlant,
@@ -13,6 +14,7 @@ enum BuildingType {
   waterTreatment,
   sawmill,
   quarry,
+  field,
 }
 
 class Building {
@@ -83,6 +85,52 @@ class Building {
     if (canUpgrade) {
       level++;
     }
+  }
+}
+
+class Field extends Building {
+  CropType cropType;
+
+  Field({
+    required BuildingType type,
+    required String name,
+    required String description,
+    required IconData icon,
+    String? assetPath,
+    required Color color,
+    required int baseCost,
+    Map<String, double> baseGeneration = const {},
+    Map<String, double> baseConsumption = const {},
+    int basePopulation = 0,
+    int maxLevel = 5,
+    int gridSize = 4,
+    int baseBuildingLimit = 4,
+    int requiredWorkers = 1,
+    required BuildingCategory category,
+    int level = 1,
+    this.cropType = CropType.wheat,
+  }) : super(
+          type: type,
+          name: name,
+          description: description,
+          icon: icon,
+          assetPath: assetPath,
+          color: color,
+          baseCost: baseCost,
+          baseGeneration: baseGeneration,
+          baseConsumption: baseConsumption,
+          basePopulation: basePopulation,
+          maxLevel: maxLevel,
+          gridSize: gridSize,
+          baseBuildingLimit: baseBuildingLimit,
+          requiredWorkers: requiredWorkers,
+          category: category,
+          level: level,
+        );
+
+  @override
+  Map<String, double> get generation {
+    return {cropType.toString().split('.').last: 1.0 * level};
   }
 }
 
@@ -252,6 +300,16 @@ class BuildingRegistry {
       baseGeneration: {'stone': 1},
       requiredWorkers: 1,
       category: BuildingCategory.rawMaterials,
+    ),
+    Field(
+      type: BuildingType.field,
+      name: 'Field',
+      description: 'Grows crops',
+      icon: Icons.grass,
+      color: Colors.lightGreen,
+      baseCost: 50,
+      requiredWorkers: 1,
+      category: BuildingCategory.foodResources,
     ),
   ];
 }
