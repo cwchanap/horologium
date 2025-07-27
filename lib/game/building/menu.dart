@@ -133,8 +133,14 @@ class BuildingMenu {
                       ),
                       const SizedBox(height: 4),
                       ...building.generation.entries.map((entry) {
+                        // Show actual production rate (0 if no workers, except for houses)
+                        final isProducing = building.type == BuildingType.house || 
+                                          building.type == BuildingType.largeHouse || 
+                                          building.hasWorkers;
+                        final actualRate = isProducing ? entry.value : 0.0;
+                        final color = isProducing ? Colors.green : Colors.grey;
                         return _buildDetailRow(
-                            _capitalizeResource(entry.key), '+${entry.value}/sec', Colors.green);
+                            _capitalizeResource(entry.key), '+$actualRate/sec', color);
                       }),
                       const SizedBox(height: 8),
                     ],

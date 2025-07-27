@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../game/resources/resources.dart';
+import '../game/resources/resource_type.dart';
+import '../game/resources/resource_category.dart';
+import '../game/building/building.dart';
 import '../game/grid.dart';
 import '../widgets/cards/cards.dart';
 
@@ -22,6 +25,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
   Map<String, double> _productionRates = {};
   Map<String, double> _consumptionRates = {};
   Timer? _updateTimer;
+  ResourceCategory _selectedCategory = ResourceCategory.rawMaterials;
 
   @override
   void initState() {
@@ -43,20 +47,37 @@ class _ResourcesPageState extends State<ResourcesPage> {
     final consumption = <String, double>{};
 
     for (final building in buildings) {
-      // Calculate production
-      building.generation.forEach((resource, rate) {
-        if (resource == 'research') {
-          // Research has special handling - 1 point every 10 seconds
-          production.update(resource, (v) => v + 0.1, ifAbsent: () => 0.1);
-        } else {
-          production.update(resource, (v) => v + rate, ifAbsent: () => rate);
-        }
-      });
+      // Only calculate production if building has workers (except houses which don't need workers)
+      if (building.type == BuildingType.house || building.type == BuildingType.largeHouse || building.hasWorkers) {
+        // Calculate production
+        building.generation.forEach((resource, rate) {
+          if (resource == 'research') {
+            // Research has special handling - 1 point every 10 seconds
+            production.update(resource, (v) => v + 0.1, ifAbsent: () => 0.1);
+          } else {
+            production.update(resource, (v) => v + rate, ifAbsent: () => rate);
+          }
+        });
+      }
       
-      // Calculate consumption
-      building.consumption.forEach((resource, rate) {
-        consumption.update(resource, (v) => v + rate, ifAbsent: () => rate);
-      });
+      // Only calculate consumption if building has workers and can actually consume
+      if (building.consumption.isNotEmpty && building.hasWorkers) {
+        bool canConsume = true;
+        
+        // Check if building can consume what it needs
+        building.consumption.forEach((key, value) {
+          final resourceType = ResourceType.values.firstWhere((e) => e.toString() == 'ResourceType.$key');
+          if ((widget.resources.resources[resourceType] ?? 0) < value) {
+            canConsume = false;
+          }
+        });
+        
+        if (canConsume) {
+          building.consumption.forEach((resource, rate) {
+            consumption.update(resource, (v) => v + rate, ifAbsent: () => rate);
+          });
+        }
+      }
     }
 
     setState(() {
@@ -107,104 +128,110 @@ class _ResourcesPageState extends State<ResourcesPage> {
                 fontSize: 16,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            
+            // Category Navigation Tabs
+            _buildCategoryTabs(),
+            
+            const SizedBox(height: 16),
+            
             Expanded(
               child: ListView(
-                children: [
-                  ResourceCard(
-                    name: 'Gold',
-                    amount: widget.resources.gold,
-                    color: Colors.amber,
-                    icon: Icons.star,
-                    productionRate: _productionRates['gold'] ?? 0.0,
-                    consumptionRate: _consumptionRates['gold'] ?? 0.0,
-                  ),
-                  ResourceCard(
-                    name: 'Coal',
-                    amount: widget.resources.coal,
-                    color: Colors.grey,
-                    icon: Icons.fireplace,
-                    productionRate: _productionRates['coal'] ?? 0.0,
-                    consumptionRate: _consumptionRates['coal'] ?? 0.0,
-                  ),
-                  ResourceCard(
-                    name: 'Electricity',
-                    amount: widget.resources.electricity,
-                    color: Colors.yellow,
-                    icon: Icons.bolt,
-                    productionRate: _productionRates['electricity'] ?? 0.0,
-                    consumptionRate: _consumptionRates['electricity'] ?? 0.0,
-                  ),
-                  ResourceCard(
-                    name: 'Wood',
-                    amount: widget.resources.wood,
-                    color: Colors.brown,
-                    icon: Icons.park,
-                    productionRate: _productionRates['wood'] ?? 0.0,
-                    consumptionRate: _consumptionRates['wood'] ?? 0.0,
-                  ),
-                  ResourceCard(
-                    name: 'Water',
-                    amount: widget.resources.water,
-                    color: Colors.cyan,
-                    icon: Icons.water_drop,
-                    productionRate: _productionRates['water'] ?? 0.0,
-                    consumptionRate: _consumptionRates['water'] ?? 0.0,
-                  ),
-                  ResourceCard(
-                    name: 'Planks',
-                    amount: widget.resources.planks,
-                    color: Colors.brown,
-                    icon: Icons.construction,
-                    productionRate: _productionRates['planks'] ?? 0.0,
-                    consumptionRate: _consumptionRates['planks'] ?? 0.0,
-                  ),
-                  ResourceCard(
-                    name: 'Stone',
-                    amount: widget.resources.stone,
-                    color: Colors.grey,
-                    icon: Icons.terrain,
-                    productionRate: _productionRates['stone'] ?? 0.0,
-                    consumptionRate: _consumptionRates['stone'] ?? 0.0,
-                  ),
-                  ResourceCard(
-                    name: 'Wheat',
-                    amount: widget.resources.wheat,
-                    color: Colors.orange,
-                    icon: Icons.grass,
-                    productionRate: _productionRates['wheat'] ?? 0.0,
-                    consumptionRate: _consumptionRates['wheat'] ?? 0.0,
-                  ),
-                  ResourceCard(
-                    name: 'Corn',
-                    amount: widget.resources.corn,
-                    color: Colors.yellow,
-                    icon: Icons.eco,
-                    productionRate: _productionRates['corn'] ?? 0.0,
-                    consumptionRate: _consumptionRates['corn'] ?? 0.0,
-                  ),
-                  ResourceCard(
-                    name: 'Rice',
-                    amount: widget.resources.rice,
-                    color: Colors.lightGreen,
-                    icon: Icons.grain,
-                    productionRate: _productionRates['rice'] ?? 0.0,
-                    consumptionRate: _consumptionRates['rice'] ?? 0.0,
-                  ),
-                  ResourceCard(
-                    name: 'Barley',
-                    amount: widget.resources.barley,
-                    color: Colors.amber,
-                    icon: Icons.agriculture,
-                    productionRate: _productionRates['barley'] ?? 0.0,
-                    consumptionRate: _consumptionRates['barley'] ?? 0.0,
-                  ),
-                ],
+                children: _buildResourceCardsForCategory(_selectedCategory),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildCategoryTabs() {
+    return Row(
+      children: ResourceCategory.values.map((category) {
+        final isSelected = category == _selectedCategory;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedCategory = category;
+              });
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: isSelected 
+                    ? Colors.cyan.withAlpha((255 * 0.2).round())
+                    : Colors.grey.withAlpha((255 * 0.1).round()),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isSelected 
+                      ? Colors.cyan
+                      : Colors.grey.withAlpha((255 * 0.3).round()),
+                  width: isSelected ? 2 : 1,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    category.icon,
+                    color: isSelected ? Colors.cyan : Colors.grey,
+                    size: 20,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    category.displayName,
+                    style: TextStyle(
+                      color: isSelected ? Colors.cyan : Colors.grey,
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  List<Widget> _buildResourceCardsForCategory(ResourceCategory category) {
+    final resourcesInCategory = _getResourcesForCategory(category);
+    return resourcesInCategory.map((resourceData) {
+      return ResourceCard(
+        name: resourceData['name'],
+        amount: resourceData['amount'],
+        color: resourceData['color'],
+        icon: resourceData['icon'],
+        productionRate: _productionRates[resourceData['key']] ?? 0.0,
+        consumptionRate: _consumptionRates[resourceData['key']] ?? 0.0,
+      );
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _getResourcesForCategory(ResourceCategory category) {
+    switch (category) {
+      case ResourceCategory.rawMaterials:
+        return [
+          {'name': 'Gold', 'amount': widget.resources.gold, 'color': Colors.amber, 'icon': Icons.star, 'key': 'gold'},
+          {'name': 'Coal', 'amount': widget.resources.coal, 'color': Colors.grey, 'icon': Icons.fireplace, 'key': 'coal'},
+          {'name': 'Electricity', 'amount': widget.resources.electricity, 'color': Colors.yellow, 'icon': Icons.bolt, 'key': 'electricity'},
+          {'name': 'Wood', 'amount': widget.resources.wood, 'color': Colors.brown, 'icon': Icons.park, 'key': 'wood'},
+          {'name': 'Water', 'amount': widget.resources.water, 'color': Colors.cyan, 'icon': Icons.water_drop, 'key': 'water'},
+          {'name': 'Planks', 'amount': widget.resources.planks, 'color': Colors.brown, 'icon': Icons.construction, 'key': 'planks'},
+          {'name': 'Stone', 'amount': widget.resources.stone, 'color': Colors.grey, 'icon': Icons.terrain, 'key': 'stone'},
+        ];
+      case ResourceCategory.foodResources:
+        return [
+          {'name': 'Wheat', 'amount': widget.resources.wheat, 'color': Colors.orange, 'icon': Icons.grass, 'key': 'wheat'},
+          {'name': 'Corn', 'amount': widget.resources.corn, 'color': Colors.yellow, 'icon': Icons.eco, 'key': 'corn'},
+          {'name': 'Rice', 'amount': widget.resources.rice, 'color': Colors.lightGreen, 'icon': Icons.grain, 'key': 'rice'},
+          {'name': 'Barley', 'amount': widget.resources.barley, 'color': Colors.amber, 'icon': Icons.agriculture, 'key': 'barley'},
+        ];
+    }
   }
 }
