@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 enum ResourceCategory {
   rawMaterials,
   foodResources,
+  stapleGrains,
 }
 
 extension ResourceCategoryExtension on ResourceCategory {
@@ -12,6 +13,8 @@ extension ResourceCategoryExtension on ResourceCategory {
         return 'Raw Materials';
       case ResourceCategory.foodResources:
         return 'Food Resources';
+      case ResourceCategory.stapleGrains:
+        return 'Staple Grains';
     }
   }
 
@@ -21,6 +24,8 @@ extension ResourceCategoryExtension on ResourceCategory {
         return Icons.build;
       case ResourceCategory.foodResources:
         return Icons.restaurant;
+      case ResourceCategory.stapleGrains:
+        return Icons.grain;
     }
   }
 }

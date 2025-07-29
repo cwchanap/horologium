@@ -10,5 +10,9 @@ class Assets {
   static const String researchLab = 'building/research_lab.png';
   static const String waterTreatmentPlant = 'building/water_treatment_plant.png';
   static const String woodFactory = 'building/wood_factory.png';
+  static const String windMill = 'building/wind_mill.png';
+  static const String grinderMill = 'building/grinder_mill.png';
+  static const String riceHuller = 'building/rice_huller.png';
+  static const String maltHouse = 'building/malt_house.png';
 
 }

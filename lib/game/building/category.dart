@@ -4,4 +4,5 @@ enum BuildingCategory {
   residential,
   foodResources,
   services,
+  processing,
 }

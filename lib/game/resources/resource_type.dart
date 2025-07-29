@@ -17,6 +17,10 @@ enum ResourceType {
   corn,
   rice,
   barley,
+  flour,
+  cornmeal,
+  polishedRice,
+  maltedBarley,
 }
 
 class Resource {
@@ -48,6 +52,10 @@ class ResourceRegistry {
     Resource(type: ResourceType.corn, name: 'Corn', value: 1, category: ResourceCategory.foodResources),
     Resource(type: ResourceType.rice, name: 'Rice', value: 1, category: ResourceCategory.foodResources),
     Resource(type: ResourceType.barley, name: 'Barley', value: 1, category: ResourceCategory.foodResources),
+    Resource(type: ResourceType.flour, name: 'Flour', value: 5, category: ResourceCategory.stapleGrains),
+    Resource(type: ResourceType.cornmeal, name: 'Cornmeal', value: 4, category: ResourceCategory.stapleGrains),
+    Resource(type: ResourceType.polishedRice, name: 'Polished Rice', value: 2, category: ResourceCategory.stapleGrains),
+    Resource(type: ResourceType.maltedBarley, name: 'Malted Barley', value: 2, category: ResourceCategory.stapleGrains),
   ];
 
   static Resource? find(ResourceType type) {

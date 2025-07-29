@@ -232,6 +232,13 @@ class _ResourcesPageState extends State<ResourcesPage> {
           {'name': 'Rice', 'amount': widget.resources.rice, 'color': Colors.lightGreen, 'icon': Icons.grain, 'key': 'rice'},
           {'name': 'Barley', 'amount': widget.resources.barley, 'color': Colors.amber, 'icon': Icons.agriculture, 'key': 'barley'},
         ];
+      case ResourceCategory.stapleGrains:
+        return [
+          {'name': 'Flour', 'amount': widget.resources.flour, 'color': Colors.orange, 'icon': Icons.grain, 'key': 'flour'},
+          {'name': 'Cornmeal', 'amount': widget.resources.cornmeal, 'color': Colors.yellow, 'icon': Icons.grain, 'key': 'cornmeal'},
+          {'name': 'Polished Rice', 'amount': widget.resources.polishedRice, 'color': Colors.lightGreen, 'icon': Icons.grain, 'key': 'polishedRice'},
+          {'name': 'Malted Barley', 'amount': widget.resources.maltedBarley, 'color': Colors.amber, 'icon': Icons.grain, 'key': 'maltedBarley'},
+        ];
     }
   }
 }

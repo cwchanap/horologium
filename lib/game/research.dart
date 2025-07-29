@@ -58,6 +58,25 @@ class Research {
       cost: 25,
       prerequisites: ['expansion_planning'],
     ),
+    Research(
+      id: 'grain_processing',
+      name: 'Grain Processing',
+      description: 'Unlocks Wind Mills and Grinder Mills',
+      icon: Icons.grain,
+      color: Colors.brown,
+      cost: 20,
+      unlocksBuildings: [BuildingType.windMill, BuildingType.grinderMill],
+    ),
+    Research(
+      id: 'advanced_grain_processing',
+      name: 'Advanced Grain Processing',
+      description: 'Unlocks Rice Hullers and Malt Houses',
+      icon: Icons.grain,
+      color: Colors.brown,
+      cost: 30,
+      prerequisites: ['grain_processing'],
+      unlocksBuildings: [BuildingType.riceHuller, BuildingType.maltHouse],
+    ),
   ];
 }
 
