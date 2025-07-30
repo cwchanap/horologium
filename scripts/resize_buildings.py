@@ -35,24 +35,26 @@ def resize_building_images(input_dir="assets/images/building/original", output_d
     
     # Process each image
     for png_file in png_files:
+        output_file = output_path / png_file.name
+        if output_file.exists():
+            print(f"~ Skipping {png_file.name} (already exists)")
+            continue
+
         try:
             # Open the image
             with Image.open(png_file) as img:
                 # Convert to RGBA if not already (to handle transparency)
                 if img.mode != 'RGBA':
                     img = img.convert('RGBA')
-                
+
                 # Resize the image using high-quality resampling
                 resized_img = img.resize(size, Image.Resampling.LANCZOS)
-                
-                # Create output filename
-                output_file = output_path / png_file.name
-                
+
                 # Save the resized image
                 resized_img.save(output_file, 'PNG')
-                
+
                 print(f"✓ Resized {png_file.name} to {size[0]}x{size[1]}")
-                
+
         except Exception as e:
             print(f"✗ Error processing {png_file.name}: {str(e)}")
     

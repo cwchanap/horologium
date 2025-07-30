@@ -28,14 +28,18 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: HamburgerMenu(
-              isVisible: false,
-              onClose: () => menuClosed = true,
-              resources: testResources,
-              researchManager: testResearchManager,
-              buildingLimitManager: testBuildingLimitManager,
-              grid: testGrid,
-              onResourcesChanged: () => resourcesChanged = true,
+            body: Stack(
+              children: [
+                HamburgerMenu(
+                  isVisible: false,
+                  onClose: () => menuClosed = true,
+                  resources: testResources,
+                  researchManager: testResearchManager,
+                  buildingLimitManager: testBuildingLimitManager,
+                  grid: testGrid,
+                  onResourcesChanged: () => resourcesChanged = true,
+                ),
+              ],
             ),
           ),
         ),
@@ -49,14 +53,18 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: HamburgerMenu(
-              isVisible: true,
-              onClose: () => menuClosed = true,
-              resources: testResources,
-              researchManager: testResearchManager,
-              buildingLimitManager: testBuildingLimitManager,
-              grid: testGrid,
-              onResourcesChanged: () => resourcesChanged = true,
+            body: Stack(
+              children: [
+                HamburgerMenu(
+                  isVisible: true,
+                  onClose: () => menuClosed = true,
+                  resources: testResources,
+                  researchManager: testResearchManager,
+                  buildingLimitManager: testBuildingLimitManager,
+                  grid: testGrid,
+                  onResourcesChanged: () => resourcesChanged = true,
+                ),
+              ],
             ),
           ),
         ),
@@ -72,14 +80,18 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: HamburgerMenu(
-              isVisible: true,
-              onClose: () => menuClosed = true,
-              resources: testResources,
-              researchManager: testResearchManager,
-              buildingLimitManager: testBuildingLimitManager,
-              grid: testGrid,
-              onResourcesChanged: () => resourcesChanged = true,
+            body: Stack(
+              children: [
+                HamburgerMenu(
+                  isVisible: true,
+                  onClose: () => menuClosed = true,
+                  resources: testResources,
+                  researchManager: testResearchManager,
+                  buildingLimitManager: testBuildingLimitManager,
+                  grid: testGrid,
+                  onResourcesChanged: () => resourcesChanged = true,
+                ),
+              ],
             ),
           ),
         ),
@@ -95,14 +107,18 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: HamburgerMenu(
-              isVisible: true,
-              onClose: () => menuClosed = true,
-              resources: testResources,
-              researchManager: testResearchManager,
-              buildingLimitManager: testBuildingLimitManager,
-              grid: testGrid,
-              onResourcesChanged: () => resourcesChanged = true,
+            body: Stack(
+              children: [
+                HamburgerMenu(
+                  isVisible: true,
+                  onClose: () => menuClosed = true,
+                  resources: testResources,
+                  researchManager: testResearchManager,
+                  buildingLimitManager: testBuildingLimitManager,
+                  grid: testGrid,
+                  onResourcesChanged: () => resourcesChanged = true,
+                ),
+              ],
             ),
           ),
         ),
@@ -118,14 +134,18 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: HamburgerMenu(
-              isVisible: true,
-              onClose: () => menuClosed = true,
-              resources: testResources,
-              researchManager: testResearchManager,
-              buildingLimitManager: testBuildingLimitManager,
-              grid: testGrid,
-              onResourcesChanged: () => resourcesChanged = true,
+            body: Stack(
+              children: [
+                HamburgerMenu(
+                  isVisible: true,
+                  onClose: () => menuClosed = true,
+                  resources: testResources,
+                  researchManager: testResearchManager,
+                  buildingLimitManager: testBuildingLimitManager,
+                  grid: testGrid,
+                  onResourcesChanged: () => resourcesChanged = true,
+                ),
+              ],
             ),
           ),
         ),
@@ -141,14 +161,18 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: HamburgerMenu(
-              isVisible: true,
-              onClose: () => menuClosed = true,
-              resources: testResources,
-              researchManager: testResearchManager,
-              buildingLimitManager: testBuildingLimitManager,
-              grid: testGrid,
-              onResourcesChanged: () => resourcesChanged = true,
+            body: Stack(
+              children: [
+                HamburgerMenu(
+                  isVisible: true,
+                  onClose: () => menuClosed = true,
+                  resources: testResources,
+                  researchManager: testResearchManager,
+                  buildingLimitManager: testBuildingLimitManager,
+                  grid: testGrid,
+                  onResourcesChanged: () => resourcesChanged = true,
+                ),
+              ],
             ),
           ),
         ),
@@ -164,14 +188,18 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: HamburgerMenu(
-              isVisible: true,
-              onClose: () => menuClosed = true,
-              resources: testResources,
-              researchManager: testResearchManager,
-              buildingLimitManager: testBuildingLimitManager,
-              grid: testGrid,
-              onResourcesChanged: () => resourcesChanged = true,
+            body: Stack(
+              children: [
+                HamburgerMenu(
+                  isVisible: true,
+                  onClose: () => menuClosed = true,
+                  resources: testResources,
+                  researchManager: testResearchManager,
+                  buildingLimitManager: testBuildingLimitManager,
+                  grid: testGrid,
+                  onResourcesChanged: () => resourcesChanged = true,
+                ),
+              ],
             ),
           ),
         ),
@@ -187,14 +215,18 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: HamburgerMenu(
-              isVisible: true,
-              onClose: () => menuClosed = true,
-              resources: testResources,
-              researchManager: testResearchManager,
-              buildingLimitManager: testBuildingLimitManager,
-              grid: testGrid,
-              onResourcesChanged: () => resourcesChanged = true,
+            body: Stack(
+              children: [
+                HamburgerMenu(
+                  isVisible: true,
+                  onClose: () => menuClosed = true,
+                  resources: testResources,
+                  researchManager: testResearchManager,
+                  buildingLimitManager: testBuildingLimitManager,
+                  grid: testGrid,
+                  onResourcesChanged: () => resourcesChanged = true,
+                ),
+              ],
             ),
           ),
         ),
@@ -218,14 +250,18 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: HamburgerMenu(
-              isVisible: true,
-              onClose: () => menuClosed = true,
-              resources: testResources,
-              researchManager: testResearchManager,
-              buildingLimitManager: testBuildingLimitManager,
-              grid: testGrid,
-              onResourcesChanged: () => resourcesChanged = true,
+            body: Stack(
+              children: [
+                HamburgerMenu(
+                  isVisible: true,
+                  onClose: () => menuClosed = true,
+                  resources: testResources,
+                  researchManager: testResearchManager,
+                  buildingLimitManager: testBuildingLimitManager,
+                  grid: testGrid,
+                  onResourcesChanged: () => resourcesChanged = true,
+                ),
+              ],
             ),
           ),
         ),
