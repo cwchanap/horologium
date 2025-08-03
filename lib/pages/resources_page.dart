@@ -239,6 +239,8 @@ class _ResourcesPageState extends State<ResourcesPage> {
           {'name': 'Polished Rice', 'amount': widget.resources.polishedRice, 'color': Colors.lightGreen, 'icon': Icons.grain, 'key': 'polishedRice'},
           {'name': 'Malted Barley', 'amount': widget.resources.maltedBarley, 'color': Colors.amber, 'icon': Icons.grain, 'key': 'maltedBarley'},
         ];
+      case ResourceCategory.refinement:
+        return [];
     }
   }
 }

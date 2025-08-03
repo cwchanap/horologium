@@ -1,0 +1,4 @@
+enum BakeryProduct {
+  bread,
+  pastries,
+}

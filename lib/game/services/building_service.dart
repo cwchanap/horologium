@@ -14,7 +14,12 @@ class BuildingService {
           building.type == BuildingType.waterTreatment ||
           building.type == BuildingType.sawmill ||
           building.type == BuildingType.quarry ||
-          building.type == BuildingType.field) {
+          building.type == BuildingType.field ||
+          building.type == BuildingType.bakery ||
+          building.type == BuildingType.windMill ||
+          building.type == BuildingType.grinderMill ||
+          building.type == BuildingType.riceHuller ||
+          building.type == BuildingType.maltHouse) {
         return true;
       }
       // Check if building is unlocked by research

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:horologium/constants/assets_path.dart';
 import 'package:horologium/game/building/category.dart';
+import 'package:horologium/game/building/bakery_product.dart';
 import 'package:horologium/game/building/crop_type.dart';
 
 enum BuildingType {
@@ -19,6 +20,7 @@ enum BuildingType {
   grinderMill,
   riceHuller,
   maltHouse,
+  bakery,
 }
 
 class Building {
@@ -138,9 +140,70 @@ class Field extends Building {
   }
 }
 
+class Bakery extends Building {
+  BakeryProduct productType;
+
+  Bakery({
+    required BuildingType type,
+    required String name,
+    required String description,
+    required IconData icon,
+    String? assetPath,
+    required Color color,
+    required int baseCost,
+    Map<String, double> baseGeneration = const {},
+    Map<String, double> baseConsumption = const {},
+    int basePopulation = 0,
+    int maxLevel = 5,
+    int gridSize = 4,
+    int baseBuildingLimit = 4,
+    int requiredWorkers = 1,
+    required BuildingCategory category,
+    int level = 1,
+    this.productType = BakeryProduct.bread,
+  }) : super(
+          type: type,
+          name: name,
+          description: description,
+          icon: icon,
+          assetPath: assetPath,
+          color: color,
+          baseCost: baseCost,
+          baseGeneration: baseGeneration,
+          baseConsumption: baseConsumption,
+          basePopulation: basePopulation,
+          maxLevel: maxLevel,
+          gridSize: gridSize,
+          baseBuildingLimit: baseBuildingLimit,
+          requiredWorkers: requiredWorkers,
+          category: category,
+          level: level,
+        );
+
+  @override
+  Map<String, double> get generation {
+    switch (productType) {
+      case BakeryProduct.bread:
+        return {'bread': 1.0 * level};
+      case BakeryProduct.pastries:
+        return {'pastries': 1.0 * level};
+    }
+  }
+
+  @override
+  Map<String, double> get consumption {
+    switch (productType) {
+      case BakeryProduct.bread:
+        return {'flour': 2.0 * level};
+      case BakeryProduct.pastries:
+        return {'flour': 3.0 * level};
+    }
+  }
+}
+
 class BuildingLimitManager {
   final Map<BuildingType, int> _limitUpgrades = {};
-  
+
   int getBuildingLimit(BuildingType type) {
     final baseLimit = BuildingRegistry.availableBuildings
         .firstWhere((b) => b.type == type)
@@ -366,6 +429,16 @@ class BuildingRegistry {
       baseGeneration: {'maltedBarley': 1},
       requiredWorkers: 1,
       category: BuildingCategory.processing,
+    ),
+    Bakery(
+      type: BuildingType.bakery,
+      name: 'Bakery',
+      description: 'Produces bread or pastries from flour.',
+      icon: Icons.bakery_dining,
+      color: Colors.orange,
+      baseCost: 150,
+      requiredWorkers: 1,
+      category: BuildingCategory.refinement,
     ),
   ];
 }

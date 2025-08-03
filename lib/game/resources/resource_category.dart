@@ -4,6 +4,7 @@ enum ResourceCategory {
   rawMaterials,
   foodResources,
   stapleGrains,
+  refinement,
 }
 
 extension ResourceCategoryExtension on ResourceCategory {
@@ -15,6 +16,8 @@ extension ResourceCategoryExtension on ResourceCategory {
         return 'Food Resources';
       case ResourceCategory.stapleGrains:
         return 'Staple Grains';
+      case ResourceCategory.refinement:
+        return 'Refinement';
     }
   }
 
@@ -26,6 +29,8 @@ extension ResourceCategoryExtension on ResourceCategory {
         return Icons.restaurant;
       case ResourceCategory.stapleGrains:
         return Icons.grain;
+      case ResourceCategory.refinement:
+        return Icons.bakery_dining;
     }
   }
 }

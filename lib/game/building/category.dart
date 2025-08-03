@@ -5,4 +5,5 @@ enum BuildingCategory {
   foodResources,
   services,
   processing,
+  refinement,
 }

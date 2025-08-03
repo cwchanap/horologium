@@ -20,6 +20,8 @@ class Resources {
     ResourceType.cornmeal: 0,
     ResourceType.polishedRice: 0,
     ResourceType.maltedBarley: 0,
+    ResourceType.bread: 0,
+    ResourceType.pastries: 0,
   };
   int population = 20; // Starting population
   int availableWorkers = 20; // Workers not assigned to buildings
@@ -127,6 +129,8 @@ class Resources {
   double get cornmeal => resources[ResourceType.cornmeal]!;
   double get polishedRice => resources[ResourceType.polishedRice]!;
   double get maltedBarley => resources[ResourceType.maltedBarley]!;
+  double get bread => resources[ResourceType.bread]!;
+  double get pastries => resources[ResourceType.pastries]!;
 
   set money(double value) => resources[ResourceType.money] = value;
   set electricity(double value) => resources[ResourceType.electricity] = value;
@@ -146,6 +150,8 @@ class Resources {
   set cornmeal(double value) => resources[ResourceType.cornmeal] = value;
   set polishedRice(double value) => resources[ResourceType.polishedRice] = value;
   set maltedBarley(double value) => resources[ResourceType.maltedBarley] = value;
+  set bread(double value) => resources[ResourceType.bread] = value;
+  set pastries(double value) => resources[ResourceType.pastries] = value;
   
   // Helper methods for worker management
   bool canAssignWorkerTo(Building building) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:horologium/game/building/building.dart';
+import 'package:horologium/game/building/bakery_product.dart';
 import 'package:horologium/game/building/crop_type.dart';
 import 'package:horologium/game/resources/resources.dart';
 
@@ -189,6 +190,30 @@ class BuildingMenu {
                         items: CropType.values
                             .map<DropdownMenuItem<CropType>>((CropType value) {
                           return DropdownMenuItem<CropType>(
+                            value: value,
+                            child: Text(value.toString().split('.').last),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                    if (building is Bakery) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Product Type:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      DropdownButton<BakeryProduct>(
+                        value: (building as Bakery).productType,
+                        onChanged: (BakeryProduct? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              (building as Bakery).productType = newValue;
+                            });
+                          }
+                        },
+                        items: BakeryProduct.values
+                            .map<DropdownMenuItem<BakeryProduct>>((BakeryProduct value) {
+                          return DropdownMenuItem<BakeryProduct>(
                             value: value,
                             child: Text(value.toString().split('.').last),
                           );
