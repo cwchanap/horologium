@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:horologium/constants/assets_path.dart';
 import 'package:horologium/game/building/category.dart';
-import 'package:horologium/game/building/bakery_product.dart';
-import 'package:horologium/game/building/crop_type.dart';
+import 'package:horologium/game/resources/resource_type.dart';
 
 enum BuildingType {
   powerPlant,

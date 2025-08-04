@@ -14,5 +14,7 @@ class Assets {
   static const String grinderMill = 'building/grinder_mill.png';
   static const String riceHuller = 'building/rice_huller.png';
   static const String maltHouse = 'building/malt_house.png';
+  static const String sawmill = 'building/sawmill.png';
+  static const String bakery = 'building/bakery.png';
 
 }

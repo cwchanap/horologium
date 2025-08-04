@@ -66,3 +66,14 @@ class ResourceRegistry {
     return availableResources.firstWhereOrNull((r) => r.type == type);
   }
 }
+enum BakeryProduct {
+  bread,
+  pastries,
+}
+
+enum CropType {
+  wheat,
+  corn,
+  rice,
+  barley,
+}
