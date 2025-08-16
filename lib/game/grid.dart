@@ -26,6 +26,11 @@ class Grid extends PositionComponent with HasGameReference {
 
   Grid({this.gridSize = 50});
 
+  // Public getter to access the sprite cache
+  Sprite? getSpriteForBuilding(Building building) {
+    return building.assetPath != null ? _spriteCache[building.assetPath!] : null;
+  }
+
   Vector2? getGridPosition(Vector2 localPosition) {
     if (localPosition.x < 0 ||
         localPosition.y < 0 ||

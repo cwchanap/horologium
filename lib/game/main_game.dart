@@ -132,7 +132,7 @@ class MainGame extends FlameGame
   void showPlacementPreview(Building building, Vector2 position) {
     if (_grid == null) return;
     
-    placementPreview.building = building;
+    placementPreview.setBuilding(building);
     
     final localPosition = _grid!.toLocal(position);
     final gridPosition = _grid!.getGridPosition(localPosition);
@@ -170,9 +170,13 @@ class MainGame extends FlameGame
   }
 }
 
-class PlacementPreview extends PositionComponent {
+class PlacementPreview extends PositionComponent with HasGameRef<MainGame> {
   Building? building;
   bool isValid = false;
+
+  void setBuilding(Building? newBuilding) {
+    building = newBuilding;
+  }
 
   @override
   void render(Canvas canvas) {
@@ -185,16 +189,50 @@ class PlacementPreview extends PositionComponent {
     final width = (cellWidth * buildingSize).toDouble();
     final height = (cellHeight * buildingSize).toDouble();
 
-    final paint = Paint()
-      ..color = (isValid ? Colors.green : Colors.red).withAlpha(100)
-      ..style = PaintingStyle.fill;
-
     final rect = Rect.fromLTWH(
       2,
       2,
       width - 4,
       height - 4,
     );
-    canvas.drawRect(rect, paint);
+
+    // Get sprite from the grid's cache
+    final sprite = gameRef.grid.getSpriteForBuilding(building!);
+
+    // Render the building sprite if available
+    if (sprite != null) {
+      // Draw a semi-transparent background first
+      final backgroundPaint = Paint()
+        ..color = (isValid ? Colors.green : Colors.red).withAlpha(50)
+        ..style = PaintingStyle.fill;
+      canvas.drawRect(rect, backgroundPaint);
+      
+      // Draw the building sprite with transparency
+      final spritePaint = Paint()
+        ..colorFilter = ColorFilter.mode(
+          (isValid ? Colors.white : Colors.red).withAlpha(180),
+          BlendMode.modulate,
+        );
+      
+      sprite.render(
+        canvas, 
+        position: Vector2(rect.left, rect.top), 
+        size: Vector2(rect.width, rect.height),
+        overridePaint: spritePaint,
+      );
+      
+      // Draw a border
+      final borderPaint = Paint()
+        ..color = (isValid ? Colors.green : Colors.red)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2;
+      canvas.drawRect(rect, borderPaint);
+    } else {
+      // Fallback to colored rectangle if no sprite available
+      final paint = Paint()
+        ..color = (isValid ? Colors.green : Colors.red).withAlpha(100)
+        ..style = PaintingStyle.fill;
+      canvas.drawRect(rect, paint);
+    }
   }
 }

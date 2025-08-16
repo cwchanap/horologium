@@ -15,6 +15,30 @@ class BuildingCard extends StatelessWidget {
     required this.maxCount,
   });
 
+  Widget _buildBuildingImage({double size = 24}) {
+    if (building.assetPath != null) {
+      return Image.asset(
+        'assets/images/${building.assetPath!}',
+        width: size,
+        height: size,
+        errorBuilder: (context, error, stackTrace) {
+          // Fallback to icon if image fails to load
+          return Icon(
+            building.icon,
+            color: building.color,
+            size: size,
+          );
+        },
+      );
+    } else {
+      return Icon(
+        building.icon,
+        color: building.color,
+        size: size,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAtLimit = currentCount >= maxCount;
@@ -34,11 +58,7 @@ class BuildingCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              Icon(
-                building.icon,
-                color: building.color,
-                size: 24,
-              ),
+              _buildBuildingImage(size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
