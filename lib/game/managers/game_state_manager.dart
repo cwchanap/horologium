@@ -2,7 +2,7 @@ import 'dart:async' as async;
 import 'package:flutter/material.dart';
 
 import '../building/building.dart';
-import '../research.dart';
+import '../research/research.dart';
 import '../resources/resources.dart';
 import '../services/resource_service.dart';
 

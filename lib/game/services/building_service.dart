@@ -1,5 +1,5 @@
 import '../building/building.dart';
-import '../research.dart';
+import '../research/research.dart';
 
 class BuildingService {
   static List<Building> getAvailableBuildings(ResearchManager researchManager) {

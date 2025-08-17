@@ -1,6 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../research.dart';
+import '../research/research.dart';
 import '../resources/resources.dart';
 
 class SaveService {
@@ -35,7 +35,7 @@ class SaveService {
     await prefs.setDouble(_keyWater, resources.water);
     
     // Save research progress
-    await prefs.setStringList(_keyCompletedResearch, researchManager.completedResearch.toList());
+    await prefs.setStringList(_keyCompletedResearch, researchManager.toList());
     
     // Save buildings if provided
     if (buildingData != null) {

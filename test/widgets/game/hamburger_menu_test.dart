@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/widgets/game/hamburger_menu.dart';
 import 'package:horologium/game/resources/resources.dart';
-import 'package:horologium/game/research.dart';
+import 'package:horologium/game/research/research.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/grid.dart';
 

@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/widgets/game/building_selection_panel.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/building/category.dart';
-import 'package:horologium/game/research.dart';
+import 'package:horologium/game/research/research.dart';
 import 'package:horologium/game/grid.dart';
 
 void main() {

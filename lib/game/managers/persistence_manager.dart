@@ -1,4 +1,4 @@
-import '../research.dart';
+import '../research/research.dart';
 import '../resources/resources.dart';
 import '../services/save_service.dart';
 

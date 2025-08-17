@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../game/building/building.dart';
 import '../../game/building/category.dart';
-import '../../game/research.dart';
+import '../../game/research/research.dart';
 import '../../game/services/building_service.dart';
 import '../../game/grid.dart';
 import '../cards/building_card.dart';

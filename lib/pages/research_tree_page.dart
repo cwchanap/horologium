@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../game/research.dart';
+import '../game/research/research.dart';
 import '../game/resources/resources.dart';
 import '../game/building/building.dart';
 
@@ -100,7 +100,7 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
   }
 
   Widget _buildResearchCard(Research research) {
-    final isCompleted = widget.researchManager.isResearched(research.id);
+    final isCompleted = widget.researchManager.isResearched(research.type);
     final canResearch = widget.researchManager.canResearch(research);
     final hasEnoughResources = widget.resources.research >= research.cost;
     
@@ -165,7 +165,7 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
                   onPressed: (canResearch && hasEnoughResources) ? () {
                     setState(() {
                       widget.resources.research -= research.cost;
-                      widget.researchManager.completeResearch(research.id);
+                      widget.researchManager.completeResearch(research.type);
                       
                       // Handle building limit upgrades
                       if (widget.buildingLimitManager != null) {

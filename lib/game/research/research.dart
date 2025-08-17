@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
-import 'building/building.dart';
+import '../building/building.dart';
+import 'research_type.dart';
 
 class Research {
-  final String id;
+  final ResearchType type;
   final String name;
   final String description;
   final IconData icon;
   final Color color;
   final int cost;
-  final List<String> prerequisites;
+  final List<ResearchType> prerequisites;
   final List<BuildingType> unlocksBuildings;
 
   Research({
-    required this.id,
+    required this.type,
     required this.name,
     required this.description,
     required this.icon,
@@ -22,9 +23,11 @@ class Research {
     this.unlocksBuildings = const [],
   });
 
+  String get id => type.id;
+
   static final List<Research> availableResearch = [
     Research(
-      id: 'electricity',
+      type: ResearchType.electricity,
       name: 'Electricity',
       description: 'Unlocks the ability to build Power Plants',
       icon: Icons.bolt,
@@ -33,7 +36,7 @@ class Research {
       unlocksBuildings: [BuildingType.powerPlant],
     ),
     Research(
-      id: 'gold_mining',
+      type: ResearchType.goldMining,
       name: 'Gold Mining',
       description: 'Unlocks the ability to build Gold Mines',
       icon: Icons.attach_money,
@@ -42,7 +45,7 @@ class Research {
       unlocksBuildings: [BuildingType.goldMine],
     ),
     Research(
-      id: 'expansion_planning',
+      type: ResearchType.expansionPlanning,
       name: 'Expansion Planning',
       description: 'Increases building limits by 2 for all building types',
       icon: Icons.business,
@@ -50,16 +53,16 @@ class Research {
       cost: 15,
     ),
     Research(
-      id: 'advanced_construction',
+      type: ResearchType.advancedConstruction,
       name: 'Advanced Construction',
       description: 'Further increases building limits by 3 for all building types',
       icon: Icons.engineering,
       color: Colors.purple,
       cost: 25,
-      prerequisites: ['expansion_planning'],
+      prerequisites: [ResearchType.expansionPlanning],
     ),
     Research(
-      id: 'grain_processing',
+      type: ResearchType.grainProcessing,
       name: 'Grain Processing',
       description: 'Unlocks Wind Mills and Grinder Mills',
       icon: Icons.grain,
@@ -68,32 +71,66 @@ class Research {
       unlocksBuildings: [BuildingType.windMill, BuildingType.grinderMill],
     ),
     Research(
-      id: 'advanced_grain_processing',
+      type: ResearchType.advancedGrainProcessing,
       name: 'Advanced Grain Processing',
       description: 'Unlocks Rice Hullers and Malt Houses',
       icon: Icons.grain,
       color: Colors.brown,
       cost: 30,
-      prerequisites: ['grain_processing'],
+      prerequisites: [ResearchType.grainProcessing],
       unlocksBuildings: [BuildingType.riceHuller, BuildingType.maltHouse],
+    ),
+    Research(
+      type: ResearchType.modernHousing,
+      name: 'Modern Housing',
+      description: 'Unlocks Large Houses with better efficiency and accommodation',
+      icon: Icons.apartment,
+      color: Colors.lightGreen,
+      cost: 25,
+      prerequisites: [ResearchType.electricity],
+      unlocksBuildings: [BuildingType.largeHouse],
+    ),
+    Research(
+      type: ResearchType.foodProcessing,
+      name: 'Food Processing',
+      description: 'Unlocks Bakeries for producing bread and pastries',
+      icon: Icons.bakery_dining,
+      color: Colors.orange,
+      cost: 30,
+      prerequisites: [ResearchType.grainProcessing],
+      unlocksBuildings: [BuildingType.bakery],
     ),
   ];
 }
 
 class ResearchManager {
-  final Set<String> _completedResearch = <String>{};
+  final Set<ResearchType> _completedResearch = <ResearchType>{};
   
-  bool isResearched(String researchId) {
-    return _completedResearch.contains(researchId);
+  bool isResearched(ResearchType researchType) {
+    return _completedResearch.contains(researchType);
+  }
+
+  // Legacy method for backward compatibility with string IDs
+  bool isResearchedById(String researchId) {
+    final type = ResearchTypeHelper.fromId(researchId);
+    return type != null && _completedResearch.contains(type);
   }
   
-  void completeResearch(String researchId) {
-    _completedResearch.add(researchId);
+  void completeResearch(ResearchType researchType) {
+    _completedResearch.add(researchType);
+  }
+
+  // Legacy method for backward compatibility with string IDs
+  void completeResearchById(String researchId) {
+    final type = ResearchTypeHelper.fromId(researchId);
+    if (type != null) {
+      _completedResearch.add(type);
+    }
   }
   
   bool canResearch(Research research) {
     // Check if already completed
-    if (isResearched(research.id)) return false;
+    if (isResearched(research.type)) return false;
     
     // Check if all prerequisites are met
     for (final prereq in research.prerequisites) {
@@ -107,7 +144,7 @@ class ResearchManager {
     final List<BuildingType> unlocked = [];
     
     for (final research in Research.availableResearch) {
-      if (isResearched(research.id)) {
+      if (isResearched(research.type)) {
         unlocked.addAll(research.unlocksBuildings);
       }
     }
@@ -115,10 +152,19 @@ class ResearchManager {
     return unlocked;
   }
   
-  Set<String> get completedResearch => Set.from(_completedResearch);
+  Set<ResearchType> get completedResearch => Set.from(_completedResearch);
   
   void loadFromList(List<String> completed) {
     _completedResearch.clear();
-    _completedResearch.addAll(completed);
+    for (final id in completed) {
+      final type = ResearchTypeHelper.fromId(id);
+      if (type != null) {
+        _completedResearch.add(type);
+      }
+    }
+  }
+
+  List<String> toList() {
+    return _completedResearch.map((type) => type.id).toList();
   }
 }
