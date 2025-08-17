@@ -67,7 +67,7 @@ class BuildingMenu {
                     const SizedBox(height: 16),
 
                     // Cost
-                    _buildDetailRow('Cost', '${building.cost} money', Colors.green),
+                    _buildDetailRow('Cost', '${building.cost} cash', Colors.green),
 
                     // Population
                     if (building.accommodationCapacity > 0)
@@ -226,9 +226,9 @@ class BuildingMenu {
                 if (building.canUpgrade)
                   ElevatedButton(
                     onPressed: () {
-                      if (resources.money >= building.upgradeCost) {
+                      if (resources.cash >= building.upgradeCost) {
                         setState(() {
-                          resources.money -= building.upgradeCost;
+                          resources.cash -= building.upgradeCost;
                           building.upgrade();
                           onResourcesChanged();
                         });
@@ -236,7 +236,7 @@ class BuildingMenu {
                         onBuildingUpgraded();
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Not enough money!')),
+                          const SnackBar(content: Text('Not enough cash!')),
                         );
                       }
                     },
@@ -283,8 +283,8 @@ class BuildingMenu {
 
   static String _capitalizeResource(String resource) {
     switch (resource) {
-      case 'money':
-        return 'Money';
+      case 'cash':
+        return 'Cash';
       case 'electricity':
         return 'Electricity';
       case 'coal':

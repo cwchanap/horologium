@@ -18,14 +18,14 @@ _game.onGridCellLongTapped = _onGridCellLongTapped;
 ```
 
 ### Resource System Architecture
-- **ResourceType enum** defines all resources (money, gold, wood, etc.)
+- **ResourceType enum** defines all resources (cash, gold, wood, etc.)
 - **Resources class** manages Map<ResourceType, double> with helper getters/setters
 - **Timer-based updates**: 1-second intervals trigger building production/consumption
 - **Worker assignment**: Buildings require workers to produce resources
 
 ### State Persistence Pattern
 All game state uses SharedPreferences with specific key patterns:
-- Resources: individual keys like 'money', 'gold', 'coal'
+- Resources: individual keys like 'cash', 'gold', 'coal'
 - Buildings: StringList 'buildings' with format 'x,y,BuildingName'
 - Research: StringList 'completed_research' with research IDs
 
@@ -40,7 +40,7 @@ All game state uses SharedPreferences with specific key patterns:
 ### Resource Management Flow
 ```dart
 // Production/consumption uses string keys that map to ResourceType enum
-building.baseGeneration = {'wood': 1, 'money': 0.5};
+building.baseGeneration = {'wood': 1, 'cash': 0.5};
 // Update cycle: check consumption → consume → produce
 resources.update(resourceType, (v) => v + value, ifAbsent: () => value);
 ```
@@ -49,7 +49,7 @@ resources.update(resourceType, (v) => v + value, ifAbsent: () => value);
 Use `SharedPreferences.setMockInitialValues()` for all tests:
 ```dart
 SharedPreferences.setMockInitialValues({
-  'money': 1000.0,
+  'cash': 1000.0,
   'population': 20,
   'buildings': ['5,5,House', '10,10,Power Plant']
 });
@@ -109,7 +109,7 @@ Focus on the Map-based resource system, callback-driven Flame integration, and S
 - **Building limits**: Research-gated building count restrictions
 
 #### Resource Management
-- **Core resources**: Money, gold, wood, coal, electricity, water, research, stone, planks
+- **Core resources**: Cash, gold, wood, coal, electricity, water, research, stone, planks
 - **Population system**: Sheltered/unsheltered population with accommodation needs
 - **Worker allocation**: Available workers can be assigned to buildings
 - **Production chains**: Buildings consume and produce different resources

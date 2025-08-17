@@ -39,7 +39,7 @@ _game.onGridCellLongTapped = _inputHandler.handleGridCellLongTapped;
 - `lib/game/managers/` - Game state, persistence, and input management
 
 ### Resource System Architecture
-- **ResourceType enum** defines all resources (money, gold, wood, coal, electricity, water, research, stone, planks)
+- **ResourceType enum** defines all resources (cash, gold, wood, coal, electricity, water, research, stone, planks)
 - **Resources class** manages `Map<ResourceType, double>` with helper getters/setters
 - **Timer-based updates**: 1-second intervals trigger building production/consumption
 - **Worker assignment**: Buildings require workers to produce resources
@@ -54,7 +54,7 @@ _game.onGridCellLongTapped = _inputHandler.handleGridCellLongTapped;
 
 ### State Persistence
 All game state uses SharedPreferences with specific patterns:
-- Resources: individual keys like 'money', 'gold', 'coal'
+- Resources: individual keys like 'cash', 'gold', 'coal'
 - Buildings: StringList 'buildings' with format 'x,y,BuildingName'
 - Research: StringList 'completed_research' with research IDs
 
@@ -75,7 +75,7 @@ All game state uses SharedPreferences with specific patterns:
 ### Resource Management Flow
 ```dart
 // Production/consumption uses string keys that map to ResourceType enum
-building.baseGeneration = {'wood': 1, 'money': 0.5};
+building.baseGeneration = {'wood': 1, 'cash': 0.5};
 // Update cycle: check consumption → consume → produce
 resources.update(resourceType, (v) => v + value, ifAbsent: () => value);
 ```
@@ -84,7 +84,7 @@ resources.update(resourceType, (v) => v + value, ifAbsent: () => value);
 Use `SharedPreferences.setMockInitialValues()` for all tests:
 ```dart
 SharedPreferences.setMockInitialValues({
-  'money': 1000.0,
+  'cash': 1000.0,
   'population': 20,
   'buildings': ['5,5,House', '10,10,Power Plant']
 });

@@ -4,7 +4,7 @@ import '../research/research.dart';
 import '../resources/resources.dart';
 
 class SaveService {
-  static const String _keyMoney = 'money';
+  static const String _keyCash = 'cash';
   static const String _keyPopulation = 'population';
   static const String _keyAvailableWorkers = 'availableWorkers';
   static const String _keyGold = 'gold';
@@ -24,7 +24,7 @@ class SaveService {
     final prefs = await SharedPreferences.getInstance();
     
     // Save resources
-    await prefs.setDouble(_keyMoney, resources.money);
+    await prefs.setDouble(_keyCash, resources.cash);
     await prefs.setInt(_keyPopulation, resources.population);
     await prefs.setInt(_keyAvailableWorkers, resources.availableWorkers);
     await prefs.setDouble(_keyGold, resources.gold);
@@ -50,7 +50,7 @@ class SaveService {
     final prefs = await SharedPreferences.getInstance();
     
     // Load resources with defaults
-    resources.money = prefs.getDouble(_keyMoney) ?? 1000.0;
+    resources.cash = prefs.getDouble(_keyCash) ?? 1000.0;
     resources.population = prefs.getInt(_keyPopulation) ?? 20;
     resources.availableWorkers = prefs.getInt(_keyAvailableWorkers) ?? resources.population;
     resources.gold = prefs.getDouble(_keyGold) ?? 0.0;

@@ -4,7 +4,7 @@ import 'package:horologium/game/resources/resource_type.dart';
 class Resources {
   Map<ResourceType, double> resources = {
     ResourceType.electricity: 0,
-    ResourceType.money: 1000,
+    ResourceType.cash: 1000,
     ResourceType.gold: 0,
     ResourceType.wood: 0,
     ResourceType.coal: 10,
@@ -111,7 +111,7 @@ class Resources {
     }
   }
 
-  double get money => resources[ResourceType.money]!;
+  double get cash => resources[ResourceType.cash]!;
   double get electricity => resources[ResourceType.electricity]!;
   double get gold => resources[ResourceType.gold]!;
   double get wood => resources[ResourceType.wood]!;
@@ -132,7 +132,7 @@ class Resources {
   double get bread => resources[ResourceType.bread]!;
   double get pastries => resources[ResourceType.pastries]!;
 
-  set money(double value) => resources[ResourceType.money] = value;
+  set cash(double value) => resources[ResourceType.cash] = value;
   set electricity(double value) => resources[ResourceType.electricity] = value;
   set gold(double value) => resources[ResourceType.gold] = value;
   set wood(double value) => resources[ResourceType.wood] = value;

@@ -25,8 +25,8 @@ class ResourceDisplay extends StatelessWidget {
           _buildResourceRow(
             icon: Icons.attach_money,
             color: Colors.green,
-            label: 'Money',
-            value: resources.money,
+            label: 'Cash',
+            value: resources.cash,
           ),
           const SizedBox(height: 8),
           _buildResourceRow(

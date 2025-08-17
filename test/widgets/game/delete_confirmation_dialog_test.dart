@@ -40,7 +40,7 @@ void main() {
       expect(find.text('Delete ${testBuilding.name}?'), findsOneWidget);
       
       // Check content mentions refund cost
-      expect(find.text('This will refund ${testBuilding.cost} money.'), findsOneWidget);
+      expect(find.text('This will refund ${testBuilding.cost} cash.'), findsOneWidget);
     });
 
     testWidgets('has Cancel and Delete buttons', (WidgetTester tester) async {

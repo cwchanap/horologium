@@ -30,7 +30,7 @@ class DeleteConfirmationDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text('Delete ${building.name}?'),
-      content: Text('This will refund ${building.cost} money.'),
+      content: Text('This will refund ${building.cost} cash.'),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),

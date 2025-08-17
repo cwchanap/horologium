@@ -2,7 +2,7 @@ import 'package:collection/collection.dart';
 import 'resource_category.dart';
 
 enum ResourceType {
-  money,
+  cash,
   population,
   availableWorkers,
   gold,
@@ -41,7 +41,7 @@ class Resource {
 
 class ResourceRegistry {
   static final List<Resource> availableResources = [
-    Resource(type: ResourceType.money, name: 'Money', value: 1, category: ResourceCategory.rawMaterials),
+    Resource(type: ResourceType.cash, name: 'Cash', value: 1, category: ResourceCategory.rawMaterials),
     Resource(type: ResourceType.gold, name: 'Gold', value: 1, category: ResourceCategory.rawMaterials),
     Resource(type: ResourceType.wood, name: 'Wood', value: 1, category: ResourceCategory.rawMaterials),
     Resource(type: ResourceType.coal, name: 'Coal', value: 1, category: ResourceCategory.rawMaterials),

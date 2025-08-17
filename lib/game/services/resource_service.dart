@@ -7,12 +7,12 @@ class ResourceService {
   }
 
   static bool canAffordBuilding(Resources resources, Building building) {
-    return resources.money >= building.cost;
+    return resources.cash >= building.cost;
   }
 
   static void purchaseBuilding(Resources resources, Building building) {
     if (canAffordBuilding(resources, building)) {
-      resources.money -= building.cost;
+      resources.cash -= building.cost;
       
       // Auto-assign worker if the building requires one and workers are available
       if (building.requiredWorkers > 0) {
@@ -22,7 +22,7 @@ class ResourceService {
   }
 
   static void refundBuilding(Resources resources, Building building) {
-    resources.money += building.cost;
+    resources.cash += building.cost;
     
     // Unassign all workers when a building is removed
     while (building.assignedWorkers > 0) {

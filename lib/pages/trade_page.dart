@@ -18,7 +18,7 @@ class _TradePageState extends State<TradePage> {
 
   // Resource icon and color mappings based on the game's existing patterns
   final Map<ResourceType, IconData> _resourceIcons = {
-    ResourceType.money: Icons.attach_money,
+    ResourceType.cash: Icons.attach_money,
     ResourceType.gold: Icons.star,
     ResourceType.wood: Icons.park,
     ResourceType.coal: Icons.fireplace,
@@ -34,7 +34,7 @@ class _TradePageState extends State<TradePage> {
   };
 
   final Map<ResourceType, Color> _resourceColors = {
-    ResourceType.money: Colors.green,
+    ResourceType.cash: Colors.green,
     ResourceType.gold: Colors.amber,
     ResourceType.wood: Colors.brown,
     ResourceType.coal: Colors.grey,

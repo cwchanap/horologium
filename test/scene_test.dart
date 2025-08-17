@@ -182,7 +182,7 @@ void main() {
   group('MainGameWidget Tests', () {
     testWidgets('MainGameWidget can be created', (WidgetTester tester) async {
       SharedPreferences.setMockInitialValues({
-        'money': 1000.0,
+        'cash': 1000.0,
         'population': 20,
         'availableWorkers': 20,
       });
@@ -199,7 +199,7 @@ void main() {
 
     testWidgets('MainGameWidget handles basic initialization', (WidgetTester tester) async {
       SharedPreferences.setMockInitialValues({
-        'money': 1000.0,
+        'cash': 1000.0,
         'population': 20,
         'availableWorkers': 20,
         'gold': 0.0,

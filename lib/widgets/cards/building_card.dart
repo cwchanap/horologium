@@ -74,7 +74,7 @@ class BuildingCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${building.cost} money',
+                      '${building.cost} cash',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,

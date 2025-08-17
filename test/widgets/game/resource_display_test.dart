@@ -9,7 +9,7 @@ void main() {
 
     setUp(() {
       testResources = Resources();
-      testResources.money = 1500.0;
+      testResources.cash = 1500.0;
       testResources.research = 25.0;
       testResources.population = 100;
       testResources.availableWorkers = 50;
@@ -25,7 +25,7 @@ void main() {
       );
 
       // Check that all resource values are displayed
-      expect(find.text('1500'), findsOneWidget); // Money
+      expect(find.text('1500'), findsOneWidget); // Cash
       expect(find.text('25'), findsOneWidget); // Research
       expect(find.text('100'), findsOneWidget); // Population
       expect(find.text('50'), findsOneWidget); // Available workers
@@ -38,7 +38,7 @@ void main() {
     });
 
     testWidgets('displays zero values correctly', (WidgetTester tester) async {
-      testResources.money = 0.0;
+      testResources.cash = 0.0;
       testResources.research = 0.0;
       testResources.population = 0;
       testResources.availableWorkers = 0;
@@ -55,7 +55,7 @@ void main() {
     });
 
     testWidgets('displays large numbers correctly', (WidgetTester tester) async {
-      testResources.money = 999999.0;
+      testResources.cash = 999999.0;
       testResources.research = 1000.0;
       testResources.population = 5000;
       testResources.availableWorkers = 2500;
