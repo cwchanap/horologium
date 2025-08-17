@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../game/research/research.dart';
+import '../game/research/research_type.dart';
 import '../game/resources/resources.dart';
 import '../game/building/building.dart';
 
@@ -22,6 +23,14 @@ class ResearchTreePage extends StatefulWidget {
 }
 
 class _ResearchTreePageState extends State<ResearchTreePage> {
+  String _getResearchNameByType(ResearchType type) {
+    final research = Research.availableResearch.firstWhere(
+      (r) => r.type == type,
+      orElse: () => Research.availableResearch.first,
+    );
+    return research.name;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -103,6 +112,9 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
     final isCompleted = widget.researchManager.isResearched(research.type);
     final canResearch = widget.researchManager.canResearch(research);
     final hasEnoughResources = widget.resources.research >= research.cost;
+    final unmetPrerequisites = research.prerequisites
+        .where((prereq) => !widget.researchManager.isResearched(prereq))
+        .toList();
     
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -291,6 +303,71 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
                 ),
             ],
           ),
+          
+          // Prerequisites section
+          if (unmetPrerequisites.isNotEmpty)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withAlpha((255 * 0.1).round()),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.red.withAlpha((255 * 0.3).round()),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.lock,
+                            color: Colors.red,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Prerequisites Required:',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ...unmetPrerequisites.map((prereq) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 24),
+                            Icon(
+                              Icons.circle,
+                              color: Colors.red.withAlpha((255 * 0.7).round()),
+                              size: 8,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _getResearchNameByType(prereq),
+                              style: TextStyle(
+                                color: Colors.red.withAlpha((255 * 0.9).round()),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )),
+                    ],
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
