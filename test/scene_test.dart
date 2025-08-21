@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/grid.dart';
-import 'package:horologium/game/resources/resources.dart';
+import 'package:horologium/game/planet/index.dart';
 import 'package:horologium/game/main_game.dart';
 import 'package:horologium/game/scene_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -189,7 +189,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: MainGameWidget(resources: Resources()),
+          home: MainGameWidget(planet: Planet(id: 'test', name: 'Test')),
         ),
       );
 
@@ -212,7 +212,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: MainGameWidget(resources: Resources()),
+          home: MainGameWidget(planet: Planet(id: 'test', name: 'Test')),
         ),
       );
 

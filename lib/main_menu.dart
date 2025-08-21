@@ -3,7 +3,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:flame/game.dart';
-import 'package:horologium/game/resources/resources.dart';
+import 'package:horologium/game/planet/index.dart';
+import 'package:horologium/game/services/save_service.dart';
 import 'package:horologium/pages/trade_page.dart';
 import 'game/scene_widget.dart';
 
@@ -21,11 +22,12 @@ class _MainMenuState extends State<MainMenu>
   late AnimationController _buttonController;
   late Animation<double> _titleAnimation;
   late Animation<double> _buttonAnimation;
-  final Resources _resources = Resources();
+  Planet? _activePlanet;
 
   @override
   void initState() {
     super.initState();
+    _initializePlanet();
 
     _starsController = AnimationController(
       duration: const Duration(seconds: 20),
@@ -53,6 +55,19 @@ class _MainMenuState extends State<MainMenu>
     // Start animations
     _titleController.forward().then((_) {
       _buttonController.forward();
+    });
+  }
+
+  Future<void> _initializePlanet() async {
+    // Load or create the active planet
+    final activePlanetId = await SaveService.loadActivePlanetId() ?? 'earth';
+    final planet = await SaveService.loadOrCreatePlanet(activePlanetId, name: 'Earth');
+    
+    // Initialize the global active planet
+    ActivePlanet().initialize(planet);
+    
+    setState(() {
+      _activePlanet = planet;
     });
   }
 
@@ -264,17 +279,21 @@ class _MainMenuState extends State<MainMenu>
   }
 
   void _startGame() {
+    if (_activePlanet == null) return;
+    
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => MainGameWidget(resources: _resources),
+        builder: (context) => MainGameWidget(planet: _activePlanet!),
       ),
     );
   }
 
   void _openTradePage() {
+    if (_activePlanet == null) return;
+    
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => TradePage(resources: _resources),
+        builder: (context) => TradePage(resources: _activePlanet!.resources),
       ),
     );
   }

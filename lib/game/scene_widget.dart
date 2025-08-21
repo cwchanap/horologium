@@ -13,13 +13,13 @@ import 'managers/building_placement_manager.dart';
 import 'managers/game_state_manager.dart';
 import 'managers/input_handler.dart';
 import 'managers/persistence_manager.dart';
+import 'planet/index.dart';
 import 'services/resource_service.dart';
-import 'resources/resources.dart';
 
 class MainGameWidget extends StatefulWidget {
-  final Resources resources;
+  final Planet planet;
 
-  const MainGameWidget({super.key, required this.resources});
+  const MainGameWidget({super.key, required this.planet});
 
   @override
   State<MainGameWidget> createState() => _MainGameWidgetState();
@@ -46,18 +46,18 @@ class _MainGameWidgetState extends State<MainGameWidget> {
 
   void _initializeGame() {
     _game = MainGame();
-    _gameStateManager = GameStateManager(resources: widget.resources);
+    _gameStateManager = GameStateManager(resources: widget.planet.resources);
     
     _placementManager = BuildingPlacementManager(
       game: _game,
-      resources: widget.resources,
+      resources: widget.planet.resources,
       buildingLimitManager: _gameStateManager.buildingLimitManager,
       onResourcesChanged: _onResourcesChanged,
     );
 
     _inputHandler = InputHandler(
       game: _game,
-      resources: widget.resources,
+      resources: widget.planet.resources,
       placementManager: _placementManager,
       onEmptyGridTapped: _onEmptyGridTapped,
       onBuildingLongTapped: _onBuildingLongTapped,
@@ -77,7 +77,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
 
   Future<void> _loadSavedData() async {
     await PersistenceManager.loadSavedData(
-      widget.resources,
+      widget.planet.resources,
       _gameStateManager.researchManager,
     );
     setState(() {});
@@ -93,7 +93,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   void _onResourcesChanged() {
     setState(() {
       PersistenceManager.saveResources(
-        widget.resources,
+        widget.planet.resources,
         _gameStateManager.researchManager,
       );
     });
@@ -171,7 +171,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                 top: 20,
                 right: 20,
                 child: ResourceDisplay(
-                  resources: widget.resources,
+                  resources: widget.planet.resources,
                 ),
               ),
             
@@ -195,7 +195,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
               HamburgerMenu(
                 isVisible: _showHamburgerMenu,
                 onClose: () => setState(() => _showHamburgerMenu = false),
-                resources: widget.resources,
+                resources: widget.planet.resources,
                 researchManager: _gameStateManager.researchManager,
                 buildingLimitManager: _gameStateManager.buildingLimitManager,
                 grid: _game.grid,
@@ -229,7 +229,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
       onConfirm: () {
         _game.grid.removeBuilding(x, y);
         setState(() {
-          ResourceService.refundBuilding(widget.resources, building);
+          ResourceService.refundBuilding(widget.planet.resources, building);
         });
         _onResourcesChanged();
       },
