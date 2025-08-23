@@ -41,7 +41,6 @@ class Resource {
 
 class ResourceRegistry {
   static final List<Resource> availableResources = [
-    Resource(type: ResourceType.cash, name: 'Cash', value: 1, category: ResourceCategory.rawMaterials),
     Resource(type: ResourceType.gold, name: 'Gold', value: 1, category: ResourceCategory.rawMaterials),
     Resource(type: ResourceType.wood, name: 'Wood', value: 1, category: ResourceCategory.rawMaterials),
     Resource(type: ResourceType.coal, name: 'Coal', value: 1, category: ResourceCategory.rawMaterials),

@@ -239,11 +239,11 @@ void main() {
       final container = tester.widget<Container>(find.byType(Container).first);
       expect(container.decoration, isA<BoxDecoration>());
       
-      // Check that there are ListTiles for each menu item
-      expect(find.byType(ListTile), findsNWidgets(4));
+      // Check that there are ListTiles for each menu item (Research, Resources, Trade, Planet Selection, Close)
+      expect(find.byType(ListTile), findsNWidgets(5));
       
       // Check that there are Dividers between items
-      expect(find.byType(Divider), findsNWidgets(3));
+      expect(find.byType(Divider), findsNWidgets(4));
     });
 
     testWidgets('has correct width', (WidgetTester tester) async {

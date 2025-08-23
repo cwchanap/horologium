@@ -12,8 +12,6 @@ class TradePage extends StatefulWidget {
 }
 
 class _TradePageState extends State<TradePage> {
-  ResourceType? _selectedFromResource;
-  ResourceType? _selectedToResource;
   final _amountController = TextEditingController();
 
   // Resource icon and color mappings based on the game's existing patterns
@@ -62,7 +60,7 @@ class _TradePageState extends State<TradePage> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         title: const Text(
-          'Trade Center',
+          'Resource Market',
           style: TextStyle(color: Colors.cyan, fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
@@ -76,7 +74,7 @@ class _TradePageState extends State<TradePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Resource Trading',
+              'Resource Market',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 24,
@@ -85,7 +83,7 @@ class _TradePageState extends State<TradePage> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Select a resource to trade, then choose what to trade it for.',
+              'Buy and sell resources using cash. Buy costs 10x value, sell gives 8x value.',
               style: TextStyle(
                 color: Colors.grey,
                 fontSize: 16,
@@ -94,17 +92,14 @@ class _TradePageState extends State<TradePage> {
             const SizedBox(height: 24),
             Expanded(
               child: ListView.builder(
-                itemCount: ResourceRegistry.availableResources.length,
+                itemCount: ResourceRegistry.availableResources.where((resource) => resource.type != ResourceType.research).length,
                 itemBuilder: (context, index) {
-                  final resource = ResourceRegistry.availableResources[index];
+                  final filteredResources = ResourceRegistry.availableResources.where((resource) => resource.type != ResourceType.research).toList();
+                  final resource = filteredResources[index];
                   return _buildResourceTileCard(resource);
                 },
               ),
             ),
-            if (_selectedFromResource != null) ...[
-              const SizedBox(height: 16),
-              _buildTradeInterface(),
-            ],
           ],
         ),
       ),
@@ -115,8 +110,6 @@ class _TradePageState extends State<TradePage> {
     final amount = widget.resources.resources[resource.type] ?? 0.0;
     final icon = _resourceIcons[resource.type] ?? Icons.help;
     final color = _resourceColors[resource.type] ?? Colors.grey;
-    final isSelected = _selectedFromResource == resource.type;
-    final hasResources = amount > 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -124,357 +117,316 @@ class _TradePageState extends State<TradePage> {
         color: Colors.grey.withAlpha((255 * 0.1).round()),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isSelected 
-              ? Colors.cyan 
-              : color.withAlpha((255 * 0.3).round()), 
-          width: isSelected ? 2 : 1,
+          color: color.withAlpha((255 * 0.3).round()),
+          width: 1,
         ),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: hasResources ? () {
-            setState(() {
-              if (_selectedFromResource == resource.type) {
-                _selectedFromResource = null;
-                _selectedToResource = null;
-              } else {
-                _selectedFromResource = resource.type;
-                _selectedToResource = null;
-              }
-            });
-          } : null,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: hasResources 
-                        ? color.withAlpha((255 * 0.2).round())
-                        : Colors.grey.withAlpha((255 * 0.1).round()),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    icon, 
-                    color: hasResources ? color : Colors.grey, 
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        resource.name,
-                        style: TextStyle(
-                          color: hasResources ? Colors.white : Colors.grey,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        resource.name == 'Research' 
-                            ? '${amount.toInt()}' 
-                            : amount.toStringAsFixed(1),
-                        style: TextStyle(
-                          color: hasResources ? color : Colors.grey,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: !hasResources
-                        ? Colors.grey.withAlpha((255 * 0.1).round())
-                        : isSelected 
-                            ? Colors.cyan.withAlpha((255 * 0.2).round())
-                            : Colors.grey.withAlpha((255 * 0.1).round()),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: !hasResources
-                          ? Colors.grey
-                          : isSelected ? Colors.cyan : Colors.grey,
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    !hasResources 
-                        ? 'NO STOCK'
-                        : isSelected 
-                            ? 'SELECTED' 
-                            : 'TRADE FOR',
-                    style: TextStyle(
-                      color: !hasResources
-                          ? Colors.grey
-                          : isSelected ? Colors.cyan : Colors.grey,
-                      fontSize: 12,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withAlpha((255 * 0.2).round()),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    resource.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTradeInterface() {
-    if (_selectedFromResource == null) return const SizedBox.shrink();
-
-    final fromResource = ResourceRegistry.find(_selectedFromResource!)!;
-    final fromIcon = _resourceIcons[_selectedFromResource] ?? Icons.help;
-    final fromColor = _resourceColors[_selectedFromResource] ?? Colors.grey;
-    final availableAmount = widget.resources.resources[_selectedFromResource!] ?? 0.0;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.withAlpha((255 * 0.05).round()),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.cyan.withAlpha((255 * 0.3).round()), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: fromColor.withAlpha((255 * 0.2).round()),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(fromIcon, color: fromColor, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Trading ${fromResource.name}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  Text(
+                    resource.name == 'Research'
+                        ? '${amount.toInt()}'
+                        : amount.toStringAsFixed(1),
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
                     ),
-                    Text(
-                      'Available: ${fromResource.name == 'Research' ? availableAmount.toInt() : availableAmount.toStringAsFixed(1)}',
-                      style: TextStyle(
-                        color: fromColor,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _amountController,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'Amount to trade',
-              labelStyle: const TextStyle(color: Colors.cyan),
-              helperText: 'Max: ${fromResource.name == 'Research' ? availableAmount.toInt() : availableAmount.toStringAsFixed(1)}',
-              helperStyle: const TextStyle(color: Colors.grey),
-              enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.cyan.withOpacity(0.5)),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Colors.cyan),
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            keyboardType: TextInputType.number,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              TextButton(
-                onPressed: () {
-                  _amountController.text = (availableAmount / 2).toStringAsFixed(1);
-                },
-                child: const Text('Half', style: TextStyle(color: Colors.cyan)),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: () {
-                  _amountController.text = fromResource.name == 'Research' 
-                      ? availableAmount.toInt().toString()
-                      : availableAmount.toStringAsFixed(1);
-                },
-                child: const Text('Max', style: TextStyle(color: Colors.cyan)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Trade for:',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 80,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: ResourceRegistry.availableResources.length,
-              itemBuilder: (context, index) {
-                final resource = ResourceRegistry.availableResources[index];
-                if (resource.type == _selectedFromResource) return const SizedBox.shrink();
-                
-                return _buildTargetResourceChip(resource);
-              },
-            ),
-          ),
-          if (_selectedToResource != null) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _performTrade,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  foregroundColor: Colors.cyan,
-                  side: const BorderSide(color: Colors.cyan, width: 1.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
                   ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  'PERFORM TRADE',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
+                ],
+              ),
+            ),
+            SizedBox(
+              width: 160,
+              child: Row(
+                children: [
+                  Flexible(
+                    child: _buildTileActionButton(
+                      'BUY',
+                      Colors.green,
+                      () => _showBuyDialog(resource, amount, resource.value * 10),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: _buildTileActionButton(
+                      'SELL',
+                      Colors.orange,
+                      amount > 0 ? () => _showSellDialog(resource, amount, resource.value * 8) : null,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildTargetResourceChip(Resource resource) {
-    final icon = _resourceIcons[resource.type] ?? Icons.help;
-    final color = _resourceColors[resource.type] ?? Colors.grey;
-    final isSelected = _selectedToResource == resource.type;
 
-    return Container(
-      margin: const EdgeInsets.only(right: 12),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () {
-            setState(() {
-              _selectedToResource = resource.type;
-            });
-          },
-          child: Container(
-            width: 120,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isSelected 
-                  ? color.withAlpha((255 * 0.2).round())
-                  : Colors.grey.withAlpha((255 * 0.1).round()),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isSelected ? color : Colors.grey.withAlpha((255 * 0.3).round()),
-                width: isSelected ? 2 : 1,
+  Widget _buildTileActionButton(String title, Color color, VoidCallback? onPressed) {
+    final isDisabled = onPressed == null;
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isDisabled
+            ? Colors.grey.withAlpha((255 * 0.1).round())
+            : color.withAlpha((255 * 0.1).round()),
+        foregroundColor: isDisabled ? Colors.grey : color,
+        side: BorderSide(
+          color: isDisabled ? Colors.grey : color,
+          width: 1
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        minimumSize: const Size(0, 36),
+      ),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: isDisabled ? Colors.grey : color,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  void _showBuyDialog(Resource resource, double availableAmount, double buyCost) {
+    final TextEditingController dialogController = TextEditingController();
+    final currentCash = widget.resources.cash;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: Text(
+            'Buy ${resource.name}',
+            style: const TextStyle(color: Colors.white),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Current Cash: ${currentCash.toStringAsFixed(1)}',
+                style: const TextStyle(color: Colors.green),
               ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: color, size: 20),
-                const SizedBox(height: 4),
-                Text(
-                  resource.name,
-                  style: TextStyle(
-                    color: isSelected ? color : Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+              const SizedBox(height: 8),
+              Text(
+                'Cost per unit: ${buyCost.toStringAsFixed(1)} cash',
+                style: const TextStyle(color: Colors.cyan),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: dialogController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Amount to buy',
+                  labelStyle: TextStyle(color: Colors.cyan),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.cyan),
                   ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.cyan),
+                  ),
                 ),
-              ],
-            ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
           ),
-        ),
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final amount = double.tryParse(dialogController.text);
+                if (amount != null && amount > 0) {
+                  final success = widget.resources.buyResource(resource.type, amount);
+                  Navigator.of(context).pop();
+                  if (success) {
+                    setState(() {});
+                    final cost = resource.value * 10 * amount;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Purchase successful! Bought ${amount.toStringAsFixed(1)} ${resource.name} for ${cost.toStringAsFixed(1)} cash'),
+                        backgroundColor: Colors.green.withAlpha((255 * 0.8).round()),
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Not enough cash for this purchase!'),
+                        backgroundColor: Colors.red.withAlpha((255 * 0.8).round()),
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Please enter a valid positive number'),
+                      backgroundColor: Colors.red.withAlpha((255 * 0.8).round()),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Buy'),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  void _performTrade() {
-    if (_selectedFromResource != null &&
-        _selectedToResource != null &&
-        _amountController.text.isNotEmpty) {
-      final amount = double.tryParse(_amountController.text);
-      if (amount != null && amount > 0) {
-        final currentAmount = widget.resources.resources[_selectedFromResource!] ?? 0.0;
-        
-        if (currentAmount >= amount) {
-          setState(() {
-            widget.resources.trade(_selectedFromResource!, _selectedToResource!, amount);
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Trade successful! Exchanged ${amount.toStringAsFixed(1)} ${ResourceRegistry.find(_selectedFromResource!)?.name} for ${ResourceRegistry.find(_selectedToResource!)?.name}'),
-              backgroundColor: Colors.green.withAlpha((255 * 0.8).round()),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-          // Clear the amount field and selections after successful trade
-          _amountController.clear();
-          setState(() {
-            _selectedFromResource = null;
-            _selectedToResource = null;
-          });
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Not enough ${ResourceRegistry.find(_selectedFromResource!)?.name}! You have ${currentAmount.toStringAsFixed(1)} but need ${amount.toStringAsFixed(1)}'),
-              backgroundColor: Colors.red.withAlpha((255 * 0.8).round()),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Please enter a valid positive number'),
-            backgroundColor: Colors.red.withAlpha((255 * 0.8).round()),
+  void _showSellDialog(Resource resource, double availableAmount, double sellGain) {
+    final TextEditingController dialogController = TextEditingController();
+    final currentCash = widget.resources.cash;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: Text(
+            'Sell ${resource.name}',
+            style: const TextStyle(color: Colors.white),
           ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Current Cash: ${currentCash.toStringAsFixed(1)}',
+                style: const TextStyle(color: Colors.green),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Available: ${resource.name == 'Research' ? availableAmount.toInt() : availableAmount.toStringAsFixed(1)}',
+                style: const TextStyle(color: Colors.orange),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Gain per unit: ${sellGain.toStringAsFixed(1)} cash',
+                style: const TextStyle(color: Colors.cyan),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: dialogController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Amount to sell',
+                  labelStyle: const TextStyle(color: Colors.cyan),
+                  helperText: 'Max: ${resource.name == 'Research' ? availableAmount.toInt() : availableAmount.toStringAsFixed(1)}',
+                  helperStyle: const TextStyle(color: Colors.grey),
+                  enabledBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.cyan),
+                  ),
+                  focusedBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.cyan),
+                  ),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final amount = double.tryParse(dialogController.text);
+                if (amount != null && amount > 0) {
+                  if (availableAmount >= amount) {
+                    final success = widget.resources.sellResource(resource.type, amount);
+                    Navigator.of(context).pop();
+                    if (success) {
+                      setState(() {});
+                      final gain = resource.value * 8 * amount;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Sale successful! Sold ${amount.toStringAsFixed(1)} ${resource.name} for ${gain.toStringAsFixed(1)} cash'),
+                          backgroundColor: Colors.green.withAlpha((255 * 0.8).round()),
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Sale failed!'),
+                          backgroundColor: Colors.red.withAlpha((255 * 0.8).round()),
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Not enough ${resource.name}! You have ${availableAmount.toStringAsFixed(1)} but need ${amount.toStringAsFixed(1)}'),
+                        backgroundColor: Colors.red.withAlpha((255 * 0.8).round()),
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Please enter a valid positive number'),
+                      backgroundColor: Colors.red.withAlpha((255 * 0.8).round()),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Sell'),
+            ),
+          ],
         );
-      }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please select both resources and enter an amount'),
-          backgroundColor: Colors.orange.withAlpha((255 * 0.8).round()),
-        ),
-      );
-    }
+      },
+    );
   }
 }

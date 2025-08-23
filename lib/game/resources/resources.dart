@@ -172,6 +172,38 @@ class Resources {
     }
   }
 
+  // Buy resource using cash (cost = resource value * 10)
+  bool buyResource(ResourceType resourceType, double amount) {
+    final resource = ResourceRegistry.find(resourceType);
+    if (resource == null) return false;
+
+    final cost = resource.value * 10 * amount;
+    final currentCash = resources[ResourceType.cash] ?? 0;
+
+    if (currentCash >= cost) {
+      resources.update(ResourceType.cash, (v) => v - cost);
+      resources.update(resourceType, (v) => v + amount, ifAbsent: () => amount);
+      return true;
+    }
+    return false;
+  }
+
+  // Sell resource for cash (gain = resource value * 8)
+  bool sellResource(ResourceType resourceType, double amount) {
+    final resource = ResourceRegistry.find(resourceType);
+    if (resource == null) return false;
+
+    final currentAmount = resources[resourceType] ?? 0;
+    if (currentAmount >= amount) {
+      final gain = resource.value * 8 * amount;
+      resources.update(resourceType, (v) => v - amount);
+      resources.update(ResourceType.cash, (v) => v + gain, ifAbsent: () => gain);
+      return true;
+    }
+    return false;
+  }
+
+  // Legacy trade method - kept for compatibility but should not be used for new cash-based trading
   void trade(ResourceType from, ResourceType to, double amount) {
     final fromResource = ResourceRegistry.find(from);
     final toResource = ResourceRegistry.find(to);
