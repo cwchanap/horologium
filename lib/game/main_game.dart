@@ -4,10 +4,10 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart' as flame_events;
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'building/building.dart';
 import 'grid.dart';
+import 'planet/index.dart';
 
 class MainGame extends FlameGame
     with
@@ -15,9 +15,11 @@ class MainGame extends FlameGame
         flame_events.DragCallbacks,
         flame_events.PointerMoveCallbacks {
   Grid? _grid;
+  Planet? _planet;
   Function(int, int)? onGridCellTapped;
   Function(int, int)? onGridCellLongTapped;
   Function(int, int)? onGridCellSecondaryTapped;
+  Function(Planet)? onPlanetChanged;
 
   static const double _minZoom = 1.0;
   static const double _maxZoom = 4.0;
@@ -27,7 +29,7 @@ class MainGame extends FlameGame
   Building? buildingToPlace;
   final PlacementPreview placementPreview = PlacementPreview();
 
-  MainGame();
+  MainGame({Planet? planet}) : _planet = planet;
 
   Grid get grid => _grid!;
   bool get hasLoaded => _grid != null;
@@ -37,7 +39,10 @@ class MainGame extends FlameGame
     await super.onLoad();
     camera.viewfinder.anchor = Anchor.center;
     camera.viewfinder.zoom = _startZoom;
-    _grid = Grid();
+    _grid = Grid(
+      onBuildingPlaced: _onBuildingPlaced,
+      onBuildingRemoved: _onBuildingRemoved,
+    );
     _grid!.size =
         Vector2(_grid!.gridSize * cellWidth, _grid!.gridSize * cellHeight);
     _grid!.anchor = Anchor.center;
@@ -46,24 +51,44 @@ class MainGame extends FlameGame
   }
 
   Future<void> loadBuildings() async {
-    final prefs = await SharedPreferences.getInstance();
-    final buildingData = prefs.getStringList('buildings');
-    if (buildingData == null || _grid == null) {
+    if (_planet == null || _grid == null) {
       return;
     }
 
-    for (final data in buildingData) {
-      final parts = data.split(',');
-      final x = int.parse(parts[0]);
-      final y = int.parse(parts[1]);
-      final buildingName = parts[2];
-
-      final building = BuildingRegistry.availableBuildings
-          .firstWhere((b) => b.name == buildingName, orElse: () {
-        return BuildingRegistry.availableBuildings.first; // Fallback to first building
-      });
-      _grid!.placeBuilding(x, y, building);
+    for (final buildingData in _planet!.buildings) {
+      final building = buildingData.createBuilding();
+      _grid!.placeBuilding(buildingData.x, buildingData.y, building, notifyCallbacks: false);
     }
+  }
+
+  // Planet management
+  void setPlanet(Planet planet) {
+    _planet = planet;
+  }
+
+  Planet? get planet => _planet;
+
+  // Grid callbacks for planet updates
+  void _onBuildingPlaced(int x, int y, Building building) {
+    if (_planet == null) return;
+    
+    final buildingData = PlacedBuildingData(
+      x: x,
+      y: y,
+      type: building.type,
+      level: building.level,
+      assignedWorkers: building.assignedWorkers,
+    );
+    
+    _planet!.addBuilding(buildingData);
+    onPlanetChanged?.call(_planet!);
+  }
+
+  void _onBuildingRemoved(int x, int y) {
+    if (_planet == null) return;
+    
+    _planet!.removeBuildingAt(x, y);
+    onPlanetChanged?.call(_planet!);
   }
 
   @override

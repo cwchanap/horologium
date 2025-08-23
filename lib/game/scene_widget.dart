@@ -15,6 +15,7 @@ import 'managers/input_handler.dart';
 import 'managers/persistence_manager.dart';
 import 'planet/index.dart';
 import 'services/resource_service.dart';
+import 'services/save_service.dart';
 
 class MainGameWidget extends StatefulWidget {
   final Planet planet;
@@ -45,7 +46,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   }
 
   void _initializeGame() {
-    _game = MainGame();
+    _game = MainGame(planet: widget.planet);
+    _game.onPlanetChanged = _onPlanetChanged;
     _gameStateManager = GameStateManager(resources: widget.planet.resources);
     
     _placementManager = BuildingPlacementManager(
@@ -96,6 +98,16 @@ class _MainGameWidgetState extends State<MainGameWidget> {
         widget.planet.resources,
         _gameStateManager.researchManager,
       );
+    });
+  }
+
+  void _onPlanetChanged(Planet planet) {
+    // Update the global active planet
+    ActivePlanet().updateActivePlanet(planet);
+    
+    setState(() {
+      // Save the planet changes immediately
+      SaveService.savePlanet(planet);
     });
   }
 

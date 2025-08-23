@@ -7,6 +7,7 @@ import '../../pages/research_tree_page.dart';
 import '../../pages/resources_page.dart';
 import '../../pages/trade_page.dart';
 import '../../game/grid.dart';
+import '../planet_switcher.dart';
 
 class HamburgerMenu extends StatelessWidget {
   final bool isVisible;
@@ -107,6 +108,18 @@ class HamburgerMenu extends StatelessWidget {
             ),
             const Divider(color: Colors.grey, height: 1),
             ListTile(
+              leading: const Icon(Icons.public, color: Colors.blue),
+              title: const Text(
+                'Planet Selection',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                onClose();
+                _showPlanetSwitcher(context);
+              },
+            ),
+            const Divider(color: Colors.grey, height: 1),
+            ListTile(
               leading: const Icon(Icons.close, color: Colors.white),
               title: const Text(
                 'Close',
@@ -117,6 +130,52 @@ class HamburgerMenu extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  void _showPlanetSwitcher(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Planet Selection',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                PlanetSwitcher(
+                  onPlanetChanged: () {
+                    Navigator.of(context).pop();
+                    onResourcesChanged(); // Refresh the UI
+                  },
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

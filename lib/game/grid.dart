@@ -2,9 +2,7 @@ import 'dart:math';
 
 import 'package:flame/components.dart';
 import 'package:flame/extensions.dart';
-import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'building/building.dart';
 
@@ -23,8 +21,16 @@ class Grid extends PositionComponent with HasGameReference {
   final int gridSize;
   final Map<String, PlacedBuilding> _buildings = {};
   final Map<String, Sprite> _spriteCache = {};
+  
+  // Callbacks for building changes (replaces direct SharedPreferences)
+  final Function(int x, int y, Building building)? onBuildingPlaced;
+  final Function(int x, int y)? onBuildingRemoved;
 
-  Grid({this.gridSize = 50});
+  Grid({
+    this.gridSize = 50, 
+    this.onBuildingPlaced,
+    this.onBuildingRemoved,
+  });
 
   // Public getter to access the sprite cache
   Sprite? getSpriteForBuilding(Building building) {
@@ -52,14 +58,6 @@ class Grid extends PositionComponent with HasGameReference {
     );
   }
 
-  Future<void> saveBuildings() async {
-    final prefs = await SharedPreferences.getInstance();
-    final buildingData = _buildings.values.toSet().map((placedBuilding) {
-      return '${placedBuilding.x},${placedBuilding.y},${placedBuilding.building.name}';
-    }).toList();
-    await prefs.setStringList('buildings', buildingData);
-  }
-
   bool isAreaAvailable(int x, int y, int size) {
     final buildingSize = sqrt(size).toInt();
     if (x + buildingSize > gridSize || y + buildingSize > gridSize) {
@@ -75,7 +73,7 @@ class Grid extends PositionComponent with HasGameReference {
     return true;
   }
 
-  void placeBuilding(int x, int y, Building building) {
+  void placeBuilding(int x, int y, Building building, {bool notifyCallbacks = true}) {
     final buildingSize = sqrt(building.gridSize).toInt();
     final placedBuilding = PlacedBuilding(building, x, y);
     for (var i = 0; i < buildingSize; i++) {
@@ -84,7 +82,9 @@ class Grid extends PositionComponent with HasGameReference {
         _buildings[key] = placedBuilding;
       }
     }
-    saveBuildings();
+    if (notifyCallbacks) {
+      onBuildingPlaced?.call(x, y, building);
+    }
   }
 
   PlacedBuilding? getPlacedBuildingAt(int x, int y) {
@@ -109,7 +109,7 @@ class Grid extends PositionComponent with HasGameReference {
         _buildings.remove(key);
       }
     }
-    saveBuildings();
+    onBuildingRemoved?.call(x, y);
   }
 
   int countBuildingsOfType(BuildingType type) {
