@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../game/resources/resources.dart';
+import '../../game/resources/resource_type.dart';
+import 'resource_icon.dart';
 
 class ResourceDisplay extends StatelessWidget {
   final Resources resources;
@@ -22,16 +24,14 @@ class ResourceDisplay extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          _buildResourceRow(
-            icon: Icons.attach_money,
-            color: Colors.green,
+          _buildResourceRowWithIcon(
+            resourceType: ResourceType.cash,
             label: 'Cash',
             value: resources.cash,
           ),
           const SizedBox(height: 8),
-          _buildResourceRow(
-            icon: Icons.science,
-            color: Colors.purple,
+          _buildResourceRowWithIcon(
+            resourceType: ResourceType.research,
             label: 'Research',
             value: resources.research,
           ),
@@ -52,6 +52,33 @@ class ResourceDisplay extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildResourceRowWithIcon({
+    required ResourceType resourceType,
+    required String label,
+    required double value,
+    bool isSubItem = false,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isSubItem) const SizedBox(width: 16),
+        ResourceIcon(
+          resourceType: resourceType,
+          size: isSubItem ? 16 : 18,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          isSubItem ? value.toInt().toString() : value.toStringAsFixed(0),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: isSubItem ? 12 : 14,
+            fontWeight: isSubItem ? FontWeight.normal : FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 

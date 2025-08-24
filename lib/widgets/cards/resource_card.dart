@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../game/resources/resource_type.dart';
+import '../game/resource_icon.dart';
 
 class ResourceCard extends StatelessWidget {
   final String name;
   final double amount;
   final Color color;
-  final IconData icon;
+  final IconData? icon;
+  final ResourceType? resourceType;
   final double productionRate;
   final double consumptionRate;
 
@@ -13,10 +16,11 @@ class ResourceCard extends StatelessWidget {
     required this.name,
     required this.amount,
     required this.color,
-    required this.icon,
+    this.icon,
+    this.resourceType,
     this.productionRate = 0.0,
     this.consumptionRate = 0.0,
-  });
+  }) : assert(icon != null || resourceType != null, 'Either icon or resourceType must be provided');
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +44,12 @@ class ResourceCard extends StatelessWidget {
                   color: color.withAlpha((255 * 0.2).round()),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: color, size: 24),
+                child: resourceType != null 
+                    ? ResourceIcon(
+                        resourceType: resourceType!,
+                        size: 24,
+                      )
+                    : Icon(icon!, color: color, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(

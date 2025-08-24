@@ -3,6 +3,8 @@ class Assets {
 
   /// With Flame's default image prefix 'assets/images/', we only need the path
   /// relative to that folder.
+  
+  // Building assets
   static const String house = 'building/house.png';
   static const String coalMine = 'building/coal_mine.png';
   static const String goldMine = 'building/gold_mine.png';
@@ -16,5 +18,25 @@ class Assets {
   static const String maltHouse = 'building/malt_house.png';
   static const String sawmill = 'building/sawmill.png';
   static const String bakery = 'building/bakery.png';
+
+  // Resource icons
+  static const String goldIcon = 'resource/gold.png';
+  static const String woodIcon = 'resource/wood.png';
+  static const String coalIcon = 'resource/coal.png';
+  static const String electricityIcon = 'resource/electricity.png';
+  static const String researchIcon = 'resource/research.png';
+  static const String waterIcon = 'resource/water.png';
+  static const String planksIcon = 'resource/plank.png';
+  static const String stoneIcon = 'resource/stone.png';
+  static const String wheatIcon = 'resource/wheat.png';
+  static const String cornIcon = 'resource/corn.png';
+  static const String riceIcon = 'resource/rice.png';
+  static const String barleyIcon = 'resource/barley.png';
+  static const String flourIcon = 'resource/flour.png';
+  static const String cornmealIcon = 'resource/cornmeal.png';
+  static const String polishedRiceIcon = 'resource/polished_rice.png';
+  static const String maltedBarleyIcon = 'resource/malted_barley.png';
+  static const String breadIcon = 'resource/bread.png';
+  static const String pastriesIcon = 'resource/pastries.png';
 
 }

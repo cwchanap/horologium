@@ -206,7 +206,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
         name: resourceData['name'],
         amount: resourceData['amount'],
         color: resourceData['color'],
-        icon: resourceData['icon'],
+        resourceType: resourceData['resourceType'],
         productionRate: _productionRates[resourceData['key']] ?? 0.0,
         consumptionRate: _consumptionRates[resourceData['key']] ?? 0.0,
       );
@@ -217,30 +217,33 @@ class _ResourcesPageState extends State<ResourcesPage> {
     switch (category) {
       case ResourceCategory.rawMaterials:
         return [
-          {'name': 'Gold', 'amount': widget.resources.gold, 'color': Colors.amber, 'icon': Icons.star, 'key': 'gold'},
-          {'name': 'Coal', 'amount': widget.resources.coal, 'color': Colors.grey, 'icon': Icons.fireplace, 'key': 'coal'},
-          {'name': 'Electricity', 'amount': widget.resources.electricity, 'color': Colors.yellow, 'icon': Icons.bolt, 'key': 'electricity'},
-          {'name': 'Wood', 'amount': widget.resources.wood, 'color': Colors.brown, 'icon': Icons.park, 'key': 'wood'},
-          {'name': 'Water', 'amount': widget.resources.water, 'color': Colors.cyan, 'icon': Icons.water_drop, 'key': 'water'},
-          {'name': 'Planks', 'amount': widget.resources.planks, 'color': Colors.brown, 'icon': Icons.construction, 'key': 'planks'},
-          {'name': 'Stone', 'amount': widget.resources.stone, 'color': Colors.grey, 'icon': Icons.terrain, 'key': 'stone'},
+          {'name': 'Gold', 'amount': widget.resources.gold, 'color': Colors.amber, 'resourceType': ResourceType.gold, 'key': 'gold'},
+          {'name': 'Coal', 'amount': widget.resources.coal, 'color': Colors.grey, 'resourceType': ResourceType.coal, 'key': 'coal'},
+          {'name': 'Electricity', 'amount': widget.resources.electricity, 'color': Colors.yellow, 'resourceType': ResourceType.electricity, 'key': 'electricity'},
+          {'name': 'Wood', 'amount': widget.resources.wood, 'color': Colors.brown, 'resourceType': ResourceType.wood, 'key': 'wood'},
+          {'name': 'Water', 'amount': widget.resources.water, 'color': Colors.cyan, 'resourceType': ResourceType.water, 'key': 'water'},
+          {'name': 'Planks', 'amount': widget.resources.planks, 'color': Colors.brown, 'resourceType': ResourceType.planks, 'key': 'planks'},
+          {'name': 'Stone', 'amount': widget.resources.stone, 'color': Colors.grey, 'resourceType': ResourceType.stone, 'key': 'stone'},
         ];
       case ResourceCategory.foodResources:
         return [
-          {'name': 'Wheat', 'amount': widget.resources.wheat, 'color': Colors.orange, 'icon': Icons.grass, 'key': 'wheat'},
-          {'name': 'Corn', 'amount': widget.resources.corn, 'color': Colors.yellow, 'icon': Icons.eco, 'key': 'corn'},
-          {'name': 'Rice', 'amount': widget.resources.rice, 'color': Colors.lightGreen, 'icon': Icons.grain, 'key': 'rice'},
-          {'name': 'Barley', 'amount': widget.resources.barley, 'color': Colors.amber, 'icon': Icons.agriculture, 'key': 'barley'},
+          {'name': 'Wheat', 'amount': widget.resources.wheat, 'color': Colors.orange, 'resourceType': ResourceType.wheat, 'key': 'wheat'},
+          {'name': 'Corn', 'amount': widget.resources.corn, 'color': Colors.yellow, 'resourceType': ResourceType.corn, 'key': 'corn'},
+          {'name': 'Rice', 'amount': widget.resources.rice, 'color': Colors.lightGreen, 'resourceType': ResourceType.rice, 'key': 'rice'},
+          {'name': 'Barley', 'amount': widget.resources.barley, 'color': Colors.amber, 'resourceType': ResourceType.barley, 'key': 'barley'},
         ];
       case ResourceCategory.stapleGrains:
         return [
-          {'name': 'Flour', 'amount': widget.resources.flour, 'color': Colors.orange, 'icon': Icons.grain, 'key': 'flour'},
-          {'name': 'Cornmeal', 'amount': widget.resources.cornmeal, 'color': Colors.yellow, 'icon': Icons.grain, 'key': 'cornmeal'},
-          {'name': 'Polished Rice', 'amount': widget.resources.polishedRice, 'color': Colors.lightGreen, 'icon': Icons.grain, 'key': 'polishedRice'},
-          {'name': 'Malted Barley', 'amount': widget.resources.maltedBarley, 'color': Colors.amber, 'icon': Icons.grain, 'key': 'maltedBarley'},
+          {'name': 'Flour', 'amount': widget.resources.flour, 'color': Colors.orange, 'resourceType': ResourceType.flour, 'key': 'flour'},
+          {'name': 'Cornmeal', 'amount': widget.resources.cornmeal, 'color': Colors.yellow, 'resourceType': ResourceType.cornmeal, 'key': 'cornmeal'},
+          {'name': 'Polished Rice', 'amount': widget.resources.polishedRice, 'color': Colors.lightGreen, 'resourceType': ResourceType.polishedRice, 'key': 'polishedRice'},
+          {'name': 'Malted Barley', 'amount': widget.resources.maltedBarley, 'color': Colors.amber, 'resourceType': ResourceType.maltedBarley, 'key': 'maltedBarley'},
         ];
       case ResourceCategory.refinement:
-        return [];
+        return [
+          {'name': 'Bread', 'amount': widget.resources.bread, 'color': Colors.orange, 'resourceType': ResourceType.bread, 'key': 'bread'},
+          {'name': 'Pastries', 'amount': widget.resources.pastries, 'color': Colors.orange, 'resourceType': ResourceType.pastries, 'key': 'pastries'},
+        ];
     }
   }
 }

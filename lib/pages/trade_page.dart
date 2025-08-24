@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/game/resources/resources.dart';
+import '../widgets/game/resource_icon.dart';
 
 class TradePage extends StatefulWidget {
   final Resources resources;
@@ -14,23 +15,7 @@ class TradePage extends StatefulWidget {
 class _TradePageState extends State<TradePage> {
   final _amountController = TextEditingController();
 
-  // Resource icon and color mappings based on the game's existing patterns
-  final Map<ResourceType, IconData> _resourceIcons = {
-    ResourceType.cash: Icons.attach_money,
-    ResourceType.gold: Icons.star,
-    ResourceType.wood: Icons.park,
-    ResourceType.coal: Icons.fireplace,
-    ResourceType.electricity: Icons.bolt,
-    ResourceType.research: Icons.science,
-    ResourceType.water: Icons.water_drop,
-    ResourceType.planks: Icons.construction,
-    ResourceType.stone: Icons.terrain,
-    ResourceType.wheat: Icons.grass,
-    ResourceType.corn: Icons.eco,
-    ResourceType.rice: Icons.grain,
-    ResourceType.barley: Icons.agriculture,
-  };
-
+  // Resource color mappings based on the game's existing patterns
   final Map<ResourceType, Color> _resourceColors = {
     ResourceType.cash: Colors.green,
     ResourceType.gold: Colors.amber,
@@ -108,7 +93,6 @@ class _TradePageState extends State<TradePage> {
 
   Widget _buildResourceTileCard(Resource resource) {
     final amount = widget.resources.resources[resource.type] ?? 0.0;
-    final icon = _resourceIcons[resource.type] ?? Icons.help;
     final color = _resourceColors[resource.type] ?? Colors.grey;
 
     return Container(
@@ -131,10 +115,10 @@ class _TradePageState extends State<TradePage> {
                 color: color.withAlpha((255 * 0.2).round()),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                icon,
-                color: color,
+              child: ResourceIcon(
+                resourceType: resource.type,
                 size: 24,
+                fallbackColor: color,
               ),
             ),
             const SizedBox(width: 16),
