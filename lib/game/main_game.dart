@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'building/building.dart';
 import 'grid.dart';
 import 'planet/index.dart';
+import 'terrain/index.dart';
 
 class MainGame extends FlameGame
     with
@@ -15,6 +16,7 @@ class MainGame extends FlameGame
         flame_events.DragCallbacks,
         flame_events.PointerMoveCallbacks {
   Grid? _grid;
+  ParallaxTerrainComponent? _terrain;
   Planet? _planet;
   Function(int, int)? onGridCellTapped;
   Function(int, int)? onGridCellLongTapped;
@@ -32,21 +34,34 @@ class MainGame extends FlameGame
   MainGame({Planet? planet}) : _planet = planet;
 
   Grid get grid => _grid!;
-  bool get hasLoaded => _grid != null;
+  ParallaxTerrainComponent? get terrain => _terrain;
+  bool get hasLoaded => _grid != null && _terrain != null;
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
     camera.viewfinder.anchor = Anchor.center;
     camera.viewfinder.zoom = _startZoom;
+    
+    // Create terrain first (renders beneath everything)
+    _terrain = ParallaxTerrainComponent(
+      gridSize: 50, // Match grid size
+      seed: _planet?.id.hashCode ?? 42, // Use planet ID as seed for consistent terrain
+    );
+    _terrain!.size = Vector2(_terrain!.gridSize * cellWidth, _terrain!.gridSize * cellHeight);
+    _terrain!.anchor = Anchor.center;
+    world.add(_terrain!);
+    
+    // Create grid (renders above terrain)
     _grid = Grid(
       onBuildingPlaced: _onBuildingPlaced,
       onBuildingRemoved: _onBuildingRemoved,
     );
-    _grid!.size =
-        Vector2(_grid!.gridSize * cellWidth, _grid!.gridSize * cellHeight);
+    _grid!.size = Vector2(_grid!.gridSize * cellWidth, _grid!.gridSize * cellHeight);
     _grid!.anchor = Anchor.center;
+    _grid!.terrainComponent = _terrain; // Connect terrain to grid
     world.add(_grid!);
+    
     await loadBuildings();
   }
 
@@ -175,8 +190,11 @@ class MainGame extends FlameGame
       final worldPosition = Vector2(localX - _grid!.size.x / 2, localY - _grid!.size.y / 2);
       placementPreview.position = worldPosition;
       
+      // Check both grid availability and terrain suitability
+      final gridAvailable = _grid!.isAreaAvailable(gridX, gridY, building.gridSize);
+      final terrainSuitable = _terrain?.isBuildableAt(gridX, gridY) ?? true;
       
-      placementPreview.isValid = _grid!.isAreaAvailable(gridX, gridY, building.gridSize);
+      placementPreview.isValid = gridAvailable && terrainSuitable;
     } else {
       // Hide preview when outside grid bounds
       placementPreview.position = Vector2(-10000, -10000);
@@ -195,7 +213,7 @@ class MainGame extends FlameGame
   }
 }
 
-class PlacementPreview extends PositionComponent with HasGameRef<MainGame> {
+class PlacementPreview extends PositionComponent with HasGameReference<MainGame> {
   Building? building;
   bool isValid = false;
 
@@ -222,7 +240,7 @@ class PlacementPreview extends PositionComponent with HasGameRef<MainGame> {
     );
 
     // Get sprite from the grid's cache
-    final sprite = gameRef.grid.getSpriteForBuilding(building!);
+    final sprite = game.grid.getSpriteForBuilding(building!);
 
     // Render the building sprite if available
     if (sprite != null) {

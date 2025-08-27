@@ -39,4 +39,13 @@ class Assets {
   static const String breadIcon = 'resource/bread.png';
   static const String pastriesIcon = 'resource/pastries.png';
 
+  // Terrain assets - included for reference but managed by TerrainAssets class
+  // Base terrain textures
+  static const String terrainGrassBase = 'terrain/base/grass_base.png';
+  static const String terrainDirtBase = 'terrain/base/dirt_base.png';
+  static const String terrainSandBase = 'terrain/base/sand_base.png';
+  static const String terrainRockBase = 'terrain/base/rock_base.png';
+  static const String terrainWaterBase = 'terrain/base/water_base.png';
+  static const String terrainSnowBase = 'terrain/base/snow_base.png';
+
 }

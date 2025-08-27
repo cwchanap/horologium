@@ -5,6 +5,7 @@ import 'package:flame/extensions.dart';
 import 'package:flutter/material.dart';
 
 import 'building/building.dart';
+import 'terrain/index.dart';
 
 const double cellWidth = 50;
 const double cellHeight = 50;
@@ -25,6 +26,9 @@ class Grid extends PositionComponent with HasGameReference {
   // Callbacks for building changes (replaces direct SharedPreferences)
   final Function(int x, int y, Building building)? onBuildingPlaced;
   final Function(int x, int y)? onBuildingRemoved;
+  
+  // Reference to terrain for buildability checks
+  ParallaxTerrainComponent? terrainComponent;
 
   Grid({
     this.gridSize = 50, 
@@ -63,6 +67,8 @@ class Grid extends PositionComponent with HasGameReference {
     if (x + buildingSize > gridSize || y + buildingSize > gridSize) {
       return false;
     }
+    
+    // Check grid occupancy
     for (var i = 0; i < buildingSize; i++) {
       for (var j = 0; j < buildingSize; j++) {
         if (isCellOccupied(x + i, y + j)) {
@@ -70,6 +76,18 @@ class Grid extends PositionComponent with HasGameReference {
         }
       }
     }
+    
+    // Check terrain buildability if terrain component is available
+    if (terrainComponent != null) {
+      for (var i = 0; i < buildingSize; i++) {
+        for (var j = 0; j < buildingSize; j++) {
+          if (!terrainComponent!.isBuildableAt(x + i, y + j)) {
+            return false;
+          }
+        }
+      }
+    }
+    
     return true;
   }
 
@@ -149,8 +167,9 @@ class Grid extends PositionComponent with HasGameReference {
     super.render(canvas);
 
     final paint = Paint()
-      ..color = Colors.white.withAlpha((255 * 0.2).round())
-      ..style = PaintingStyle.stroke;
+      ..color = Colors.white.withAlpha((255 * 0.1).round()) // Made more subtle for terrain
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.5; // Thinner lines
 
     // Draw grid lines
     for (var i = 0; i <= gridSize; i++) {
