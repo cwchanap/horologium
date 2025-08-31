@@ -60,10 +60,11 @@ class TerrainLayer extends PositionComponent with HasGameReference {
         return TerrainAssets.sandBase;
       case TerrainType.rock:
         return TerrainAssets.rockBase;
-      case TerrainType.water:
-        return TerrainAssets.waterBase;
       case TerrainType.snow:
         return TerrainAssets.snowBase;
+      case TerrainType.water:
+        // water_base.png not available - will use fallback color
+        return null;
     }
   }
 
@@ -73,36 +74,23 @@ class TerrainLayer extends PositionComponent with HasGameReference {
         return TerrainAssets.treeOakSmall;
       case FeatureType.treeOakLarge:
         return TerrainAssets.treeOakLarge;
+      // Other features not available yet - will use fallback rendering
       case FeatureType.treePineSmall:
-        return TerrainAssets.treePineSmall;
       case FeatureType.treePineLarge:
-        return TerrainAssets.treePineLarge;
       case FeatureType.bushGreen:
-        return TerrainAssets.bushGreen;
       case FeatureType.bushFlowering:
-        return TerrainAssets.bushFlowering;
       case FeatureType.rockSmall:
-        return TerrainAssets.rockSmall;
       case FeatureType.rockMedium:
-        return TerrainAssets.rockMedium;
       case FeatureType.rockLarge:
-        return TerrainAssets.rockLarge;
       case FeatureType.riverHorizontal:
-        return TerrainAssets.riverHorizontal;
       case FeatureType.riverVertical:
-        return TerrainAssets.riverVertical;
       case FeatureType.riverCornerTL:
-        return TerrainAssets.riverCornerTL;
       case FeatureType.riverCornerTR:
-        return TerrainAssets.riverCornerTR;
       case FeatureType.riverCornerBL:
-        return TerrainAssets.riverCornerBL;
       case FeatureType.riverCornerBR:
-        return TerrainAssets.riverCornerBR;
       case FeatureType.lakeSmall:
-        return TerrainAssets.lakeSmall;
       case FeatureType.lakeLarge:
-        return TerrainAssets.lakeLarge;
+        return null;
     }
   }
 

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flame/components.dart';
 import 'package:flame/extensions.dart';
 import 'package:flutter/material.dart';
@@ -60,7 +59,10 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     for (final terrainType in config.allowedTerrainTypes) {
       final assetPath = _getBaseAssetPath(terrainType);
       if (assetPath != null) {
-        await _loadSpriteWithFallback(assetPath);
+        final sprite = await _loadSpriteWithFallback(assetPath);
+        if (sprite != null) {
+          _spriteCache[assetPath] = sprite;
+        }
       }
     }
 
@@ -68,24 +70,24 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     for (final feature in config.allowedFeatureTypes) {
       final assetPath = _getFeatureAssetPath(feature);
       if (assetPath != null) {
-        await _loadSpriteWithFallback(assetPath);
+        final sprite = await _loadSpriteWithFallback(assetPath);
+        if (sprite != null) {
+          _spriteCache[assetPath] = sprite;
+        }
       }
     }
   }
 
   /// Safely loads a sprite with fallback handling for missing assets
-  Future<void> _loadSpriteWithFallback(String assetPath) async {
-    // Skip asset loading during Flutter tests to avoid exceptions
-    if (Platform.environment.containsKey('FLUTTER_TEST')) {
-      return;
-    }
-    
+  Future<Sprite?> _loadSpriteWithFallback(String path) async {
     try {
-      final image = await game.images.load(assetPath);
-      _spriteCache[assetPath] = Sprite(image);
+      // Simple try-catch approach - if asset exists, load it
+      // If not, return null and we'll use fallback rendering
+      return await Sprite.load(path);
     } catch (e) {
-      // Asset not available, silently continue with fallback colors
-      // This is expected behavior when assets haven't been generated yet
+      // Asset doesn't exist or can't be loaded (common in tests)
+      // Return null to use fallback rendering
+      return null;
     }
   }
 
@@ -232,10 +234,11 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
         return TerrainAssets.sandBase;
       case TerrainType.rock:
         return TerrainAssets.rockBase;
-      case TerrainType.water:
-        return TerrainAssets.waterBase;
       case TerrainType.snow:
         return TerrainAssets.snowBase;
+      case TerrainType.water:
+        // water_base.png not available - will use fallback color
+        return null;
     }
   }
 
@@ -245,36 +248,23 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
         return TerrainAssets.treeOakSmall;
       case FeatureType.treeOakLarge:
         return TerrainAssets.treeOakLarge;
+      // Other features not available yet - will use fallback rendering
       case FeatureType.treePineSmall:
-        return TerrainAssets.treePineSmall;
       case FeatureType.treePineLarge:
-        return TerrainAssets.treePineLarge;
       case FeatureType.bushGreen:
-        return TerrainAssets.bushGreen;
       case FeatureType.bushFlowering:
-        return TerrainAssets.bushFlowering;
       case FeatureType.rockSmall:
-        return TerrainAssets.rockSmall;
       case FeatureType.rockMedium:
-        return TerrainAssets.rockMedium;
       case FeatureType.rockLarge:
-        return TerrainAssets.rockLarge;
       case FeatureType.riverHorizontal:
-        return TerrainAssets.riverHorizontal;
       case FeatureType.riverVertical:
-        return TerrainAssets.riverVertical;
       case FeatureType.riverCornerTL:
-        return TerrainAssets.riverCornerTL;
       case FeatureType.riverCornerTR:
-        return TerrainAssets.riverCornerTR;
       case FeatureType.riverCornerBL:
-        return TerrainAssets.riverCornerBL;
       case FeatureType.riverCornerBR:
-        return TerrainAssets.riverCornerBR;
       case FeatureType.lakeSmall:
-        return TerrainAssets.lakeSmall;
       case FeatureType.lakeLarge:
-        return TerrainAssets.lakeLarge;
+        return null;
     }
   }
 }
