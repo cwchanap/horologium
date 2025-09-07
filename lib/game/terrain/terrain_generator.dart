@@ -16,14 +16,23 @@ class TerrainGenerator {
   Map<String, TerrainCell> generateTerrain() {
     final terrain = <String, TerrainCell>{};
     
+    print('=== TERRAIN GENERATOR DEBUG ===');
+    print('Starting terrain generation for grid size: $gridSize');
+    
     // Generate elevation and moisture maps using Perlin-like noise
     final elevationMap = _generateElevationMap();
     final moistureMap = _generateMoistureMap();
     
+    print('Generated elevation map with ${elevationMap.length} entries');
+    print('Generated moisture map with ${moistureMap.length} entries');
+    
     // Generate terrain based on elevation and moisture
-    for (int x = 0; x < gridSize; x++) {
-      for (int y = 0; y < gridSize; y++) {
-        final key = '$x,$y';
+    print('Starting terrain generation loops: x from 0 to ${gridSize-1}, y from 0 to ${gridSize-1}');
+    
+    var debugCellCount = 0;
+    for (int xCoord = 0; xCoord < gridSize; xCoord++) {
+      for (int yCoord = 0; yCoord < gridSize; yCoord++) {
+        final key = '$xCoord,$yCoord';
         final elevation = elevationMap[key] ?? 0.5;
         final moisture = moistureMap[key] ?? 0.5;
         
@@ -35,7 +44,7 @@ class TerrainGenerator {
         final terrainType = _selectTerrainType(biomeConfig, elevation, moisture);
         
         // Generate features for this cell
-        final features = _generateFeatures(biomeConfig, x, y, elevation, moisture);
+        final features = _generateFeatures(biomeConfig, xCoord, yCoord, elevation, moisture);
         
         terrain[key] = TerrainCell(
           baseType: terrainType,
@@ -44,8 +53,42 @@ class TerrainGenerator {
           moisture: moisture,
           biome: biome,
         );
+        
+        debugCellCount++;
+        
+        // Debug sample coordinates
+        if (xCoord < 2 && yCoord < 2) {
+          print('Generated cell ($xCoord,$yCoord) -> key:"$key", terrain:${terrainType.name}');
+        }
+      }
+      
+      // Debug X progression
+      if (xCoord == 0 || xCoord == 10 || xCoord == 49) {
+        print('Completed column x=$xCoord, total cells so far: $debugCellCount');
       }
     }
+    
+    print('Total terrain cells generated: ${terrain.length}');
+    
+    // Check key distribution
+    final xValues = <int>[];
+    final yValues = <int>[];
+    for (final key in terrain.keys) {
+      final coords = key.split(',');
+      if (coords.length == 2) {
+        final x = int.tryParse(coords[0]);
+        final y = int.tryParse(coords[1]);
+        if (x != null) xValues.add(x);
+        if (y != null) yValues.add(y);
+      }
+    }
+    
+    final uniqueX = xValues.toSet().toList()..sort();
+    final uniqueY = yValues.toSet().toList()..sort();
+    
+    print('Unique X coordinates: ${uniqueX.length} (range: ${uniqueX.isEmpty ? 'none' : '${uniqueX.first}-${uniqueX.last}'})');
+    print('Unique Y coordinates: ${uniqueY.length} (range: ${uniqueY.isEmpty ? 'none' : '${uniqueY.first}-${uniqueY.last}'})');
+    print('Sample keys: ${terrain.keys.take(10).join(', ')}');
     
     // Post-process to add coherent features like rivers and paths
     _addCoherentFeatures(terrain);
@@ -58,9 +101,9 @@ class TerrainGenerator {
     final elevationMap = <String, double>{};
     const scale = 0.1;
     
-    for (int x = 0; x < gridSize; x++) {
-      for (int y = 0; y < gridSize; y++) {
-        final key = '$x,$y';
+    for (int xCoord = 0; xCoord < gridSize; xCoord++) {
+      for (int yCoord = 0; yCoord < gridSize; yCoord++) {
+        final key = '$xCoord,$yCoord';
         
         // Multi-octave noise for more natural elevation
         double elevation = 0.0;
@@ -68,7 +111,7 @@ class TerrainGenerator {
         double frequency = scale;
         
         for (int octave = 0; octave < 4; octave++) {
-          elevation += _noise(x * frequency, y * frequency) * amplitude;
+          elevation += _noise(xCoord * frequency, yCoord * frequency) * amplitude;
           amplitude *= 0.5;
           frequency *= 2;
         }
@@ -89,12 +132,12 @@ class TerrainGenerator {
     final moistureMap = <String, double>{};
     const scale = 0.08;
     
-    for (int x = 0; x < gridSize; x++) {
-      for (int y = 0; y < gridSize; y++) {
-        final key = '$x,$y';
+    for (int xCoord = 0; xCoord < gridSize; xCoord++) {
+      for (int yCoord = 0; yCoord < gridSize; yCoord++) {
+        final key = '$xCoord,$yCoord';
         
         // Different seed offset for moisture
-        double moisture = _noise((x + 1000) * scale, (y + 1000) * scale);
+        double moisture = _noise((xCoord + 1000) * scale, (yCoord + 1000) * scale);
         
         // Normalize to 0-1 range
         moisture = (moisture + 1) / 2;

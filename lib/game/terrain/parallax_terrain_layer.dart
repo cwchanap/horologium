@@ -97,18 +97,42 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
 
     final config = TerrainDepthManager.getConfig(depth);
     
-    // Render each terrain cell
-    for (int x = 0; x < gridSize; x++) {
-      for (int y = 0; y < gridSize; y++) {
-        final key = '$x,$y';
-        final terrainCell = terrainData[key];
+    var renderedCells = 0;
+    var centerCellsRendered = 0;
+    
+    // Render each terrain cell that exists in our data
+    for (final entry in terrainData.entries) {
+      final key = entry.key;
+      final terrainCell = entry.value;
+      
+      // Parse coordinates from key
+      final coords = key.split(',');
+      if (coords.length != 2) continue;
+      
+      final x = int.tryParse(coords[0]);
+      final y = int.tryParse(coords[1]);
+      
+      if (x != null && y != null && x >= 0 && y >= 0 && x < gridSize && y < gridSize) {
+        _renderTerrainCell(canvas, x, y, terrainCell, config);
+        renderedCells++;
         
-        if (terrainCell != null) {
-          _renderTerrainCell(canvas, x, y, terrainCell, config);
+        // Count center area cells (around 25,25)
+        if ((x >= 20 && x <= 30) && (y >= 20 && y <= 30)) {
+          centerCellsRendered++;
         }
       }
     }
+    
+    // Debug rendering info (only once)
+    if (depth == TerrainDepth.midBackground && renderedCells != _lastRenderedCount) {
+      print('${depth.name}: rendered $renderedCells cells, data has ${terrainData.length} cells');
+      print('Center area (20-30,20-30): $centerCellsRendered cells rendered');
+      print('Layer size: $size, position: $position, anchor: $anchor');
+      _lastRenderedCount = renderedCells;
+    }
   }
+  
+  int _lastRenderedCount = -1;
 
   void _renderTerrainCell(
     Canvas canvas,
@@ -117,9 +141,14 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     TerrainCell terrainCell,
     TerrainDepthConfig config,
   ) {
+    // Calculate position relative to the centered anchor
+    // Since anchor is center, coordinates need to be offset by half the size
+    final offsetX = x * cellWidth - (size.x / 2);
+    final offsetY = y * cellHeight - (size.y / 2);
+    
     final cellRect = Rect.fromLTWH(
-      x * cellWidth,
-      y * cellHeight,
+      offsetX,
+      offsetY,
       cellWidth,
       cellHeight,
     );
@@ -210,17 +239,17 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
   Color _getFallbackColor(TerrainType type) {
     switch (type) {
       case TerrainType.grass:
-        return const Color(0xFF4CAF50);
+        return const Color(0xFF00FF00); // Bright green for debugging
       case TerrainType.dirt:
-        return const Color(0xFF8D6E63);
+        return const Color(0xFFFF6600); // Bright orange for debugging
       case TerrainType.sand:
-        return const Color(0xFFFFECB3);
+        return const Color(0xFFFFFF00); // Bright yellow for debugging
       case TerrainType.rock:
-        return const Color(0xFF757575);
+        return const Color(0xFF800080); // Bright purple for debugging
       case TerrainType.water:
-        return const Color(0xFF2196F3);
+        return const Color(0xFF0000FF); // Bright blue for debugging
       case TerrainType.snow:
-        return const Color(0xFFFAFAFA);
+        return const Color(0xFFFFFFFF); // Pure white for debugging
     }
   }
 

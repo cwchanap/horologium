@@ -1,4 +1,4 @@
-import 'dart:math';
+import 'dart:math' as math;
 
 import 'package:flame/components.dart';
 import 'package:flame/events.dart' as flame_events;
@@ -23,7 +23,7 @@ class MainGame extends FlameGame
   Function(int, int)? onGridCellSecondaryTapped;
   Function(Planet)? onPlanetChanged;
 
-  static const double _minZoom = 1.0;
+  static const double _minZoom = 0.1; // Allow zooming out much further
   static const double _maxZoom = 4.0;
 
   final double _startZoom = _minZoom;
@@ -43,6 +43,13 @@ class MainGame extends FlameGame
     camera.viewfinder.anchor = Anchor.center;
     camera.viewfinder.zoom = _startZoom;
     
+    print('=== MAIN GAME LOAD DEBUG ===');
+    print('Camera viewfinder anchor: ${camera.viewfinder.anchor}');
+    print('Camera zoom: ${camera.viewfinder.zoom}');
+    print('Camera position: ${camera.viewfinder.position}');
+    print('Camera viewport size: ${camera.viewport.size}');
+    print('Cell dimensions: ${cellWidth}x$cellHeight');
+    
     // Create terrain first (renders beneath everything)
     _terrain = ParallaxTerrainComponent(
       gridSize: 50, // Match grid size
@@ -50,6 +57,14 @@ class MainGame extends FlameGame
     );
     _terrain!.size = Vector2(_terrain!.gridSize * cellWidth, _terrain!.gridSize * cellHeight);
     _terrain!.anchor = Anchor.center;
+    _terrain!.position = Vector2.zero();
+    
+    print('Terrain component:');
+    print('  - Size: ${_terrain!.size}');
+    print('  - Anchor: ${_terrain!.anchor}');
+    print('  - Position: ${_terrain!.position}');
+    print('  - Expected size: ${50 * cellWidth}x${50 * cellHeight}');
+    
     world.add(_terrain!);
     
     // Create grid (renders above terrain)
@@ -59,8 +74,35 @@ class MainGame extends FlameGame
     );
     _grid!.size = Vector2(_grid!.gridSize * cellWidth, _grid!.gridSize * cellHeight);
     _grid!.anchor = Anchor.center;
+    _grid!.position = Vector2.zero();
     _grid!.terrainComponent = _terrain; // Connect terrain to grid
+    
+    print('Grid component:');
+    print('  - Size: ${_grid!.size}');
+    print('  - Anchor: ${_grid!.anchor}');
+    print('  - Position: ${_grid!.position}');
+    print('  - Grid size: ${_grid!.gridSize}');
+    
     world.add(_grid!);
+    
+    // Calculate proper zoom level to fit the terrain in the viewport
+    final terrainSize = _terrain!.size;
+    final viewportSize = camera.viewport.size;
+    final zoomX = viewportSize.x / terrainSize.x;
+    final zoomY = viewportSize.y / terrainSize.y;
+    final properZoom = math.min(zoomX, zoomY) * 0.8; // 80% to leave some margin
+    
+    print('=== CAMERA ZOOM CALCULATION ===');
+    print('Terrain size: $terrainSize');
+    print('Viewport size: $viewportSize');
+    print('Zoom ratios: X=$zoomX, Y=$zoomY');
+    print('Calculated zoom: $properZoom');
+    print('Current zoom: ${camera.viewfinder.zoom}');
+    
+    // Apply the proper zoom to fit terrain in viewport
+    camera.viewfinder.zoom = properZoom.clamp(_minZoom, _maxZoom);
+    
+    print('Applied zoom: ${camera.viewfinder.zoom}');
     
     await loadBuildings();
   }
@@ -228,7 +270,7 @@ class PlacementPreview extends PositionComponent with HasGameReference<MainGame>
       return;
     }
 
-    final buildingSize = sqrt(building!.gridSize).toInt();
+    final buildingSize = math.sqrt(building!.gridSize).toInt();
     final width = (cellWidth * buildingSize).toDouble();
     final height = (cellHeight * buildingSize).toDouble();
 

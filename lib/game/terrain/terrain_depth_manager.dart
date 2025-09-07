@@ -157,27 +157,57 @@ class TerrainDepthManager {
     final filteredTerrain = <String, TerrainCell>{};
     final config = getConfig(depth);
 
-    for (final entry in allTerrain.entries) {
-      final key = entry.key;
-      final cell = entry.value;
+    // For layers that render base terrain, we need all cells to ensure full coverage
+    if (config.allowedTerrainTypes.isNotEmpty) {
+      // This layer renders base terrain - include all cells
+      for (final entry in allTerrain.entries) {
+        final key = entry.key;
+        final cell = entry.value;
 
-      // Filter terrain type
-      final shouldIncludeBase = config.allowedTerrainTypes.contains(cell.baseType);
-      
-      // Filter features
-      final filteredFeatures = cell.features
-          .where((feature) => config.allowedFeatureTypes.contains(feature))
-          .toList();
+        final shouldIncludeBase = config.allowedTerrainTypes.contains(cell.baseType);
+        final filteredFeatures = cell.features
+            .where((feature) => config.allowedFeatureTypes.contains(feature))
+            .toList();
 
-      // Include this cell if it has base terrain or features for this depth
-      if (shouldIncludeBase || filteredFeatures.isNotEmpty) {
-        filteredTerrain[key] = TerrainCell(
-          baseType: shouldIncludeBase ? cell.baseType : TerrainType.grass, // Default if no base
-          features: filteredFeatures,
-          elevation: cell.elevation,
-          moisture: cell.moisture,
-          biome: cell.biome,
-        );
+        if (shouldIncludeBase) {
+          // Include with original terrain type
+          filteredTerrain[key] = TerrainCell(
+            baseType: cell.baseType,
+            features: filteredFeatures,
+            elevation: cell.elevation,
+            moisture: cell.moisture,
+            biome: cell.biome,
+          );
+        } else {
+          // Create placeholder cell with default terrain for full coverage
+          filteredTerrain[key] = TerrainCell(
+            baseType: TerrainType.grass, // Default fallback terrain
+            features: filteredFeatures,
+            elevation: cell.elevation,
+            moisture: cell.moisture,
+            biome: cell.biome,
+          );
+        }
+      }
+    } else {
+      // This layer only renders features - only include cells with relevant features
+      for (final entry in allTerrain.entries) {
+        final key = entry.key;
+        final cell = entry.value;
+
+        final filteredFeatures = cell.features
+            .where((feature) => config.allowedFeatureTypes.contains(feature))
+            .toList();
+
+        if (filteredFeatures.isNotEmpty) {
+          filteredTerrain[key] = TerrainCell(
+            baseType: cell.baseType, // Keep original type but won't be rendered
+            features: filteredFeatures,
+            elevation: cell.elevation,
+            moisture: cell.moisture,
+            biome: cell.biome,
+          );
+        }
       }
     }
 

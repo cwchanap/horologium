@@ -39,12 +39,68 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
 
   void _generateTerrain() {
     _baseTerrain.clear();
-    _baseTerrain.addAll(generator.generateTerrain());
+    final generatedTerrain = generator.generateTerrain();
+    _baseTerrain.addAll(generatedTerrain);
+    
+    // Debug: Print terrain generation info
+    print('=== TERRAIN GENERATION DEBUG ===');
+    print('Grid size: $gridSize');
+    print('Generated terrain cells: ${generatedTerrain.length}');
+    print('Expected cells: ${gridSize * gridSize}');
+    
+    // Check what keys we actually have
+    final allKeys = generatedTerrain.keys.toList()..sort();
+    print('First 10 keys: ${allKeys.take(10).join(', ')}');
+    print('Last 10 keys: ${allKeys.reversed.take(10).toList().reversed.join(', ')}');
+    
+    // Check coordinate distribution
+    final xCoords = <int>{};
+    final yCoords = <int>{};
+    for (final key in allKeys) {
+      final coords = key.split(',');
+      if (coords.length == 2) {
+        final x = int.tryParse(coords[0]);
+        final y = int.tryParse(coords[1]);
+        if (x != null) xCoords.add(x);
+        if (y != null) yCoords.add(y);
+      }
+    }
+    print('X coordinates: min=${xCoords.isEmpty ? 'none' : xCoords.reduce((a, b) => a < b ? a : b)}, max=${xCoords.isEmpty ? 'none' : xCoords.reduce((a, b) => a > b ? a : b)}, count=${xCoords.length}');
+    print('Y coordinates: min=${yCoords.isEmpty ? 'none' : yCoords.reduce((a, b) => a < b ? a : b)}, max=${yCoords.isEmpty ? 'none' : yCoords.reduce((a, b) => a > b ? a : b)}, count=${yCoords.length}');
+    print('Sample X coords: ${xCoords.take(10).join(', ')}');
+    print('Sample Y coords: ${yCoords.take(10).join(', ')}');
+    
+    // Sample a few cells
+    for (int i = 0; i < 5; i++) {
+      for (int j = 0; j < 5; j++) {
+        final key = '$i,$j';
+        final cell = generatedTerrain[key];
+        if (cell != null) {
+          print('Cell ($i,$j): ${cell.baseType.name} (elevation: ${cell.elevation.toStringAsFixed(2)})');
+        } else {
+          print('Cell ($i,$j): NULL');
+        }
+      }
+    }
+    
+    // Check corners and edges
+    final corners = [
+      '0,0', '0,${gridSize-1}', 
+      '${gridSize-1},0', '${gridSize-1},${gridSize-1}',
+      '24,24', '25,25', // Center area
+    ];
+    for (final key in corners) {
+      final cell = generatedTerrain[key];
+      print('Corner/Edge $key: ${cell?.baseType.name ?? 'NULL'}');
+    }
   }
 
   Future<void> _createParallaxLayers() async {
     _parallaxLayers.clear();
     removeAll(children);
+
+    print('=== PARALLAX LAYER CREATION DEBUG ===');
+    print('Base terrain cells: ${_baseTerrain.length}');
 
     // Get sorted depths (far to near)
     final sortedDepths = TerrainDepthManager.getSortedDepths();
@@ -52,6 +108,8 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
     for (final depth in sortedDepths) {
       // Skip interactive layer - that's handled by the grid
       if (depth == TerrainDepth.interactive) continue;
+      
+      print('Creating layer: ${depth.name}');
       
       // Filter terrain data for this depth layer
       Map<String, TerrainCell> layerTerrain;
@@ -70,6 +128,18 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
         );
       }
 
+      print('  Filtered terrain cells for ${depth.name}: ${layerTerrain.length}');
+      
+      // Sample first few cells for this layer
+      var count = 0;
+      for (final entry in layerTerrain.entries) {
+        if (count >= 3) break;
+        final key = entry.key;
+        final cell = entry.value;
+        print('    Cell $key: ${cell.baseType.name}, features: ${cell.features.length}');
+        count++;
+      }
+
       // Create parallax layer if it has terrain to render
       if (layerTerrain.isNotEmpty) {
         final parallaxLayer = ParallaxTerrainLayer(
@@ -80,14 +150,21 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
           cellHeight: cellHeight,
         );
         
-        // Position the layer at the correct grid position
+        // Position the layer to match the parent component exactly
         parallaxLayer.position = Vector2.zero();
         parallaxLayer.anchor = Anchor.center;
+        parallaxLayer.size = Vector2(gridSize * cellWidth, gridSize * cellHeight);
+        
+        print('  Created layer ${depth.name} with size: ${parallaxLayer.size}');
         
         _parallaxLayers[depth] = parallaxLayer;
         add(parallaxLayer);
+      } else {
+        print('  Skipped layer ${depth.name} - no terrain data');
       }
     }
+    
+    print('Total parallax layers created: ${_parallaxLayers.length}');
   }
 
   @override
@@ -95,6 +172,17 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
     if (!_isLoaded) return;
     
     super.render(canvas);
+    
+    // Debug: Draw a border around the terrain component to see its bounds
+    final borderPaint = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.0;
+    
+    canvas.drawRect(
+      Rect.fromLTWH(-size.x / 2, -size.y / 2, size.x, size.y),
+      borderPaint,
+    );
     
     // Optional: Add overall atmosphere effects
     _renderAtmosphereEffects(canvas);

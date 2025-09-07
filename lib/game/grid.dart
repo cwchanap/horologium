@@ -22,6 +22,7 @@ class Grid extends PositionComponent with HasGameReference {
   final int gridSize;
   final Map<String, PlacedBuilding> _buildings = {};
   final Map<String, Sprite> _spriteCache = {};
+  int _lastLoggedGridSize = -1; // For debug logging
   
   // Callbacks for building changes (replaces direct SharedPreferences)
   final Function(int x, int y, Building building)? onBuildingPlaced;
@@ -42,23 +43,31 @@ class Grid extends PositionComponent with HasGameReference {
   }
 
   Vector2? getGridPosition(Vector2 localPosition) {
-    if (localPosition.x < 0 ||
-        localPosition.y < 0 ||
-        localPosition.x >= size.x ||
-        localPosition.y >= size.y) {
+    // Adjust for centered anchor
+    final adjustedX = localPosition.x + size.x / 2;
+    final adjustedY = localPosition.y + size.y / 2;
+    
+    if (adjustedX < 0 ||
+        adjustedY < 0 ||
+        adjustedX >= size.x ||
+        adjustedY >= size.y) {
       return null;
     }
 
-    final gridX = (localPosition.x / cellWidth).floor();
-    final gridY = (localPosition.y / cellHeight).floor();
+    final gridX = (adjustedX / cellWidth).floor();
+    final gridY = (adjustedY / cellHeight).floor();
 
     return Vector2(gridX.toDouble(), gridY.toDouble());
   }
 
   Vector2 getGridCenterPosition(int x, int y) {
+    // Adjust for centered anchor
+    final offsetX = -size.x / 2;
+    final offsetY = -size.y / 2;
+    
     return Vector2(
-      (x * cellWidth) + (cellWidth / 2),
-      (y * cellHeight) + (cellHeight / 2),
+      offsetX + (x * cellWidth) + (cellWidth / 2),
+      offsetY + (y * cellHeight) + (cellHeight / 2),
     );
   }
 
@@ -167,19 +176,37 @@ class Grid extends PositionComponent with HasGameReference {
     super.render(canvas);
 
     final paint = Paint()
-      ..color = Colors.white.withAlpha((255 * 0.1).round()) // Made more subtle for terrain
+      ..color = Colors.white.withAlpha((255 * 0.02).round()) // Much more transparent for debugging
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.5; // Thinner lines
 
+    // Calculate offset for centered anchor
+    final offsetX = -size.x / 2;
+    final offsetY = -size.y / 2;
+
     // Draw grid lines
     for (var i = 0; i <= gridSize; i++) {
-      final double x = i * cellWidth;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.y), paint);
+      final double x = offsetX + i * cellWidth;
+      canvas.drawLine(Offset(x, offsetY), Offset(x, offsetY + size.y), paint);
     }
 
     for (var i = 0; i <= gridSize; i++) {
-      final double y = i * cellHeight;
-      canvas.drawLine(Offset(0, y), Offset(size.x, y), paint);
+      final double y = offsetY + i * cellHeight;
+      canvas.drawLine(Offset(offsetX, y), Offset(offsetX + size.x, y), paint);
+    }
+
+    // Debug: Print actual grid dimensions being rendered
+    if (gridSize != _lastLoggedGridSize) {
+      print('=== GRID RENDERING DEBUG ===');
+      print('gridSize: $gridSize');
+      print('Lines drawn: ${gridSize + 1} in each direction');
+      print('Cells created: $gridSize x $gridSize');
+      print('Visual size: ${size.x} x ${size.y}');
+      print('Cell dimensions: $cellWidth x $cellHeight');
+      print('Expected total size: ${gridSize * cellWidth} x ${gridSize * cellHeight}');
+      print('Actual calculated size from gridSize: ${gridSize * cellWidth} x ${gridSize * cellHeight}');
+      print('Size mismatch: ${size.x != gridSize * cellWidth || size.y != gridSize * cellHeight}');
+      _lastLoggedGridSize = gridSize;
     }
 
     // Draw buildings
@@ -200,9 +227,13 @@ class Grid extends PositionComponent with HasGameReference {
     final y = placedBuilding.y;
     final buildingSize = sqrt(building.gridSize).toInt();
 
+    // Calculate position relative to the centered anchor
+    final offsetX = -size.x / 2;
+    final offsetY = -size.y / 2;
+
     final rect = Rect.fromLTWH(
-      x * cellWidth + 2,
-      y * cellHeight + 2,
+      offsetX + x * cellWidth + 2,
+      offsetY + y * cellHeight + 2,
       cellWidth * buildingSize - 4,
       cellHeight * buildingSize - 4,
     );
