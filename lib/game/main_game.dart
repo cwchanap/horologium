@@ -92,17 +92,8 @@ class MainGame extends FlameGame
     final zoomY = viewportSize.y / terrainSize.y;
     final properZoom = math.min(zoomX, zoomY) * 0.8; // 80% to leave some margin
     
-    print('=== CAMERA ZOOM CALCULATION ===');
-    print('Terrain size: $terrainSize');
-    print('Viewport size: $viewportSize');
-    print('Zoom ratios: X=$zoomX, Y=$zoomY');
-    print('Calculated zoom: $properZoom');
-    print('Current zoom: ${camera.viewfinder.zoom}');
-    
     // Apply the proper zoom to fit terrain in viewport
     camera.viewfinder.zoom = properZoom.clamp(_minZoom, _maxZoom);
-    
-    print('Applied zoom: ${camera.viewfinder.zoom}');
     
     await loadBuildings();
   }

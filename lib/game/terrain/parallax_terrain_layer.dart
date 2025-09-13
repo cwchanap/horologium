@@ -97,9 +97,6 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
 
     final config = TerrainDepthManager.getConfig(depth);
     
-    var renderedCells = 0;
-    var centerCellsRendered = 0;
-    
     // Render each terrain cell that exists in our data
     for (final entry in terrainData.entries) {
       final key = entry.key;
@@ -114,25 +111,9 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
       
       if (x != null && y != null && x >= 0 && y >= 0 && x < gridSize && y < gridSize) {
         _renderTerrainCell(canvas, x, y, terrainCell, config);
-        renderedCells++;
-        
-        // Count center area cells (around 25,25)
-        if ((x >= 20 && x <= 30) && (y >= 20 && y <= 30)) {
-          centerCellsRendered++;
-        }
       }
     }
-    
-    // Debug rendering info (only once)
-    if (depth == TerrainDepth.midBackground && renderedCells != _lastRenderedCount) {
-      print('${depth.name}: rendered $renderedCells cells, data has ${terrainData.length} cells');
-      print('Center area (20-30,20-30): $centerCellsRendered cells rendered');
-      print('Layer size: $size, position: $position, anchor: $anchor');
-      _lastRenderedCount = renderedCells;
-    }
   }
-  
-  int _lastRenderedCount = -1;
 
   void _renderTerrainCell(
     Canvas canvas,
@@ -142,9 +123,12 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     TerrainDepthConfig config,
   ) {
     // Calculate position relative to the centered anchor
-    // Since anchor is center, coordinates need to be offset by half the size
-    final offsetX = x * cellWidth - (size.x / 2);
-    final offsetY = y * cellHeight - (size.y / 2);
+    // For a 50x50 grid with center at (0,0):
+    // - Grid center in coordinates: (24.5, 24.5)  
+    // - Pixel center: (24.5 * 50, 24.5 * 50) = (1225, 1225)
+    // - Offset to center at (0,0): subtract 1225
+    final offsetX = (x * cellWidth) - 1225.0;
+    final offsetY = (y * cellHeight) - 1225.0;
     
     final cellRect = Rect.fromLTWH(
       offsetX,
@@ -152,6 +136,8 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
       cellWidth,
       cellHeight,
     );
+
+
 
     // Render base terrain if this layer should show it
     if (config.allowedTerrainTypes.contains(terrainCell.baseType)) {

@@ -42,34 +42,6 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
     final generatedTerrain = generator.generateTerrain();
     _baseTerrain.addAll(generatedTerrain);
     
-    // Debug: Print terrain generation info
-    print('=== TERRAIN GENERATION DEBUG ===');
-    print('Grid size: $gridSize');
-    print('Generated terrain cells: ${generatedTerrain.length}');
-    print('Expected cells: ${gridSize * gridSize}');
-    
-    // Check what keys we actually have
-    final allKeys = generatedTerrain.keys.toList()..sort();
-    print('First 10 keys: ${allKeys.take(10).join(', ')}');
-    print('Last 10 keys: ${allKeys.reversed.take(10).toList().reversed.join(', ')}');
-    
-    // Check coordinate distribution
-    final xCoords = <int>{};
-    final yCoords = <int>{};
-    for (final key in allKeys) {
-      final coords = key.split(',');
-      if (coords.length == 2) {
-        final x = int.tryParse(coords[0]);
-        final y = int.tryParse(coords[1]);
-        if (x != null) xCoords.add(x);
-        if (y != null) yCoords.add(y);
-      }
-    }
-    print('X coordinates: min=${xCoords.isEmpty ? 'none' : xCoords.reduce((a, b) => a < b ? a : b)}, max=${xCoords.isEmpty ? 'none' : xCoords.reduce((a, b) => a > b ? a : b)}, count=${xCoords.length}');
-    print('Y coordinates: min=${yCoords.isEmpty ? 'none' : yCoords.reduce((a, b) => a < b ? a : b)}, max=${yCoords.isEmpty ? 'none' : yCoords.reduce((a, b) => a > b ? a : b)}, count=${yCoords.length}');
-    print('Sample X coords: ${xCoords.take(10).join(', ')}');
-    print('Sample Y coords: ${yCoords.take(10).join(', ')}');
-    
     // Sample a few cells
     for (int i = 0; i < 5; i++) {
       for (int j = 0; j < 5; j++) {

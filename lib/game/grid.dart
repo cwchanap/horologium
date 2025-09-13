@@ -180,9 +180,9 @@ class Grid extends PositionComponent with HasGameReference {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.5; // Thinner lines
 
-    // Calculate offset for centered anchor
-    final offsetX = -size.x / 2;
-    final offsetY = -size.y / 2;
+    // Calculate offset for centered anchor - matching terrain positioning
+    final offsetX = -1225.0; // Grid center at x = 24.5 * 50 = 1225
+    final offsetY = -1225.0; // Grid center at y = 24.5 * 50 = 1225
 
     // Draw grid lines
     for (var i = 0; i <= gridSize; i++) {
