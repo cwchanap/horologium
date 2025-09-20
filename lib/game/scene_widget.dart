@@ -36,6 +36,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   int? _selectedGridY;
   bool _showBuildingSelection = false;
   bool _showHamburgerMenu = false;
+  bool _uiOverlayOpen = false; // gates pointer events to GameWidget
+
 
   @override
   void initState() {
@@ -168,8 +170,14 @@ class _MainGameWidgetState extends State<MainGameWidget> {
         game: _game,
         onEscapePressed: _handleEscapePressed,
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            GameWidget(game: _game),
+            Positioned.fill(
+              child: IgnorePointer(
+                ignoring: _uiOverlayOpen || _showHamburgerMenu || _showBuildingSelection,
+                child: GameWidget(game: _game),
+              ),
+            ),
             
             // Top UI Bar
             GameOverlay(
@@ -195,18 +203,33 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                 onPressed: () {
                   setState(() {
                     _showHamburgerMenu = !_showHamburgerMenu;
+                    _uiOverlayOpen = _showHamburgerMenu || _showBuildingSelection || _uiOverlayOpen;
                   });
                 },
                 backgroundColor: Colors.purple.withAlpha((255 * 0.8).round()),
                 child: const Icon(Icons.menu, color: Colors.white),
               ),
             ),
+            // Debug Tools Button (bottom-left)
+            Positioned(
+              bottom: 20,
+              left: 20,
+              child: FloatingActionButton.small(
+                heroTag: 'debug_tools_button',
+                onPressed: _openDebugSheet,
+                backgroundColor: Colors.teal.withAlpha((255 * 0.8).round()),
+                child: const Icon(Icons.bug_report, color: Colors.white),
+              ),
+            ),
             
-            // Hamburger Menu
-            if (_game.hasLoaded)
+            // Hamburger Menu (only add when visible to avoid zero-size children)
+            if (_game.hasLoaded && _showHamburgerMenu)
               HamburgerMenu(
-                isVisible: _showHamburgerMenu,
-                onClose: () => setState(() => _showHamburgerMenu = false),
+                isVisible: true,
+                onClose: () => setState(() {
+                  _showHamburgerMenu = false;
+                  _uiOverlayOpen = _showBuildingSelection; // remain open if building panel is open
+                }),
                 resources: widget.planet.resources,
                 researchManager: _gameStateManager.researchManager,
                 buildingLimitManager: _gameStateManager.buildingLimitManager,
@@ -214,13 +237,16 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                 onResourcesChanged: _onResourcesChanged,
               ),
             
-            // Building Selection Panel
-            if (_game.hasLoaded)
+            // Building Selection Panel (only add when visible)
+            if (_game.hasLoaded && _showBuildingSelection)
               BuildingSelectionPanel(
-                isVisible: _showBuildingSelection,
+                isVisible: true,
                 selectedGridX: _selectedGridX,
                 selectedGridY: _selectedGridY,
-                onClose: _closeBuildingSelection,
+                onClose: () {
+                  _closeBuildingSelection();
+                  setState(() => _uiOverlayOpen = _showHamburgerMenu);
+                },
                 onBuildingSelected: _onBuildingSelected,
                 researchManager: _gameStateManager.researchManager,
                 buildingLimitManager: _gameStateManager.buildingLimitManager,
@@ -230,6 +256,87 @@ class _MainGameWidgetState extends State<MainGameWidget> {
         ),
       ),
     );
+  }
+
+  void _openDebugSheet() {
+    if (!_game.hasLoaded) return;
+    // Gate pointer events to the game and defer the modal until the next frame
+    setState(() => _uiOverlayOpen = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final initialTerrainDebug = _game.terrain?.showDebug ?? false;
+      final initialGridDebug = _game.grid.showDebug;
+      final initialParallax = _game.terrain?.parallaxEnabled ?? false;
+      await showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.black.withAlpha((255 * 0.95).round()),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) {
+          bool terrainDebug = initialTerrainDebug;
+          bool gridDebug = initialGridDebug;
+          bool parallax = initialParallax;
+          return StatefulBuilder(
+            builder: (context, setSheetState) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Developer Tools', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        IconButton(
+                          tooltip: 'Close',
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.close, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Terrain debug overlays', style: TextStyle(color: Colors.white70)),
+                      value: terrainDebug,
+                      onChanged: (v) {
+                        setSheetState(() => terrainDebug = v);
+                        _game.terrain?.setDebugOverlays(v);
+                      },
+                    ),
+                    SwitchListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Grid debug overlays', style: TextStyle(color: Colors.white70)),
+                      value: gridDebug,
+                      onChanged: (v) {
+                        setSheetState(() => gridDebug = v);
+                        _game.grid.showDebug = v;
+                      },
+                    ),
+                    SwitchListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Enable parallax', style: TextStyle(color: Colors.white70)),
+                      value: parallax,
+                      onChanged: (v) {
+                        setSheetState(() => parallax = v);
+                        _game.terrain?.setParallaxEnabled(v);
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+      if (!mounted) return;
+      setState(() => _uiOverlayOpen = _showHamburgerMenu || _showBuildingSelection);
+    });
   }
 
   void _showDeleteConfirmationDialog(int x, int y, Building building) {

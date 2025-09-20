@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flame/components.dart';
-import 'package:flame/events.dart' as flame_events;
 import 'package:flame/game.dart';
+import 'package:flame/events.dart' as flame_events;
 import 'package:flutter/material.dart';
 
 import 'building/building.dart';
@@ -43,13 +43,6 @@ class MainGame extends FlameGame
     camera.viewfinder.anchor = Anchor.center;
     camera.viewfinder.zoom = _startZoom;
     
-    print('=== MAIN GAME LOAD DEBUG ===');
-    print('Camera viewfinder anchor: ${camera.viewfinder.anchor}');
-    print('Camera zoom: ${camera.viewfinder.zoom}');
-    print('Camera position: ${camera.viewfinder.position}');
-    print('Camera viewport size: ${camera.viewport.size}');
-    print('Cell dimensions: ${cellWidth}x$cellHeight');
-    
     // Create terrain first (renders beneath everything)
     _terrain = ParallaxTerrainComponent(
       gridSize: 50, // Match grid size
@@ -58,12 +51,7 @@ class MainGame extends FlameGame
     _terrain!.size = Vector2(_terrain!.gridSize * cellWidth, _terrain!.gridSize * cellHeight);
     _terrain!.anchor = Anchor.center;
     _terrain!.position = Vector2.zero();
-    
-    print('Terrain component:');
-    print('  - Size: ${_terrain!.size}');
-    print('  - Anchor: ${_terrain!.anchor}');
-    print('  - Position: ${_terrain!.position}');
-    print('  - Expected size: ${50 * cellWidth}x${50 * cellHeight}');
+    _terrain!.priority = 10; // Terrain underlay for normal gameplay
     
     world.add(_terrain!);
     
@@ -76,12 +64,7 @@ class MainGame extends FlameGame
     _grid!.anchor = Anchor.center;
     _grid!.position = Vector2.zero();
     _grid!.terrainComponent = _terrain; // Connect terrain to grid
-    
-    print('Grid component:');
-    print('  - Size: ${_grid!.size}');
-    print('  - Anchor: ${_grid!.anchor}');
-    print('  - Position: ${_grid!.position}');
-    print('  - Grid size: ${_grid!.gridSize}');
+    _grid!.priority = 20; // Grid above terrain
     
     world.add(_grid!);
     
@@ -90,10 +73,14 @@ class MainGame extends FlameGame
     final viewportSize = camera.viewport.size;
     final zoomX = viewportSize.x / terrainSize.x;
     final zoomY = viewportSize.y / terrainSize.y;
-    final properZoom = math.min(zoomX, zoomY) * 0.8; // 80% to leave some margin
+    // Zoom to fit the entire terrain in the viewport. Do NOT go below fit,
+    // otherwise the viewport becomes larger than the world and clamping breaks.
+    final properZoom = math.min(zoomX, zoomY);
     
     // Apply the proper zoom to fit terrain in viewport
     camera.viewfinder.zoom = properZoom.clamp(_minZoom, _maxZoom);
+    // Center the camera on the terrain and clamp within bounds
+    _centerCameraOnTerrain();
     
     await loadBuildings();
   }
@@ -142,6 +129,7 @@ class MainGame extends FlameGame
   @override
   void onDragUpdate(flame_events.DragUpdateEvent event) {
     camera.viewfinder.position -= event.canvasDelta / camera.viewfinder.zoom;
+    _clampCameraToTerrain();
   }
 
   @override
@@ -215,11 +203,11 @@ class MainGame extends FlameGame
       final gridX = gridPosition.x.toInt();
       final gridY = gridPosition.y.toInt();
       
-      // Calculate position relative to grid's local coordinate system (top-left corner like buildings)
+      // Calculate position in grid's local coordinate system (top-left indices)
       final localX = gridX * cellWidth;
       final localY = gridY * cellHeight;
       
-      // Since grid is centered at world (0,0), local coordinates are already relative to world center
+      // For center-anchored grid at world (0,0), world = local - size/2
       final worldPosition = Vector2(localX - _grid!.size.x / 2, localY - _grid!.size.y / 2);
       placementPreview.position = worldPosition;
       
@@ -243,6 +231,37 @@ class MainGame extends FlameGame
     if (world.contains(placementPreview)) {
       world.remove(placementPreview);
     }
+  }
+
+  // Camera helpers
+  void _clampCameraToTerrain() {
+    if (_terrain == null) return;
+    final w = _terrain!.size.x;
+    final h = _terrain!.size.y;
+
+    // Half viewport in world units
+    final halfViewW = camera.viewport.size.x / camera.viewfinder.zoom / 2;
+    final halfViewH = camera.viewport.size.y / camera.viewfinder.zoom / 2;
+
+    // Terrain is centered at (0,0). Clamp camera center so viewport stays within terrain.
+    // If the viewport is larger than the terrain along an axis, pin the camera to 0 on that axis.
+    final overWideX = halfViewW >= w / 2;
+    final overWideY = halfViewH >= h / 2;
+
+    final minX = -w / 2 + halfViewW;
+    final maxX =  w / 2 - halfViewW;
+    final minY = -h / 2 + halfViewH;
+    final maxY =  h / 2 - halfViewH;
+
+    final pos = camera.viewfinder.position;
+    final clampedX = overWideX ? 0.0 : pos.x.clamp(minX, maxX);
+    final clampedY = overWideY ? 0.0 : pos.y.clamp(minY, maxY);
+    camera.viewfinder.position = Vector2(clampedX, clampedY);
+  }
+
+  void _centerCameraOnTerrain() {
+    camera.viewfinder.position = Vector2.zero();
+    _clampCameraToTerrain();
   }
 }
 

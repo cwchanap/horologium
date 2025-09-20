@@ -15,6 +15,12 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   final Map<TerrainDepth, ParallaxTerrainLayer> _parallaxLayers = {};
   
   bool _isLoaded = false;
+  bool _loggedParentRenderOnce = false;
+  
+  // Toggle for debug overlays (fill, border, axes, markers)
+  bool showDebug = false;
+  // Toggle for parallax across all layers
+  bool parallaxEnabled = false;
 
   ParallaxTerrainComponent({
     required this.gridSize,
@@ -41,38 +47,11 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
     _baseTerrain.clear();
     final generatedTerrain = generator.generateTerrain();
     _baseTerrain.addAll(generatedTerrain);
-    
-    // Sample a few cells
-    for (int i = 0; i < 5; i++) {
-      for (int j = 0; j < 5; j++) {
-        final key = '$i,$j';
-        final cell = generatedTerrain[key];
-        if (cell != null) {
-          print('Cell ($i,$j): ${cell.baseType.name} (elevation: ${cell.elevation.toStringAsFixed(2)})');
-        } else {
-          print('Cell ($i,$j): NULL');
-        }
-      }
-    }
-    
-    // Check corners and edges
-    final corners = [
-      '0,0', '0,${gridSize-1}', 
-      '${gridSize-1},0', '${gridSize-1},${gridSize-1}',
-      '24,24', '25,25', // Center area
-    ];
-    for (final key in corners) {
-      final cell = generatedTerrain[key];
-      print('Corner/Edge $key: ${cell?.baseType.name ?? 'NULL'}');
-    }
   }
 
   Future<void> _createParallaxLayers() async {
     _parallaxLayers.clear();
     removeAll(children);
-
-    print('=== PARALLAX LAYER CREATION DEBUG ===');
-    print('Base terrain cells: ${_baseTerrain.length}');
 
     // Get sorted depths (far to near)
     final sortedDepths = TerrainDepthManager.getSortedDepths();
@@ -80,8 +59,6 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
     for (final depth in sortedDepths) {
       // Skip interactive layer - that's handled by the grid
       if (depth == TerrainDepth.interactive) continue;
-      
-      print('Creating layer: ${depth.name}');
       
       // Filter terrain data for this depth layer
       Map<String, TerrainCell> layerTerrain;
@@ -100,18 +77,6 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
         );
       }
 
-      print('  Filtered terrain cells for ${depth.name}: ${layerTerrain.length}');
-      
-      // Sample first few cells for this layer
-      var count = 0;
-      for (final entry in layerTerrain.entries) {
-        if (count >= 3) break;
-        final key = entry.key;
-        final cell = entry.value;
-        print('    Cell $key: ${cell.baseType.name}, features: ${cell.features.length}');
-        count++;
-      }
-
       // Create parallax layer if it has terrain to render
       if (layerTerrain.isNotEmpty) {
         final parallaxLayer = ParallaxTerrainLayer(
@@ -122,46 +87,91 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
           cellHeight: cellHeight,
         );
         
-        // Position the layer to match the parent component exactly
-        parallaxLayer.position = Vector2.zero();
-        parallaxLayer.anchor = Anchor.center;
+        // Match grid & layer rendering: draw from local top-left with Anchor.center.
+        // For a center-anchored child to align its (0,0) with the parent's (0,0),
+        // set the child local position to size/2 (cancels the anchor shift).
         parallaxLayer.size = Vector2(gridSize * cellWidth, gridSize * cellHeight);
+        parallaxLayer.anchor = Anchor.center;
+        parallaxLayer.position = parallaxLayer.size / 2;
         
-        print('  Created layer ${depth.name} with size: ${parallaxLayer.size}');
-        
+        // Propagate debug flag
+        parallaxLayer.showDebug = showDebug;
+        // Propagate parallax flag
+        parallaxLayer.enableParallax = parallaxEnabled;
+
         _parallaxLayers[depth] = parallaxLayer;
         add(parallaxLayer);
       } else {
-        print('  Skipped layer ${depth.name} - no terrain data');
       }
     }
-    
-    print('Total parallax layers created: ${_parallaxLayers.length}');
   }
 
   @override
   void render(Canvas canvas) {
     if (!_isLoaded) return;
-    
-    super.render(canvas);
-    
-    // Debug: Draw a border around the terrain component to see its bounds
-    final borderPaint = Paint()
-      ..color = Colors.red
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.0;
-    
-    canvas.drawRect(
-      Rect.fromLTWH(-size.x / 2, -size.y / 2, size.x, size.y),
-      borderPaint,
-    );
-    
-    // Optional: Add overall atmosphere effects
+    // 1) Atmosphere under children (local top-left drawing)
     _renderAtmosphereEffects(canvas);
+
+    // 2) Optional parent debug fill (UNDER children)
+    if (showDebug) {
+      final dbgFill = Paint()
+        ..color = const Color(0xFF44FF55).withAlpha(60)
+        ..style = PaintingStyle.fill;
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, size.x, size.y),
+        dbgFill,
+      );
+    }
+
+    // 3) Render children (terrain layers)
+    super.render(canvas);
+
+    // 4) Optional red border, axes and debug markers (local top-left drawing)
+    if (showDebug) {
+      final borderPaint = Paint()
+        ..color = Colors.red
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, size.x, size.y),
+        borderPaint,
+      );
+
+      // Center axes to visualize the component's local center
+      final axesPaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+      // Vertical axis at x = size.x/2
+      canvas.drawLine(
+        Offset(size.x / 2, 0),
+        Offset(size.x / 2, size.y),
+        axesPaint,
+      );
+      // Horizontal axis at y = size.y/2
+      canvas.drawLine(
+        Offset(0, size.y / 2),
+        Offset(size.x, size.y / 2),
+        axesPaint,
+      );
+
+      // Debug markers for local top-left
+      final pTopLeftPaint = Paint()..color = Colors.green;       // (0,0)
+      final pCenterPaint = Paint()..color = Colors.orange;       // (size/2, size/2)
+      final pBottomRightPaint = Paint()..color = Colors.cyan;    // (size-40, size-40)
+      // Larger markers for visibility
+      canvas.drawRect(const Rect.fromLTWH(0, 0, 40, 40), pTopLeftPaint);
+      canvas.drawRect(Rect.fromLTWH(size.x / 2 - 20, size.y / 2 - 20, 40, 40), pCenterPaint);
+      canvas.drawRect(Rect.fromLTWH(size.x - 40, size.y - 40, 40, 40), pBottomRightPaint);
+    }
+
+    if (!_loggedParentRenderOnce) {
+      _loggedParentRenderOnce = true;
+    }
   }
 
   void _renderAtmosphereEffects(Canvas canvas) {
-    // Create a subtle ambient lighting effect that affects all layers
+    // Subtle ambient lighting, local top-left
     final gradient = RadialGradient(
       center: Alignment.center,
       radius: 2.0,
@@ -297,9 +307,9 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
 
   /// Enable/disable parallax effect on all layers
   void setParallaxEnabled(bool enabled) {
+    parallaxEnabled = enabled;
     for (final layer in _parallaxLayers.values) {
-      // This could be extended to pause/resume parallax updates
-      layer.priority = enabled ? 0 : -1;
+      layer.enableParallax = enabled;
     }
   }
 
@@ -307,6 +317,14 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   void adjustParallaxSpeeds(double multiplier) {
     // This could be implemented to dynamically adjust parallax speeds
     // Currently the speeds are fixed in TerrainDepthManager
+  }
+
+  /// Enable/disable debug overlays on parent and all child layers
+  void setDebugOverlays(bool enabled) {
+    showDebug = enabled;
+    for (final layer in _parallaxLayers.values) {
+      layer.showDebug = enabled;
+    }
   }
 
   /// Generate terrain for a specific region (useful for large worlds)

@@ -1,4 +1,3 @@
-import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -16,21 +15,6 @@ class GameControls extends StatelessWidget {
     this.onEscapePressed,
   });
 
-  void _handlePointerEvent(Offset globalPosition, BuildContext context) {
-    if (game.buildingToPlace != null) {
-      try {
-        final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
-        if (renderBox != null) {
-          final localPosition = renderBox.globalToLocal(globalPosition);
-          final worldPosition = game.camera.globalToLocal(Vector2(localPosition.dx, localPosition.dy));
-          game.showPlacementPreview(game.buildingToPlace!, worldPosition);
-        }
-      } catch (e) {
-        // Silently handle errors
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return KeyboardListener(
@@ -41,12 +25,7 @@ class GameControls extends StatelessWidget {
           onEscapePressed?.call();
         }
       },
-      child: MouseRegion(
-        onHover: (event) {
-          _handlePointerEvent(event.position, context);
-        },
-        child: child,
-      ),
+      child: child,
     );
   }
 }

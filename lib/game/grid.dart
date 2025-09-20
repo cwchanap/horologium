@@ -22,7 +22,9 @@ class Grid extends PositionComponent with HasGameReference {
   final int gridSize;
   final Map<String, PlacedBuilding> _buildings = {};
   final Map<String, Sprite> _spriteCache = {};
-  int _lastLoggedGridSize = -1; // For debug logging
+  
+  // Debug overlays (border and markers) toggle
+  bool showDebug = false;
   
   // Callbacks for building changes (replaces direct SharedPreferences)
   final Function(int x, int y, Building building)? onBuildingPlaced;
@@ -43,9 +45,9 @@ class Grid extends PositionComponent with HasGameReference {
   }
 
   Vector2? getGridPosition(Vector2 localPosition) {
-    // Adjust for centered anchor
-    final adjustedX = localPosition.x + size.x / 2;
-    final adjustedY = localPosition.y + size.y / 2;
+    // Local coordinates are top-left-based inside render
+    final adjustedX = localPosition.x;
+    final adjustedY = localPosition.y;
     
     if (adjustedX < 0 ||
         adjustedY < 0 ||
@@ -61,13 +63,10 @@ class Grid extends PositionComponent with HasGameReference {
   }
 
   Vector2 getGridCenterPosition(int x, int y) {
-    // Adjust for centered anchor
-    final offsetX = -size.x / 2;
-    final offsetY = -size.y / 2;
-    
+    // Local coordinates are top-left-based inside render
     return Vector2(
-      offsetX + (x * cellWidth) + (cellWidth / 2),
-      offsetY + (y * cellHeight) + (cellHeight / 2),
+      (x * cellWidth) + (cellWidth / 2),
+      (y * cellHeight) + (cellHeight / 2),
     );
   }
 
@@ -176,13 +175,13 @@ class Grid extends PositionComponent with HasGameReference {
     super.render(canvas);
 
     final paint = Paint()
-      ..color = Colors.white.withAlpha((255 * 0.02).round()) // Much more transparent for debugging
+      ..color = Colors.white.withAlpha((255 * 0.25).round()) // More visible for debugging
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.5; // Thinner lines
+      ..strokeWidth = 1.0; // Slightly thicker lines
 
-    // Calculate offset for centered anchor - matching terrain positioning
-    final offsetX = -1225.0; // Grid center at x = 24.5 * 50 = 1225
-    final offsetY = -1225.0; // Grid center at y = 24.5 * 50 = 1225
+    // Draw from local top-left (0,0) for center-anchored component
+    final offsetX = 0.0;
+    final offsetY = 0.0;
 
     // Draw grid lines
     for (var i = 0; i <= gridSize; i++) {
@@ -195,18 +194,28 @@ class Grid extends PositionComponent with HasGameReference {
       canvas.drawLine(Offset(offsetX, y), Offset(offsetX + size.x, y), paint);
     }
 
-    // Debug: Print actual grid dimensions being rendered
-    if (gridSize != _lastLoggedGridSize) {
-      print('=== GRID RENDERING DEBUG ===');
-      print('gridSize: $gridSize');
-      print('Lines drawn: ${gridSize + 1} in each direction');
-      print('Cells created: $gridSize x $gridSize');
-      print('Visual size: ${size.x} x ${size.y}');
-      print('Cell dimensions: $cellWidth x $cellHeight');
-      print('Expected total size: ${gridSize * cellWidth} x ${gridSize * cellHeight}');
-      print('Actual calculated size from gridSize: ${gridSize * cellWidth} x ${gridSize * cellHeight}');
-      print('Size mismatch: ${size.x != gridSize * cellWidth || size.y != gridSize * cellHeight}');
-      _lastLoggedGridSize = gridSize;
+    if (showDebug) {
+      // Debug: blue border to compare with terrain red border
+      final borderPaint = Paint()
+        ..color = Colors.blue
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2;
+      canvas.drawRect(
+        Rect.fromLTWH(offsetX, offsetY, size.x, size.y),
+        borderPaint,
+      );
+
+      // Debug markers: center and corners
+      final centerPaint = Paint()..color = Colors.orange; // (size/2,size/2)
+      final tlPaint = Paint()..color = Colors.green; // (0,0)
+      final brPaint = Paint()..color = Colors.cyan;  // (size,size)
+
+      // Center marker (local center is at (size/2,size/2))
+      canvas.drawRect(Rect.fromLTWH(size.x / 2 - 5, size.y / 2 - 5, 10, 10), centerPaint);
+      // Top-left marker
+      canvas.drawRect(Rect.fromLTWH(offsetX, offsetY, 8, 8), tlPaint);
+      // Bottom-right marker
+      canvas.drawRect(Rect.fromLTWH(offsetX + size.x - 8, offsetY + size.y - 8, 8, 8), brPaint);
     }
 
     // Draw buildings
@@ -227,13 +236,9 @@ class Grid extends PositionComponent with HasGameReference {
     final y = placedBuilding.y;
     final buildingSize = sqrt(building.gridSize).toInt();
 
-    // Calculate position relative to the centered anchor
-    final offsetX = -size.x / 2;
-    final offsetY = -size.y / 2;
-
     final rect = Rect.fromLTWH(
-      offsetX + x * cellWidth + 2,
-      offsetY + y * cellHeight + 2,
+      x * cellWidth + 2,
+      y * cellHeight + 2,
       cellWidth * buildingSize - 4,
       cellHeight * buildingSize - 4,
     );

@@ -13,6 +13,11 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
   final double cellWidth;
   final double cellHeight;
   
+  // Toggle for debug overlays (magenta fill, borders, diagonals, markers)
+  bool showDebug = false;
+  // Toggle for parallax motion relative to camera
+  bool enableParallax = false;
+  
   final Map<String, Sprite> _spriteCache = {};
   late double _parallaxSpeed;
 
@@ -40,14 +45,12 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
   void update(double dt) {
     super.update(dt);
     
-    // Apply parallax effect by adjusting position based on camera movement
-    if (parent?.parent is CameraComponent) {
-      final camera = parent!.parent! as CameraComponent;
+    // Optional parallax effect by adjusting position based on camera movement
+    if (enableParallax) {
+      final camera = game.camera;
       final cameraPosition = camera.viewfinder.position;
-      
       // Calculate parallax offset (slower movement for background layers)
-      final parallaxOffset = cameraPosition * (_parallaxSpeed - 1.0);
-      position = parallaxOffset;
+      position = (size / 2) + cameraPosition * (_parallaxSpeed - 1.0);
     }
   }
 
@@ -94,6 +97,53 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
   @override
   void render(Canvas canvas) {
     super.render(canvas);
+    if (showDebug) {
+      // Background to verify layer visibility and bounds
+      final bgPaint = Paint()
+        ..color = const Color(0xFFAA33FF).withAlpha(80)
+        ..style = PaintingStyle.fill;
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, size.x, size.y),
+        bgPaint,
+      );
+      // Layer border for bounds
+      final borderPaint = Paint()
+        ..color = const Color(0xFFAA33FF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2;
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, size.x, size.y),
+        borderPaint,
+      );
+
+      // Diagonals across the layer to ensure visibility
+      final diagPaint = Paint()
+        ..color = const Color(0xFFAA33FF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      canvas.drawLine(
+        const Offset(0, 0),
+        Offset(size.x, size.y),
+        diagPaint,
+      );
+      canvas.drawLine(
+        Offset(size.x, 0),
+        Offset(0, size.y),
+        diagPaint,
+      );
+      // Debug: layer origin marker at local (0,0)
+      final originPaint = Paint()..color = Colors.pink;
+      canvas.drawRect(const Rect.fromLTWH(0, 0, 6, 6), originPaint);
+    }
+    // (debug logging removed)
+    
+    if (showDebug) {
+      // Debug markers to validate alignment vs parent
+      final topLeftPaint = Paint()..color = Colors.pink;   // (0,0)
+      final centerPaint = Paint()..color = Colors.blue;    // (size/2,size/2)
+      canvas.drawRect(const Rect.fromLTWH(0, 0, 6, 6), topLeftPaint);
+      canvas.drawRect(Rect.fromLTWH(size.x / 2 - 3, size.y / 2 - 3, 6, 6), centerPaint);
+    }
 
     final config = TerrainDepthManager.getConfig(depth);
     
@@ -122,13 +172,9 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     TerrainCell terrainCell,
     TerrainDepthConfig config,
   ) {
-    // Calculate position relative to the centered anchor
-    // For a 50x50 grid with center at (0,0):
-    // - Grid center in coordinates: (24.5, 24.5)  
-    // - Pixel center: (24.5 * 50, 24.5 * 50) = (1225, 1225)
-    // - Offset to center at (0,0): subtract 1225
-    final offsetX = (x * cellWidth) - 1225.0;
-    final offsetY = (y * cellHeight) - 1225.0;
+    // Draw cell from local top-left (0,0)
+    final offsetX = x * cellWidth;
+    final offsetY = y * cellHeight;
     
     final cellRect = Rect.fromLTWH(
       offsetX,
