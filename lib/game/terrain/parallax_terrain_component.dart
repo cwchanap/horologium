@@ -21,6 +21,9 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   bool showDebug = false;
   // Toggle for parallax across all layers
   bool parallaxEnabled = true;
+  // Phase 5: Optional terrain debug overlays
+  bool showPatchCentersDebug = false;
+  bool showEdgeZonesDebug = false;
 
   ParallaxTerrainComponent({
     required this.gridSize,
@@ -41,6 +44,45 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
     await _createParallaxLayers();
     
     _isLoaded = true;
+  }
+
+  // Phase 5: Debug overlays for patch centers and edge zones
+  void _renderPatchDebugOverlays(Canvas canvas) {
+    // Compute centers once per render
+    final centers = generator.getPatchCentersForBounds(0, 0, gridSize - 1, gridSize - 1);
+
+    // Draw edge zones as translucent overlay on cells near borders
+    if (showEdgeZonesDebug || showDebug) {
+      final edgePaint = Paint()
+        ..color = const Color(0xFFFFD54F).withAlpha(70) // amber with alpha
+        ..style = PaintingStyle.fill;
+      for (int x = 0; x < gridSize; x++) {
+        for (int y = 0; y < gridSize; y++) {
+          final metric = generator.computeBorderMetricAt(x, y, centers);
+          if (metric < generator.edgeWidth) {
+            final rect = Rect.fromLTWH(
+              x * cellWidth,
+              y * cellHeight,
+              cellWidth,
+              cellHeight,
+            );
+            canvas.drawRect(rect, edgePaint);
+          }
+        }
+      }
+    }
+
+    // Draw patch centers as small circles
+    if (showPatchCentersDebug || showDebug) {
+      final centerPaint = Paint()
+        ..color = Colors.pinkAccent
+        ..style = PaintingStyle.fill;
+      for (final c in centers) {
+        final cx = c.x * cellWidth + cellWidth / 2;
+        final cy = c.y * cellHeight + cellHeight / 2;
+        canvas.drawCircle(Offset(cx, cy), 4, centerPaint);
+      }
+    }
   }
 
   void _generateTerrain() {
@@ -125,6 +167,11 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
 
     // 3) Render children (terrain layers)
     super.render(canvas);
+
+    // 3.5) Optional patch debug overlays (centers and edge zones)
+    if (showPatchCentersDebug || showEdgeZonesDebug || showDebug) {
+      _renderPatchDebugOverlays(canvas);
+    }
 
     // 4) Optional red border, axes and debug markers (local top-left drawing)
     if (showDebug) {
