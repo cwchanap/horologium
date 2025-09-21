@@ -56,8 +56,8 @@ Previously, mixing center-origin drawing (e.g., `Rect.fromLTWH(-size/2, -size/2,
 
 ## Parallax
 
-- Disabled by default (`enableParallax = false`).
-- When enabled, layer `position = size/2 + cameraPosition * (parallaxSpeed - 1.0)`.
+- Enabled by default (`enableParallax = true`).
+- Layer position: `position = size/2 + cameraPosition * (parallaxSpeed - 1.0)`.
 - Do not change the local drawing convention; still render from `(0,0)` in `render()`.
 
 ## Z-Order (Priorities)
@@ -101,4 +101,4 @@ These can be toggled at runtime to switch between clean visuals and diagnostic o
 
 - Tune parallax speeds per depth.
 - Add more terrain feature sprites.
-- Provide a UI toggle for `showDebug`/`enableParallax`.
+- Provide a UI toggle for `showDebug`.

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 import 'package:flame/events.dart' as flame_events;
+import 'package:flame/input.dart';
 import 'package:flutter/material.dart';
 
 import 'building/building.dart';
@@ -13,8 +14,9 @@ import 'terrain/index.dart';
 class MainGame extends FlameGame
     with
         flame_events.TapCallbacks,
-        flame_events.DragCallbacks,
-        flame_events.PointerMoveCallbacks {
+        flame_events.PointerMoveCallbacks,
+        ScrollDetector,
+        ScaleDetector {
   Grid? _grid;
   ParallaxTerrainComponent? _terrain;
   Planet? _planet;
@@ -25,8 +27,11 @@ class MainGame extends FlameGame
 
   static const double _minZoom = 0.1; // Allow zooming out much further
   static const double _maxZoom = 4.0;
+  static const double _zoomPerScrollUnit = 0.02;
 
   final double _startZoom = _minZoom;
+  late double _scaleStartZoom;
+  double? _fitZoom; // Computed zoom that fits the whole terrain in the viewport
 
   Building? buildingToPlace;
   final PlacementPreview placementPreview = PlacementPreview();
@@ -48,6 +53,8 @@ class MainGame extends FlameGame
       gridSize: 50, // Match grid size
       seed: _planet?.id.hashCode ?? 42, // Use planet ID as seed for consistent terrain
     );
+    // Keep terrain perfectly aligned with the grid (no parallax drift)
+    _terrain!.parallaxEnabled = false;
     _terrain!.size = Vector2(_terrain!.gridSize * cellWidth, _terrain!.gridSize * cellHeight);
     _terrain!.anchor = Anchor.center;
     _terrain!.position = Vector2.zero();
@@ -76,6 +83,7 @@ class MainGame extends FlameGame
     // Zoom to fit the entire terrain in the viewport. Do NOT go below fit,
     // otherwise the viewport becomes larger than the world and clamping breaks.
     final properZoom = math.min(zoomX, zoomY);
+    _fitZoom = properZoom; // Save fit zoom so we never allow zooming out beyond full-terrain view
     
     // Apply the proper zoom to fit terrain in viewport
     camera.viewfinder.zoom = properZoom.clamp(_minZoom, _maxZoom);
@@ -126,11 +134,7 @@ class MainGame extends FlameGame
     onPlanetChanged?.call(_planet!);
   }
 
-  @override
-  void onDragUpdate(flame_events.DragUpdateEvent event) {
-    camera.viewfinder.position -= event.canvasDelta / camera.viewfinder.zoom;
-    _clampCameraToTerrain();
-  }
+  // Note: Panning is handled in onScaleUpdate when scale is identity
 
   @override
   void onPointerMove(flame_events.PointerMoveEvent event) {
@@ -187,7 +191,38 @@ class MainGame extends FlameGame
   }
 
   void clampZoom() {
-    camera.viewfinder.zoom = camera.viewfinder.zoom.clamp(_minZoom, _maxZoom);
+    final minAllowed = _fitZoom != null ? math.max(_minZoom, _fitZoom!) : _minZoom;
+    camera.viewfinder.zoom = camera.viewfinder.zoom.clamp(minAllowed, _maxZoom);
+  }
+
+  // Mouse wheel / trackpad scroll zoom (web/desktop)
+  @override
+  void onScroll(flame_events.PointerScrollInfo info) {
+    camera.viewfinder.zoom += info.scrollDelta.global.y.sign * _zoomPerScrollUnit;
+    clampZoom();
+    _clampCameraToTerrain();
+  }
+
+  // Pinch to zoom (mobile & trackpads supporting pinch)
+  @override
+  void onScaleStart(flame_events.ScaleStartInfo info) {
+    _scaleStartZoom = camera.viewfinder.zoom;
+  }
+
+  @override
+  void onScaleUpdate(flame_events.ScaleUpdateInfo info) {
+    final currentScale = info.scale.global;
+    // When pinching, scale is not identity; when panning with one finger it is
+    if (!currentScale.isIdentity()) {
+      camera.viewfinder.zoom = (_scaleStartZoom * currentScale.y).clamp(_minZoom, _maxZoom);
+      _clampCameraToTerrain();
+    } else {
+      // Handle pan/drag when not scaling
+      final zoom = camera.viewfinder.zoom;
+      final delta = (info.delta.global..negate()) / zoom;
+      camera.moveBy(delta);
+      _clampCameraToTerrain();
+    }
   }
 
   void showPlacementPreview(Building building, Vector2 position) {
