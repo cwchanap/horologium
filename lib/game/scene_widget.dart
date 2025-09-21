@@ -133,6 +133,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     _placementManager.selectBuilding(building);
     setState(() {
       _showBuildingSelection = false;
+      // Re-enable game input once a building is selected for placement
+      _uiOverlayOpen = false;
     });
   }
 
@@ -203,7 +205,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                 onPressed: () {
                   setState(() {
                     _showHamburgerMenu = !_showHamburgerMenu;
-                    _uiOverlayOpen = _showHamburgerMenu || _showBuildingSelection || _uiOverlayOpen;
+                    // Only reflect current overlays; do not OR with existing value to avoid sticky state
+                    _uiOverlayOpen = _showHamburgerMenu || _showBuildingSelection;
                   });
                 },
                 backgroundColor: Colors.purple.withAlpha((255 * 0.8).round()),

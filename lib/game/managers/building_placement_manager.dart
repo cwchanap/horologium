@@ -21,14 +21,21 @@ class BuildingPlacementManager {
   bool handleBuildingPlacement(int x, int y, BuildContext context) {
     if (game.buildingToPlace == null) return false;
 
-    if (!game.placementPreview.isValid) {
-      // Cancel placement when clicking on invalid position
-      game.buildingToPlace = null;
-      game.hidePlacementPreview();
-      return true;
+    // Validate placement against grid occupancy and terrain suitability
+    final building = game.buildingToPlace!;
+    final canPlace = game.grid.isAreaAvailable(x, y, building.gridSize);
+    if (!canPlace) {
+      // Show feedback and keep placement mode active so the player can move cursor
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid location: blocked or unsuitable terrain.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
     }
 
-    final buildingType = game.buildingToPlace!.type;
+    final buildingType = building.type;
     final currentCount = game.grid.countBuildingsOfType(buildingType);
     final limit = buildingLimitManager.getBuildingLimit(buildingType);
     
@@ -39,7 +46,7 @@ class BuildingPlacementManager {
       return false;
     }
 
-    if (!ResourceService.canAffordBuilding(resources, game.buildingToPlace!)) {
+    if (!ResourceService.canAffordBuilding(resources, building)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Insufficient funds!'),
@@ -50,8 +57,8 @@ class BuildingPlacementManager {
     }
 
     // Place the building
-    game.grid.placeBuilding(x, y, game.buildingToPlace!);
-    ResourceService.purchaseBuilding(resources, game.buildingToPlace!);
+    game.grid.placeBuilding(x, y, building);
+    ResourceService.purchaseBuilding(resources, building);
     
     game.buildingToPlace = null;
     game.hidePlacementPreview();

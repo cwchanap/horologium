@@ -28,13 +28,14 @@ class MainGame extends FlameGame
   static const double _minZoom = 0.1; // Allow zooming out much further
   static const double _maxZoom = 4.0;
   static const double _zoomPerScrollUnit = 0.02;
+  static const double _zoomSpeedMultiplier = 3.0; // 3x faster zooming
 
   final double _startZoom = _minZoom;
   late double _scaleStartZoom;
   double? _fitZoom; // Computed zoom that fits the whole terrain in the viewport
 
   Building? buildingToPlace;
-  final PlacementPreview placementPreview = PlacementPreview();
+  final PlacementPreview placementPreview = PlacementPreview()..priority = 30; // Ensure preview renders above grid
 
   MainGame({Planet? planet}) : _planet = planet;
 
@@ -150,6 +151,10 @@ class MainGame extends FlameGame
     if (_grid == null) return;
     
     final worldPosition = camera.globalToLocal(event.canvasPosition);
+    // Update preview on tap as well, so it appears even if the cursor hasn't moved
+    if (buildingToPlace != null) {
+      showPlacementPreview(buildingToPlace!, worldPosition);
+    }
     final localPosition = _grid!.toLocal(worldPosition);
     final gridPosition = _grid!.getGridPosition(localPosition);
 
@@ -198,7 +203,7 @@ class MainGame extends FlameGame
   // Mouse wheel / trackpad scroll zoom (web/desktop)
   @override
   void onScroll(flame_events.PointerScrollInfo info) {
-    camera.viewfinder.zoom += info.scrollDelta.global.y.sign * _zoomPerScrollUnit;
+    camera.viewfinder.zoom += info.scrollDelta.global.y.sign * _zoomPerScrollUnit * _zoomSpeedMultiplier;
     clampZoom();
     _clampCameraToTerrain();
   }
@@ -214,7 +219,9 @@ class MainGame extends FlameGame
     final currentScale = info.scale.global;
     // When pinching, scale is not identity; when panning with one finger it is
     if (!currentScale.isIdentity()) {
-      camera.viewfinder.zoom = (_scaleStartZoom * currentScale.y).clamp(_minZoom, _maxZoom);
+      // Amplify pinch zooming speed
+      final scaleFactor = 1 + (currentScale.y - 1) * _zoomSpeedMultiplier;
+      camera.viewfinder.zoom = (_scaleStartZoom * scaleFactor).clamp(_minZoom, _maxZoom);
       _clampCameraToTerrain();
     } else {
       // Handle pan/drag when not scaling
