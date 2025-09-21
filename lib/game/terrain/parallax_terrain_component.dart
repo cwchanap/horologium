@@ -20,7 +20,7 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   // Toggle for debug overlays (fill, border, axes, markers)
   bool showDebug = false;
   // Toggle for parallax across all layers
-  bool parallaxEnabled = false;
+  bool parallaxEnabled = true;
 
   ParallaxTerrainComponent({
     required this.gridSize,

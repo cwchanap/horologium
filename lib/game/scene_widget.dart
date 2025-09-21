@@ -266,7 +266,6 @@ class _MainGameWidgetState extends State<MainGameWidget> {
       if (!mounted) return;
       final initialTerrainDebug = _game.terrain?.showDebug ?? false;
       final initialGridDebug = _game.grid.showDebug;
-      final initialParallax = _game.terrain?.parallaxEnabled ?? false;
       await showModalBottomSheet(
         context: context,
         backgroundColor: Colors.black.withAlpha((255 * 0.95).round()),
@@ -276,7 +275,6 @@ class _MainGameWidgetState extends State<MainGameWidget> {
         builder: (ctx) {
           bool terrainDebug = initialTerrainDebug;
           bool gridDebug = initialGridDebug;
-          bool parallax = initialParallax;
           return StatefulBuilder(
             builder: (context, setSheetState) {
               return Padding(
@@ -317,16 +315,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                         _game.grid.showDebug = v;
                       },
                     ),
-                    SwitchListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Enable parallax', style: TextStyle(color: Colors.white70)),
-                      value: parallax,
-                      onChanged: (v) {
-                        setSheetState(() => parallax = v);
-                        _game.terrain?.setParallaxEnabled(v);
-                      },
-                    ),
+                    // Parallax is enabled by default and no longer toggled here.
                   ],
                 ),
               );
