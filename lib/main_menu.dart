@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import 'package:flame/game.dart';
 import 'package:horologium/game/planet/index.dart';
 import 'package:horologium/game/services/save_service.dart';
 import 'package:horologium/pages/trade_page.dart';
@@ -144,9 +142,7 @@ class _MainMenuState extends State<MainMenu>
                                         .headlineMedium
                                         ?.copyWith(
                                           fontSize: 14,
-                                          color: Colors.cyanAccent.withOpacity(
-                                            0.8,
-                                          ),
+                                          color: Colors.cyanAccent.withAlpha((255 * 0.8).round()),
                                         ),
                                   ),
                                 ],
@@ -214,7 +210,7 @@ class _MainMenuState extends State<MainMenu>
                           'v1.0.0 | Explore • Discover • Evolve',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.3),
+                            color: Colors.white.withAlpha((255 * 0.3).round()),
                             fontSize: 12,
                             letterSpacing: 1.0,
                           ),
@@ -300,17 +296,17 @@ class _MainMenuState extends State<MainMenu>
 
   void _openStellarMap() {
     // TODO: Navigate to stellar map
-    print('Opening stellar map...');
+    if (kDebugMode) debugPrint('Opening stellar map...');
   }
 
   void _openResearchLab() {
     // TODO: Navigate to research lab
-    print('Opening research lab...');
+    if (kDebugMode) debugPrint('Opening research lab...');
   }
 
   void _openSettings() {
     // TODO: Navigate to settings
-    print('Opening settings...');
+    if (kDebugMode) debugPrint('Opening settings...');
   }
 }
 
@@ -330,7 +326,7 @@ class StarfieldPainter extends CustomPainter {
       final opacity = (math.sin(animationValue * 2 * math.pi + i) + 1) / 2;
       final starSize = random.nextDouble() * 2 + 0.5;
 
-      paint.color = Colors.white.withOpacity(opacity * 0.8);
+      paint.color = Colors.white.withAlpha((255 * (opacity * 0.8)).round());
       canvas.drawCircle(Offset(x, y), starSize, paint);
     }
 
@@ -340,7 +336,7 @@ class StarfieldPainter extends CustomPainter {
       final y = random.nextDouble() * size.height;
       final twinkle = (math.sin(animationValue * 3 * math.pi + i * 2) + 1) / 2;
 
-      paint.color = Colors.cyanAccent.withOpacity(twinkle * 0.6);
+      paint.color = Colors.cyanAccent.withAlpha((255 * (twinkle * 0.6)).round());
       canvas.drawCircle(Offset(x, y), 3, paint);
     }
   }
@@ -405,11 +401,11 @@ class _FloatingParticleState extends State<FloatingParticle>
             width: 4,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.cyanAccent.withOpacity(0.6),
+              color: Colors.cyanAccent.withAlpha((255 * 0.6).round()),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.cyanAccent.withOpacity(0.3),
+                  color: Colors.cyanAccent.withAlpha((255 * 0.3).round()),
                   blurRadius: 8,
                   spreadRadius: 2,
                 ),

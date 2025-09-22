@@ -12,14 +12,14 @@ void main() {
     late BuildingLimitManager testBuildingLimitManager;
     late Grid testGrid;
     bool panelClosed = false;
-    Building? selectedBuilding;
+    // selectedBuilding variable removed; we only verify callback invocations indirectly
 
     setUp(() {
       testResearchManager = ResearchManager();
       testBuildingLimitManager = BuildingLimitManager();
       testGrid = Grid();
       panelClosed = false;
-      selectedBuilding = null;
+      
     });
 
     testWidgets('does not render when not visible', (WidgetTester tester) async {
@@ -33,7 +33,7 @@ void main() {
                   selectedGridX: 5,
                   selectedGridY: 3,
                   onClose: () => panelClosed = true,
-                  onBuildingSelected: (building) => selectedBuilding = building,
+                  onBuildingSelected: (_) {},
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,
@@ -59,7 +59,7 @@ void main() {
                   selectedGridX: 5,
                   selectedGridY: 3,
                   onClose: () => panelClosed = true,
-                  onBuildingSelected: (building) => selectedBuilding = building,
+                  onBuildingSelected: (_) {},
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,
@@ -85,7 +85,7 @@ void main() {
                   selectedGridX: 10,
                   selectedGridY: 7,
                   onClose: () => panelClosed = true,
-                  onBuildingSelected: (building) => selectedBuilding = building,
+                  onBuildingSelected: (_) {},
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,
@@ -110,7 +110,7 @@ void main() {
                   selectedGridX: 5,
                   selectedGridY: 3,
                   onClose: () => panelClosed = true,
-                  onBuildingSelected: (building) => selectedBuilding = building,
+                  onBuildingSelected: (_) {},
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,
@@ -138,7 +138,7 @@ void main() {
                   selectedGridX: 5,
                   selectedGridY: 3,
                   onClose: () => panelClosed = true,
-                  onBuildingSelected: (building) => selectedBuilding = building,
+                  onBuildingSelected: (_) {},
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,

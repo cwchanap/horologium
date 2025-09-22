@@ -10,7 +10,7 @@ import 'terrain_generator.dart';
 
 class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   final int gridSize;
-  final TerrainGenerator generator;
+  TerrainGenerator generator;
   final Map<String, TerrainCell> _baseTerrain = {};
   final Map<TerrainDepth, ParallaxTerrainLayer> _parallaxLayers = {};
   
@@ -289,9 +289,20 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   Future<void> regenerateTerrain({int? newSeed}) async {
     if (newSeed != null) {
       // Create new generator with different seed
-      final newGenerator = TerrainGenerator(gridSize: gridSize, seed: newSeed);
+      final newGenerator = TerrainGenerator(
+        gridSize: gridSize,
+        seed: newSeed,
+        patchSizeBase: generator.patchSizeBase,
+        patchJitter: generator.patchJitter,
+        primaryWeight: generator.primaryWeight,
+        warpAmplitude: generator.warpAmplitude,
+        warpFrequency: generator.warpFrequency,
+        edgeWidth: generator.edgeWidth,
+        edgeGamma: generator.edgeGamma,
+      );
+      generator = newGenerator;
       _baseTerrain.clear();
-      _baseTerrain.addAll(newGenerator.generateTerrain());
+      _baseTerrain.addAll(generator.generateTerrain());
     } else {
       _generateTerrain();
     }
@@ -364,6 +375,45 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   void adjustParallaxSpeeds(double multiplier) {
     // This could be implemented to dynamically adjust parallax speeds
     // Currently the speeds are fixed in TerrainDepthManager
+  }
+
+  /// Update terrain generator parameters and regenerate the terrain.
+  Future<void> updateTerrainParams({
+    int? patchSizeBase,
+    int? patchJitter,
+    double? primaryWeight,
+    double? warpAmplitude,
+    double? warpFrequency,
+    double? edgeWidth,
+    double? edgeGamma,
+  }) async {
+    final newGenerator = TerrainGenerator(
+      gridSize: gridSize,
+      seed: generator.seed,
+      patchSizeBase: patchSizeBase ?? generator.patchSizeBase,
+      patchJitter: patchJitter ?? generator.patchJitter,
+      primaryWeight: primaryWeight ?? generator.primaryWeight,
+      warpAmplitude: warpAmplitude ?? generator.warpAmplitude,
+      warpFrequency: warpFrequency ?? generator.warpFrequency,
+      edgeWidth: edgeWidth ?? generator.edgeWidth,
+      edgeGamma: edgeGamma ?? generator.edgeGamma,
+    );
+    generator = newGenerator;
+    _baseTerrain.clear();
+    _baseTerrain.addAll(generator.generateTerrain());
+    await _createParallaxLayers();
+  }
+
+  /// Toggle patch debug overlays
+  void setPatchDebugOverlays({bool? showCenters, bool? showEdges}) {
+    if (showCenters != null) showPatchCentersDebug = showCenters;
+    if (showEdges != null) showEdgeZonesDebug = showEdges;
+  }
+
+  /// Shuffle seed and regenerate keeping current parameters
+  Future<void> shuffleSeed() async {
+    final nextSeed = generator.seed + 1;
+    await regenerateTerrain(newSeed: nextSeed);
   }
 
   /// Enable/disable debug overlays on parent and all child layers

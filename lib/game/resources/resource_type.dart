@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'resource_category.dart';
 
 enum ResourceType {
@@ -62,7 +61,10 @@ class ResourceRegistry {
   ];
 
   static Resource? find(ResourceType type) {
-    return availableResources.firstWhereOrNull((r) => r.type == type);
+    for (final r in availableResources) {
+      if (r.type == type) return r;
+    }
+    return null;
   }
 }
 enum BakeryProduct {

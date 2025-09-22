@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:horologium/game/building/building.dart';
-import 'package:horologium/game/main_game.dart';
 import 'package:horologium/game/grid.dart';
 import 'package:horologium/game/planet/planet.dart';
 import 'package:horologium/game/planet/placed_building_data.dart';
@@ -9,15 +8,13 @@ import 'package:horologium/game/services/save_service.dart';
 
 void main() {
   group('Planet Placement Persistence Integration Tests', () {
-    late SharedPreferences prefs;
     late Planet planet;
-    late MainGame game;
     late Grid grid;
     bool planetSaved = false;
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
-      prefs = await SharedPreferences.getInstance();
+      await SharedPreferences.getInstance();
       
       // Create a planet
       planet = Planet(
@@ -43,9 +40,6 @@ void main() {
           planetSaved = true; // Track that planet would be saved
         },
       );
-      
-      // Create game with planet and grid
-      game = MainGame(planet: planet);
       
       planetSaved = false;
     });

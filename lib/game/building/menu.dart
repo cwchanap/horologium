@@ -22,7 +22,12 @@ class BuildingMenu {
             bool meetsConsumptionRequirements = true;
             if (building.consumption.isNotEmpty) {
               building.consumption.forEach((key, value) {
-                if ((resources.resources[key] ?? 0) < value) {
+                final rt = ResourceType.values.firstWhere(
+                  (e) => e.toString().split('.').last == key,
+                  orElse: () => ResourceType.cash,
+                );
+                final amount = resources.resources[rt] ?? 0;
+                if (amount < value) {
                   meetsConsumptionRequirements = false;
                 }
               });
@@ -163,7 +168,11 @@ class BuildingMenu {
                       ),
                       const SizedBox(height: 4),
                       ...building.consumption.entries.map((entry) {
-                        final hasEnough = (resources.resources[entry.key] ?? 0) >= entry.value;
+                        final rt = ResourceType.values.firstWhere(
+                          (e) => e.toString().split('.').last == entry.key,
+                          orElse: () => ResourceType.cash,
+                        );
+                        final hasEnough = (resources.resources[rt] ?? 0) >= entry.value;
                         return _buildDetailRow(
                           _capitalizeResource(entry.key),
                           '-${entry.value}/sec',
@@ -178,11 +187,11 @@ class BuildingMenu {
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       DropdownButton<CropType>(
-                        value: (building as Field).cropType,
+                        value: building.cropType,
                         onChanged: (CropType? newValue) {
                           if (newValue != null) {
                             setState(() {
-                              (building as Field).cropType = newValue;
+                              building.cropType = newValue;
                             });
                           }
                         },
@@ -202,11 +211,11 @@ class BuildingMenu {
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       DropdownButton<BakeryProduct>(
-                        value: (building as Bakery).productType,
+                        value: building.productType,
                         onChanged: (BakeryProduct? newValue) {
                           if (newValue != null) {
                             setState(() {
-                              (building as Bakery).productType = newValue;
+                              building.productType = newValue;
                             });
                           }
                         },

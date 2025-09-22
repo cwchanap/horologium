@@ -47,6 +47,26 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     _startResourceGeneration();
   }
 
+  // Helper for labeled slider rows in debug sheet
+  Widget _buildSliderRow({required String label, required String valueText, required Widget child}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: const TextStyle(color: Colors.white70)),
+              Text(valueText, style: const TextStyle(color: Colors.white54)),
+            ],
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+
   void _initializeGame() {
     _game = MainGame(planet: widget.planet);
     _game.onPlanetChanged = _onPlanetChanged;
@@ -278,6 +298,17 @@ class _MainGameWidgetState extends State<MainGameWidget> {
         builder: (ctx) {
           bool terrainDebug = initialTerrainDebug;
           bool gridDebug = initialGridDebug;
+          bool showCenters = _game.terrain?.showPatchCentersDebug ?? false;
+          bool showEdges = _game.terrain?.showEdgeZonesDebug ?? false;
+          // Terrain generator parameters
+          final gen = _game.terrain!.generator;
+          int patchSizeBase = gen.patchSizeBase;
+          int patchJitter = gen.patchJitter;
+          double primaryWeight = gen.primaryWeight;
+          double warpAmplitude = gen.warpAmplitude;
+          double warpFrequency = gen.warpFrequency;
+          double edgeWidth = gen.edgeWidth;
+          double edgeGamma = gen.edgeGamma;
           return StatefulBuilder(
             builder: (context, setSheetState) {
               return Padding(
@@ -308,6 +339,27 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                         _game.terrain?.setDebugOverlays(v);
                       },
                     ),
+                    // Patch overlay toggles
+                    SwitchListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Show patch centers', style: TextStyle(color: Colors.white70)),
+                      value: showCenters,
+                      onChanged: (v) {
+                        setSheetState(() => showCenters = v);
+                        _game.terrain?.setPatchDebugOverlays(showCenters: v);
+                      },
+                    ),
+                    SwitchListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Show edge zones', style: TextStyle(color: Colors.white70)),
+                      value: showEdges,
+                      onChanged: (v) {
+                        setSheetState(() => showEdges = v);
+                        _game.terrain?.setPatchDebugOverlays(showEdges: v);
+                      },
+                    ),
                     SwitchListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
@@ -317,6 +369,126 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                         setSheetState(() => gridDebug = v);
                         _game.grid.showDebug = v;
                       },
+                    ),
+                    const Divider(color: Colors.white24),
+                    const Text('Terrain parameters', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    // Patch size
+                    _buildSliderRow(
+                      label: 'Patch Size',
+                      valueText: '$patchSizeBase',
+                      child: Slider(
+                        value: patchSizeBase.toDouble(),
+                        min: 5,
+                        max: 15,
+                        divisions: 10,
+                        label: '$patchSizeBase',
+                        onChanged: (v) => setSheetState(() => patchSizeBase = v.round()),
+                      ),
+                    ),
+                    // Patch jitter
+                    _buildSliderRow(
+                      label: 'Patch Jitter',
+                      valueText: '$patchJitter',
+                      child: Slider(
+                        value: patchJitter.toDouble(),
+                        min: 0,
+                        max: 4,
+                        divisions: 4,
+                        label: '$patchJitter',
+                        onChanged: (v) => setSheetState(() => patchJitter = v.round()),
+                      ),
+                    ),
+                    // Primary weight
+                    _buildSliderRow(
+                      label: 'Primary Weight',
+                      valueText: primaryWeight.toStringAsFixed(2),
+                      child: Slider(
+                        value: primaryWeight,
+                        min: 0.6,
+                        max: 1.0,
+                        divisions: 20,
+                        label: primaryWeight.toStringAsFixed(2),
+                        onChanged: (v) => setSheetState(() => primaryWeight = v),
+                      ),
+                    ),
+                    // Warp amplitude
+                    _buildSliderRow(
+                      label: 'Warp Amplitude',
+                      valueText: warpAmplitude.toStringAsFixed(2),
+                      child: Slider(
+                        value: warpAmplitude,
+                        min: 0.0,
+                        max: 3.0,
+                        divisions: 30,
+                        label: warpAmplitude.toStringAsFixed(2),
+                        onChanged: (v) => setSheetState(() => warpAmplitude = v),
+                      ),
+                    ),
+                    // Warp frequency
+                    _buildSliderRow(
+                      label: 'Warp Frequency',
+                      valueText: warpFrequency.toStringAsFixed(2),
+                      child: Slider(
+                        value: warpFrequency,
+                        min: 0.05,
+                        max: 0.4,
+                        divisions: 35,
+                        label: warpFrequency.toStringAsFixed(2),
+                        onChanged: (v) => setSheetState(() => warpFrequency = v),
+                      ),
+                    ),
+                    // Edge width
+                    _buildSliderRow(
+                      label: 'Edge Width',
+                      valueText: edgeWidth.toStringAsFixed(2),
+                      child: Slider(
+                        value: edgeWidth,
+                        min: 0.5,
+                        max: 2.5,
+                        divisions: 20,
+                        label: edgeWidth.toStringAsFixed(2),
+                        onChanged: (v) => setSheetState(() => edgeWidth = v),
+                      ),
+                    ),
+                    // Edge gamma
+                    _buildSliderRow(
+                      label: 'Edge Gamma',
+                      valueText: edgeGamma.toStringAsFixed(2),
+                      child: Slider(
+                        value: edgeGamma,
+                        min: 1.0,
+                        max: 2.5,
+                        divisions: 15,
+                        label: edgeGamma.toStringAsFixed(2),
+                        onChanged: (v) => setSheetState(() => edgeGamma = v),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            await _game.terrain?.updateTerrainParams(
+                              patchSizeBase: patchSizeBase,
+                              patchJitter: patchJitter,
+                              primaryWeight: primaryWeight,
+                              warpAmplitude: warpAmplitude,
+                              warpFrequency: warpFrequency,
+                              edgeWidth: edgeWidth,
+                              edgeGamma: edgeGamma,
+                            );
+                          },
+                          icon: const Icon(Icons.tune),
+                          label: const Text('Apply Params'),
+                        ),
+                        const SizedBox(width: 12),
+                        OutlinedButton.icon(
+                          onPressed: () => _game.terrain?.shuffleSeed(),
+                          icon: const Icon(Icons.shuffle),
+                          label: const Text('Shuffle Seed'),
+                        ),
+                      ],
                     ),
                     // Parallax is enabled by default and no longer toggled here.
                   ],

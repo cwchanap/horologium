@@ -378,7 +378,9 @@ class TerrainGenerator {
   /// Public helper: compute border metric (smaller means closer to a border) at cell using provided centers
   double computeBorderMetricAt(int x, int y, List<Point<int>> centers) {
     final (wx, wy) = warpCoords(x, y);
-    final (_, __, d1, d2) = _nearestTwoCenters(wx, wy, centers);
+    final pair = _nearestTwoCenters(wx, wy, centers);
+    final double d1 = pair.$3;
+    final double d2 = pair.$4;
     return (sqrt(d2) - sqrt(d1)).abs();
   }
 

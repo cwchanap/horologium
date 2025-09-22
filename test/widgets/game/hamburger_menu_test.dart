@@ -13,7 +13,6 @@ void main() {
     late BuildingLimitManager testBuildingLimitManager;
     late Grid testGrid;
     bool menuClosed = false;
-    bool resourcesChanged = false;
 
     setUp(() {
       testResources = Resources();
@@ -21,7 +20,7 @@ void main() {
       testBuildingLimitManager = BuildingLimitManager();
       testGrid = Grid();
       menuClosed = false;
-      resourcesChanged = false;
+      
     });
 
     testWidgets('does not render when not visible', (WidgetTester tester) async {
@@ -37,7 +36,7 @@ void main() {
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,
-                  onResourcesChanged: () => resourcesChanged = true,
+                  onResourcesChanged: () {},
                 ),
               ],
             ),
@@ -62,7 +61,7 @@ void main() {
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,
-                  onResourcesChanged: () => resourcesChanged = true,
+                  onResourcesChanged: () {},
                 ),
               ],
             ),
@@ -89,7 +88,7 @@ void main() {
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,
-                  onResourcesChanged: () => resourcesChanged = true,
+                  onResourcesChanged: () {},
                 ),
               ],
             ),
@@ -116,7 +115,7 @@ void main() {
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,
-                  onResourcesChanged: () => resourcesChanged = true,
+                  onResourcesChanged: () {},
                 ),
               ],
             ),
@@ -143,7 +142,7 @@ void main() {
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,
-                  onResourcesChanged: () => resourcesChanged = true,
+                  onResourcesChanged: () {},
                 ),
               ],
             ),
@@ -170,7 +169,7 @@ void main() {
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,
-                  onResourcesChanged: () => resourcesChanged = true,
+                  onResourcesChanged: () {},
                 ),
               ],
             ),
@@ -197,7 +196,7 @@ void main() {
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,
-                  onResourcesChanged: () => resourcesChanged = true,
+                  onResourcesChanged: () {},
                 ),
               ],
             ),
@@ -224,7 +223,7 @@ void main() {
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,
-                  onResourcesChanged: () => resourcesChanged = true,
+                  onResourcesChanged: () {},
                 ),
               ],
             ),
@@ -259,7 +258,7 @@ void main() {
                   researchManager: testResearchManager,
                   buildingLimitManager: testBuildingLimitManager,
                   grid: testGrid,
-                  onResourcesChanged: () => resourcesChanged = true,
+                  onResourcesChanged: () {},
                 ),
               ],
             ),

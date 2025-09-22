@@ -45,10 +45,7 @@ void main() {
         'buildings': ['5,5,House', '10,10,Power Plant']
       });
       
-      // Initialize grid first
-      final grid = Grid();
-      // Use reflection or direct assignment to set the grid
-      // Since _grid is private, we'll test this differently
+      // Since _grid is private, we'll test loadBuildings path completes
       await game.loadBuildings();
       expect(true, isTrue);
     });
