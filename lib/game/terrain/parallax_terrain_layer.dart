@@ -220,9 +220,36 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     final sprite = assetPath != null ? _spriteCache[assetPath] : null;
 
     if (sprite != null) {
-      // Position feature within the cell
-      final featurePosition = _getFeaturePosition(cellRect, feature);
+      // Position feature deterministically per cell + feature
       final featureSize = _getFeatureSize(feature);
+      final rawPosition = _isLargeFeature(feature)
+          ? _getLargeFeaturePosition(cellRect, feature, featureSize)
+          : _getFeaturePosition(cellRect, feature);
+
+      // Adjust by feature-specific anchor offset (e.g., tree trunk baseline)
+      final anchorOffset = _getFeatureAnchorOffset(feature, featureSize);
+      final baseX = rawPosition.x + anchorOffset.x;
+      final baseY = rawPosition.y + anchorOffset.y;
+
+      // Constrain position
+      double clampedX;
+      double clampedY;
+
+      if (_isLargeFeature(feature)) {
+        // Large features can span multiple cells, but must stay within the grid layer
+        clampedX = baseX.clamp(0.0, size.x - featureSize.x).toDouble();
+        clampedY = baseY.clamp(0.0, size.y - featureSize.y).toDouble();
+      } else {
+        // Small features must stay within their cell
+        final minX = cellRect.left;
+        final minY = cellRect.top;
+        final maxX = cellRect.right - featureSize.x;
+        final maxY = cellRect.bottom - featureSize.y;
+        clampedX = baseX.clamp(minX, maxX).toDouble();
+        clampedY = baseY.clamp(minY, maxY).toDouble();
+      }
+
+      final featurePosition = Vector2(clampedX, clampedY);
 
       sprite.render(
         canvas,
@@ -233,12 +260,54 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
   }
 
   Vector2 _getFeaturePosition(Rect cellRect, FeatureType feature) {
-    // Position features within the cell bounds
-    // Use deterministic positioning based on feature type
-    final hash = feature.hashCode;
-    final x = (hash % 100) / 100.0 * (cellRect.width * 0.6) + (cellRect.width * 0.2);
-    final y = ((hash ~/ 100) % 100) / 100.0 * (cellRect.height * 0.6) + (cellRect.height * 0.2);
-    return Vector2(cellRect.left + x, cellRect.top + y);
+    // Deterministic per-cell offset using cell coordinates + feature
+    // This yields variety across the grid while staying reproducible.
+    final cellX = (cellRect.left / cellWidth).round();
+    final cellY = (cellRect.top / cellHeight).round();
+
+    // Simple integer hash mix
+    final seed = (cellX * 73856093) ^ (cellY * 19349663) ^ feature.hashCode;
+
+    // Pseudo-random fractions in [0,1)
+    final fx = ((seed & 0xFFFF) / 0x10000);
+    final fy = (((seed >> 16) & 0xFFFF) / 0x10000);
+
+    // Position target within a central band; final clamping will ensure fit w.r.t. sprite size
+    final x = cellRect.left + (cellRect.width * 0.1) + fx * (cellRect.width * 0.8);
+    final y = cellRect.top + (cellRect.height * 0.1) + fy * (cellRect.height * 0.8);
+    return Vector2(x, y);
+  }
+
+  Vector2 _getLargeFeaturePosition(Rect cellRect, FeatureType feature, Vector2 featureSize) {
+    // Large features: center relative to the cell with a small deterministic offset,
+    // and bottom-align within the cell so trunks feel grounded. Final clamp keeps within grid bounds.
+    final cellX = (cellRect.left / cellWidth).round();
+    final cellY = (cellRect.top / cellHeight).round();
+
+    final seed = (cellX * 2654435761) ^ (cellY * 1597334677) ^ feature.hashCode;
+    final fx = ((seed & 0xFFFF) / 0x10000) - 0.5; // [-0.5, 0.5)
+    final fy = (((seed >> 16) & 0xFFFF) / 0x10000); // [0, 1)
+
+    // Base at cell center (x) and bottom (y)
+    final baseX = cellRect.center.dx - featureSize.x / 2;
+    final baseY = cellRect.bottom - featureSize.y;
+
+    // Small offsets for variety (tighter range to avoid looking "off")
+    final xOffset = fx * cellRect.width * 0.1;  // +/- 0.05 cell width
+    final yOffset = -fy * cellRect.height * 0.03; // slight lift within the cell
+
+    return Vector2(baseX + xOffset, baseY + yOffset);
+  }
+
+  Vector2 _getFeatureAnchorOffset(FeatureType feature, Vector2 featureSize) {
+    switch (feature) {
+      case FeatureType.treeOakLarge:
+      case FeatureType.treePineLarge:
+        // Slight downward shift to account for transparent padding below the trunk
+        return Vector2(0.0, featureSize.y * 0.06);
+      default:
+        return Vector2.zero();
+    }
   }
 
   Vector2 _getFeatureSize(FeatureType feature) {
@@ -265,6 +334,19 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
         return Vector2(cellWidth * 3.0, cellHeight * 2.5);
       default:
         return Vector2(cellWidth, cellHeight);
+    }
+  }
+
+  bool _isLargeFeature(FeatureType feature) {
+    switch (feature) {
+      case FeatureType.treeOakLarge:
+      case FeatureType.treePineLarge:
+      case FeatureType.rockLarge:
+      case FeatureType.lakeSmall:
+      case FeatureType.lakeLarge:
+        return true;
+      default:
+        return false;
     }
   }
 
