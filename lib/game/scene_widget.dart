@@ -1,5 +1,6 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../widgets/game/building_selection_panel.dart';
 import '../widgets/game/game_controls.dart';
@@ -45,6 +46,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     _initializeGame();
     _loadSavedData();
     _startResourceGeneration();
+    _applyTerrainPrefsWhenReady();
   }
 
   // Helper for labeled slider rows in debug sheet
@@ -112,6 +114,88 @@ class _MainGameWidgetState extends State<MainGameWidget> {
       () => _game.hasLoaded ? _game.grid.getAllBuildings() : <Building>[],
       _onResourcesChanged,
     );
+  }
+
+  // Load saved terrain debug toggles and generation parameters once the game is ready
+  Future<void> _applyTerrainPrefsWhenReady() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Read toggle prefs
+    final terrainDebug = prefs.getBool('terrain.debug') ?? false;
+    final showCenters = prefs.getBool('terrain.showCenters') ?? false;
+    final showEdges = prefs.getBool('terrain.showEdges') ?? false;
+    final gridDebug = prefs.getBool('grid.debug') ?? false;
+
+    // Wait until game is loaded
+    while (mounted && !_game.hasLoaded) {
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
+    if (!mounted || !_game.hasLoaded) return;
+
+    // Apply toggles
+    _game.terrain?.setDebugOverlays(terrainDebug);
+    _game.terrain?.setPatchDebugOverlays(showCenters: showCenters, showEdges: showEdges);
+    _game.grid.showDebug = gridDebug;
+
+    // Apply parameter prefs (fallback to current generator values)
+    final gen = _game.terrain!.generator;
+    final newPatchSizeBase = prefs.getInt('terrain.patchSizeBase') ?? gen.patchSizeBase;
+    final newPatchJitter = prefs.getInt('terrain.patchJitter') ?? gen.patchJitter;
+    final newPrimaryWeight = prefs.getDouble('terrain.primaryWeight') ?? gen.primaryWeight;
+    final newWarpAmplitude = prefs.getDouble('terrain.warpAmplitude') ?? gen.warpAmplitude;
+    final newWarpFrequency = prefs.getDouble('terrain.warpFrequency') ?? gen.warpFrequency;
+    final newEdgeWidth = prefs.getDouble('terrain.edgeWidth') ?? gen.edgeWidth;
+    final newEdgeGamma = prefs.getDouble('terrain.edgeGamma') ?? gen.edgeGamma;
+
+    final paramsChanged = newPatchSizeBase != gen.patchSizeBase ||
+        newPatchJitter != gen.patchJitter ||
+        newPrimaryWeight != gen.primaryWeight ||
+        newWarpAmplitude != gen.warpAmplitude ||
+        newWarpFrequency != gen.warpFrequency ||
+        newEdgeWidth != gen.edgeWidth ||
+        newEdgeGamma != gen.edgeGamma;
+    if (paramsChanged) {
+      await _game.terrain?.updateTerrainParams(
+        patchSizeBase: newPatchSizeBase,
+        patchJitter: newPatchJitter,
+        primaryWeight: newPrimaryWeight,
+        warpAmplitude: newWarpAmplitude,
+        warpFrequency: newWarpFrequency,
+        edgeWidth: newEdgeWidth,
+        edgeGamma: newEdgeGamma,
+      );
+    }
+  }
+
+  Future<void> _saveTerrainTogglePrefs({
+    required bool terrainDebug,
+    required bool showCenters,
+    required bool showEdges,
+    required bool gridDebug,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('terrain.debug', terrainDebug);
+    await prefs.setBool('terrain.showCenters', showCenters);
+    await prefs.setBool('terrain.showEdges', showEdges);
+    await prefs.setBool('grid.debug', gridDebug);
+  }
+
+  Future<void> _saveTerrainParamPrefs({
+    required int patchSizeBase,
+    required int patchJitter,
+    required double primaryWeight,
+    required double warpAmplitude,
+    required double warpFrequency,
+    required double edgeWidth,
+    required double edgeGamma,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('terrain.patchSizeBase', patchSizeBase);
+    await prefs.setInt('terrain.patchJitter', patchJitter);
+    await prefs.setDouble('terrain.primaryWeight', primaryWeight);
+    await prefs.setDouble('terrain.warpAmplitude', warpAmplitude);
+    await prefs.setDouble('terrain.warpFrequency', warpFrequency);
+    await prefs.setDouble('terrain.edgeWidth', edgeWidth);
+    await prefs.setDouble('terrain.edgeGamma', edgeGamma);
   }
 
   void _onResourcesChanged() {
@@ -337,6 +421,12 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                       onChanged: (v) {
                         setSheetState(() => terrainDebug = v);
                         _game.terrain?.setDebugOverlays(v);
+                        _saveTerrainTogglePrefs(
+                          terrainDebug: terrainDebug,
+                          showCenters: showCenters,
+                          showEdges: showEdges,
+                          gridDebug: gridDebug,
+                        );
                       },
                     ),
                     // Patch overlay toggles
@@ -348,6 +438,12 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                       onChanged: (v) {
                         setSheetState(() => showCenters = v);
                         _game.terrain?.setPatchDebugOverlays(showCenters: v);
+                        _saveTerrainTogglePrefs(
+                          terrainDebug: terrainDebug,
+                          showCenters: showCenters,
+                          showEdges: showEdges,
+                          gridDebug: gridDebug,
+                        );
                       },
                     ),
                     SwitchListTile(
@@ -358,6 +454,12 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                       onChanged: (v) {
                         setSheetState(() => showEdges = v);
                         _game.terrain?.setPatchDebugOverlays(showEdges: v);
+                        _saveTerrainTogglePrefs(
+                          terrainDebug: terrainDebug,
+                          showCenters: showCenters,
+                          showEdges: showEdges,
+                          gridDebug: gridDebug,
+                        );
                       },
                     ),
                     SwitchListTile(
@@ -368,9 +470,69 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                       onChanged: (v) {
                         setSheetState(() => gridDebug = v);
                         _game.grid.showDebug = v;
+                        _saveTerrainTogglePrefs(
+                          terrainDebug: terrainDebug,
+                          showCenters: showCenters,
+                          showEdges: showEdges,
+                          gridDebug: gridDebug,
+                        );
                       },
                     ),
                     const Divider(color: Colors.white24),
+                    const Text('Presets', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () {
+                            setSheetState(() {
+                              // Smooth Plains
+                              patchSizeBase = 12;
+                              patchJitter = 1;
+                              primaryWeight = 0.90;
+                              warpAmplitude = 1.0;
+                              warpFrequency = 0.12;
+                              edgeWidth = 1.1;
+                              edgeGamma = 1.4;
+                            });
+                          },
+                          child: const Text('Plains'),
+                        ),
+                        OutlinedButton(
+                          onPressed: () {
+                            setSheetState(() {
+                              // Rugged / patchy
+                              patchSizeBase = 8;
+                              patchJitter = 2;
+                              primaryWeight = 0.80;
+                              warpAmplitude = 2.0;
+                              warpFrequency = 0.22;
+                              edgeWidth = 1.4;
+                              edgeGamma = 1.8;
+                            });
+                          },
+                          child: const Text('Rugged'),
+                        ),
+                        OutlinedButton(
+                          onPressed: () {
+                            setSheetState(() {
+                              // Coastal / accentuated borders
+                              patchSizeBase = 10;
+                              patchJitter = 2;
+                              primaryWeight = 0.75;
+                              warpAmplitude = 1.6;
+                              warpFrequency = 0.18;
+                              edgeWidth = 1.6;
+                              edgeGamma = 1.6;
+                            });
+                          },
+                          child: const Text('Coastal'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     const Text('Terrain parameters', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     // Patch size
@@ -470,6 +632,15 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                         ElevatedButton.icon(
                           onPressed: () async {
                             await _game.terrain?.updateTerrainParams(
+                              patchSizeBase: patchSizeBase,
+                              patchJitter: patchJitter,
+                              primaryWeight: primaryWeight,
+                              warpAmplitude: warpAmplitude,
+                              warpFrequency: warpFrequency,
+                              edgeWidth: edgeWidth,
+                              edgeGamma: edgeGamma,
+                            );
+                            _saveTerrainParamPrefs(
                               patchSizeBase: patchSizeBase,
                               patchJitter: patchJitter,
                               primaryWeight: primaryWeight,
