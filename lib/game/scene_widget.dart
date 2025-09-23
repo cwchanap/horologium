@@ -379,6 +379,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
+        isScrollControlled: true,
         builder: (ctx) {
           bool terrainDebug = initialTerrainDebug;
           bool gridDebug = initialGridDebug;
@@ -397,10 +398,11 @@ class _MainGameWidgetState extends State<MainGameWidget> {
             builder: (context, setSheetState) {
               return Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -664,7 +666,8 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                     // Parallax is enabled by default and no longer toggled here.
                   ],
                 ),
-              );
+              ),
+            );
             },
           );
         },
