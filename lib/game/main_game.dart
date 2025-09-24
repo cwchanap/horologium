@@ -4,6 +4,7 @@ import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 import 'package:flame/events.dart' as flame_events;
 import 'package:flame/input.dart';
+import 'package:flame_audio/flame_audio.dart';
 import 'package:flutter/material.dart';
 
 import 'building/building.dart';
@@ -24,6 +25,7 @@ class MainGame extends FlameGame
   Function(int, int)? onGridCellLongTapped;
   Function(int, int)? onGridCellSecondaryTapped;
   Function(Planet)? onPlanetChanged;
+  VoidCallback? onUserInteracted;
 
   static const double _minZoom = 0.1; // Allow zooming out much further
   static const double _maxZoom = 4.0;
@@ -46,6 +48,10 @@ class MainGame extends FlameGame
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    // Ensure BGM listener is registered early so lifecycle events are handled
+    try {
+      await FlameAudio.bgm.initialize();
+    } catch (_) {}
     camera.viewfinder.anchor = Anchor.center;
     camera.viewfinder.zoom = _startZoom;
     
@@ -148,6 +154,7 @@ class MainGame extends FlameGame
 
   @override
   void onTapUp(flame_events.TapUpEvent event) {
+    onUserInteracted?.call();
     if (_grid == null) return;
     
     final worldPosition = camera.globalToLocal(event.canvasPosition);
@@ -170,6 +177,7 @@ class MainGame extends FlameGame
 
   @override
   void onLongTapDown(flame_events.TapDownEvent event) {
+    onUserInteracted?.call();
     if (_grid == null) return;
     
     final worldPosition = camera.globalToLocal(event.canvasPosition);
@@ -203,6 +211,7 @@ class MainGame extends FlameGame
   // Mouse wheel / trackpad scroll zoom (web/desktop)
   @override
   void onScroll(flame_events.PointerScrollInfo info) {
+    onUserInteracted?.call();
     camera.viewfinder.zoom += info.scrollDelta.global.y.sign * _zoomPerScrollUnit * _zoomSpeedMultiplier;
     clampZoom();
     _clampCameraToTerrain();
@@ -211,6 +220,7 @@ class MainGame extends FlameGame
   // Pinch to zoom (mobile & trackpads supporting pinch)
   @override
   void onScaleStart(flame_events.ScaleStartInfo info) {
+    onUserInteracted?.call();
     _scaleStartZoom = camera.viewfinder.zoom;
   }
 

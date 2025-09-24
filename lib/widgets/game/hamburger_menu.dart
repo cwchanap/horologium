@@ -17,6 +17,11 @@ class HamburgerMenu extends StatelessWidget {
   final BuildingLimitManager buildingLimitManager;
   final Grid grid;
   final VoidCallback onResourcesChanged;
+  // Audio controls
+  final bool musicEnabled;
+  final double musicVolume;
+  final ValueChanged<bool>? onMusicEnabledChanged;
+  final ValueChanged<double>? onMusicVolumeChanged;
 
   const HamburgerMenu({
     super.key,
@@ -27,6 +32,10 @@ class HamburgerMenu extends StatelessWidget {
     required this.buildingLimitManager,
     required this.grid,
     required this.onResourcesChanged,
+    this.musicEnabled = true,
+    this.musicVolume = 0.5,
+    this.onMusicEnabledChanged,
+    this.onMusicVolumeChanged,
   });
 
   @override
@@ -117,6 +126,43 @@ class HamburgerMenu extends StatelessWidget {
                 onClose();
                 _showPlanetSwitcher(context);
               },
+            ),
+            const Divider(color: Colors.grey, height: 1),
+            // Audio controls
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Row(
+                children: const [
+                  Icon(Icons.music_note, color: Colors.white70),
+                  SizedBox(width: 8),
+                  Text('Audio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            SwitchListTile(
+              dense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              title: const Text('Music', style: TextStyle(color: Colors.white70)),
+              value: musicEnabled,
+              onChanged: onMusicEnabledChanged,
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Volume', style: TextStyle(color: Colors.white70)),
+                  Text('${(musicVolume * 100).round()}%', style: const TextStyle(color: Colors.white54)),
+                ],
+              ),
+            ),
+            Slider(
+              value: musicVolume,
+              min: 0.0,
+              max: 1.0,
+              divisions: 20,
+              label: '${(musicVolume * 100).round()}%',
+              onChanged: musicEnabled ? onMusicVolumeChanged : null,
             ),
             const Divider(color: Colors.grey, height: 1),
             ListTile(

@@ -1,4 +1,5 @@
 import 'package:flame/game.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -27,7 +28,7 @@ class MainGameWidget extends StatefulWidget {
   State<MainGameWidget> createState() => _MainGameWidgetState();
 }
 
-class _MainGameWidgetState extends State<MainGameWidget> {
+class _MainGameWidgetState extends State<MainGameWidget> with WidgetsBindingObserver {
   late MainGame _game;
   late GameStateManager _gameStateManager;
   late BuildingPlacementManager _placementManager;
@@ -38,15 +39,22 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   bool _showBuildingSelection = false;
   bool _showHamburgerMenu = false;
   bool _uiOverlayOpen = false; // gates pointer events to GameWidget
+  bool _bgmStarted = false; // start audio after first user interaction (web-safe)
+  bool _musicEnabled = true;
+  double _musicVolume = 0.5;
+  AudioPlayer? _bgm;
 
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeGame();
     _loadSavedData();
+    _loadAudioPrefs();
     _startResourceGeneration();
     _applyTerrainPrefsWhenReady();
+    // Do not auto-start audio; start on first user interaction to satisfy web autoplay policy
   }
 
   // Helper for labeled slider rows in debug sheet
@@ -93,12 +101,132 @@ class _MainGameWidgetState extends State<MainGameWidget> {
     _game.onGridCellTapped = _handleGridCellTapped;
     _game.onGridCellLongTapped = _inputHandler.handleGridCellLongTapped;
     _game.onGridCellSecondaryTapped = _inputHandler.handleGridCellLongTapped;
+    _game.onUserInteracted = _maybeStartBgm;
   }
 
   @override
   void dispose() {
     _gameStateManager.dispose();
+    // Stop and dispose background music only if started
+    if (_bgmStarted) {
+      try {
+        _bgm?.stop();
+        _bgm?.dispose();
+      } catch (e) {
+        debugPrint('BGM dispose error: $e');
+      }
+    }
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  Future<void> _initAudio() async {
+    try {
+      _bgm ??= AudioPlayer();
+      await _bgm!.setReleaseMode(ReleaseMode.loop);
+      await _bgm!.setVolume(_musicVolume);
+      await _bgm!.play(AssetSource('audio/background.mp3'));
+      debugPrint('BGM started (volume=$_musicVolume).');
+    } catch (e) {
+      debugPrint('Failed to initialize/play BGM: $e');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    try {
+      if (!_bgmStarted) return; // nothing to do until BGM has started
+      switch (state) {
+        case AppLifecycleState.paused:
+        case AppLifecycleState.inactive:
+          _bgm?.pause();
+          debugPrint('BGM paused due to lifecycle.');
+          break;
+        case AppLifecycleState.resumed:
+          if (_musicEnabled) {
+            _bgm?.resume();
+            debugPrint('BGM resumed due to lifecycle.');
+          }
+          break;
+        case AppLifecycleState.detached:
+          // App is terminating; ensure BGM is stopped
+          _bgm?.stop();
+          debugPrint('BGM stopped due to lifecycle detach.');
+          break;
+        default:
+          break;
+      }
+    } catch (e) {
+      debugPrint('BGM lifecycle handling error: $e');
+    }
+  }
+
+  void _maybeStartBgm() {
+    if (_bgmStarted || !_musicEnabled) return;
+    setState(() => _bgmStarted = true);
+    _initAudio();
+  }
+
+  Future<void> _loadAudioPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final enabled = prefs.getBool('audio.musicEnabled');
+      final volume = prefs.getDouble('audio.musicVolume');
+      setState(() {
+        if (enabled != null) _musicEnabled = enabled;
+        if (volume != null) _musicVolume = volume.clamp(0.0, 1.0);
+      });
+    } catch (e) {
+      debugPrint('Failed to load audio prefs: $e');
+    }
+  }
+
+  Future<void> _saveAudioPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('audio.musicEnabled', _musicEnabled);
+      await prefs.setDouble('audio.musicVolume', _musicVolume);
+    } catch (e) {
+      debugPrint('Failed to save audio prefs: $e');
+    }
+  }
+
+  void _setMusicEnabled(bool value) {
+    setState(() => _musicEnabled = value);
+    _saveAudioPrefs();
+    if (!_bgmStarted && value) {
+      // Start after the user's explicit toggle (gesture) on web
+      _maybeStartBgm();
+    } else if (_bgmStarted && !value) {
+      try {
+        _bgm?.pause();
+        debugPrint('BGM paused by user.');
+      } catch (e) {
+        debugPrint('Failed to pause BGM: $e');
+      }
+    } else if (_bgmStarted && value) {
+      try {
+        _bgm?.resume();
+        debugPrint('BGM resumed by user.');
+      } catch (e) {
+        debugPrint('Failed to resume BGM: $e');
+      }
+    }
+  }
+
+  void _setMusicVolume(double value) {
+    setState(() => _musicVolume = value.clamp(0.0, 1.0));
+    _saveAudioPrefs();
+    if (_bgmStarted) {
+      // Change volume without restarting playback
+      try {
+        _bgm?.setVolume(_musicVolume);
+        debugPrint('BGM volume changed to $_musicVolume.');
+      } catch (e) {
+        debugPrint('Failed to change BGM volume: $e');
+      }
+    }
   }
 
   Future<void> _loadSavedData() async {
@@ -218,6 +346,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
   }
 
   void _handleGridCellTapped(int x, int y) {
+    _maybeStartBgm();
     _inputHandler.handleGridCellTapped(x, y, context);
   }
 
@@ -307,6 +436,7 @@ class _MainGameWidgetState extends State<MainGameWidget> {
               right: 20,
               child: FloatingActionButton(
                 onPressed: () {
+                  _maybeStartBgm();
                   setState(() {
                     _showHamburgerMenu = !_showHamburgerMenu;
                     // Only reflect current overlays; do not OR with existing value to avoid sticky state
@@ -323,7 +453,10 @@ class _MainGameWidgetState extends State<MainGameWidget> {
               left: 20,
               child: FloatingActionButton.small(
                 heroTag: 'debug_tools_button',
-                onPressed: _openDebugSheet,
+                onPressed: () {
+                  _maybeStartBgm();
+                  _openDebugSheet();
+                },
                 backgroundColor: Colors.teal.withAlpha((255 * 0.8).round()),
                 child: const Icon(Icons.bug_report, color: Colors.white),
               ),
@@ -342,6 +475,10 @@ class _MainGameWidgetState extends State<MainGameWidget> {
                 buildingLimitManager: _gameStateManager.buildingLimitManager,
                 grid: _game.grid,
                 onResourcesChanged: _onResourcesChanged,
+                musicEnabled: _musicEnabled,
+                musicVolume: _musicVolume,
+                onMusicEnabledChanged: _setMusicEnabled,
+                onMusicVolumeChanged: _setMusicVolume,
               ),
             
             // Building Selection Panel (only add when visible)
