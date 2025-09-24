@@ -19,10 +19,8 @@ class DeleteConfirmationDialog extends StatelessWidget {
   }) {
     return showDialog(
       context: context,
-      builder: (context) => DeleteConfirmationDialog(
-        building: building,
-        onConfirm: onConfirm,
-      ),
+      builder: (context) =>
+          DeleteConfirmationDialog(building: building, onConfirm: onConfirm),
     );
   }
 

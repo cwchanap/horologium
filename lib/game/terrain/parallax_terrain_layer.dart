@@ -12,12 +12,12 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
   final int gridSize;
   final double cellWidth;
   final double cellHeight;
-  
+
   // Toggle for debug overlays (magenta fill, borders, diagonals, markers)
   bool showDebug = false;
   // Toggle for parallax motion relative to camera
   bool enableParallax = false;
-  
+
   final Map<String, Sprite> _spriteCache = {};
   late double _parallaxSpeed;
 
@@ -36,7 +36,7 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
   Future<void> onLoad() async {
     await super.onLoad();
     await _loadSprites();
-    
+
     // Set the size to match the total terrain area
     size = Vector2(gridSize * cellWidth, gridSize * cellHeight);
   }
@@ -44,7 +44,7 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
   @override
   void update(double dt) {
     super.update(dt);
-    
+
     // Optional parallax effect by adjusting position based on camera movement
     if (enableParallax) {
       final camera = game.camera;
@@ -57,7 +57,7 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
   Future<void> _loadSprites() async {
     // Load sprites for terrain types and features that appear on this depth
     final config = TerrainDepthManager.getConfig(depth);
-    
+
     // Load terrain base sprites
     for (final terrainType in config.allowedTerrainTypes) {
       final assetPath = _getBaseAssetPath(terrainType);
@@ -102,64 +102,58 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
       final bgPaint = Paint()
         ..color = const Color(0xFFAA33FF).withAlpha(80)
         ..style = PaintingStyle.fill;
-      canvas.drawRect(
-        Rect.fromLTWH(0, 0, size.x, size.y),
-        bgPaint,
-      );
+      canvas.drawRect(Rect.fromLTWH(0, 0, size.x, size.y), bgPaint);
       // Layer border for bounds
       final borderPaint = Paint()
         ..color = const Color(0xFFAA33FF)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2;
-      canvas.drawRect(
-        Rect.fromLTWH(0, 0, size.x, size.y),
-        borderPaint,
-      );
+      canvas.drawRect(Rect.fromLTWH(0, 0, size.x, size.y), borderPaint);
 
       // Diagonals across the layer to ensure visibility
       final diagPaint = Paint()
         ..color = const Color(0xFFAA33FF)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5;
-      canvas.drawLine(
-        const Offset(0, 0),
-        Offset(size.x, size.y),
-        diagPaint,
-      );
-      canvas.drawLine(
-        Offset(size.x, 0),
-        Offset(0, size.y),
-        diagPaint,
-      );
+      canvas.drawLine(const Offset(0, 0), Offset(size.x, size.y), diagPaint);
+      canvas.drawLine(Offset(size.x, 0), Offset(0, size.y), diagPaint);
       // Debug: layer origin marker at local (0,0)
       final originPaint = Paint()..color = Colors.pink;
       canvas.drawRect(const Rect.fromLTWH(0, 0, 6, 6), originPaint);
     }
     // (debug logging removed)
-    
+
     if (showDebug) {
       // Debug markers to validate alignment vs parent
-      final topLeftPaint = Paint()..color = Colors.pink;   // (0,0)
-      final centerPaint = Paint()..color = Colors.blue;    // (size/2,size/2)
+      final topLeftPaint = Paint()..color = Colors.pink; // (0,0)
+      final centerPaint = Paint()..color = Colors.blue; // (size/2,size/2)
       canvas.drawRect(const Rect.fromLTWH(0, 0, 6, 6), topLeftPaint);
-      canvas.drawRect(Rect.fromLTWH(size.x / 2 - 3, size.y / 2 - 3, 6, 6), centerPaint);
+      canvas.drawRect(
+        Rect.fromLTWH(size.x / 2 - 3, size.y / 2 - 3, 6, 6),
+        centerPaint,
+      );
     }
 
     final config = TerrainDepthManager.getConfig(depth);
-    
+
     // Render each terrain cell that exists in our data
     for (final entry in terrainData.entries) {
       final key = entry.key;
       final terrainCell = entry.value;
-      
+
       // Parse coordinates from key
       final coords = key.split(',');
       if (coords.length != 2) continue;
-      
+
       final x = int.tryParse(coords[0]);
       final y = int.tryParse(coords[1]);
-      
-      if (x != null && y != null && x >= 0 && y >= 0 && x < gridSize && y < gridSize) {
+
+      if (x != null &&
+          y != null &&
+          x >= 0 &&
+          y >= 0 &&
+          x < gridSize &&
+          y < gridSize) {
         _renderTerrainCell(canvas, x, y, terrainCell, config);
       }
     }
@@ -175,15 +169,8 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     // Draw cell from local top-left (0,0)
     final offsetX = x * cellWidth;
     final offsetY = y * cellHeight;
-    
-    final cellRect = Rect.fromLTWH(
-      offsetX,
-      offsetY,
-      cellWidth,
-      cellHeight,
-    );
 
-
+    final cellRect = Rect.fromLTWH(offsetX, offsetY, cellWidth, cellHeight);
 
     // Render base terrain if this layer should show it
     if (config.allowedTerrainTypes.contains(terrainCell.baseType)) {
@@ -198,7 +185,11 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     }
   }
 
-  void _renderBaseTerrain(Canvas canvas, Rect cellRect, TerrainType terrainType) {
+  void _renderBaseTerrain(
+    Canvas canvas,
+    Rect cellRect,
+    TerrainType terrainType,
+  ) {
     final assetPath = _getBaseAssetPath(terrainType);
     final sprite = assetPath != null ? _spriteCache[assetPath] : null;
 
@@ -251,11 +242,7 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
 
       final featurePosition = Vector2(clampedX, clampedY);
 
-      sprite.render(
-        canvas,
-        position: featurePosition,
-        size: featureSize,
-      );
+      sprite.render(canvas, position: featurePosition, size: featureSize);
     }
   }
 
@@ -273,12 +260,18 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     final fy = (((seed >> 16) & 0xFFFF) / 0x10000);
 
     // Position target within a central band; final clamping will ensure fit w.r.t. sprite size
-    final x = cellRect.left + (cellRect.width * 0.1) + fx * (cellRect.width * 0.8);
-    final y = cellRect.top + (cellRect.height * 0.1) + fy * (cellRect.height * 0.8);
+    final x =
+        cellRect.left + (cellRect.width * 0.1) + fx * (cellRect.width * 0.8);
+    final y =
+        cellRect.top + (cellRect.height * 0.1) + fy * (cellRect.height * 0.8);
     return Vector2(x, y);
   }
 
-  Vector2 _getLargeFeaturePosition(Rect cellRect, FeatureType feature, Vector2 featureSize) {
+  Vector2 _getLargeFeaturePosition(
+    Rect cellRect,
+    FeatureType feature,
+    Vector2 featureSize,
+  ) {
     // Large features: center relative to the cell with a small deterministic offset,
     // and bottom-align within the cell so trunks feel grounded. Final clamp keeps within grid bounds.
     final cellX = (cellRect.left / cellWidth).round();
@@ -293,7 +286,7 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     final baseY = cellRect.bottom - featureSize.y;
 
     // Small offsets for variety (tighter range to avoid looking "off")
-    final xOffset = fx * cellRect.width * 0.1;  // +/- 0.05 cell width
+    final xOffset = fx * cellRect.width * 0.1; // +/- 0.05 cell width
     final yOffset = -fy * cellRect.height * 0.03; // slight lift within the cell
 
     return Vector2(baseX + xOffset, baseY + yOffset);

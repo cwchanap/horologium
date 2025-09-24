@@ -17,7 +17,7 @@ class ResourceIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final assetPath = _getAssetPath(resourceType);
-    
+
     if (assetPath != null) {
       return Image.asset(
         'assets/images/$assetPath',

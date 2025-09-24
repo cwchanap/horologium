@@ -23,36 +23,25 @@ class BuildingCard extends StatelessWidget {
         height: size,
         errorBuilder: (context, error, stackTrace) {
           // Fallback to icon if image fails to load
-          return Icon(
-            building.icon,
-            color: building.color,
-            size: size,
-          );
+          return Icon(building.icon, color: building.color, size: size);
         },
       );
     } else {
-      return Icon(
-        building.icon,
-        color: building.color,
-        size: size,
-      );
+      return Icon(building.icon, color: building.color, size: size);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isAtLimit = currentCount >= maxCount;
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: building.color.withAlpha((255 * 0.2).round()),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: building.color,
-            width: 2,
-          ),
+          border: Border.all(color: building.color, width: 2),
         ),
         child: Padding(
           padding: const EdgeInsets.all(12),

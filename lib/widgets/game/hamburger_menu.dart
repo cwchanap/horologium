@@ -88,10 +88,8 @@ class HamburgerMenu extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ResourcesPage(
-                      resources: resources,
-                      grid: grid,
-                    ),
+                    builder: (context) =>
+                        ResourcesPage(resources: resources, grid: grid),
                   ),
                 );
               },
@@ -99,18 +97,13 @@ class HamburgerMenu extends StatelessWidget {
             const Divider(color: Colors.grey, height: 1),
             ListTile(
               leading: const Icon(Icons.swap_horiz, color: Colors.green),
-              title: const Text(
-                'Trade',
-                style: TextStyle(color: Colors.white),
-              ),
+              title: const Text('Trade', style: TextStyle(color: Colors.white)),
               onTap: () {
                 onClose();
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => TradePage(
-                      resources: resources,
-                    ),
+                    builder: (context) => TradePage(resources: resources),
                   ),
                 );
               },
@@ -135,14 +128,23 @@ class HamburgerMenu extends StatelessWidget {
                 children: const [
                   Icon(Icons.music_note, color: Colors.white70),
                   SizedBox(width: 8),
-                  Text('Audio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  Text(
+                    'Audio',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ),
             SwitchListTile(
               dense: true,
               contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-              title: const Text('Music', style: TextStyle(color: Colors.white70)),
+              title: const Text(
+                'Music',
+                style: TextStyle(color: Colors.white70),
+              ),
               value: musicEnabled,
               onChanged: onMusicEnabledChanged,
             ),
@@ -152,7 +154,10 @@ class HamburgerMenu extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Volume', style: TextStyle(color: Colors.white70)),
-                  Text('${(musicVolume * 100).round()}%', style: const TextStyle(color: Colors.white54)),
+                  Text(
+                    '${(musicVolume * 100).round()}%',
+                    style: const TextStyle(color: Colors.white54),
+                  ),
                 ],
               ),
             ),
@@ -167,10 +172,7 @@ class HamburgerMenu extends StatelessWidget {
             const Divider(color: Colors.grey, height: 1),
             ListTile(
               leading: const Icon(Icons.close, color: Colors.white),
-              title: const Text(
-                'Close',
-                style: TextStyle(color: Colors.white),
-              ),
+              title: const Text('Close', style: TextStyle(color: Colors.white)),
               onTap: onClose,
             ),
           ],

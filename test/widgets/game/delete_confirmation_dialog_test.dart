@@ -24,7 +24,9 @@ void main() {
       confirmPressed = false;
     });
 
-    testWidgets('displays building name and cost correctly', (WidgetTester tester) async {
+    testWidgets('displays building name and cost correctly', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -38,9 +40,12 @@ void main() {
 
       // Check title contains building name
       expect(find.text('Delete ${testBuilding.name}?'), findsOneWidget);
-      
+
       // Check content mentions refund cost
-      expect(find.text('This will refund ${testBuilding.cost} cash.'), findsOneWidget);
+      expect(
+        find.text('This will refund ${testBuilding.cost} cash.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('has Cancel and Delete buttons', (WidgetTester tester) async {
@@ -60,7 +65,9 @@ void main() {
       expect(find.byType(TextButton), findsNWidgets(2));
     });
 
-    testWidgets('calls onConfirm when Delete button is tapped', (WidgetTester tester) async {
+    testWidgets('calls onConfirm when Delete button is tapped', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -78,7 +85,9 @@ void main() {
       expect(confirmPressed, isTrue);
     });
 
-    testWidgets('does not call onConfirm when Cancel button is tapped', (WidgetTester tester) async {
+    testWidgets('does not call onConfirm when Cancel button is tapped', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -96,7 +105,9 @@ void main() {
       expect(confirmPressed, isFalse);
     });
 
-    testWidgets('static show method creates dialog', (WidgetTester tester) async {
+    testWidgets('static show method creates dialog', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -123,7 +134,9 @@ void main() {
       expect(find.text('Delete ${testBuilding.name}?'), findsOneWidget);
     });
 
-    testWidgets('dialog can be dismissed by tapping outside', (WidgetTester tester) async {
+    testWidgets('dialog can be dismissed by tapping outside', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(

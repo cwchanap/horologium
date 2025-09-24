@@ -1,11 +1,11 @@
 import 'terrain_biome.dart';
 
 enum TerrainDepth {
-  farBackground,    // 0.1-0.2 speed - distant mountains, sky
-  midBackground,    // 0.4-0.5 speed - main terrain base
-  nearBackground,   // 0.7-0.8 speed - large features (trees, rocks)
-  foreground,       // 0.9 speed - detail overlays, small features
-  interactive,      // 1.0 speed - grid, buildings (no parallax)
+  farBackground, // 0.1-0.2 speed - distant mountains, sky
+  midBackground, // 0.4-0.5 speed - main terrain base
+  nearBackground, // 0.7-0.8 speed - large features (trees, rocks)
+  foreground, // 0.9 speed - detail overlays, small features
+  interactive, // 1.0 speed - grid, buildings (no parallax)
 }
 
 class TerrainDepthConfig {
@@ -31,14 +31,14 @@ class TerrainDepthManager {
       renderOrder: 0,
       layerName: 'Far Background',
       allowedTerrainTypes: [
-        TerrainType.rock,   // Distant mountains
-        TerrainType.snow,   // Snow-capped peaks
+        TerrainType.rock, // Distant mountains
+        TerrainType.snow, // Snow-capped peaks
       ],
       allowedFeatureTypes: [
         // No features in far background - just base terrain
       ],
     ),
-    
+
     TerrainDepth.midBackground: TerrainDepthConfig(
       parallaxSpeed: 0.45,
       renderOrder: 1,
@@ -56,7 +56,7 @@ class TerrainDepthManager {
         FeatureType.riverVertical,
       ],
     ),
-    
+
     TerrainDepth.nearBackground: TerrainDepthConfig(
       parallaxSpeed: 0.75,
       renderOrder: 2,
@@ -69,7 +69,7 @@ class TerrainDepthManager {
         FeatureType.rockMedium,
       ],
     ),
-    
+
     TerrainDepth.foreground: TerrainDepthConfig(
       parallaxSpeed: 0.9,
       renderOrder: 3,
@@ -83,7 +83,7 @@ class TerrainDepthManager {
         FeatureType.rockSmall,
       ],
     ),
-    
+
     TerrainDepth.interactive: TerrainDepthConfig(
       parallaxSpeed: 1.0,
       renderOrder: 4,
@@ -101,7 +101,9 @@ class TerrainDepthManager {
   /// Get all depth layers sorted by render order
   static List<TerrainDepth> getSortedDepths() {
     final depths = TerrainDepth.values.toList();
-    depths.sort((a, b) => getConfig(a).renderOrder.compareTo(getConfig(b).renderOrder));
+    depths.sort(
+      (a, b) => getConfig(a).renderOrder.compareTo(getConfig(b).renderOrder),
+    );
     return depths;
   }
 
@@ -140,12 +142,18 @@ class TerrainDepthManager {
   }
 
   /// Check if a terrain type should be rendered on a specific depth
-  static bool shouldRenderTerrainOnDepth(TerrainType terrainType, TerrainDepth depth) {
+  static bool shouldRenderTerrainOnDepth(
+    TerrainType terrainType,
+    TerrainDepth depth,
+  ) {
     return getConfig(depth).allowedTerrainTypes.contains(terrainType);
   }
 
   /// Check if a feature should be rendered on a specific depth
-  static bool shouldRenderFeatureOnDepth(FeatureType feature, TerrainDepth depth) {
+  static bool shouldRenderFeatureOnDepth(
+    FeatureType feature,
+    TerrainDepth depth,
+  ) {
     return getConfig(depth).allowedFeatureTypes.contains(feature);
   }
 
@@ -164,7 +172,9 @@ class TerrainDepthManager {
         final key = entry.key;
         final cell = entry.value;
 
-        final shouldIncludeBase = config.allowedTerrainTypes.contains(cell.baseType);
+        final shouldIncludeBase = config.allowedTerrainTypes.contains(
+          cell.baseType,
+        );
         final filteredFeatures = cell.features
             .where((feature) => config.allowedFeatureTypes.contains(feature))
             .toList();
@@ -225,12 +235,14 @@ class TerrainDepthManager {
       for (int y = 0; y < gridSize; y++) {
         final key = '$x,$y';
         final baseCell = baseTerrain[key];
-        
+
         if (baseCell != null) {
           // Create distant mountains based on elevation
           TerrainType farTerrainType;
           if (baseCell.elevation > 0.6) {
-            farTerrainType = baseCell.elevation > 0.8 ? TerrainType.snow : TerrainType.rock;
+            farTerrainType = baseCell.elevation > 0.8
+                ? TerrainType.snow
+                : TerrainType.rock;
           } else {
             continue; // No far background for low elevation areas
           }

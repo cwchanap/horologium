@@ -27,7 +27,7 @@ void main() {
           level: building.level,
           assignedWorkers: building.assignedWorkers,
         );
-        
+
         planet.addBuilding(buildingData);
         planetChangedCalled = true;
         updatedPlanet = planet;
@@ -74,16 +74,14 @@ void main() {
     test('loading buildings should not trigger callbacks', () async {
       // Create a planet with existing buildings
       final planet = Planet(id: 'test', name: 'Test Planet');
-      planet.addBuilding(const PlacedBuildingData(
-        x: 10,
-        y: 10,
-        type: BuildingType.house,
-      ));
-      
+      planet.addBuilding(
+        const PlacedBuildingData(x: 10, y: 10, type: BuildingType.house),
+      );
+
       expect(planet.buildings.length, 1);
 
       bool planetChangedCalled = false;
-      
+
       void onBuildingPlaced(int x, int y, Building building) {
         planetChangedCalled = true;
       }
@@ -101,13 +99,18 @@ void main() {
       // Simulate loading buildings (like MainGame.loadBuildings does)
       for (final buildingData in planet.buildings) {
         final building = buildingData.createBuilding();
-        grid.placeBuilding(buildingData.x, buildingData.y, building, notifyCallbacks: false);
+        grid.placeBuilding(
+          buildingData.x,
+          buildingData.y,
+          building,
+          notifyCallbacks: false,
+        );
       }
 
       // Verify callbacks were not triggered during loading
       expect(planetChangedCalled, false);
       expect(grid.getAllBuildings().length, 1);
-      
+
       // Verify the building is in the correct position
       final buildingInGrid = grid.getBuildingAt(10, 10);
       expect(buildingInGrid, isNotNull);
@@ -117,16 +120,12 @@ void main() {
     test('planet state should persist building data correctly', () async {
       // Create a planet with buildings
       final planet = Planet(id: 'test', name: 'Test Planet');
-      planet.addBuilding(const PlacedBuildingData(
-        x: 5,
-        y: 5,
-        type: BuildingType.powerPlant,
-      ));
-      planet.addBuilding(const PlacedBuildingData(
-        x: 10,
-        y: 10,
-        type: BuildingType.house,
-      ));
+      planet.addBuilding(
+        const PlacedBuildingData(x: 5, y: 5, type: BuildingType.powerPlant),
+      );
+      planet.addBuilding(
+        const PlacedBuildingData(x: 10, y: 10, type: BuildingType.house),
+      );
 
       expect(planet.buildings.length, 2);
 
@@ -134,7 +133,12 @@ void main() {
       final grid = Grid();
       for (final buildingData in planet.buildings) {
         final building = buildingData.createBuilding();
-        grid.placeBuilding(buildingData.x, buildingData.y, building, notifyCallbacks: false);
+        grid.placeBuilding(
+          buildingData.x,
+          buildingData.y,
+          building,
+          notifyCallbacks: false,
+        );
       }
 
       // Verify buildings are loaded correctly
@@ -156,7 +160,7 @@ void main() {
 
     test('planet buildings should survive callback-driven updates', () async {
       final planet = Planet(id: 'test', name: 'Test Planet');
-      
+
       void onBuildingPlaced(int x, int y, Building building) {
         final buildingData = PlacedBuildingData(
           x: x,
@@ -178,10 +182,12 @@ void main() {
       );
 
       // Place multiple buildings
-      final house = BuildingRegistry.availableBuildings
-          .firstWhere((b) => b.type == BuildingType.house);
-      final powerPlant = BuildingRegistry.availableBuildings
-          .firstWhere((b) => b.type == BuildingType.powerPlant);
+      final house = BuildingRegistry.availableBuildings.firstWhere(
+        (b) => b.type == BuildingType.house,
+      );
+      final powerPlant = BuildingRegistry.availableBuildings.firstWhere(
+        (b) => b.type == BuildingType.powerPlant,
+      );
 
       grid.placeBuilding(5, 5, house);
       grid.placeBuilding(10, 10, powerPlant);

@@ -13,10 +13,10 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   TerrainGenerator generator;
   final Map<String, TerrainCell> _baseTerrain = {};
   final Map<TerrainDepth, ParallaxTerrainLayer> _parallaxLayers = {};
-  
+
   bool _isLoaded = false;
   bool _loggedParentRenderOnce = false;
-  
+
   // Toggle for debug overlays (fill, border, axes, markers)
   bool showDebug = false;
   // Toggle for parallax across all layers
@@ -25,36 +25,40 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   bool showPatchCentersDebug = false;
   bool showEdgeZonesDebug = false;
 
-  ParallaxTerrainComponent({
-    required this.gridSize,
-    int? seed,
-  }) : generator = TerrainGenerator(gridSize: gridSize, seed: seed ?? 42);
+  ParallaxTerrainComponent({required this.gridSize, int? seed})
+    : generator = TerrainGenerator(gridSize: gridSize, seed: seed ?? 42);
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    
+
     // Set component size to match the grid
     size = Vector2(gridSize * cellWidth, gridSize * cellHeight);
-    
+
     // Generate base terrain data
     _generateTerrain();
-    
+
     // Create parallax layers
     await _createParallaxLayers();
-    
+
     _isLoaded = true;
   }
 
   // Phase 5: Debug overlays for patch centers and edge zones
   void _renderPatchDebugOverlays(Canvas canvas) {
     // Compute centers once per render
-    final centers = generator.getPatchCentersForBounds(0, 0, gridSize - 1, gridSize - 1);
+    final centers = generator.getPatchCentersForBounds(
+      0,
+      0,
+      gridSize - 1,
+      gridSize - 1,
+    );
 
     // Draw edge zones as translucent overlay on cells near borders
     if (showEdgeZonesDebug || showDebug) {
       final edgePaint = Paint()
-        ..color = const Color(0xFFFFD54F).withAlpha(70) // amber with alpha
+        ..color = const Color(0xFFFFD54F)
+            .withAlpha(70) // amber with alpha
         ..style = PaintingStyle.fill;
       for (int x = 0; x < gridSize; x++) {
         for (int y = 0; y < gridSize; y++) {
@@ -97,14 +101,14 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
 
     // Get sorted depths (far to near)
     final sortedDepths = TerrainDepthManager.getSortedDepths();
-    
+
     for (final depth in sortedDepths) {
       // Skip interactive layer - that's handled by the grid
       if (depth == TerrainDepth.interactive) continue;
-      
+
       // Filter terrain data for this depth layer
       Map<String, TerrainCell> layerTerrain;
-      
+
       if (depth == TerrainDepth.farBackground) {
         // Generate special far background terrain (distant mountains)
         layerTerrain = TerrainDepthManager.generateFarBackgroundTerrain(
@@ -128,14 +132,17 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
           cellWidth: cellWidth,
           cellHeight: cellHeight,
         );
-        
+
         // Match grid & layer rendering: draw from local top-left with Anchor.center.
         // For a center-anchored child to align its (0,0) with the parent's (0,0),
         // set the child local position to size/2 (cancels the anchor shift).
-        parallaxLayer.size = Vector2(gridSize * cellWidth, gridSize * cellHeight);
+        parallaxLayer.size = Vector2(
+          gridSize * cellWidth,
+          gridSize * cellHeight,
+        );
         parallaxLayer.anchor = Anchor.center;
         parallaxLayer.position = parallaxLayer.size / 2;
-        
+
         // Propagate debug flag
         parallaxLayer.showDebug = showDebug;
         // Propagate parallax flag
@@ -143,8 +150,7 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
 
         _parallaxLayers[depth] = parallaxLayer;
         add(parallaxLayer);
-      } else {
-      }
+      } else {}
     }
   }
 
@@ -159,10 +165,7 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
       final dbgFill = Paint()
         ..color = const Color(0xFF44FF55).withAlpha(60)
         ..style = PaintingStyle.fill;
-      canvas.drawRect(
-        Rect.fromLTWH(0, 0, size.x, size.y),
-        dbgFill,
-      );
+      canvas.drawRect(Rect.fromLTWH(0, 0, size.x, size.y), dbgFill);
     }
 
     // 3) Render children (terrain layers)
@@ -179,10 +182,7 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
         ..color = Colors.red
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.0;
-      canvas.drawRect(
-        Rect.fromLTWH(0, 0, size.x, size.y),
-        borderPaint,
-      );
+      canvas.drawRect(Rect.fromLTWH(0, 0, size.x, size.y), borderPaint);
 
       // Center axes to visualize the component's local center
       final axesPaint = Paint()
@@ -203,13 +203,20 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
       );
 
       // Debug markers for local top-left
-      final pTopLeftPaint = Paint()..color = Colors.green;       // (0,0)
-      final pCenterPaint = Paint()..color = Colors.orange;       // (size/2, size/2)
-      final pBottomRightPaint = Paint()..color = Colors.cyan;    // (size-40, size-40)
+      final pTopLeftPaint = Paint()..color = Colors.green; // (0,0)
+      final pCenterPaint = Paint()..color = Colors.orange; // (size/2, size/2)
+      final pBottomRightPaint = Paint()
+        ..color = Colors.cyan; // (size-40, size-40)
       // Larger markers for visibility
       canvas.drawRect(const Rect.fromLTWH(0, 0, 40, 40), pTopLeftPaint);
-      canvas.drawRect(Rect.fromLTWH(size.x / 2 - 20, size.y / 2 - 20, 40, 40), pCenterPaint);
-      canvas.drawRect(Rect.fromLTWH(size.x - 40, size.y - 40, 40, 40), pBottomRightPaint);
+      canvas.drawRect(
+        Rect.fromLTWH(size.x / 2 - 20, size.y / 2 - 20, 40, 40),
+        pCenterPaint,
+      );
+      canvas.drawRect(
+        Rect.fromLTWH(size.x - 40, size.y - 40, 40, 40),
+        pBottomRightPaint,
+      );
     }
 
     if (!_loggedParentRenderOnce) {
@@ -231,14 +238,9 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
     );
 
     final paint = Paint()
-      ..shader = gradient.createShader(
-        Rect.fromLTWH(0, 0, size.x, size.y),
-      );
+      ..shader = gradient.createShader(Rect.fromLTWH(0, 0, size.x, size.y));
 
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.x, size.y),
-      paint,
-    );
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.x, size.y), paint);
   }
 
   /// Get terrain data for a specific cell (for buildability checks)
@@ -251,24 +253,24 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   bool isBuildableAt(int x, int y) {
     final terrain = getTerrainAt(x, y);
     if (terrain == null) return true; // Default to buildable if no terrain data
-    
+
     // Water and steep terrain are typically not buildable
     if (terrain.baseType == TerrainType.water) {
       return false;
     }
-    
+
     // Very steep terrain is not buildable
     if (terrain.elevation > 0.8) {
       return false;
     }
-    
+
     // Large features block building (check all features across all layers)
     for (final feature in terrain.features) {
       if (_isLargeFeature(feature)) {
         return false;
       }
     }
-    
+
     return true;
   }
 
@@ -306,7 +308,7 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
     } else {
       _generateTerrain();
     }
-    
+
     await _createParallaxLayers();
   }
 
@@ -323,11 +325,11 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   /// Get biome distribution for statistics
   Map<BiomeType, int> getBiomeDistribution() {
     final distribution = <BiomeType, int>{};
-    
+
     for (final terrain in _baseTerrain.values) {
       distribution[terrain.biome] = (distribution[terrain.biome] ?? 0) + 1;
     }
-    
+
     return distribution;
   }
 
@@ -427,10 +429,10 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   /// Generate terrain for a specific region (useful for large worlds)
   Future<void> loadRegion(int startX, int startY, int width, int height) async {
     final regionData = generator.generateRegion(startX, startY, width, height);
-    
+
     // Update base terrain data for this region
     _baseTerrain.addAll(regionData);
-    
+
     // Recreate parallax layers to include new terrain
     await _createParallaxLayers();
   }

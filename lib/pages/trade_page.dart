@@ -69,17 +69,20 @@ class _TradePageState extends State<TradePage> {
             const SizedBox(height: 8),
             const Text(
               'Buy and sell resources using cash. Buy costs 10x value, sell gives 8x value.',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: Colors.grey, fontSize: 16),
             ),
             const SizedBox(height: 24),
             Expanded(
               child: ListView.builder(
-                itemCount: ResourceRegistry.availableResources.where((resource) => resource.type != ResourceType.research).length,
+                itemCount: ResourceRegistry.availableResources
+                    .where((resource) => resource.type != ResourceType.research)
+                    .length,
                 itemBuilder: (context, index) {
-                  final filteredResources = ResourceRegistry.availableResources.where((resource) => resource.type != ResourceType.research).toList();
+                  final filteredResources = ResourceRegistry.availableResources
+                      .where(
+                        (resource) => resource.type != ResourceType.research,
+                      )
+                      .toList();
                   final resource = filteredResources[index];
                   return _buildResourceTileCard(resource);
                 },
@@ -155,7 +158,8 @@ class _TradePageState extends State<TradePage> {
                     child: _buildTileActionButton(
                       'BUY',
                       Colors.green,
-                      () => _showBuyDialog(resource, amount, resource.value * 10),
+                      () =>
+                          _showBuyDialog(resource, amount, resource.value * 10),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -163,7 +167,13 @@ class _TradePageState extends State<TradePage> {
                     child: _buildTileActionButton(
                       'SELL',
                       Colors.orange,
-                      amount > 0 ? () => _showSellDialog(resource, amount, resource.value * 8) : null,
+                      amount > 0
+                          ? () => _showSellDialog(
+                              resource,
+                              amount,
+                              resource.value * 8,
+                            )
+                          : null,
                     ),
                   ),
                 ],
@@ -175,8 +185,11 @@ class _TradePageState extends State<TradePage> {
     );
   }
 
-
-  Widget _buildTileActionButton(String title, Color color, VoidCallback? onPressed) {
+  Widget _buildTileActionButton(
+    String title,
+    Color color,
+    VoidCallback? onPressed,
+  ) {
     final isDisabled = onPressed == null;
     return ElevatedButton(
       onPressed: onPressed,
@@ -185,13 +198,8 @@ class _TradePageState extends State<TradePage> {
             ? Colors.grey.withAlpha((255 * 0.1).round())
             : color.withAlpha((255 * 0.1).round()),
         foregroundColor: isDisabled ? Colors.grey : color,
-        side: BorderSide(
-          color: isDisabled ? Colors.grey : color,
-          width: 1
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        side: BorderSide(color: isDisabled ? Colors.grey : color, width: 1),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         elevation: 0,
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         minimumSize: const Size(0, 36),
@@ -207,7 +215,11 @@ class _TradePageState extends State<TradePage> {
     );
   }
 
-  void _showBuyDialog(Resource resource, double availableAmount, double buyCost) {
+  void _showBuyDialog(
+    Resource resource,
+    double availableAmount,
+    double buyCost,
+  ) {
     final TextEditingController dialogController = TextEditingController();
     final currentCash = widget.resources.cash;
 
@@ -260,23 +272,34 @@ class _TradePageState extends State<TradePage> {
               onPressed: () {
                 final amount = double.tryParse(dialogController.text);
                 if (amount != null && amount > 0) {
-                  final success = widget.resources.buyResource(resource.type, amount);
+                  final success = widget.resources.buyResource(
+                    resource.type,
+                    amount,
+                  );
                   Navigator.of(context).pop();
                   if (success) {
                     setState(() {});
                     final cost = resource.value * 10 * amount;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Purchase successful! Bought ${amount.toStringAsFixed(1)} ${resource.name} for ${cost.toStringAsFixed(1)} cash'),
-                        backgroundColor: Colors.green.withAlpha((255 * 0.8).round()),
+                        content: Text(
+                          'Purchase successful! Bought ${amount.toStringAsFixed(1)} ${resource.name} for ${cost.toStringAsFixed(1)} cash',
+                        ),
+                        backgroundColor: Colors.green.withAlpha(
+                          (255 * 0.8).round(),
+                        ),
                         duration: const Duration(seconds: 3),
                       ),
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: const Text('Not enough cash for this purchase!'),
-                        backgroundColor: Colors.red.withAlpha((255 * 0.8).round()),
+                        content: const Text(
+                          'Not enough cash for this purchase!',
+                        ),
+                        backgroundColor: Colors.red.withAlpha(
+                          (255 * 0.8).round(),
+                        ),
                         duration: const Duration(seconds: 3),
                       ),
                     );
@@ -284,8 +307,12 @@ class _TradePageState extends State<TradePage> {
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Please enter a valid positive number'),
-                      backgroundColor: Colors.red.withAlpha((255 * 0.8).round()),
+                      content: const Text(
+                        'Please enter a valid positive number',
+                      ),
+                      backgroundColor: Colors.red.withAlpha(
+                        (255 * 0.8).round(),
+                      ),
                     ),
                   );
                 }
@@ -302,7 +329,11 @@ class _TradePageState extends State<TradePage> {
     );
   }
 
-  void _showSellDialog(Resource resource, double availableAmount, double sellGain) {
+  void _showSellDialog(
+    Resource resource,
+    double availableAmount,
+    double sellGain,
+  ) {
     final TextEditingController dialogController = TextEditingController();
     final currentCash = widget.resources.cash;
 
@@ -340,7 +371,8 @@ class _TradePageState extends State<TradePage> {
                 decoration: InputDecoration(
                   labelText: 'Amount to sell',
                   labelStyle: const TextStyle(color: Colors.cyan),
-                  helperText: 'Max: ${resource.name == 'Research' ? availableAmount.toInt() : availableAmount.toStringAsFixed(1)}',
+                  helperText:
+                      'Max: ${resource.name == 'Research' ? availableAmount.toInt() : availableAmount.toStringAsFixed(1)}',
                   helperStyle: const TextStyle(color: Colors.grey),
                   enabledBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.cyan),
@@ -363,15 +395,22 @@ class _TradePageState extends State<TradePage> {
                 final amount = double.tryParse(dialogController.text);
                 if (amount != null && amount > 0) {
                   if (availableAmount >= amount) {
-                    final success = widget.resources.sellResource(resource.type, amount);
+                    final success = widget.resources.sellResource(
+                      resource.type,
+                      amount,
+                    );
                     Navigator.of(context).pop();
                     if (success) {
                       setState(() {});
                       final gain = resource.value * 8 * amount;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Sale successful! Sold ${amount.toStringAsFixed(1)} ${resource.name} for ${gain.toStringAsFixed(1)} cash'),
-                          backgroundColor: Colors.green.withAlpha((255 * 0.8).round()),
+                          content: Text(
+                            'Sale successful! Sold ${amount.toStringAsFixed(1)} ${resource.name} for ${gain.toStringAsFixed(1)} cash',
+                          ),
+                          backgroundColor: Colors.green.withAlpha(
+                            (255 * 0.8).round(),
+                          ),
                           duration: const Duration(seconds: 3),
                         ),
                       );
@@ -379,7 +418,9 @@ class _TradePageState extends State<TradePage> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: const Text('Sale failed!'),
-                          backgroundColor: Colors.red.withAlpha((255 * 0.8).round()),
+                          backgroundColor: Colors.red.withAlpha(
+                            (255 * 0.8).round(),
+                          ),
                           duration: const Duration(seconds: 3),
                         ),
                       );
@@ -387,8 +428,12 @@ class _TradePageState extends State<TradePage> {
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Not enough ${resource.name}! You have ${availableAmount.toStringAsFixed(1)} but need ${amount.toStringAsFixed(1)}'),
-                        backgroundColor: Colors.red.withAlpha((255 * 0.8).round()),
+                        content: Text(
+                          'Not enough ${resource.name}! You have ${availableAmount.toStringAsFixed(1)} but need ${amount.toStringAsFixed(1)}',
+                        ),
+                        backgroundColor: Colors.red.withAlpha(
+                          (255 * 0.8).round(),
+                        ),
                         duration: const Duration(seconds: 3),
                       ),
                     );
@@ -396,8 +441,12 @@ class _TradePageState extends State<TradePage> {
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Please enter a valid positive number'),
-                      backgroundColor: Colors.red.withAlpha((255 * 0.8).round()),
+                      content: const Text(
+                        'Please enter a valid positive number',
+                      ),
+                      backgroundColor: Colors.red.withAlpha(
+                        (255 * 0.8).round(),
+                      ),
                     ),
                   );
                 }

@@ -21,7 +21,8 @@ class GameControls extends StatelessWidget {
       focusNode: FocusNode()..requestFocus(),
       autofocus: true,
       onKeyEvent: (event) {
-        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.escape) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.escape) {
           onEscapePressed?.call();
         }
       },

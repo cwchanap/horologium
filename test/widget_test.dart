@@ -31,11 +31,9 @@ void main() {
     expect(startButton, findsOneWidget);
 
     // Just verify the button exists and is tappable (without actually navigating)
-    final widget = tester.widget<ElevatedButton>(find.ancestor(
-      of: startButton,
-      matching: find.byType(ElevatedButton),
-    ));
+    final widget = tester.widget<ElevatedButton>(
+      find.ancestor(of: startButton, matching: find.byType(ElevatedButton)),
+    );
     expect(widget.onPressed, isNotNull);
   });
 }
-

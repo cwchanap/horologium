@@ -21,12 +21,12 @@ void main() {
       expect(game, isA<MainGame>());
       expect(game.buildingToPlace, isNull);
       expect(game.placementPreview, isA<PlacementPreview>());
-      
+
       // Test that callback functions can be assigned
       game.onGridCellTapped = (int x, int y) {};
       game.onGridCellLongTapped = (int x, int y) {};
       game.onGridCellSecondaryTapped = (int x, int y) {};
-      
+
       expect(game.onGridCellTapped, isNotNull);
       expect(game.onGridCellLongTapped, isNotNull);
       expect(game.onGridCellSecondaryTapped, isNotNull);
@@ -42,9 +42,9 @@ void main() {
     test('LoadBuildings with valid data', () async {
       // Setup mock data
       SharedPreferences.setMockInitialValues({
-        'buildings': ['5,5,House', '10,10,Power Plant']
+        'buildings': ['5,5,House', '10,10,Power Plant'],
       });
-      
+
       // Since _grid is private, we'll test loadBuildings path completes
       await game.loadBuildings();
       expect(true, isTrue);
@@ -53,10 +53,10 @@ void main() {
     test('LoadBuildings with empty data', () async {
       // Setup empty mock data
       SharedPreferences.setMockInitialValues({});
-      
+
       // Test loadBuildings method directly
       await game.loadBuildings();
-      
+
       // Method should handle empty data gracefully
       expect(true, isTrue); // Method completed without throwing
     });
@@ -64,16 +64,16 @@ void main() {
     test('Grid cell tap callback logic', () {
       bool callbackCalled = false;
       int tapX = -1, tapY = -1;
-      
+
       game.onGridCellTapped = (x, y) {
         callbackCalled = true;
         tapX = x;
         tapY = y;
       };
-      
+
       // Test callback invocation
       game.onGridCellTapped?.call(5, 5);
-      
+
       expect(callbackCalled, isTrue);
       expect(tapX, equals(5));
       expect(tapY, equals(5));
@@ -107,7 +107,7 @@ void main() {
       final testBuilding = BuildingRegistry.availableBuildings.first;
       preview.building = testBuilding;
       preview.isValid = true;
-      
+
       expect(preview.building, equals(testBuilding));
       expect(preview.isValid, isTrue);
     });
@@ -135,7 +135,7 @@ void main() {
     test('Grid position calculation', () {
       // Initialize grid size first
       grid.size = Vector2(500, 500); // Set a proper size
-      
+
       // Test getGridPosition with valid coordinates
       final position = grid.getGridPosition(Vector2(75, 75)); // 1.5 cells in
       expect(position, isNotNull);
@@ -186,7 +186,9 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: MainGameWidget(planet: Planet(id: 'test', name: 'Test')),
+          home: MainGameWidget(
+            planet: Planet(id: 'test', name: 'Test'),
+          ),
         ),
       );
 
@@ -194,7 +196,9 @@ void main() {
       expect(find.byType(MainGameWidget), findsOneWidget);
     });
 
-    testWidgets('MainGameWidget handles basic initialization', (WidgetTester tester) async {
+    testWidgets('MainGameWidget handles basic initialization', (
+      WidgetTester tester,
+    ) async {
       SharedPreferences.setMockInitialValues({
         'cash': 1000.0,
         'population': 20,
@@ -209,7 +213,9 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: MainGameWidget(planet: Planet(id: 'test', name: 'Test')),
+          home: MainGameWidget(
+            planet: Planet(id: 'test', name: 'Test'),
+          ),
         ),
       );
 

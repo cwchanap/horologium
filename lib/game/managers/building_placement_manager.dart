@@ -38,10 +38,14 @@ class BuildingPlacementManager {
     final buildingType = building.type;
     final currentCount = game.grid.countBuildingsOfType(buildingType);
     final limit = buildingLimitManager.getBuildingLimit(buildingType);
-    
+
     if (currentCount >= limit) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Building limit reached! Maximum $limit ${game.buildingToPlace!.name}s allowed.')),
+        SnackBar(
+          content: Text(
+            'Building limit reached! Maximum $limit ${game.buildingToPlace!.name}s allowed.',
+          ),
+        ),
       );
       return false;
     }
@@ -59,7 +63,7 @@ class BuildingPlacementManager {
     // Place the building
     game.grid.placeBuilding(x, y, building);
     ResourceService.purchaseBuilding(resources, building);
-    
+
     game.buildingToPlace = null;
     game.hidePlacementPreview();
     onResourcesChanged();

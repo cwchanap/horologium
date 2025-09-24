@@ -19,10 +19,11 @@ void main() {
       testBuildingLimitManager = BuildingLimitManager();
       testGrid = Grid();
       panelClosed = false;
-      
     });
 
-    testWidgets('does not render when not visible', (WidgetTester tester) async {
+    testWidgets('does not render when not visible', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -74,7 +75,9 @@ void main() {
       expect(find.byIcon(Icons.close), findsOneWidget);
     });
 
-    testWidgets('displays grid coordinates correctly', (WidgetTester tester) async {
+    testWidgets('displays grid coordinates correctly', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -99,7 +102,9 @@ void main() {
       expect(find.text('Select Building (10, 7)'), findsOneWidget);
     });
 
-    testWidgets('calls onClose when close button is tapped', (WidgetTester tester) async {
+    testWidgets('calls onClose when close button is tapped', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -127,7 +132,9 @@ void main() {
       expect(panelClosed, isTrue);
     });
 
-    testWidgets('has TabBar with building categories', (WidgetTester tester) async {
+    testWidgets('has TabBar with building categories', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -151,7 +158,7 @@ void main() {
 
       expect(find.byType(TabBar), findsOneWidget);
       expect(find.byType(TabBarView), findsOneWidget);
-      
+
       // Should have tabs for each building category
       expect(find.byType(Tab), findsNWidgets(BuildingCategory.values.length));
     });

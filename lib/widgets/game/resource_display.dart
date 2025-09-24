@@ -4,10 +4,7 @@ import '../../game/resources/resources.dart';
 class ResourceDisplay extends StatelessWidget {
   final Resources resources;
 
-  const ResourceDisplay({
-    super.key,
-    required this.resources,
-  });
+  const ResourceDisplay({super.key, required this.resources});
 
   @override
   Widget build(BuildContext context) {
@@ -66,11 +63,7 @@ class ResourceDisplay extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (isSubItem) const SizedBox(width: 16),
-        Icon(
-          icon,
-          color: color,
-          size: isSubItem ? 16 : 18,
-        ),
+        Icon(icon, color: color, size: isSubItem ? 16 : 18),
         const SizedBox(width: 6),
         Text(
           isSubItem ? value.toInt().toString() : value.toStringAsFixed(0),

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "Pre-commit: formatting staged Dart files and running analyzer..."
+
+# Collect staged Dart files (added, copied, modified, renamed)
+STAGED_DART_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.dart$' || true)
+
+if [ -n "$STAGED_DART_FILES" ]; then
+  echo "Formatting staged Dart files:"
+  echo "$STAGED_DART_FILES" | xargs -I {} echo "  - {}"
+  # Format staged files and re-add to index
+  echo "$STAGED_DART_FILES" | xargs -r dart format --output=write
+  echo "$STAGED_DART_FILES" | xargs -r git add
+else
+  echo "No staged Dart files to format."
+fi
+
+# Run analyzer for the whole project to prevent committing broken code
+echo "Running flutter analyze..."
+if ! flutter analyze; then
+  echo "\nError: flutter analyze reported issues. Fix them and re-commit."
+  exit 1
+fi
+
+echo "Pre-commit checks passed."

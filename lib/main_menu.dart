@@ -13,8 +13,7 @@ class MainMenu extends StatefulWidget {
   State<MainMenu> createState() => _MainMenuState();
 }
 
-class _MainMenuState extends State<MainMenu>
-    with TickerProviderStateMixin {
+class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
   late AnimationController _starsController;
   late AnimationController _titleController;
   late AnimationController _buttonController;
@@ -59,11 +58,14 @@ class _MainMenuState extends State<MainMenu>
   Future<void> _initializePlanet() async {
     // Load or create the active planet
     final activePlanetId = await SaveService.loadActivePlanetId() ?? 'earth';
-    final planet = await SaveService.loadOrCreatePlanet(activePlanetId, name: 'Earth');
-    
+    final planet = await SaveService.loadOrCreatePlanet(
+      activePlanetId,
+      name: 'Earth',
+    );
+
     // Initialize the global active planet
     ActivePlanet().initialize(planet);
-    
+
     setState(() {
       _activePlanet = planet;
     });
@@ -142,7 +144,9 @@ class _MainMenuState extends State<MainMenu>
                                         .headlineMedium
                                         ?.copyWith(
                                           fontSize: 14,
-                                          color: Colors.cyanAccent.withAlpha((255 * 0.8).round()),
+                                          color: Colors.cyanAccent.withAlpha(
+                                            (255 * 0.8).round(),
+                                          ),
                                         ),
                                   ),
                                 ],
@@ -159,7 +163,10 @@ class _MainMenuState extends State<MainMenu>
                         animation: _buttonAnimation,
                         builder: (context, child) {
                           return Transform.translate(
-                            offset: Offset(0, 50 * (1 - _buttonAnimation.value)),
+                            offset: Offset(
+                              0,
+                              50 * (1 - _buttonAnimation.value),
+                            ),
                             child: Opacity(
                               opacity: _buttonAnimation.value.clamp(0.0, 1.0),
                               child: Column(
@@ -276,7 +283,7 @@ class _MainMenuState extends State<MainMenu>
 
   void _startGame() {
     if (_activePlanet == null) return;
-    
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => MainGameWidget(planet: _activePlanet!),
@@ -286,7 +293,7 @@ class _MainMenuState extends State<MainMenu>
 
   void _openTradePage() {
     if (_activePlanet == null) return;
-    
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => TradePage(resources: _activePlanet!.resources),
@@ -336,7 +343,9 @@ class StarfieldPainter extends CustomPainter {
       final y = random.nextDouble() * size.height;
       final twinkle = (math.sin(animationValue * 3 * math.pi + i * 2) + 1) / 2;
 
-      paint.color = Colors.cyanAccent.withAlpha((255 * (twinkle * 0.6)).round());
+      paint.color = Colors.cyanAccent.withAlpha(
+        (255 * (twinkle * 0.6)).round(),
+      );
       canvas.drawCircle(Offset(x, y), 3, paint);
     }
   }

@@ -28,13 +28,13 @@ class PlacedBuildingData {
   static PlacedBuildingData? fromLegacyString(String data) {
     final parts = data.split(',');
     if (parts.length < 3) return null;
-    
+
     final x = int.tryParse(parts[0]);
     final y = int.tryParse(parts[1]);
     final typeName = parts[2];
-    
+
     if (x == null || y == null) return null;
-    
+
     // Find matching BuildingType
     BuildingType? type;
     for (final buildingType in BuildingType.values) {
@@ -43,9 +43,9 @@ class PlacedBuildingData {
         break;
       }
     }
-    
+
     if (type == null) return null;
-    
+
     return PlacedBuildingData(
       x: x,
       y: y,
@@ -57,9 +57,10 @@ class PlacedBuildingData {
 
   /// Create a Building instance from this placement data
   Building createBuilding() {
-    final template = BuildingRegistry.availableBuildings
-        .firstWhere((b) => b.type == type);
-    
+    final template = BuildingRegistry.availableBuildings.firstWhere(
+      (b) => b.type == type,
+    );
+
     return Building(
       type: template.type,
       name: template.name,

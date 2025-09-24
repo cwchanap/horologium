@@ -15,12 +15,12 @@ void main() {
       testResources.availableWorkers = 50;
     });
 
-    testWidgets('displays all resource values correctly', (WidgetTester tester) async {
+    testWidgets('displays all resource values correctly', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: ResourceDisplay(resources: testResources),
-          ),
+          home: Scaffold(body: ResourceDisplay(resources: testResources)),
         ),
       );
 
@@ -45,16 +45,16 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: ResourceDisplay(resources: testResources),
-          ),
+          home: Scaffold(body: ResourceDisplay(resources: testResources)),
         ),
       );
 
       expect(find.text('0'), findsNWidgets(4)); // All resources should show 0
     });
 
-    testWidgets('displays large numbers correctly', (WidgetTester tester) async {
+    testWidgets('displays large numbers correctly', (
+      WidgetTester tester,
+    ) async {
       testResources.cash = 999999.0;
       testResources.research = 1000.0;
       testResources.population = 5000;
@@ -62,9 +62,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: ResourceDisplay(resources: testResources),
-          ),
+          home: Scaffold(body: ResourceDisplay(resources: testResources)),
         ),
       );
 
@@ -77,29 +75,27 @@ void main() {
     testWidgets('has correct styling and layout', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: ResourceDisplay(resources: testResources),
-          ),
+          home: Scaffold(body: ResourceDisplay(resources: testResources)),
         ),
       );
 
       // Check container decoration
       final container = tester.widget<Container>(find.byType(Container).first);
       expect(container.decoration, isA<BoxDecoration>());
-      
+
       // Check that the widget uses Column layout
       expect(find.byType(Column), findsOneWidget);
-      
+
       // Check that there are Row widgets for each resource
       expect(find.byType(Row), findsNWidgets(4));
     });
 
-    testWidgets('workers display is indented correctly', (WidgetTester tester) async {
+    testWidgets('workers display is indented correctly', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: ResourceDisplay(resources: testResources),
-          ),
+          home: Scaffold(body: ResourceDisplay(resources: testResources)),
         ),
       );
 

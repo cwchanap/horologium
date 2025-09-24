@@ -1,11 +1,4 @@
-enum TerrainType {
-  grass,
-  dirt,
-  sand, 
-  rock,
-  water,
-  snow,
-}
+enum TerrainType { grass, dirt, sand, rock, water, snow }
 
 enum FeatureType {
   treeOakSmall,
@@ -27,14 +20,7 @@ enum FeatureType {
   lakeLarge,
 }
 
-enum BiomeType {
-  grassland,
-  forest,
-  desert,
-  mountains,
-  tundra,
-  wetlands,
-}
+enum BiomeType { grassland, forest, desert, mountains, tundra, wetlands }
 
 class TerrainCell {
   final TerrainType baseType;
@@ -42,7 +28,7 @@ class TerrainCell {
   final double elevation;
   final double moisture;
   final BiomeType biome;
-  
+
   const TerrainCell({
     required this.baseType,
     this.features = const [],
@@ -104,7 +90,7 @@ class BiomeRegistry {
       moistureMin: 0.3,
       moistureMax: 0.8,
     ),
-    
+
     BiomeType.forest: BiomeConfig(
       primaryTerrain: TerrainType.grass,
       secondaryTerrains: [TerrainType.dirt],
@@ -121,7 +107,7 @@ class BiomeRegistry {
       moistureMin: 0.5,
       moistureMax: 1.0,
     ),
-    
+
     BiomeType.desert: BiomeConfig(
       primaryTerrain: TerrainType.sand,
       secondaryTerrains: [TerrainType.rock],
@@ -135,7 +121,7 @@ class BiomeRegistry {
       moistureMin: 0.0,
       moistureMax: 0.3,
     ),
-    
+
     BiomeType.mountains: BiomeConfig(
       primaryTerrain: TerrainType.rock,
       secondaryTerrains: [TerrainType.dirt, TerrainType.snow],
@@ -149,20 +135,17 @@ class BiomeRegistry {
       moistureMin: 0.2,
       moistureMax: 0.7,
     ),
-    
+
     BiomeType.tundra: BiomeConfig(
       primaryTerrain: TerrainType.snow,
       secondaryTerrains: [TerrainType.rock, TerrainType.dirt],
-      commonFeatures: [
-        FeatureType.treePineSmall,
-        FeatureType.rockSmall,
-      ],
+      commonFeatures: [FeatureType.treePineSmall, FeatureType.rockSmall],
       elevationMin: 0.3,
       elevationMax: 1.0,
       moistureMin: 0.1,
       moistureMax: 0.5,
     ),
-    
+
     BiomeType.wetlands: BiomeConfig(
       primaryTerrain: TerrainType.water,
       secondaryTerrains: [TerrainType.grass, TerrainType.dirt],
@@ -179,7 +162,7 @@ class BiomeRegistry {
       moistureMax: 1.0,
     ),
   };
-  
+
   static BiomeConfig getConfig(BiomeType biome) {
     return configs[biome] ?? configs[BiomeType.grassland]!;
   }

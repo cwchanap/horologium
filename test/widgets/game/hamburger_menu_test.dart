@@ -20,10 +20,11 @@ void main() {
       testBuildingLimitManager = BuildingLimitManager();
       testGrid = Grid();
       menuClosed = false;
-      
     });
 
-    testWidgets('does not render when not visible', (WidgetTester tester) async {
+    testWidgets('does not render when not visible', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -48,7 +49,9 @@ void main() {
       expect(find.text('Research Tree'), findsNothing);
     });
 
-    testWidgets('renders all menu items when visible', (WidgetTester tester) async {
+    testWidgets('renders all menu items when visible', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -75,7 +78,9 @@ void main() {
       expect(find.text('Close'), findsOneWidget);
     });
 
-    testWidgets('displays correct icons for each menu item', (WidgetTester tester) async {
+    testWidgets('displays correct icons for each menu item', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -102,7 +107,9 @@ void main() {
       expect(find.byIcon(Icons.close), findsOneWidget);
     });
 
-    testWidgets('calls onClose when Close item is tapped', (WidgetTester tester) async {
+    testWidgets('calls onClose when Close item is tapped', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -129,7 +136,9 @@ void main() {
       expect(menuClosed, isTrue);
     });
 
-    testWidgets('navigates to Research Tree page when tapped', (WidgetTester tester) async {
+    testWidgets('navigates to Research Tree page when tapped', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -156,7 +165,9 @@ void main() {
       expect(menuClosed, isTrue); // Should close menu before navigating
     });
 
-    testWidgets('navigates to Resources page when tapped', (WidgetTester tester) async {
+    testWidgets('navigates to Resources page when tapped', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -183,7 +194,9 @@ void main() {
       expect(menuClosed, isTrue); // Should close menu before navigating
     });
 
-    testWidgets('navigates to Trade page when tapped', (WidgetTester tester) async {
+    testWidgets('navigates to Trade page when tapped', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -233,14 +246,14 @@ void main() {
 
       // Check that it's positioned correctly
       expect(find.byType(Positioned), findsOneWidget);
-      
+
       // Check container styling
       final container = tester.widget<Container>(find.byType(Container).first);
       expect(container.decoration, isA<BoxDecoration>());
-      
+
       // Check that there are ListTiles for each menu item (Research, Resources, Trade, Planet Selection, Close)
       expect(find.byType(ListTile), findsNWidgets(5));
-      
+
       // Check that there are Dividers between items
       expect(find.byType(Divider), findsNWidgets(4));
     });

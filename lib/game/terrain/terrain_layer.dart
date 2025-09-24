@@ -10,7 +10,7 @@ class TerrainLayer extends PositionComponent with HasGameReference {
   final List<FeatureType> features;
   final double opacity;
   final int renderOrder;
-  
+
   Sprite? _baseSprite;
   final List<Sprite> _featureSprites = [];
   final Map<String, Sprite> _spriteCache = {};
@@ -120,7 +120,7 @@ class TerrainLayer extends PositionComponent with HasGameReference {
       // Position features randomly within the cell but consistently
       final featurePosition = _getFeaturePosition(featureSprite);
       final featureSize = _getFeatureSize(featureSprite);
-      
+
       featureSprite.render(
         canvas,
         position: featurePosition,
@@ -160,19 +160,22 @@ class TerrainLayer extends PositionComponent with HasGameReference {
     // Return appropriate size based on feature type
     // This should match the original asset dimensions
     final originalSize = sprite.originalSize;
-    
+
     // Scale features to fit within cell if they're too large
     final maxSize = size * 0.8;
     if (originalSize.x > maxSize.x || originalSize.y > maxSize.y) {
       final scale = (maxSize.x / originalSize.x).clamp(0.1, 1.0);
       return originalSize * scale;
     }
-    
+
     return originalSize;
   }
 
   /// Update terrain type and reload sprites
-  Future<void> updateTerrain(TerrainType newType, List<FeatureType> newFeatures) async {
+  Future<void> updateTerrain(
+    TerrainType newType,
+    List<FeatureType> newFeatures,
+  ) async {
     if (terrainType != newType || !_listsEqual(features, newFeatures)) {
       await _loadSprites();
     }

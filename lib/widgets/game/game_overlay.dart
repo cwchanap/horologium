@@ -23,9 +23,10 @@ class GameOverlay extends StatelessWidget {
             IconButton(
               onPressed: onBackPressed,
               icon: Icon(
-                  game.buildingToPlace != null ? Icons.close : Icons.arrow_back,
-                  color: Colors.white),
-              tooltip: game.buildingToPlace != null 
+                game.buildingToPlace != null ? Icons.close : Icons.arrow_back,
+                color: Colors.white,
+              ),
+              tooltip: game.buildingToPlace != null
                   ? 'Cancel (ESC or click outside)'
                   : 'Back',
               style: IconButton.styleFrom(

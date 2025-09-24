@@ -43,10 +43,7 @@ class BuildingMenu {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          building.name,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        Text(building.name, overflow: TextOverflow.ellipsis),
                         Text(
                           'Level ${building.level}/${building.maxLevel}',
                           style: const TextStyle(
@@ -72,12 +69,19 @@ class BuildingMenu {
                     const SizedBox(height: 16),
 
                     // Cost
-                    _buildDetailRow('Cost', '${building.cost} cash', Colors.green),
+                    _buildDetailRow(
+                      'Cost',
+                      '${building.cost} cash',
+                      Colors.green,
+                    ),
 
                     // Population
                     if (building.accommodationCapacity > 0)
                       _buildDetailRow(
-                          'Accommodation', '${building.accommodationCapacity}', Colors.blue),
+                        'Accommodation',
+                        '${building.accommodationCapacity}',
+                        Colors.blue,
+                      ),
                     if (building.requiredWorkers > 0)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
@@ -93,7 +97,10 @@ class BuildingMenu {
                                 Visibility(
                                   visible: building.assignedWorkers > 0,
                                   child: IconButton(
-                                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                      color: Colors.red,
+                                    ),
                                     onPressed: () {
                                       setState(() {
                                         resources.unassignWorkerFrom(building);
@@ -107,13 +114,20 @@ class BuildingMenu {
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: building.hasWorkers ? Colors.green : Colors.red,
+                                    color: building.hasWorkers
+                                        ? Colors.green
+                                        : Colors.red,
                                   ),
                                 ),
                                 Visibility(
-                                  visible: resources.canAssignWorkerTo(building),
+                                  visible: resources.canAssignWorkerTo(
+                                    building,
+                                  ),
                                   child: IconButton(
-                                    icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                                    icon: const Icon(
+                                      Icons.add_circle_outline,
+                                      color: Colors.green,
+                                    ),
                                     onPressed: () {
                                       setState(() {
                                         resources.assignWorkerTo(building);
@@ -134,18 +148,25 @@ class BuildingMenu {
                     if (building.generation.isNotEmpty) ...[
                       const Text(
                         'Generation:',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       ...building.generation.entries.map((entry) {
                         // Show actual production rate (0 if no workers, except for houses)
-                        final isProducing = building.type == BuildingType.house || 
-                                          building.type == BuildingType.largeHouse || 
-                                          building.hasWorkers;
+                        final isProducing =
+                            building.type == BuildingType.house ||
+                            building.type == BuildingType.largeHouse ||
+                            building.hasWorkers;
                         final actualRate = isProducing ? entry.value : 0.0;
                         final color = isProducing ? Colors.green : Colors.grey;
                         return _buildDetailRow(
-                            _capitalizeResource(entry.key), '+$actualRate/sec', color);
+                          _capitalizeResource(entry.key),
+                          '+$actualRate/sec',
+                          color,
+                        );
                       }),
                       const SizedBox(height: 8),
                     ],
@@ -157,12 +178,18 @@ class BuildingMenu {
                           const Text(
                             'Consumption:',
                             style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                           if (!meetsConsumptionRequirements)
                             const Padding(
                               padding: EdgeInsets.only(left: 8.0),
-                              child: Icon(Icons.warning, color: Colors.red, size: 16),
+                              child: Icon(
+                                Icons.warning,
+                                color: Colors.red,
+                                size: 16,
+                              ),
                             ),
                         ],
                       ),
@@ -172,7 +199,8 @@ class BuildingMenu {
                           (e) => e.toString().split('.').last == entry.key,
                           orElse: () => ResourceType.cash,
                         );
-                        final hasEnough = (resources.resources[rt] ?? 0) >= entry.value;
+                        final hasEnough =
+                            (resources.resources[rt] ?? 0) >= entry.value;
                         return _buildDetailRow(
                           _capitalizeResource(entry.key),
                           '-${entry.value}/sec',
@@ -184,7 +212,10 @@ class BuildingMenu {
                       const SizedBox(height: 16),
                       const Text(
                         'Crop Type:',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                       DropdownButton<CropType>(
                         value: building.cropType,
@@ -195,8 +226,9 @@ class BuildingMenu {
                             });
                           }
                         },
-                        items: CropType.values
-                            .map<DropdownMenuItem<CropType>>((CropType value) {
+                        items: CropType.values.map<DropdownMenuItem<CropType>>((
+                          CropType value,
+                        ) {
                           return DropdownMenuItem<CropType>(
                             value: value,
                             child: Text(value.toString().split('.').last),
@@ -208,7 +240,10 @@ class BuildingMenu {
                       const SizedBox(height: 16),
                       const Text(
                         'Product Type:',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                       DropdownButton<BakeryProduct>(
                         value: building.productType,
@@ -220,12 +255,15 @@ class BuildingMenu {
                           }
                         },
                         items: BakeryProduct.values
-                            .map<DropdownMenuItem<BakeryProduct>>((BakeryProduct value) {
-                          return DropdownMenuItem<BakeryProduct>(
-                            value: value,
-                            child: Text(value.toString().split('.').last),
-                          );
-                        }).toList(),
+                            .map<DropdownMenuItem<BakeryProduct>>((
+                              BakeryProduct value,
+                            ) {
+                              return DropdownMenuItem<BakeryProduct>(
+                                value: value,
+                                child: Text(value.toString().split('.').last),
+                              );
+                            })
+                            .toList(),
                       ),
                     ],
                   ],
@@ -273,10 +311,7 @@ class BuildingMenu {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 14),
-          ),
+          Text(label, style: const TextStyle(fontSize: 14)),
           Text(
             value,
             style: TextStyle(
@@ -319,11 +354,7 @@ class BuildingMenu {
         height: size,
       );
     } else {
-      return Icon(
-        building.icon,
-        color: building.color,
-        size: size,
-      );
+      return Icon(building.icon, color: building.color, size: size);
     }
   }
 }

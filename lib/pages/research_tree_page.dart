@@ -87,10 +87,7 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
             const SizedBox(height: 8),
             const Text(
               'Unlock new technologies and buildings by spending research points.',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: Colors.grey, fontSize: 16),
             ),
             const SizedBox(height: 24),
             Expanded(
@@ -115,19 +112,17 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
     final unmetPrerequisites = research.prerequisites
         .where((prereq) => !widget.researchManager.isResearched(prereq))
         .toList();
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isCompleted 
+        color: isCompleted
             ? Colors.green.withAlpha((255 * 0.15).round())
             : Colors.grey.withAlpha((255 * 0.1).round()),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isCompleted 
-              ? Colors.green
-              : research.color,
+          color: isCompleted ? Colors.green : research.color,
           width: 2,
         ),
       ),
@@ -139,7 +134,8 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: (isCompleted ? Colors.green : research.color).withAlpha((255 * 0.2).round()),
+                  color: (isCompleted ? Colors.green : research.color)
+                      .withAlpha((255 * 0.2).round()),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -164,60 +160,71 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
                     const SizedBox(height: 4),
                     Text(
                       research.description,
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 14,
-                      ),
+                      style: const TextStyle(color: Colors.grey, fontSize: 14),
                     ),
                   ],
                 ),
               ),
               if (!isCompleted)
                 ElevatedButton(
-                  onPressed: (canResearch && hasEnoughResources) ? () {
-                    setState(() {
-                      widget.resources.research -= research.cost;
-                      widget.researchManager.completeResearch(research.type);
-                      
-                      // Handle building limit upgrades
-                      if (widget.buildingLimitManager != null) {
-                        if (research.id == 'expansion_planning') {
-                          // Increase all building limits by 2
-                          for (final buildingType in BuildingType.values) {
-                            widget.buildingLimitManager!.increaseBuildingLimit(buildingType, 2);
-                          }
-                        } else if (research.id == 'advanced_construction') {
-                          // Increase all building limits by 3
-                          for (final buildingType in BuildingType.values) {
-                            widget.buildingLimitManager!.increaseBuildingLimit(buildingType, 3);
-                          }
+                  onPressed: (canResearch && hasEnoughResources)
+                      ? () {
+                          setState(() {
+                            widget.resources.research -= research.cost;
+                            widget.researchManager.completeResearch(
+                              research.type,
+                            );
+
+                            // Handle building limit upgrades
+                            if (widget.buildingLimitManager != null) {
+                              if (research.id == 'expansion_planning') {
+                                // Increase all building limits by 2
+                                for (final buildingType
+                                    in BuildingType.values) {
+                                  widget.buildingLimitManager!
+                                      .increaseBuildingLimit(buildingType, 2);
+                                }
+                              } else if (research.id ==
+                                  'advanced_construction') {
+                                // Increase all building limits by 3
+                                for (final buildingType
+                                    in BuildingType.values) {
+                                  widget.buildingLimitManager!
+                                      .increaseBuildingLimit(buildingType, 3);
+                                }
+                              }
+                            }
+
+                            widget.onResourcesChanged();
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Research completed: ${research.name}',
+                              ),
+                              backgroundColor: Colors.green,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
                         }
-                      }
-                      
-                      widget.onResourcesChanged();
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Research completed: ${research.name}'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  } : null,
+                      : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: research.color,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 16,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   child: Text(
-                    canResearch && hasEnoughResources 
+                    canResearch && hasEnoughResources
                         ? 'Research'
-                        : !hasEnoughResources 
-                            ? 'Not Enough'
-                            : 'Locked',
+                        : !hasEnoughResources
+                        ? 'Not Enough'
+                        : 'Locked',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -226,7 +233,10 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
                 )
               else
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 16,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.withAlpha((255 * 0.2).round()),
                     borderRadius: BorderRadius.circular(12),
@@ -251,7 +261,7 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Cost and unlocks info
           Row(
             children: [
@@ -280,7 +290,10 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
               const SizedBox(width: 12),
               if (research.unlocksBuildings.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.blue.withAlpha((255 * 0.3).round()),
                     borderRadius: BorderRadius.circular(8),
@@ -303,7 +316,7 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
                 ),
             ],
           ),
-          
+
           // Prerequisites section
           if (unmetPrerequisites.isNotEmpty)
             Column(
@@ -325,11 +338,7 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            Icons.lock,
-                            color: Colors.red,
-                            size: 16,
-                          ),
+                          Icon(Icons.lock, color: Colors.red, size: 16),
                           const SizedBox(width: 8),
                           Text(
                             'Prerequisites Required:',
@@ -342,27 +351,33 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      ...unmetPrerequisites.map((prereq) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
-                          children: [
-                            const SizedBox(width: 24),
-                            Icon(
-                              Icons.circle,
-                              color: Colors.red.withAlpha((255 * 0.7).round()),
-                              size: 8,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _getResearchNameByType(prereq),
-                              style: TextStyle(
-                                color: Colors.red.withAlpha((255 * 0.9).round()),
-                                fontSize: 11,
+                      ...unmetPrerequisites.map(
+                        (prereq) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              const SizedBox(width: 24),
+                              Icon(
+                                Icons.circle,
+                                color: Colors.red.withAlpha(
+                                  (255 * 0.7).round(),
+                                ),
+                                size: 8,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 8),
+                              Text(
+                                _getResearchNameByType(prereq),
+                                style: TextStyle(
+                                  color: Colors.red.withAlpha(
+                                    (255 * 0.9).round(),
+                                  ),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      )),
+                      ),
                     ],
                   ),
                 ),

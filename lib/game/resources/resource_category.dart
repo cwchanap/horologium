@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum ResourceCategory {
-  rawMaterials,
-  foodResources,
-  stapleGrains,
-  refinement,
-}
+enum ResourceCategory { rawMaterials, foodResources, stapleGrains, refinement }
 
 extension ResourceCategoryExtension on ResourceCategory {
   String get displayName {

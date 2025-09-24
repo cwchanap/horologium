@@ -55,7 +55,8 @@ class Research {
     Research(
       type: ResearchType.advancedConstruction,
       name: 'Advanced Construction',
-      description: 'Further increases building limits by 3 for all building types',
+      description:
+          'Further increases building limits by 3 for all building types',
       icon: Icons.engineering,
       color: Colors.purple,
       cost: 25,
@@ -83,7 +84,8 @@ class Research {
     Research(
       type: ResearchType.modernHousing,
       name: 'Modern Housing',
-      description: 'Unlocks Large Houses with better efficiency and accommodation',
+      description:
+          'Unlocks Large Houses with better efficiency and accommodation',
       icon: Icons.apartment,
       color: Colors.lightGreen,
       cost: 25,
@@ -105,7 +107,7 @@ class Research {
 
 class ResearchManager {
   final Set<ResearchType> _completedResearch = <ResearchType>{};
-  
+
   bool isResearched(ResearchType researchType) {
     return _completedResearch.contains(researchType);
   }
@@ -115,7 +117,7 @@ class ResearchManager {
     final type = ResearchTypeHelper.fromId(researchId);
     return type != null && _completedResearch.contains(type);
   }
-  
+
   void completeResearch(ResearchType researchType) {
     _completedResearch.add(researchType);
   }
@@ -127,33 +129,33 @@ class ResearchManager {
       _completedResearch.add(type);
     }
   }
-  
+
   bool canResearch(Research research) {
     // Check if already completed
     if (isResearched(research.type)) return false;
-    
+
     // Check if all prerequisites are met
     for (final prereq in research.prerequisites) {
       if (!isResearched(prereq)) return false;
     }
-    
+
     return true;
   }
-  
+
   List<BuildingType> getUnlockedBuildings() {
     final List<BuildingType> unlocked = [];
-    
+
     for (final research in Research.availableResearch) {
       if (isResearched(research.type)) {
         unlocked.addAll(research.unlocksBuildings);
       }
     }
-    
+
     return unlocked;
   }
-  
+
   Set<ResearchType> get completedResearch => Set.from(_completedResearch);
-  
+
   void loadFromList(List<String> completed) {
     _completedResearch.clear();
     for (final id in completed) {

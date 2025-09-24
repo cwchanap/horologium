@@ -3,14 +3,15 @@ class Assets {
 
   /// With Flame's default image prefix 'assets/images/', we only need the path
   /// relative to that folder.
-  
+
   // Building assets
   static const String house = 'building/house.png';
   static const String coalMine = 'building/coal_mine.png';
   static const String goldMine = 'building/gold_mine.png';
   static const String quarry = 'building/quarry.png';
   static const String researchLab = 'building/research_lab.png';
-  static const String waterTreatmentPlant = 'building/water_treatment_plant.png';
+  static const String waterTreatmentPlant =
+      'building/water_treatment_plant.png';
   static const String woodFactory = 'building/wood_factory.png';
   static const String windMill = 'building/wind_mill.png';
   static const String grinderMill = 'building/grinder_mill.png';
@@ -47,5 +48,4 @@ class Assets {
   static const String terrainRockBase = 'terrain/base/rock_base.png';
   static const String terrainWaterBase = 'terrain/base/water_base.png';
   static const String terrainSnowBase = 'terrain/base/snow_base.png';
-
 }

@@ -15,13 +15,10 @@ void main() {
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
       await SharedPreferences.getInstance();
-      
+
       // Create a planet
-      planet = Planet(
-        id: 'earth',
-        name: 'Earth',
-      );
-      
+      planet = Planet(id: 'earth', name: 'Earth');
+
       // Create grid with callbacks
       grid = Grid(
         onBuildingPlaced: (x, y, building) {
@@ -40,7 +37,7 @@ void main() {
           planetSaved = true; // Track that planet would be saved
         },
       );
-      
+
       planetSaved = false;
     });
 
@@ -48,10 +45,10 @@ void main() {
       // Arrange
       final building = BuildingRegistry.availableBuildings.first;
       expect(planet.buildings, isEmpty);
-      
+
       // Act - Place building through grid (simulates placement manager)
       grid.placeBuilding(2, 3, building);
-      
+
       // Assert - Planet updated
       expect(planetSaved, isTrue);
       final buildings = planet.buildings;
@@ -59,7 +56,7 @@ void main() {
       expect(buildings.first.x, equals(2));
       expect(buildings.first.y, equals(3));
       expect(buildings.first.type, equals(building.type));
-      
+
       // Verify grid and planet are in sync
       expect(grid.getBuildingAt(2, 3)?.type, equals(building.type));
     });
@@ -71,13 +68,13 @@ void main() {
           .first;
       grid.placeBuilding(5, 7, building);
       planetSaved = false; // Reset save tracking
-      
+
       expect(planet.buildings, hasLength(1));
       expect(grid.getBuildingAt(5, 7), isNotNull);
-      
+
       // Act - Remove building through grid (simulates scene widget)
       grid.removeBuilding(5, 7);
-      
+
       // Assert - Planet updated
       expect(planetSaved, isTrue);
       expect(planet.buildings, isEmpty);
@@ -92,19 +89,19 @@ void main() {
       final building2 = BuildingRegistry.availableBuildings
           .where((b) => b.type == BuildingType.goldMine)
           .first;
-      
+
       // Act - Place multiple buildings
       grid.placeBuilding(1, 1, building1);
       grid.placeBuilding(10, 10, building2);
-      
+
       // Assert - Both in planet
       final buildings = planet.buildings;
       expect(buildings, hasLength(2));
-      
+
       final positions = buildings.map((b) => '${b.x},${b.y}').toSet();
       expect(positions, contains('1,1'));
       expect(positions, contains('10,10'));
-      
+
       // Assert - Both in grid
       expect(grid.getBuildingAt(1, 1)?.type, equals(BuildingType.powerPlant));
       expect(grid.getBuildingAt(10, 10)?.type, equals(BuildingType.goldMine));
@@ -115,14 +112,14 @@ void main() {
       final building = BuildingRegistry.availableBuildings
           .where((b) => b.type == BuildingType.house)
           .first;
-      
+
       // Act - Place building and save planet
       grid.placeBuilding(0, 0, building);
       await SaveService.savePlanet(planet);
-      
+
       // Load a fresh planet from storage
       final loadedPlanet = await SaveService.loadOrCreatePlanet('earth');
-      
+
       // Assert - Building persisted
       final loadedBuildings = loadedPlanet.buildings;
       expect(loadedBuildings, hasLength(1));
@@ -138,14 +135,14 @@ void main() {
           .first;
       grid.placeBuilding(8, 9, building);
       await SaveService.savePlanet(planet);
-      
+
       // Act - Remove building and save again
       grid.removeBuilding(8, 9);
       await SaveService.savePlanet(planet);
-      
+
       // Load fresh planet
       final loadedPlanet = await SaveService.loadOrCreatePlanet('earth');
-      
+
       // Assert - Building removed from persistence
       expect(loadedPlanet.buildings, isEmpty);
     });

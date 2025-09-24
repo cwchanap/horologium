@@ -40,7 +40,10 @@ class _BuildingSelectionPanelState extends State<BuildingSelectionPanel>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: BuildingCategory.values.length, vsync: this);
+    _tabController = TabController(
+      length: BuildingCategory.values.length,
+      vsync: this,
+    );
   }
 
   @override
@@ -58,7 +61,8 @@ class _BuildingSelectionPanelState extends State<BuildingSelectionPanel>
       left: 0,
       right: 0,
       child: Container(
-        height: MediaQuery.of(context).size.height * 0.5, // 50% of screen height
+        height:
+            MediaQuery.of(context).size.height * 0.5, // 50% of screen height
         decoration: BoxDecoration(
           color: Colors.black.withAlpha((255 * 0.9).round()),
           borderRadius: const BorderRadius.only(
@@ -93,16 +97,19 @@ class _BuildingSelectionPanelState extends State<BuildingSelectionPanel>
               controller: _tabController,
               isScrollable: true,
               tabs: BuildingCategory.values
-                  .map((category) => Tab(text: category.toString().split('.').last))
+                  .map(
+                    (category) =>
+                        Tab(text: category.toString().split('.').last),
+                  )
                   .toList(),
             ),
             Expanded(
               child: TabBarView(
                 controller: _tabController,
                 children: BuildingCategory.values.map((category) {
-                  final buildings = BuildingService.getAvailableBuildings(widget.researchManager)
-                      .where((b) => b.category == category)
-                      .toList();
+                  final buildings = BuildingService.getAvailableBuildings(
+                    widget.researchManager,
+                  ).where((b) => b.category == category).toList();
                   if (buildings.isEmpty) {
                     return const Center(
                       child: Text(
@@ -114,21 +121,23 @@ class _BuildingSelectionPanelState extends State<BuildingSelectionPanel>
                   return GridView.builder(
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 2.5,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
+                          crossAxisCount: 2,
+                          childAspectRatio: 2.5,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                        ),
                     itemCount: buildings.length,
                     itemBuilder: (context, index) {
                       final building = buildings[index];
                       return BuildingCard(
                         building: building,
                         onTap: () => widget.onBuildingSelected(building),
-                        currentCount: widget.grid
-                            .countBuildingsOfType(building.type),
-                        maxCount: widget.buildingLimitManager
-                            .getBuildingLimit(building.type),
+                        currentCount: widget.grid.countBuildingsOfType(
+                          building.type,
+                        ),
+                        maxCount: widget.buildingLimitManager.getBuildingLimit(
+                          building.type,
+                        ),
                       );
                     },
                   );

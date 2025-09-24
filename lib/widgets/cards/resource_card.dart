@@ -20,7 +20,10 @@ class ResourceCard extends StatelessWidget {
     this.resourceType,
     this.productionRate = 0.0,
     this.consumptionRate = 0.0,
-  }) : assert(icon != null || resourceType != null, 'Either icon or resourceType must be provided');
+  }) : assert(
+         icon != null || resourceType != null,
+         'Either icon or resourceType must be provided',
+       );
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +35,10 @@ class ResourceCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.grey.withAlpha((255 * 0.1).round()),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withAlpha((255 * 0.3).round()), width: 1),
+        border: Border.all(
+          color: color.withAlpha((255 * 0.3).round()),
+          width: 1,
+        ),
       ),
       child: Column(
         children: [
@@ -44,11 +50,8 @@ class ResourceCard extends StatelessWidget {
                   color: color.withAlpha((255 * 0.2).round()),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: resourceType != null 
-                    ? ResourceIcon(
-                        resourceType: resourceType!,
-                        size: 24,
-                      )
+                child: resourceType != null
+                    ? ResourceIcon(resourceType: resourceType!, size: 24)
                     : Icon(icon!, color: color, size: 24),
               ),
               const SizedBox(width: 16),
@@ -65,7 +68,9 @@ class ResourceCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      name == 'Research' ? '${amount.toInt()}' : amount.toStringAsFixed(1),
+                      name == 'Research'
+                          ? '${amount.toInt()}'
+                          : amount.toStringAsFixed(1),
                       style: TextStyle(
                         color: color,
                         fontSize: 24,
@@ -80,16 +85,22 @@ class ResourceCard extends StatelessWidget {
                 children: [
                   if (netRate != 0)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: (netRate > 0 ? Colors.green : Colors.red).withAlpha((255 * 0.2).round()),
+                        color: (netRate > 0 ? Colors.green : Colors.red)
+                            .withAlpha((255 * 0.2).round()),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            netRate > 0 ? Icons.trending_up : Icons.trending_down,
+                            netRate > 0
+                                ? Icons.trending_up
+                                : Icons.trending_down,
                             color: netRate > 0 ? Colors.green : Colors.red,
                             size: 16,
                           ),
@@ -117,7 +128,9 @@ class ResourceCard extends StatelessWidget {
               Expanded(
                 child: _buildRateInfo(
                   'Production',
-                  name == 'Research' ? '${(productionRate * 10).toStringAsFixed(1)}/s' : '${productionRate.toStringAsFixed(1)}/s',
+                  name == 'Research'
+                      ? '${(productionRate * 10).toStringAsFixed(1)}/s'
+                      : '${productionRate.toStringAsFixed(1)}/s',
                   productionRate > 0 ? Colors.green : Colors.grey,
                   Icons.add_circle_outline,
                 ),
@@ -148,10 +161,7 @@ class ResourceCard extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(
-                color: Colors.grey,
-                fontSize: 10,
-              ),
+              style: const TextStyle(color: Colors.grey, fontSize: 10),
             ),
             Text(
               rate,

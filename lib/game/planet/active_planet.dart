@@ -22,7 +22,9 @@ class ActivePlanet {
   /// Get the active planet as a ValueNotifier for UI reactivity
   ValueNotifier<Planet> get active {
     if (_active == null) {
-      throw StateError('ActivePlanet not initialized. Call initialize() first.');
+      throw StateError(
+        'ActivePlanet not initialized. Call initialize() first.',
+      );
     }
     return _active!;
   }
@@ -30,7 +32,9 @@ class ActivePlanet {
   /// Get the current active planet value
   Planet get value {
     if (_active == null) {
-      throw StateError('ActivePlanet not initialized. Call initialize() first.');
+      throw StateError(
+        'ActivePlanet not initialized. Call initialize() first.',
+      );
     }
     return _active!.value;
   }
@@ -44,7 +48,7 @@ class ActivePlanet {
       initialize(planet);
       return;
     }
-    
+
     _active!.value = planet;
     _activePlanetId = planet.id;
   }
@@ -55,12 +59,14 @@ class ActivePlanet {
       initialize(planet);
       return;
     }
-    
+
     if (planet.id != _activePlanetId) {
-      throw ArgumentError('Cannot update active planet with different ID. '
-          'Expected: $_activePlanetId, got: ${planet.id}');
+      throw ArgumentError(
+        'Cannot update active planet with different ID. '
+        'Expected: $_activePlanetId, got: ${planet.id}',
+      );
     }
-    
+
     _active!.value = planet;
   }
 
@@ -72,8 +78,11 @@ class ActivePlanet {
 
     // Load the target planet from storage (use appropriate name)
     final planetName = getPlanetDisplayName(planetId);
-    final targetPlanet = await SaveService.loadOrCreatePlanet(planetId, name: planetName);
-    
+    final targetPlanet = await SaveService.loadOrCreatePlanet(
+      planetId,
+      name: planetName,
+    );
+
     // Switch to the new planet
     setActivePlanet(targetPlanet);
   }

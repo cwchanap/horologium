@@ -62,30 +62,32 @@ class Building {
 
   // Getters for level-scaled values
   int get cost => baseCost * level;
-  Map<String, double> get generation => baseGeneration.map((key, value) => MapEntry(key, value * level));
-  Map<String, double> get consumption => baseConsumption.map((key, value) => MapEntry(key, value * level));
+  Map<String, double> get generation =>
+      baseGeneration.map((key, value) => MapEntry(key, value * level));
+  Map<String, double> get consumption =>
+      baseConsumption.map((key, value) => MapEntry(key, value * level));
   int get accommodationCapacity => basePopulation * level; // For houses only
-  
+
   bool get hasWorkers => assignedWorkers >= requiredWorkers;
   bool get canAssignWorker => assignedWorkers < requiredWorkers;
-  
+
   void assignWorker() {
     if (canAssignWorker) {
       assignedWorkers++;
     }
   }
-  
+
   void unassignWorker() {
     if (assignedWorkers > 0) {
       assignedWorkers--;
     }
   }
-  
+
   // Upgrade cost is the cost of the next level
   int get upgradeCost => baseCost * (level + 1);
-  
+
   bool get canUpgrade => level < maxLevel;
-  
+
   void upgrade() {
     if (canUpgrade) {
       level++;
@@ -175,13 +177,17 @@ class BuildingLimitManager {
         .baseBuildingLimit;
     return baseLimit + (_limitUpgrades[type] ?? 0);
   }
-  
+
   void increaseBuildingLimit(BuildingType type, int amount) {
-    _limitUpgrades.update(type, (value) => value + amount, ifAbsent: () => amount);
+    _limitUpgrades.update(
+      type,
+      (value) => value + amount,
+      ifAbsent: () => amount,
+    );
   }
-  
+
   Map<BuildingType, int> get limitUpgrades => Map.from(_limitUpgrades);
-  
+
   void loadFromMap(Map<String, int> upgrades) {
     _limitUpgrades.clear();
     for (final entry in upgrades.entries) {
@@ -192,7 +198,7 @@ class BuildingLimitManager {
       _limitUpgrades[type] = entry.value;
     }
   }
-  
+
   Map<String, int> toMap() {
     return _limitUpgrades.map(
       (key, value) => MapEntry(key.toString().split('.').last, value),
@@ -246,7 +252,8 @@ class BuildingRegistry {
     Building(
       type: BuildingType.largeHouse,
       name: 'Large House',
-      description: 'Modern housing with more population accommodation and cash generation',
+      description:
+          'Modern housing with more population accommodation and cash generation',
       icon: Icons.apartment,
       color: Colors.lightGreen,
       baseCost: 250,

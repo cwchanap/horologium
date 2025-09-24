@@ -7,14 +7,15 @@ class TerrainGenerator {
   final int seed;
   final Random _random;
   // Phase 1: Patch-based grouping parameters
-  final int patchSizeBase;     // approximate patch span in cells (e.g., 9)
-  final int patchJitter;       // max center jitter in cells (e.g., 2)
-  final double primaryWeight;  // probability to pick biome primary terrain for a patch
+  final int patchSizeBase; // approximate patch span in cells (e.g., 9)
+  final int patchJitter; // max center jitter in cells (e.g., 2)
+  final double
+  primaryWeight; // probability to pick biome primary terrain for a patch
   // Phase 2: Edge blending & domain warping
-  final double warpAmplitude;  // cells, e.g., 1.5
-  final double warpFrequency;  // e.g., 0.18 per cell
-  final double edgeWidth;      // blending zone width in cells, e.g., 1.2
-  final double edgeGamma;      // blending curve exponent, e.g., 1.6
+  final double warpAmplitude; // cells, e.g., 1.5
+  final double warpFrequency; // e.g., 0.18 per cell
+  final double edgeWidth; // blending zone width in cells, e.g., 1.2
+  final double edgeGamma; // blending curve exponent, e.g., 1.6
 
   TerrainGenerator({
     required this.gridSize,
@@ -31,15 +32,20 @@ class TerrainGenerator {
   /// Generate terrain data for the entire grid
   Map<String, TerrainCell> generateTerrain() {
     final terrain = <String, TerrainCell>{};
-    
+
     // Generate elevation and moisture maps using Perlin-like noise
     final elevationMap = _generateElevationMap();
     final moistureMap = _generateMoistureMap();
 
     // Phase 1: Precompute jittered patch centers and per-patch main terrain types
-    final patchCenters = _generatePatchCentersForBounds(0, 0, gridSize - 1, gridSize - 1);
+    final patchCenters = _generatePatchCentersForBounds(
+      0,
+      0,
+      gridSize - 1,
+      gridSize - 1,
+    );
     final Map<Point<int>, TerrainType> patchMainTypes = {
-      for (final c in patchCenters) c: _choosePatchMainTypeAt(c.x, c.y)
+      for (final c in patchCenters) c: _choosePatchMainTypeAt(c.x, c.y),
     };
 
     // Assign cells to nearest (and blend with second-nearest) patch center
@@ -54,8 +60,20 @@ class TerrainGenerator {
         final biomeConfig = BiomeRegistry.getConfig(biome);
 
         // Domain-warped coordinates for organic borders
-        final wx = xCoord + warpAmplitude * _noise(xCoord * warpFrequency + 917.0, yCoord * warpFrequency + 613.0);
-        final wy = yCoord + warpAmplitude * _noise(xCoord * warpFrequency + 231.0, yCoord * warpFrequency + 101.0);
+        final wx =
+            xCoord +
+            warpAmplitude *
+                _noise(
+                  xCoord * warpFrequency + 917.0,
+                  yCoord * warpFrequency + 613.0,
+                );
+        final wy =
+            yCoord +
+            warpAmplitude *
+                _noise(
+                  xCoord * warpFrequency + 231.0,
+                  yCoord * warpFrequency + 101.0,
+                );
 
         // Find nearest and second-nearest centers
         final nearestPair = _nearestTwoCenters(wx, wy, patchCenters);
@@ -77,14 +95,26 @@ class TerrainGenerator {
             final p = 1.0 - pow(t, edgeGamma).toDouble();
             final noiseP = _rand01FromCell(xCoord, yCoord, 4242);
             if (noiseP < p) {
-              final neighborType = patchMainTypes[c2] ?? biomeConfig.primaryTerrain;
-              baseType = _transitionBlend(baseType, neighborType, elevation, moisture);
+              final neighborType =
+                  patchMainTypes[c2] ?? biomeConfig.primaryTerrain;
+              baseType = _transitionBlend(
+                baseType,
+                neighborType,
+                elevation,
+                moisture,
+              );
             }
           }
         }
 
         // Generate features for this cell (unchanged)
-        final features = _generateFeatures(biomeConfig, xCoord, yCoord, elevation, moisture);
+        final features = _generateFeatures(
+          biomeConfig,
+          xCoord,
+          yCoord,
+          elevation,
+          moisture,
+        );
 
         terrain[key] = TerrainCell(
           baseType: baseType,
@@ -106,30 +136,31 @@ class TerrainGenerator {
   Map<String, double> _generateElevationMap() {
     final elevationMap = <String, double>{};
     const scale = 0.1;
-    
+
     for (int xCoord = 0; xCoord < gridSize; xCoord++) {
       for (int yCoord = 0; yCoord < gridSize; yCoord++) {
         final key = '$xCoord,$yCoord';
-        
+
         // Multi-octave noise for more natural elevation
         double elevation = 0.0;
         double amplitude = 1.0;
         double frequency = scale;
-        
+
         for (int octave = 0; octave < 4; octave++) {
-          elevation += _noise(xCoord * frequency, yCoord * frequency) * amplitude;
+          elevation +=
+              _noise(xCoord * frequency, yCoord * frequency) * amplitude;
           amplitude *= 0.5;
           frequency *= 2;
         }
-        
+
         // Normalize to 0-1 range
         elevation = (elevation + 1) / 2;
         elevation = elevation.clamp(0.0, 1.0);
-        
+
         elevationMap[key] = elevation;
       }
     }
-    
+
     return elevationMap;
   }
 
@@ -137,22 +168,25 @@ class TerrainGenerator {
   Map<String, double> _generateMoistureMap() {
     final moistureMap = <String, double>{};
     const scale = 0.08;
-    
+
     for (int xCoord = 0; xCoord < gridSize; xCoord++) {
       for (int yCoord = 0; yCoord < gridSize; yCoord++) {
         final key = '$xCoord,$yCoord';
-        
+
         // Different seed offset for moisture
-        double moisture = _noise((xCoord + 1000) * scale, (yCoord + 1000) * scale);
-        
+        double moisture = _noise(
+          (xCoord + 1000) * scale,
+          (yCoord + 1000) * scale,
+        );
+
         // Normalize to 0-1 range
         moisture = (moisture + 1) / 2;
         moisture = moisture.clamp(0.0, 1.0);
-        
+
         moistureMap[key] = moisture;
       }
     }
-    
+
     return moistureMap;
   }
 
@@ -161,20 +195,20 @@ class TerrainGenerator {
     // Hash-based noise function
     int ix = x.floor();
     int iy = y.floor();
-    
+
     double fx = x - ix;
     double fy = y - iy;
-    
+
     // Get random values at grid corners
     double a = _hash(ix, iy);
     double b = _hash(ix + 1, iy);
     double c = _hash(ix, iy + 1);
     double d = _hash(ix + 1, iy + 1);
-    
+
     // Interpolate
     double i1 = _lerp(a, b, fx);
     double i2 = _lerp(c, d, fx);
-    
+
     return _lerp(i1, i2, fy);
   }
 
@@ -209,25 +243,25 @@ class TerrainGenerator {
 
   /// Generate features for a terrain cell
   List<FeatureType> _generateFeatures(
-    BiomeConfig config, 
-    int x, 
-    int y, 
-    double elevation, 
+    BiomeConfig config,
+    int x,
+    int y,
+    double elevation,
     double moisture,
   ) {
     final features = <FeatureType>[];
-    
+
     // Don't place features on every cell to avoid clutter
     if (_random.nextDouble() > 0.3) {
       return features;
     }
-    
+
     // Randomly select from common features for this biome
     if (config.commonFeatures.isNotEmpty) {
       final featureIndex = _random.nextInt(config.commonFeatures.length);
       features.add(config.commonFeatures[featureIndex]);
     }
-    
+
     return features;
   }
 
@@ -235,9 +269,14 @@ class TerrainGenerator {
   // water overlay with shorelines implemented in _applyWaterOverlay.
 
   /// Generate terrain for a specific region (useful for streaming)
-  Map<String, TerrainCell> generateRegion(int startX, int startY, int width, int height) {
+  Map<String, TerrainCell> generateRegion(
+    int startX,
+    int startY,
+    int width,
+    int height,
+  ) {
     final terrain = <String, TerrainCell>{};
-    
+
     // Compute an expanded bounds for patch centers to avoid edge artifacts
     final minX = max(0, startX - patchSizeBase * 2);
     final minY = max(0, startY - patchSizeBase * 2);
@@ -246,7 +285,7 @@ class TerrainGenerator {
 
     final patchCenters = _generatePatchCentersForBounds(minX, minY, maxX, maxY);
     final Map<Point<int>, TerrainType> patchMainTypes = {
-      for (final c in patchCenters) c: _choosePatchMainTypeAt(c.x, c.y)
+      for (final c in patchCenters) c: _choosePatchMainTypeAt(c.x, c.y),
     };
 
     // Generate just the requested region with patch-based base assignment & blending
@@ -260,8 +299,14 @@ class TerrainGenerator {
         final biomeConfig = BiomeRegistry.getConfig(biome);
 
         // Warped coords and nearest-two centers
-        final wx = x + warpAmplitude * _noise(x * warpFrequency + 917.0, y * warpFrequency + 613.0);
-        final wy = y + warpAmplitude * _noise(x * warpFrequency + 231.0, y * warpFrequency + 101.0);
+        final wx =
+            x +
+            warpAmplitude *
+                _noise(x * warpFrequency + 917.0, y * warpFrequency + 613.0);
+        final wy =
+            y +
+            warpAmplitude *
+                _noise(x * warpFrequency + 231.0, y * warpFrequency + 101.0);
         final nearestPair = _nearestTwoCenters(wx, wy, patchCenters);
         final Point<int>? c1 = nearestPair.$1;
         final Point<int>? c2 = nearestPair.$2;
@@ -278,13 +323,25 @@ class TerrainGenerator {
             final p = 1.0 - pow(t, edgeGamma).toDouble();
             final noiseP = _rand01FromCell(x, y, 4242);
             if (noiseP < p) {
-              final neighborType = patchMainTypes[c2] ?? biomeConfig.primaryTerrain;
-              baseType = _transitionBlend(baseType, neighborType, elevation, moisture);
+              final neighborType =
+                  patchMainTypes[c2] ?? biomeConfig.primaryTerrain;
+              baseType = _transitionBlend(
+                baseType,
+                neighborType,
+                elevation,
+                moisture,
+              );
             }
           }
         }
-        final features = _generateFeatures(biomeConfig, x, y, elevation, moisture);
-        
+        final features = _generateFeatures(
+          biomeConfig,
+          x,
+          y,
+          elevation,
+          moisture,
+        );
+
         terrain[key] = TerrainCell(
           baseType: baseType,
           features: features,
@@ -305,13 +362,13 @@ class TerrainGenerator {
     double elevation = 0.0;
     double amplitude = 1.0;
     double frequency = scale;
-    
+
     for (int octave = 0; octave < 4; octave++) {
       elevation += _noise(x * frequency, y * frequency) * amplitude;
       amplitude *= 0.5;
       frequency *= 2;
     }
-    
+
     elevation = (elevation + 1) / 2;
     return elevation.clamp(0.0, 1.0);
   }
@@ -326,7 +383,12 @@ class TerrainGenerator {
   // ===== Phase 1 helpers: patch centers & selection =====
 
   // Generate jittered patch centers for a rectangular bounds (inclusive)
-  List<Point<int>> _generatePatchCentersForBounds(int minX, int minY, int maxX, int maxY) {
+  List<Point<int>> _generatePatchCentersForBounds(
+    int minX,
+    int minY,
+    int maxX,
+    int maxY,
+  ) {
     final centers = <Point<int>>[];
     final seen = <String>{};
 
@@ -359,19 +421,34 @@ class TerrainGenerator {
   }
 
   /// Public helper for debug/visualization to retrieve patch centers in bounds (inclusive)
-  List<Point<int>> getPatchCentersForBounds(int minX, int minY, int maxX, int maxY) {
+  List<Point<int>> getPatchCentersForBounds(
+    int minX,
+    int minY,
+    int maxX,
+    int maxY,
+  ) {
     return _generatePatchCentersForBounds(minX, minY, maxX, maxY);
   }
 
   /// Public helper: domain-warped coordinates for a cell
   (double, double) warpCoords(num x, num y) {
-    final wx = x + warpAmplitude * _noise(x * warpFrequency + 917.0, y * warpFrequency + 613.0);
-    final wy = y + warpAmplitude * _noise(x * warpFrequency + 231.0, y * warpFrequency + 101.0);
+    final wx =
+        x +
+        warpAmplitude *
+            _noise(x * warpFrequency + 917.0, y * warpFrequency + 613.0);
+    final wy =
+        y +
+        warpAmplitude *
+            _noise(x * warpFrequency + 231.0, y * warpFrequency + 101.0);
     return (wx.toDouble(), wy.toDouble());
   }
 
   /// Public helper: nearest and second-nearest patch centers to warped coords
-  (Point<int>?, Point<int>?, double, double) nearestTwoCenters(double wx, double wy, List<Point<int>> centers) {
+  (Point<int>?, Point<int>?, double, double) nearestTwoCenters(
+    double wx,
+    double wy,
+    List<Point<int>> centers,
+  ) {
     return _nearestTwoCenters(wx, wy, centers);
   }
 
@@ -407,7 +484,10 @@ class TerrainGenerator {
         return TerrainType.dirt;
       }
       final rIdx = _rand01FromCenter(cx, cy, 997);
-      final idx = (rIdx * config.secondaryTerrains.length).floor().clamp(0, config.secondaryTerrains.length - 1);
+      final idx = (rIdx * config.secondaryTerrains.length).floor().clamp(
+        0,
+        config.secondaryTerrains.length - 1,
+      );
       final candidate = config.secondaryTerrains[idx];
       // If the randomly chosen secondary is water, swap to a landy fallback
       if (candidate == TerrainType.water) {
@@ -444,7 +524,11 @@ class TerrainGenerator {
   }
 
   // Find nearest and second-nearest centers to (wx, wy)
-  (Point<int>?, Point<int>?, double, double) _nearestTwoCenters(double wx, double wy, List<Point<int>> centers) {
+  (Point<int>?, Point<int>?, double, double) _nearestTwoCenters(
+    double wx,
+    double wy,
+    List<Point<int>> centers,
+  ) {
     Point<int>? first;
     Point<int>? second;
     double d1 = double.infinity;
@@ -467,7 +551,10 @@ class TerrainGenerator {
 
   // Deterministic 0..1 for a cell
   double _rand01FromCell(int x, int y, int salt) {
-    final v = _hash(x * 2654435761 % 0x7fffffff + salt, y * 40503 % 0x7fffffff + seed);
+    final v = _hash(
+      x * 2654435761 % 0x7fffffff + salt,
+      y * 40503 % 0x7fffffff + seed,
+    );
     return (v + 1.0) * 0.5;
   }
 
@@ -523,7 +610,11 @@ class TerrainGenerator {
       if (x == null || y == null) continue;
       final cell = terrain[key]!;
       if (cell.baseType == TerrainType.water) continue;
-      final neighborWater = _isWaterAt(x - 1, y) || _isWaterAt(x + 1, y) || _isWaterAt(x, y - 1) || _isWaterAt(x, y + 1);
+      final neighborWater =
+          _isWaterAt(x - 1, y) ||
+          _isWaterAt(x + 1, y) ||
+          _isWaterAt(x, y - 1) ||
+          _isWaterAt(x, y + 1);
       if (neighborWater) {
         terrain[key] = cell.copyWith(baseType: TerrainType.sand);
       }
@@ -544,7 +635,8 @@ class TerrainGenerator {
     final river = (rNoise.abs() < rBand);
     // Lakes using high-value noise in wet + low
     const lScale = 0.05;
-    final lNoise = (_noise((x + 4000) * lScale, (y + 4000) * lScale) + 1.0) * 0.5; // 0..1
+    final lNoise =
+        (_noise((x + 4000) * lScale, (y + 4000) * lScale) + 1.0) * 0.5; // 0..1
     final lake = lNoise > 0.85;
     return isLow && isWet && (river || lake);
   }

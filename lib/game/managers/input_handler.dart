@@ -51,7 +51,12 @@ class InputHandler {
     }
   }
 
-  void _showBuildingDetailsDialog(BuildContext context, int x, int y, Building building) {
+  void _showBuildingDetailsDialog(
+    BuildContext context,
+    int x,
+    int y,
+    Building building,
+  ) {
     BuildingMenu.showBuildingDetailsDialog(
       context: context,
       x: x,

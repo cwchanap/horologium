@@ -17,7 +17,10 @@ class PopulationCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.grey.withAlpha((255 * 0.1).round()),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withAlpha((255 * 0.3).round()), width: 1),
+        border: Border.all(
+          color: Colors.blue.withAlpha((255 * 0.3).round()),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [

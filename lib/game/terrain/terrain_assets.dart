@@ -16,14 +16,19 @@ class TerrainAssets {
   static const String dirtPatches = 'terrain/details/dirt_patches.png';
 
   // Trees
-  static const String treeOakSmall = 'terrain/features/trees/tree_oak_small.png';
-  static const String treeOakLarge = 'terrain/features/trees/tree_oak_large.png';
-  static const String treePineSmall = 'terrain/features/trees/tree_pine_small.png';
-  static const String treePineLarge = 'terrain/features/trees/tree_pine_large.png';
+  static const String treeOakSmall =
+      'terrain/features/trees/tree_oak_small.png';
+  static const String treeOakLarge =
+      'terrain/features/trees/tree_oak_large.png';
+  static const String treePineSmall =
+      'terrain/features/trees/tree_pine_small.png';
+  static const String treePineLarge =
+      'terrain/features/trees/tree_pine_large.png';
 
   // Bushes
   static const String bushGreen = 'terrain/features/bushes/bush_green.png';
-  static const String bushFlowering = 'terrain/features/bushes/bush_flowering.png';
+  static const String bushFlowering =
+      'terrain/features/bushes/bush_flowering.png';
 
   // Rocks
   static const String rockSmall = 'terrain/features/rocks/rock_small.png';
@@ -31,25 +36,37 @@ class TerrainAssets {
   static const String rockLarge = 'terrain/features/rocks/rock_large.png';
 
   // Water features
-  static const String riverHorizontal = 'terrain/features/water/river_horizontal.png';
-  static const String riverVertical = 'terrain/features/water/river_vertical.png';
-  static const String riverCornerTL = 'terrain/features/water/river_corner_tl.png';
-  static const String riverCornerTR = 'terrain/features/water/river_corner_tr.png';
-  static const String riverCornerBL = 'terrain/features/water/river_corner_bl.png';
-  static const String riverCornerBR = 'terrain/features/water/river_corner_br.png';
+  static const String riverHorizontal =
+      'terrain/features/water/river_horizontal.png';
+  static const String riverVertical =
+      'terrain/features/water/river_vertical.png';
+  static const String riverCornerTL =
+      'terrain/features/water/river_corner_tl.png';
+  static const String riverCornerTR =
+      'terrain/features/water/river_corner_tr.png';
+  static const String riverCornerBL =
+      'terrain/features/water/river_corner_bl.png';
+  static const String riverCornerBR =
+      'terrain/features/water/river_corner_br.png';
   static const String lakeSmall = 'terrain/features/water/lake_small.png';
   static const String lakeLarge = 'terrain/features/water/lake_large.png';
 
   // Paths
-  static const String pathDirtStraight = 'terrain/paths/dirt/path_dirt_straight.png';
-  static const String pathDirtCorner = 'terrain/paths/dirt/path_dirt_corner.png';
-  static const String pathStoneStraight = 'terrain/paths/stone/path_stone_straight.png';
-  static const String pathStoneCorner = 'terrain/paths/stone/path_stone_corner.png';
+  static const String pathDirtStraight =
+      'terrain/paths/dirt/path_dirt_straight.png';
+  static const String pathDirtCorner =
+      'terrain/paths/dirt/path_dirt_corner.png';
+  static const String pathStoneStraight =
+      'terrain/paths/stone/path_stone_straight.png';
+  static const String pathStoneCorner =
+      'terrain/paths/stone/path_stone_corner.png';
 
   // Effects
-  static const String buildingShadow = 'terrain/effects/shadows/building_shadow.png';
+  static const String buildingShadow =
+      'terrain/effects/shadows/building_shadow.png';
   static const String treeShadow = 'terrain/effects/shadows/tree_shadow.png';
-  static const String ambientLight = 'terrain/effects/lighting/ambient_light.png';
+  static const String ambientLight =
+      'terrain/effects/lighting/ambient_light.png';
 
   // Get all asset paths for preloading (only available assets)
   static List<String> get allAssets => [

@@ -6,10 +6,7 @@ import '../game/planet/active_planet.dart';
 class PlanetSwitcher extends StatefulWidget {
   final VoidCallback? onPlanetChanged;
 
-  const PlanetSwitcher({
-    super.key,
-    this.onPlanetChanged,
-  });
+  const PlanetSwitcher({super.key, this.onPlanetChanged});
 
   @override
   State<PlanetSwitcher> createState() => _PlanetSwitcherState();
@@ -22,7 +19,9 @@ class _PlanetSwitcherState extends State<PlanetSwitcher> {
   Widget build(BuildContext context) {
     final activePlanet = ActivePlanet();
     final availablePlanets = ActivePlanet.getAvailablePlanetIds();
-    final currentPlanetId = activePlanet.isInitialized ? activePlanet.activePlanetId : 'earth';
+    final currentPlanetId = activePlanet.isInitialized
+        ? activePlanet.activePlanetId
+        : 'earth';
 
     return Card(
       child: Padding(
@@ -33,10 +32,7 @@ class _PlanetSwitcherState extends State<PlanetSwitcher> {
           children: [
             const Text(
               'Planet Selection',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             Text(
@@ -46,13 +42,12 @@ class _PlanetSwitcherState extends State<PlanetSwitcher> {
             const SizedBox(height: 16),
             const Text(
               'Available Planets:',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 8),
-            ...availablePlanets.map((planetId) => _buildPlanetButton(planetId, currentPlanetId)),
+            ...availablePlanets.map(
+              (planetId) => _buildPlanetButton(planetId, currentPlanetId),
+            ),
             const SizedBox(height: 12),
             if (availablePlanets.length == 1)
               const Text(
@@ -78,7 +73,9 @@ class _PlanetSwitcherState extends State<PlanetSwitcher> {
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: _isSwitching || isCurrentPlanet ? null : () => _switchToPlanet(planetId),
+          onPressed: _isSwitching || isCurrentPlanet
+              ? null
+              : () => _switchToPlanet(planetId),
           style: ElevatedButton.styleFrom(
             backgroundColor: isCurrentPlanet ? Colors.green.shade100 : null,
             foregroundColor: isCurrentPlanet ? Colors.green.shade800 : null,
@@ -110,11 +107,13 @@ class _PlanetSwitcherState extends State<PlanetSwitcher> {
     try {
       await ActivePlanet().switchToPlanet(planetId);
       widget.onPlanetChanged?.call();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Switched to ${ActivePlanet.getPlanetDisplayName(planetId)}'),
+            content: Text(
+              'Switched to ${ActivePlanet.getPlanetDisplayName(planetId)}',
+            ),
             backgroundColor: Colors.green,
           ),
         );

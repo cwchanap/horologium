@@ -13,7 +13,7 @@ class ResourceService {
   static void purchaseBuilding(Resources resources, Building building) {
     if (canAffordBuilding(resources, building)) {
       resources.cash -= building.cost;
-      
+
       // Auto-assign worker if the building requires one and workers are available
       if (building.requiredWorkers > 0) {
         resources.assignWorkerTo(building);
@@ -23,7 +23,7 @@ class ResourceService {
 
   static void refundBuilding(Resources resources, Building building) {
     resources.cash += building.cost;
-    
+
     // Unassign all workers when a building is removed
     while (building.assignedWorkers > 0) {
       resources.unassignWorkerFrom(building);

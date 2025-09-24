@@ -34,7 +34,8 @@ class Resources {
     // Calculate accommodation capacity
     int totalAccommodation = 0;
     for (final building in buildings) {
-      if (building.type == BuildingType.house || building.type == BuildingType.largeHouse) {
+      if (building.type == BuildingType.house ||
+          building.type == BuildingType.largeHouse) {
         totalAccommodation += building.accommodationCapacity;
       }
     }
@@ -53,15 +54,23 @@ class Resources {
     availableWorkers = population - totalAssignedWorkers;
     // Count active research labs for time-based generation
     int activeResearchLabs = 0;
-    
+
     // First, generate resources from buildings that don't require consumption
     for (final building in buildings) {
       if (building.consumption.isEmpty) {
         // Buildings with no consumption generate if they have workers (except houses)
-        if (building.type == BuildingType.house || building.type == BuildingType.largeHouse || building.hasWorkers) {
+        if (building.type == BuildingType.house ||
+            building.type == BuildingType.largeHouse ||
+            building.hasWorkers) {
           building.generation.forEach((key, value) {
-            final resourceType = ResourceType.values.firstWhere((e) => e.toString() == 'ResourceType.$key');
-            resources.update(resourceType, (v) => v + value, ifAbsent: () => value);
+            final resourceType = ResourceType.values.firstWhere(
+              (e) => e.toString() == 'ResourceType.$key',
+            );
+            resources.update(
+              resourceType,
+              (v) => v + value,
+              ifAbsent: () => value,
+            );
           });
         }
       }
@@ -71,10 +80,12 @@ class Resources {
     for (final building in buildings) {
       if (building.consumption.isNotEmpty) {
         bool canProduce = true;
-        
+
         // Check if this building can consume what it needs
         building.consumption.forEach((key, value) {
-          final resourceType = ResourceType.values.firstWhere((e) => e.toString() == 'ResourceType.$key');
+          final resourceType = ResourceType.values.firstWhere(
+            (e) => e.toString() == 'ResourceType.$key',
+          );
           if ((resources[resourceType] ?? 0) < value) {
             canProduce = false;
           }
@@ -83,17 +94,29 @@ class Resources {
         if (canProduce && building.hasWorkers) {
           // Consume resources
           building.consumption.forEach((key, value) {
-            final resourceType = ResourceType.values.firstWhere((e) => e.toString() == 'ResourceType.$key');
-            resources.update(resourceType, (v) => v - value, ifAbsent: () => -value);
+            final resourceType = ResourceType.values.firstWhere(
+              (e) => e.toString() == 'ResourceType.$key',
+            );
+            resources.update(
+              resourceType,
+              (v) => v - value,
+              ifAbsent: () => -value,
+            );
           });
-          
+
           // Generate resources and count research labs
           building.generation.forEach((key, value) {
-            final resourceType = ResourceType.values.firstWhere((e) => e.toString() == 'ResourceType.$key');
+            final resourceType = ResourceType.values.firstWhere(
+              (e) => e.toString() == 'ResourceType.$key',
+            );
             if (key == 'research') {
               activeResearchLabs++;
             } else {
-              resources.update(resourceType, (v) => v + value, ifAbsent: () => value);
+              resources.update(
+                resourceType,
+                (v) => v + value,
+                ifAbsent: () => value,
+              );
             }
           });
         }
@@ -104,8 +127,13 @@ class Resources {
     if (activeResearchLabs > 0) {
       _researchAccumulator += 1.0; // Add 1 second of time
       if (_researchAccumulator >= 10) {
-        int pointsToAdd = activeResearchLabs; // 1 point per lab every 10 seconds
-        resources.update(ResourceType.research, (v) => v + pointsToAdd, ifAbsent: () => pointsToAdd.toDouble());
+        int pointsToAdd =
+            activeResearchLabs; // 1 point per lab every 10 seconds
+        resources.update(
+          ResourceType.research,
+          (v) => v + pointsToAdd,
+          ifAbsent: () => pointsToAdd.toDouble(),
+        );
         _researchAccumulator = 0; // Reset accumulator
       }
     }
@@ -148,23 +176,25 @@ class Resources {
 
   set flour(double value) => resources[ResourceType.flour] = value;
   set cornmeal(double value) => resources[ResourceType.cornmeal] = value;
-  set polishedRice(double value) => resources[ResourceType.polishedRice] = value;
-  set maltedBarley(double value) => resources[ResourceType.maltedBarley] = value;
+  set polishedRice(double value) =>
+      resources[ResourceType.polishedRice] = value;
+  set maltedBarley(double value) =>
+      resources[ResourceType.maltedBarley] = value;
   set bread(double value) => resources[ResourceType.bread] = value;
   set pastries(double value) => resources[ResourceType.pastries] = value;
-  
+
   // Helper methods for worker management
   bool canAssignWorkerTo(Building building) {
     return availableWorkers > 0 && building.canAssignWorker;
   }
-  
+
   void assignWorkerTo(Building building) {
     if (canAssignWorkerTo(building)) {
       building.assignWorker();
       availableWorkers--;
     }
   }
-  
+
   void unassignWorkerFrom(Building building) {
     if (building.assignedWorkers > 0) {
       building.unassignWorker();
@@ -197,7 +227,11 @@ class Resources {
     if (currentAmount >= amount) {
       final gain = resource.value * 8 * amount;
       resources.update(resourceType, (v) => v - amount);
-      resources.update(ResourceType.cash, (v) => v + gain, ifAbsent: () => gain);
+      resources.update(
+        ResourceType.cash,
+        (v) => v + gain,
+        ifAbsent: () => gain,
+      );
       return true;
     }
     return false;

@@ -37,7 +37,8 @@ class MainGame extends FlameGame
   double? _fitZoom; // Computed zoom that fits the whole terrain in the viewport
 
   Building? buildingToPlace;
-  final PlacementPreview placementPreview = PlacementPreview()..priority = 30; // Ensure preview renders above grid
+  final PlacementPreview placementPreview = PlacementPreview()
+    ..priority = 30; // Ensure preview renders above grid
 
   MainGame({Planet? planet}) : _planet = planet;
 
@@ -54,34 +55,42 @@ class MainGame extends FlameGame
     } catch (_) {}
     camera.viewfinder.anchor = Anchor.center;
     camera.viewfinder.zoom = _startZoom;
-    
+
     // Create terrain first (renders beneath everything)
     _terrain = ParallaxTerrainComponent(
       gridSize: 50, // Match grid size
-      seed: _planet?.id.hashCode ?? 42, // Use planet ID as seed for consistent terrain
+      seed:
+          _planet?.id.hashCode ??
+          42, // Use planet ID as seed for consistent terrain
     );
     // Keep terrain perfectly aligned with the grid (no parallax drift)
     _terrain!.parallaxEnabled = false;
-    _terrain!.size = Vector2(_terrain!.gridSize * cellWidth, _terrain!.gridSize * cellHeight);
+    _terrain!.size = Vector2(
+      _terrain!.gridSize * cellWidth,
+      _terrain!.gridSize * cellHeight,
+    );
     _terrain!.anchor = Anchor.center;
     _terrain!.position = Vector2.zero();
     _terrain!.priority = 10; // Terrain underlay for normal gameplay
-    
+
     world.add(_terrain!);
-    
+
     // Create grid (renders above terrain)
     _grid = Grid(
       onBuildingPlaced: _onBuildingPlaced,
       onBuildingRemoved: _onBuildingRemoved,
     );
-    _grid!.size = Vector2(_grid!.gridSize * cellWidth, _grid!.gridSize * cellHeight);
+    _grid!.size = Vector2(
+      _grid!.gridSize * cellWidth,
+      _grid!.gridSize * cellHeight,
+    );
     _grid!.anchor = Anchor.center;
     _grid!.position = Vector2.zero();
     _grid!.terrainComponent = _terrain; // Connect terrain to grid
     _grid!.priority = 20; // Grid above terrain
-    
+
     world.add(_grid!);
-    
+
     // Calculate proper zoom level to fit the terrain in the viewport
     final terrainSize = _terrain!.size;
     final viewportSize = camera.viewport.size;
@@ -90,13 +99,14 @@ class MainGame extends FlameGame
     // Zoom to fit the entire terrain in the viewport. Do NOT go below fit,
     // otherwise the viewport becomes larger than the world and clamping breaks.
     final properZoom = math.min(zoomX, zoomY);
-    _fitZoom = properZoom; // Save fit zoom so we never allow zooming out beyond full-terrain view
-    
+    _fitZoom =
+        properZoom; // Save fit zoom so we never allow zooming out beyond full-terrain view
+
     // Apply the proper zoom to fit terrain in viewport
     camera.viewfinder.zoom = properZoom.clamp(_minZoom, _maxZoom);
     // Center the camera on the terrain and clamp within bounds
     _centerCameraOnTerrain();
-    
+
     await loadBuildings();
   }
 
@@ -107,7 +117,12 @@ class MainGame extends FlameGame
 
     for (final buildingData in _planet!.buildings) {
       final building = buildingData.createBuilding();
-      _grid!.placeBuilding(buildingData.x, buildingData.y, building, notifyCallbacks: false);
+      _grid!.placeBuilding(
+        buildingData.x,
+        buildingData.y,
+        building,
+        notifyCallbacks: false,
+      );
     }
   }
 
@@ -121,7 +136,7 @@ class MainGame extends FlameGame
   // Grid callbacks for planet updates
   void _onBuildingPlaced(int x, int y, Building building) {
     if (_planet == null) return;
-    
+
     final buildingData = PlacedBuildingData(
       x: x,
       y: y,
@@ -129,14 +144,14 @@ class MainGame extends FlameGame
       level: building.level,
       assignedWorkers: building.assignedWorkers,
     );
-    
+
     _planet!.addBuilding(buildingData);
     onPlanetChanged?.call(_planet!);
   }
 
   void _onBuildingRemoved(int x, int y) {
     if (_planet == null) return;
-    
+
     _planet!.removeBuildingAt(x, y);
     onPlanetChanged?.call(_planet!);
   }
@@ -156,7 +171,7 @@ class MainGame extends FlameGame
   void onTapUp(flame_events.TapUpEvent event) {
     onUserInteracted?.call();
     if (_grid == null) return;
-    
+
     final worldPosition = camera.globalToLocal(event.canvasPosition);
     // Update preview on tap as well, so it appears even if the cursor hasn't moved
     if (buildingToPlace != null) {
@@ -170,7 +185,10 @@ class MainGame extends FlameGame
     } else {
       // Clicked outside grid - cancel building placement if active
       if (buildingToPlace != null) {
-        onGridCellTapped?.call(-1, -1); // Special coordinates to indicate cancel
+        onGridCellTapped?.call(
+          -1,
+          -1,
+        ); // Special coordinates to indicate cancel
       }
     }
   }
@@ -179,32 +197,38 @@ class MainGame extends FlameGame
   void onLongTapDown(flame_events.TapDownEvent event) {
     onUserInteracted?.call();
     if (_grid == null) return;
-    
+
     final worldPosition = camera.globalToLocal(event.canvasPosition);
     final localPosition = _grid!.toLocal(worldPosition);
     final gridPosition = _grid!.getGridPosition(localPosition);
 
     if (gridPosition != null) {
       onGridCellLongTapped?.call(
-          gridPosition.x.toInt(), gridPosition.y.toInt());
+        gridPosition.x.toInt(),
+        gridPosition.y.toInt(),
+      );
     }
   }
 
   void onSecondaryTapUp(flame_events.TapUpEvent event) {
     if (_grid == null) return;
-    
+
     final worldPosition = camera.globalToLocal(event.canvasPosition);
     final localPosition = _grid!.toLocal(worldPosition);
     final gridPosition = _grid!.getGridPosition(localPosition);
 
     if (gridPosition != null) {
       onGridCellSecondaryTapped?.call(
-          gridPosition.x.toInt(), gridPosition.y.toInt());
+        gridPosition.x.toInt(),
+        gridPosition.y.toInt(),
+      );
     }
   }
 
   void clampZoom() {
-    final minAllowed = _fitZoom != null ? math.max(_minZoom, _fitZoom!) : _minZoom;
+    final minAllowed = _fitZoom != null
+        ? math.max(_minZoom, _fitZoom!)
+        : _minZoom;
     camera.viewfinder.zoom = camera.viewfinder.zoom.clamp(minAllowed, _maxZoom);
   }
 
@@ -212,7 +236,10 @@ class MainGame extends FlameGame
   @override
   void onScroll(flame_events.PointerScrollInfo info) {
     onUserInteracted?.call();
-    camera.viewfinder.zoom += info.scrollDelta.global.y.sign * _zoomPerScrollUnit * _zoomSpeedMultiplier;
+    camera.viewfinder.zoom +=
+        info.scrollDelta.global.y.sign *
+        _zoomPerScrollUnit *
+        _zoomSpeedMultiplier;
     clampZoom();
     _clampCameraToTerrain();
   }
@@ -231,7 +258,10 @@ class MainGame extends FlameGame
     if (!currentScale.isIdentity()) {
       // Amplify pinch zooming speed
       final scaleFactor = 1 + (currentScale.y - 1) * _zoomSpeedMultiplier;
-      camera.viewfinder.zoom = (_scaleStartZoom * scaleFactor).clamp(_minZoom, _maxZoom);
+      camera.viewfinder.zoom = (_scaleStartZoom * scaleFactor).clamp(
+        _minZoom,
+        _maxZoom,
+      );
       _clampCameraToTerrain();
     } else {
       // Handle pan/drag when not scaling
@@ -244,9 +274,9 @@ class MainGame extends FlameGame
 
   void showPlacementPreview(Building building, Vector2 position) {
     if (_grid == null) return;
-    
+
     placementPreview.setBuilding(building);
-    
+
     final localPosition = _grid!.toLocal(position);
     final gridPosition = _grid!.getGridPosition(localPosition);
 
@@ -254,19 +284,26 @@ class MainGame extends FlameGame
       // Use the same positioning logic as the grid's render method
       final gridX = gridPosition.x.toInt();
       final gridY = gridPosition.y.toInt();
-      
+
       // Calculate position in grid's local coordinate system (top-left indices)
       final localX = gridX * cellWidth;
       final localY = gridY * cellHeight;
-      
+
       // For center-anchored grid at world (0,0), world = local - size/2
-      final worldPosition = Vector2(localX - _grid!.size.x / 2, localY - _grid!.size.y / 2);
+      final worldPosition = Vector2(
+        localX - _grid!.size.x / 2,
+        localY - _grid!.size.y / 2,
+      );
       placementPreview.position = worldPosition;
-      
+
       // Check both grid availability and terrain suitability
-      final gridAvailable = _grid!.isAreaAvailable(gridX, gridY, building.gridSize);
+      final gridAvailable = _grid!.isAreaAvailable(
+        gridX,
+        gridY,
+        building.gridSize,
+      );
       final terrainSuitable = _terrain?.isBuildableAt(gridX, gridY) ?? true;
-      
+
       placementPreview.isValid = gridAvailable && terrainSuitable;
     } else {
       // Hide preview when outside grid bounds
@@ -301,9 +338,9 @@ class MainGame extends FlameGame
     final overWideY = halfViewH >= h / 2;
 
     final minX = -w / 2 + halfViewW;
-    final maxX =  w / 2 - halfViewW;
+    final maxX = w / 2 - halfViewW;
     final minY = -h / 2 + halfViewH;
-    final maxY =  h / 2 - halfViewH;
+    final maxY = h / 2 - halfViewH;
 
     final pos = camera.viewfinder.position;
     final clampedX = overWideX ? 0.0 : pos.x.clamp(minX, maxX);
@@ -317,7 +354,8 @@ class MainGame extends FlameGame
   }
 }
 
-class PlacementPreview extends PositionComponent with HasGameReference<MainGame> {
+class PlacementPreview extends PositionComponent
+    with HasGameReference<MainGame> {
   Building? building;
   bool isValid = false;
 
@@ -336,12 +374,7 @@ class PlacementPreview extends PositionComponent with HasGameReference<MainGame>
     final width = (cellWidth * buildingSize).toDouble();
     final height = (cellHeight * buildingSize).toDouble();
 
-    final rect = Rect.fromLTWH(
-      2,
-      2,
-      width - 4,
-      height - 4,
-    );
+    final rect = Rect.fromLTWH(2, 2, width - 4, height - 4);
 
     // Get sprite from the grid's cache
     final sprite = game.grid.getSpriteForBuilding(building!);
@@ -353,21 +386,21 @@ class PlacementPreview extends PositionComponent with HasGameReference<MainGame>
         ..color = (isValid ? Colors.green : Colors.red).withAlpha(50)
         ..style = PaintingStyle.fill;
       canvas.drawRect(rect, backgroundPaint);
-      
+
       // Draw the building sprite with transparency
       final spritePaint = Paint()
         ..colorFilter = ColorFilter.mode(
           (isValid ? Colors.white : Colors.red).withAlpha(180),
           BlendMode.modulate,
         );
-      
+
       sprite.render(
-        canvas, 
-        position: Vector2(rect.left, rect.top), 
+        canvas,
+        position: Vector2(rect.left, rect.top),
         size: Vector2(rect.width, rect.height),
         overridePaint: spritePaint,
       );
-      
+
       // Draw a border
       final borderPaint = Paint()
         ..color = (isValid ? Colors.green : Colors.red)

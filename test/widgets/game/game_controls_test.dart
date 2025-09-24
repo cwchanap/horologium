@@ -33,7 +33,9 @@ void main() {
       expect(find.text('Test Child'), findsOneWidget);
     });
 
-    testWidgets('has KeyboardListener and MouseRegion', (WidgetTester tester) async {
+    testWidgets('has KeyboardListener and MouseRegion', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -50,7 +52,9 @@ void main() {
       expect(find.byType(MouseRegion), findsAtLeastNWidgets(1));
     });
 
-    testWidgets('calls onEscapePressed when Escape key is pressed', (WidgetTester tester) async {
+    testWidgets('calls onEscapePressed when Escape key is pressed', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -70,7 +74,9 @@ void main() {
       expect(escapePressed, isTrue);
     });
 
-    testWidgets('does not call onEscapePressed for other keys', (WidgetTester tester) async {
+    testWidgets('does not call onEscapePressed for other keys', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -92,7 +98,9 @@ void main() {
       expect(escapePressed, isFalse);
     });
 
-    testWidgets('works without onEscapePressed callback', (WidgetTester tester) async {
+    testWidgets('works without onEscapePressed callback', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -134,7 +142,9 @@ void main() {
       // Test passes if no exception is thrown during hover
     });
 
-    testWidgets('KeyboardListener has correct focus setup', (WidgetTester tester) async {
+    testWidgets('KeyboardListener has correct focus setup', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -147,7 +157,9 @@ void main() {
         ),
       );
 
-      final keyboardListener = tester.widget<KeyboardListener>(find.byType(KeyboardListener));
+      final keyboardListener = tester.widget<KeyboardListener>(
+        find.byType(KeyboardListener),
+      );
       expect(keyboardListener.autofocus, isTrue);
       expect(keyboardListener.focusNode, isNotNull);
     });

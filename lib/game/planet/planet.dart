@@ -19,10 +19,10 @@ class Planet {
     ResearchManager? researchManager,
     BuildingLimitManager? buildingLimitManager,
     List<PlacedBuildingData>? buildings,
-  })  : resources = resources ?? Resources(),
-        researchManager = researchManager ?? ResearchManager(),
-        buildingLimitManager = buildingLimitManager ?? BuildingLimitManager(),
-        _buildings = buildings ?? [];
+  }) : resources = resources ?? Resources(),
+       researchManager = researchManager ?? ResearchManager(),
+       buildingLimitManager = buildingLimitManager ?? BuildingLimitManager(),
+       _buildings = buildings ?? [];
 
   /// Get a copy of all buildings on this planet
   List<PlacedBuildingData> get buildings => List.unmodifiable(_buildings);

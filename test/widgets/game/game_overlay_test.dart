@@ -13,7 +13,9 @@ void main() {
       backPressed = false;
     });
 
-    testWidgets('displays back button when no building to place', (WidgetTester tester) async {
+    testWidgets('displays back button when no building to place', (
+      WidgetTester tester,
+    ) async {
       mockGame.buildingToPlace = null;
 
       await tester.pumpWidget(
@@ -30,16 +32,18 @@ void main() {
       // Should show back arrow icon
       expect(find.byIcon(Icons.arrow_back), findsOneWidget);
       expect(find.byIcon(Icons.close), findsNothing);
-      
+
       // Check tooltip
       final iconButton = tester.widget<IconButton>(find.byType(IconButton));
       expect(iconButton.tooltip, equals('Back'));
     });
 
-    testWidgets('displays close button when building to place exists', (WidgetTester tester) async {
+    testWidgets('displays close button when building to place exists', (
+      WidgetTester tester,
+    ) async {
       // Create a mock building to place
       mockGame.buildingToPlace = null; // We'll simulate this differently
-      
+
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -55,7 +59,9 @@ void main() {
       expect(find.byIcon(Icons.arrow_back), findsOneWidget);
     });
 
-    testWidgets('calls onBackPressed when button is tapped', (WidgetTester tester) async {
+    testWidgets('calls onBackPressed when button is tapped', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -87,13 +93,13 @@ void main() {
 
       // Check SafeArea is present
       expect(find.byType(SafeArea), findsOneWidget);
-      
+
       // Check Row layout
       expect(find.byType(Row), findsOneWidget);
-      
+
       // Check Spacer for layout
       expect(find.byType(Spacer), findsOneWidget);
-      
+
       // Check IconButton styling
       final iconButton = tester.widget<IconButton>(find.byType(IconButton));
       expect(iconButton.style, isNotNull);
@@ -113,7 +119,7 @@ void main() {
 
       final iconButton = tester.widget<IconButton>(find.byType(IconButton));
       expect(iconButton.style, isNotNull);
-      
+
       // Check icon color
       final icon = tester.widget<Icon>(find.byType(Icon));
       expect(icon.color, equals(Colors.white));

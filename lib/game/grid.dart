@@ -22,33 +22,31 @@ class Grid extends PositionComponent with HasGameReference {
   final int gridSize;
   final Map<String, PlacedBuilding> _buildings = {};
   final Map<String, Sprite> _spriteCache = {};
-  
+
   // Debug overlays (border and markers) toggle
   bool showDebug = false;
-  
+
   // Callbacks for building changes (replaces direct SharedPreferences)
   final Function(int x, int y, Building building)? onBuildingPlaced;
   final Function(int x, int y)? onBuildingRemoved;
-  
+
   // Reference to terrain for buildability checks
   ParallaxTerrainComponent? terrainComponent;
 
-  Grid({
-    this.gridSize = 50, 
-    this.onBuildingPlaced,
-    this.onBuildingRemoved,
-  });
+  Grid({this.gridSize = 50, this.onBuildingPlaced, this.onBuildingRemoved});
 
   // Public getter to access the sprite cache
   Sprite? getSpriteForBuilding(Building building) {
-    return building.assetPath != null ? _spriteCache[building.assetPath!] : null;
+    return building.assetPath != null
+        ? _spriteCache[building.assetPath!]
+        : null;
   }
 
   Vector2? getGridPosition(Vector2 localPosition) {
     // Local coordinates are top-left-based inside render
     final adjustedX = localPosition.x;
     final adjustedY = localPosition.y;
-    
+
     if (adjustedX < 0 ||
         adjustedY < 0 ||
         adjustedX >= size.x ||
@@ -75,7 +73,7 @@ class Grid extends PositionComponent with HasGameReference {
     if (x + buildingSize > gridSize || y + buildingSize > gridSize) {
       return false;
     }
-    
+
     // Check grid occupancy
     for (var i = 0; i < buildingSize; i++) {
       for (var j = 0; j < buildingSize; j++) {
@@ -84,7 +82,7 @@ class Grid extends PositionComponent with HasGameReference {
         }
       }
     }
-    
+
     // Check terrain buildability if terrain component is available
     if (terrainComponent != null) {
       for (var i = 0; i < buildingSize; i++) {
@@ -95,11 +93,16 @@ class Grid extends PositionComponent with HasGameReference {
         }
       }
     }
-    
+
     return true;
   }
 
-  void placeBuilding(int x, int y, Building building, {bool notifyCallbacks = true}) {
+  void placeBuilding(
+    int x,
+    int y,
+    Building building, {
+    bool notifyCallbacks = true,
+  }) {
     final buildingSize = sqrt(building.gridSize).toInt();
     final placedBuilding = PlacedBuilding(building, x, y);
     for (var i = 0; i < buildingSize; i++) {
@@ -175,7 +178,8 @@ class Grid extends PositionComponent with HasGameReference {
     super.render(canvas);
 
     final paint = Paint()
-      ..color = Colors.white.withAlpha((255 * 0.25).round()) // More visible for debugging
+      ..color = Colors.white
+          .withAlpha((255 * 0.25).round()) // More visible for debugging
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0; // Slightly thicker lines
 
@@ -208,14 +212,20 @@ class Grid extends PositionComponent with HasGameReference {
       // Debug markers: center and corners
       final centerPaint = Paint()..color = Colors.orange; // (size/2,size/2)
       final tlPaint = Paint()..color = Colors.green; // (0,0)
-      final brPaint = Paint()..color = Colors.cyan;  // (size,size)
+      final brPaint = Paint()..color = Colors.cyan; // (size,size)
 
       // Center marker (local center is at (size/2,size/2))
-      canvas.drawRect(Rect.fromLTWH(size.x / 2 - 5, size.y / 2 - 5, 10, 10), centerPaint);
+      canvas.drawRect(
+        Rect.fromLTWH(size.x / 2 - 5, size.y / 2 - 5, 10, 10),
+        centerPaint,
+      );
       // Top-left marker
       canvas.drawRect(Rect.fromLTWH(offsetX, offsetY, 8, 8), tlPaint);
       // Bottom-right marker
-      canvas.drawRect(Rect.fromLTWH(offsetX + size.x - 8, offsetY + size.y - 8, 8, 8), brPaint);
+      canvas.drawRect(
+        Rect.fromLTWH(offsetX + size.x - 8, offsetY + size.y - 8, 8, 8),
+        brPaint,
+      );
     }
 
     // Draw buildings
@@ -247,7 +257,11 @@ class Grid extends PositionComponent with HasGameReference {
     if (building.assetPath != null) {
       final sprite = _spriteCache[building.assetPath!];
       if (sprite != null) {
-        sprite.render(canvas, position: rect.topLeft.toVector2(), size: rect.size.toVector2());
+        sprite.render(
+          canvas,
+          position: rect.topLeft.toVector2(),
+          size: rect.size.toVector2(),
+        );
       }
     } else {
       final buildingPaint = Paint()
