@@ -194,6 +194,10 @@ void main() {
 
       // Just verify the widget can be created without immediate errors
       expect(find.byType(MainGameWidget), findsOneWidget);
+
+      // Remove the widget to allow async tasks to complete and avoid pending timers
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
     });
 
     testWidgets('MainGameWidget handles basic initialization', (
@@ -224,6 +228,10 @@ void main() {
 
       // Verify the widget builds successfully
       expect(find.byType(MainGameWidget), findsOneWidget);
+
+      // Remove the widget to allow async tasks to complete and avoid pending timers
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
     });
   });
 }

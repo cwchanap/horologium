@@ -251,11 +251,12 @@ void main() {
       final container = tester.widget<Container>(find.byType(Container).first);
       expect(container.decoration, isA<BoxDecoration>());
 
-      // Check that there are ListTiles for each menu item (Research, Resources, Trade, Planet Selection, Close)
-      expect(find.byType(ListTile), findsNWidgets(5));
+      // Verify the expected menu entries exist (including the audio toggle which is a SwitchListTile)
+      expect(find.byType(ListTile), findsNWidgets(6));
+      expect(find.byType(SwitchListTile), findsOneWidget);
 
       // Check that there are Dividers between items
-      expect(find.byType(Divider), findsNWidgets(4));
+      expect(find.byType(Divider), findsNWidgets(5));
     });
 
     testWidgets('has correct width', (WidgetTester tester) async {
