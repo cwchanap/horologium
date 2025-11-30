@@ -1,116 +1,37 @@
-# CLAUDE.md
+# Repository Guidelines
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Project Structure & Module Organization
+- `lib/` hosts gameplay logic; `lib/game/` covers Flame components, while `lib/main.dart` and `lib/main_menu.dart` keep the Flutter shell.
+- `assets/images/` and `assets/audio/` store sprites, terrain atlases, and music referenced via the `Assets` helper.
+- `test/` contains widget and scene tests; mirror new modules with matching `*_test.dart` files.
+- `docs/` tracks feature briefs (terrain, parallax, etc.)—update when mechanics change.
+- `scripts/` includes utility tooling; prefer adding maintenance tasks here instead of ad-hoc commands.
 
-## Project Overview
+## Build, Test, and Development Commands
+- `flutter pub get` fetches and locks dependencies; run after editing `pubspec.yaml`.
+- `flutter run` launches the game; use `-d chrome` for a quick web pass or omit for native targets.
+- `flutter test` executes unit, widget, and integration suites with mocked preferences.
+- `flutter analyze` enforces static analysis defined in `analysis_options.yaml`.
+- `flutter build apk` and `flutter build ios` generate release binaries for QA drops.
 
-Horologium is a Flutter-based space city-building game using the Flame game engine. The core architecture uses Flame's component system with a 50x50 grid for building placement, real-time resource management, and research-gated progression.
+## Coding Style & Naming Conventions
+- Follow Flutter defaults: 2-space indentation, trailing commas for multi-line literals, and `lowerCamelCase` for members.
+- Keep Flame components in dedicated files named `<Feature>Component` to ease discovery.
+- Run `dart format lib test` before committing; CI enforces these rules.
+- Centralize constants in the relevant manager or `Assets` class rather than scattering magic values.
 
-## Development Commands
+## Testing Guidelines
+- Add tests beside features using the Flutter test package; name files `<feature>_test.dart` and groups with clear scenario labels.
+- Use `SharedPreferences.setMockInitialValues` to seed resource or building state.
+- Prefer deterministic timers by overriding Flame tickers or injecting clocks for verification.
+- Ensure new resource or building logic updates both success and failure branches in tests.
 
-- **Install dependencies**: `flutter pub get`
-- **Run the application**: `flutter run`
-- **Run tests**: `flutter test`
-- **Build for Android**: `flutter build apk`
-- **Build for iOS**: `flutter build ios`
-- **Analyze code**: `flutter analyze`
+## Commit & Pull Request Guidelines
+- Adopt Conventional Commits (`feat:`, `fix:`, `chore:`, `ci:`) as in the git history.
+- Keep commits focused: gameplay change, UI tweak, and tooling updates should land separately.
+- Pull requests need a concise summary, testing notes (`flutter test`, manual device checks), and any relevant screenshots or screen recordings.
+- Link issues or TODO references, and call out migrations that require data wipes or saved-game resets.
 
-## Code Architecture
-
-### Dual-Architecture System
-- **Flutter UI Layer**: `MainGameWidget` (StatefulWidget) manages UI state and dialogs
-- **Flame Game Layer**: `MainGame` (FlameGame) handles grid, camera, and input events
-- **Bridge Pattern**: Callback functions connect Flame events to Flutter state updates
-
-Key pattern for Flame → Flutter communication:
-```dart
-_game.onGridCellTapped = _handleGridCellTapped;
-_game.onGridCellLongTapped = _inputHandler.handleGridCellLongTapped;
-```
-
-### Core Structure
-- `lib/main.dart` - Application entry point with MaterialApp and dark space theme
-- `lib/main_menu.dart` - Animated main menu with starfield background and navigation
-- `lib/game/scene_widget.dart` - Main game widget integrating Flame with Flutter UI
-- `lib/game/main_game.dart` - Flame game with grid system and camera controls
-- `lib/game/grid.dart` - 50x50 grid system for building placement
-- `lib/game/resources/resources.dart` - Resource management system
-- `lib/game/building/building.dart` - Building definitions and registry
-- `lib/game/managers/` - Game state, persistence, and input management
-
-### Resource System Architecture
-- **ResourceType enum** defines all resources (cash, gold, wood, coal, electricity, water, research, stone, planks)
-- **Resources class** manages `Map<ResourceType, double>` with helper getters/setters
-- **Timer-based updates**: 1-second intervals trigger building production/consumption
-- **Worker assignment**: Buildings require workers to produce resources
-- **Population system**: Tracks sheltered/unsheltered population and available workers
-
-### Building System
-- **Grid-based placement**: 50x50 cell grid with collision detection
-- **Building types**: Houses, factories, mines, research labs, utilities
-- **Production chains**: Buildings consume and produce different resources
-- **Worker requirements**: Buildings need assigned workers to operate
-- **Research gating**: Advanced buildings locked behind technology research
-
-### State Persistence
-All game state uses SharedPreferences with specific patterns:
-- Resources: individual keys like 'cash', 'gold', 'coal'
-- Buildings: StringList 'buildings' with format 'x,y,BuildingName'
-- Research: StringList 'completed_research' with research IDs
-
-### Key Integration Points
-- Grid interactions trigger callback functions that update Flutter state
-- PlacementPreview component shows building validity before placement
-- Camera zoom clamped between 1.0x-4.0x with drag controls
-- Timer management for resource generation and UI updates
-
-## Development Patterns
-
-### Adding Buildings
-1. Add to `BuildingType` enum and `BuildingRegistry.availableBuildings`
-2. Define category in `BuildingCategory` enum
-3. Add sprite path to `Assets` class (assets/images/building/name.png)
-4. Use baseGeneration/baseConsumption Maps with string keys matching ResourceType names
-
-### Resource Management Flow
-```dart
-// Production/consumption uses string keys that map to ResourceType enum
-building.baseGeneration = {'wood': 1, 'cash': 0.5};
-// Update cycle: check consumption → consume → produce
-resources.update(resourceType, (v) => v + value, ifAbsent: () => value);
-```
-
-### Testing Patterns
-Use `SharedPreferences.setMockInitialValues()` for all tests:
-```dart
-SharedPreferences.setMockInitialValues({
-  'cash': 1000.0,
-  'population': 20,
-  'buildings': ['5,5,House', '10,10,Power Plant']
-});
-```
-
-### Worker Assignment System
-Buildings track `assignedWorkers`/`requiredWorkers`. Resources class provides:
-```dart
-bool canAssignWorkerTo(Building building)
-void assignWorkerTo(Building building)
-void unassignWorkerFrom(Building building)
-```
-
-## Theme and Styling
-- Dark space theme with cyan/purple accent colors (`Colors.cyanAccent`)
-- Custom text shadows and glowing effects
-- Consistent transparency: `Colors.withAlpha((255 * 0.8).round())`
-- Animated starfield with twinkling effects using CustomPainter
-- Floating particle effects for visual polish
-
-## Testing
-- Widget tests in `test/widget_test.dart` and `test/scene_test.dart`
-- Use `flutter test` to run all tests
-- Mock SharedPreferences for state-dependent tests
-
-## Platform Support
-- Android: Uses Kotlin for platform-specific code
-- iOS: Uses Swift for platform-specific code  
-- Both platforms configured with standard Flutter project structure
+## Architecture Notes
+- MainGame communicates with Flutter widgets through callbacks; when adding interactions, wire them in `MainGameWidget` and document the flow.
+- SharedPreferences persists core state—update key constants in one place and provide migration steps if formats shift.
