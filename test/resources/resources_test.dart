@@ -178,6 +178,90 @@ void main() {
     });
   });
 
+  group('Happiness system', () {
+    test('happiness increases when all factors are satisfied', () {
+      final resources = Resources();
+      resources.population = 10;
+      resources.availableWorkers = 0; // All employed
+      resources.unshelteredPopulation = 0; // All sheltered
+      resources.resources[ResourceType.bread] = 10; // Plenty of food
+      resources.resources[ResourceType.water] = 10; // Plenty of water
+      resources.resources[ResourceType.electricity] = 10; // Plenty of power
+      resources.happiness = 0; // Start low
+
+      // Create a house to provide accommodation
+      final house = Building(
+        type: BuildingType.house,
+        name: 'House',
+        description: 'Test house',
+        icon: Icons.house,
+        color: Colors.green,
+        baseCost: 100,
+        basePopulation: 10,
+        requiredWorkers: 0,
+        category: BuildingCategory.residential,
+      );
+
+      // Run several update cycles
+      for (int i = 0; i < 20; i++) {
+        resources.update([house]);
+      }
+
+      // Happiness should have increased significantly
+      expect(resources.happiness, greaterThan(50));
+    });
+
+    test('happiness decreases when factors are unsatisfied', () {
+      final resources = Resources();
+      resources.population = 10;
+      resources.availableWorkers = 10; // No one employed
+      resources.unshelteredPopulation = 10; // No one sheltered
+      resources.resources[ResourceType.bread] = 0; // No food
+      resources.resources[ResourceType.water] = 0; // No water
+      resources.resources[ResourceType.electricity] = 0; // No power
+      resources.happiness = 100; // Start high
+
+      // Run several update cycles with no buildings (no housing)
+      for (int i = 0; i < 20; i++) {
+        resources.update([]);
+      }
+
+      // Happiness should have decreased significantly
+      expect(resources.happiness, lessThan(50));
+    });
+
+    test('population grows when happiness is high and housing available', () {
+      final resources = Resources();
+      resources.population = 5;
+      resources.availableWorkers = 0;
+      resources.unshelteredPopulation = 0;
+      resources.happiness = 80; // High happiness
+      resources.resources[ResourceType.bread] = 100;
+      resources.resources[ResourceType.water] = 100;
+      resources.resources[ResourceType.electricity] = 100;
+
+      final house = Building(
+        type: BuildingType.house,
+        name: 'House',
+        description: 'Test house',
+        icon: Icons.house,
+        color: Colors.green,
+        baseCost: 100,
+        basePopulation: 20, // Plenty of housing
+        requiredWorkers: 0,
+        category: BuildingCategory.residential,
+      );
+
+      // Run 31 update cycles (30 seconds = 1 growth check)
+      for (int i = 0; i < 31; i++) {
+        resources.update([house]);
+      }
+
+      // Population should have increased by 1
+      expect(resources.population, 6);
+    });
+  });
+
   group('Worker management', () {
     test('assignWorkerTo attaches workers when available', () {
       final resources = Resources();

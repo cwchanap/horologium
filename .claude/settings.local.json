@@ -3,7 +3,8 @@
     "allow": [
       "Bash(flutter analyze:*)",
       "WebFetch(domain:docs.flame-engine.org)",
-      "Bash(flutter pub:*)"
+      "Bash(flutter pub:*)",
+      "Bash(flutter test:*)"
     ],
     "deny": []
   }

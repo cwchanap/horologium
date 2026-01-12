@@ -29,6 +29,8 @@ class SaveService {
       'planet.$planetId.population';
   static String _planetAvailableWorkersKey(String planetId) =>
       'planet.$planetId.availableWorkers';
+  static String _planetHappinessKey(String planetId) =>
+      'planet.$planetId.happiness';
   static String _planetResearchKey(String planetId) =>
       'planet.$planetId.research.completed';
   static String _planetBuildingLimitsKey(String planetId) =>
@@ -198,6 +200,12 @@ class SaveService {
       planet.resources.availableWorkers,
     );
 
+    // Save happiness
+    await prefs.setDouble(
+      _planetHappinessKey(planetId),
+      planet.resources.happiness,
+    );
+
     // Save research progress
     await prefs.setStringList(
       _planetResearchKey(planetId),
@@ -284,6 +292,8 @@ class SaveService {
     resources.availableWorkers =
         prefs.getInt(_planetAvailableWorkersKey(planetId)) ??
         resources.population;
+    resources.happiness =
+        prefs.getDouble(_planetHappinessKey(planetId)) ?? 50.0;
 
     // Load research progress
     final researchManager = ResearchManager();

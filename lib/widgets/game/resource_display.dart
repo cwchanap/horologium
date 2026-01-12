@@ -33,12 +33,9 @@ class ResourceDisplay extends StatelessWidget {
             value: resources.research,
           ),
           const SizedBox(height: 8),
-          _buildResourceRow(
-            icon: Icons.people,
-            color: Colors.blue,
-            label: 'Population',
-            value: resources.population.toDouble(),
-          ),
+          _buildHappinessRow(),
+          const SizedBox(height: 8),
+          _buildPopulationRow(),
           const SizedBox(height: 4),
           _buildResourceRow(
             icon: Icons.work,
@@ -50,6 +47,100 @@ class ResourceDisplay extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildHappinessRow() {
+    final happiness = resources.happiness;
+    final color = _getHappinessColor(happiness);
+    final icon = _getHappinessIcon(happiness);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(width: 6),
+        Text(
+          '${happiness.toStringAsFixed(0)}%',
+          style: TextStyle(
+            color: color,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPopulationRow() {
+    final happiness = resources.happiness;
+    final hasHousing = resources.unshelteredPopulation <= 0;
+
+    // Determine trend based on current happiness and housing
+    PopulationTrend trend;
+    if (happiness >= 60 && hasHousing) {
+      trend = PopulationTrend.growing;
+    } else if (happiness <= 30) {
+      trend = PopulationTrend.shrinking;
+    } else {
+      trend = PopulationTrend.stable;
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.people, color: Colors.blue, size: 18),
+        const SizedBox(width: 6),
+        Text(
+          resources.population.toString(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(width: 4),
+        _buildTrendIndicator(trend),
+      ],
+    );
+  }
+
+  Widget _buildTrendIndicator(PopulationTrend trend) {
+    switch (trend) {
+      case PopulationTrend.growing:
+        return const Icon(
+          Icons.arrow_upward,
+          color: Colors.greenAccent,
+          size: 14,
+        );
+      case PopulationTrend.shrinking:
+        return const Icon(
+          Icons.arrow_downward,
+          color: Colors.redAccent,
+          size: 14,
+        );
+      case PopulationTrend.stable:
+        return Icon(Icons.remove, color: Colors.grey.shade400, size: 14);
+    }
+  }
+
+  Color _getHappinessColor(double happiness) {
+    if (happiness >= 70) {
+      return Colors.greenAccent;
+    } else if (happiness >= 40) {
+      return Colors.yellowAccent;
+    } else {
+      return Colors.redAccent;
+    }
+  }
+
+  IconData _getHappinessIcon(double happiness) {
+    if (happiness >= 70) {
+      return Icons.sentiment_very_satisfied;
+    } else if (happiness >= 40) {
+      return Icons.sentiment_neutral;
+    } else {
+      return Icons.sentiment_very_dissatisfied;
+    }
   }
 
   Widget _buildResourceRow({
@@ -77,3 +168,5 @@ class ResourceDisplay extends StatelessWidget {
     );
   }
 }
+
+enum PopulationTrend { growing, stable, shrinking }

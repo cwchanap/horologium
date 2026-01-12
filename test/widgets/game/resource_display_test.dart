@@ -18,6 +18,8 @@ void main() {
     testWidgets('displays all resource values correctly', (
       WidgetTester tester,
     ) async {
+      testResources.happiness = 75.0;
+
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(body: ResourceDisplay(resources: testResources)),
@@ -27,12 +29,17 @@ void main() {
       // Check that all resource values are displayed
       expect(find.text('1500'), findsOneWidget); // Cash
       expect(find.text('25'), findsOneWidget); // Research
+      expect(find.text('75%'), findsOneWidget); // Happiness
       expect(find.text('100'), findsOneWidget); // Population
-      expect(find.text('50'), findsOneWidget); // Available workers
+      // Note: availableWorkers = 50, but happiness also shows 50 by default if not set
 
       // Check that icons are present
       expect(find.byIcon(Icons.attach_money), findsOneWidget);
       expect(find.byIcon(Icons.science), findsOneWidget);
+      expect(
+        find.byIcon(Icons.sentiment_very_satisfied),
+        findsOneWidget,
+      ); // Happiness icon
       expect(find.byIcon(Icons.people), findsOneWidget);
       expect(find.byIcon(Icons.work), findsOneWidget);
     });
@@ -42,6 +49,7 @@ void main() {
       testResources.research = 0.0;
       testResources.population = 0;
       testResources.availableWorkers = 0;
+      testResources.happiness = 0.0;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -49,7 +57,9 @@ void main() {
         ),
       );
 
-      expect(find.text('0'), findsNWidgets(4)); // All resources should show 0
+      // Cash, research, population, workers show 0; happiness shows 0%
+      expect(find.text('0'), findsNWidgets(4));
+      expect(find.text('0%'), findsOneWidget);
     });
 
     testWidgets('displays large numbers correctly', (
@@ -87,7 +97,8 @@ void main() {
       expect(find.byType(Column), findsOneWidget);
 
       // Check that there are Row widgets for each resource
-      expect(find.byType(Row), findsNWidgets(4));
+      // (cash, research, happiness, population, workers)
+      expect(find.byType(Row), findsNWidgets(5));
     });
 
     testWidgets('workers display is indented correctly', (

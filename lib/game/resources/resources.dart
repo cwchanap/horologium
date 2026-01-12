@@ -27,6 +27,11 @@ class Resources {
   int availableWorkers = 20; // Workers not assigned to buildings
   int unshelteredPopulation = 20;
 
+  // Happiness system (0-100 scale)
+  double happiness = 50.0;
+  int _populationGrowthAccumulator = 0; // Counts seconds for 30s growth cycle
+  int _lowHappinessStreak = 0; // Counts consecutive low happiness cycles
+
   // Track research accumulation (seconds)
   double _researchAccumulator = 0;
 
@@ -135,6 +140,94 @@ class Resources {
           ifAbsent: () => pointsToAdd.toDouble(),
         );
         _researchAccumulator = 0; // Reset accumulator
+      }
+    }
+
+    // Calculate happiness and handle population growth
+    _updateHappiness(buildings, totalAccommodation);
+  }
+
+  /// Calculates happiness based on housing, food, services, and employment.
+  /// Also handles population growth/shrinkage every 30 seconds.
+  void _updateHappiness(List<Building> buildings, int totalAccommodation) {
+    // Factor weights (must sum to 1.0)
+    const double housingWeight = 0.30;
+    const double foodWeight = 0.25;
+    const double servicesWeight = 0.25;
+    const double employmentWeight = 0.20;
+
+    // 1. Housing factor (0-100): ratio of sheltered population
+    double housingFactor = 0;
+    if (population > 0) {
+      final shelteredPop = population - unshelteredPopulation;
+      housingFactor = (shelteredPop / population) * 100;
+    }
+
+    // 2. Food factor (0-100): based on bread and pastries availability
+    // Target: 1 food per 5 population for 100% satisfaction
+    double foodFactor = 0;
+    if (population > 0) {
+      final totalFood = bread + pastries;
+      final targetFood = population / 5.0;
+      foodFactor = targetFood > 0
+          ? ((totalFood / targetFood) * 100).clamp(0, 100)
+          : 100;
+    }
+
+    // 3. Services factor (0-100): electricity and water per capita
+    // Target: 1 electricity + 2 water per 10 population for 100%
+    double servicesFactor = 0;
+    if (population > 0) {
+      final targetElectricity = population / 10.0;
+      final targetWater = population / 5.0;
+      final electricitySat = targetElectricity > 0
+          ? (electricity / targetElectricity).clamp(0, 1)
+          : 1;
+      final waterSat = targetWater > 0 ? (water / targetWater).clamp(0, 1) : 1;
+      servicesFactor = ((electricitySat + waterSat) / 2) * 100;
+    }
+
+    // 4. Employment factor (0-100): ratio of employed workers
+    double employmentFactor = 0;
+    if (population > 0) {
+      final employedWorkers = population - availableWorkers;
+      employmentFactor = (employedWorkers / population) * 100;
+    }
+
+    // Calculate weighted happiness
+    final newHappiness =
+        (housingFactor * housingWeight) +
+        (foodFactor * foodWeight) +
+        (servicesFactor * servicesWeight) +
+        (employmentFactor * employmentWeight);
+
+    // Smooth transition (gradual change for better UX)
+    happiness = happiness * 0.9 + newHappiness * 0.1;
+    happiness = happiness.clamp(0, 100);
+
+    // Population growth/shrinkage every 30 seconds
+    _populationGrowthAccumulator++;
+    if (_populationGrowthAccumulator >= 30) {
+      _populationGrowthAccumulator = 0;
+
+      if (happiness >= 60 && unshelteredPopulation <= 0) {
+        // High happiness + housing available = population growth
+        population++;
+        availableWorkers++;
+        _lowHappinessStreak = 0;
+      } else if (happiness <= 30) {
+        // Low happiness = track streak
+        _lowHappinessStreak++;
+        // After 2 consecutive low happiness cycles (60s), population shrinks
+        if (_lowHappinessStreak >= 2 && population > 1) {
+          population--;
+          if (availableWorkers > 0) {
+            availableWorkers--;
+          }
+        }
+      } else {
+        // Medium happiness = reset low streak but no growth
+        _lowHappinessStreak = 0;
       }
     }
   }
