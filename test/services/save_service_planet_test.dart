@@ -89,22 +89,16 @@ void main() {
         );
         expect(house.x, 5);
         expect(house.y, 5);
-        expect(house.level, 1); // Legacy format doesn't preserve level
-        expect(
-          house.assignedWorkers,
-          0,
-        ); // Legacy format doesn't preserve worker count
+        expect(house.level, 2); // Level is now preserved
+        expect(house.assignedWorkers, 1); // Worker count is now preserved
 
         final powerPlant = loadedPlanet.buildings.firstWhere(
           (b) => b.type == BuildingType.powerPlant,
         );
         expect(powerPlant.x, 10);
         expect(powerPlant.y, 10);
-        expect(powerPlant.level, 1); // Legacy format doesn't preserve level
-        expect(
-          powerPlant.assignedWorkers,
-          0,
-        ); // Legacy format doesn't preserve worker count
+        expect(powerPlant.level, 1); // Default level
+        expect(powerPlant.assignedWorkers, 0); // Default worker count
       });
 
       test('should create new planet when no data exists', () async {

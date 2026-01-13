@@ -18,13 +18,14 @@ class PlacedBuildingData {
     this.variant,
   });
 
-  /// Convert to string format for persistence (legacy format compatibility)
-  /// Format: "x,y,BuildingName"
+  /// Convert to string format for persistence
+  /// Format: "x,y,BuildingName,level,assignedWorkers"
   String toLegacyString() {
-    return '$x,$y,${type.toString().split('.').last}';
+    return '$x,$y,${type.toString().split('.').last},$level,$assignedWorkers';
   }
 
   /// Parse from legacy string format
+  /// Supports both old format "x,y,BuildingName" and new format "x,y,BuildingName,level,workers"
   static PlacedBuildingData? fromLegacyString(String data) {
     final parts = data.split(',');
     if (parts.length < 3) return null;
@@ -46,12 +47,18 @@ class PlacedBuildingData {
 
     if (type == null) return null;
 
+    // Parse level (default to 1 for backward compatibility)
+    final level = parts.length > 3 ? int.tryParse(parts[3]) ?? 1 : 1;
+
+    // Parse assigned workers (default to 0 for backward compatibility)
+    final assignedWorkers = parts.length > 4 ? int.tryParse(parts[4]) ?? 0 : 0;
+
     return PlacedBuildingData(
       x: x,
       y: y,
       type: type,
-      level: 1, // Legacy format doesn't include level
-      assignedWorkers: 0, // Legacy format doesn't include worker count
+      level: level,
+      assignedWorkers: assignedWorkers,
     );
   }
 

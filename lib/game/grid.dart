@@ -284,5 +284,72 @@ class Grid extends PositionComponent with HasGameReference {
         borderPaint,
       );
     }
+
+    // Draw level badge if level > 1
+    if (building.level > 1) {
+      _renderLevelBadge(canvas, rect, building.level);
+    }
+  }
+
+  void _renderLevelBadge(Canvas canvas, Rect buildingRect, int level) {
+    // Badge dimensions
+    const badgeWidth = 16.0;
+    const badgeHeight = 14.0;
+
+    // Position badge in top-right corner
+    final badgeRect = Rect.fromLTWH(
+      buildingRect.right - badgeWidth - 2,
+      buildingRect.top + 2,
+      badgeWidth,
+      badgeHeight,
+    );
+
+    // Badge background color based on level
+    final badgeColor = _getLevelColor(level);
+
+    // Draw badge background
+    final badgePaint = Paint()
+      ..color = badgeColor
+      ..style = PaintingStyle.fill;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(badgeRect, const Radius.circular(3)),
+      badgePaint,
+    );
+
+    // Draw level number
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: '$level',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+
+    final textOffset = Offset(
+      badgeRect.center.dx - textPainter.width / 2,
+      badgeRect.center.dy - textPainter.height / 2,
+    );
+    textPainter.paint(canvas, textOffset);
+  }
+
+  Color _getLevelColor(int level) {
+    switch (level) {
+      case 2:
+        return Colors.green;
+      case 3:
+        return Colors.blue;
+      case 4:
+        return Colors.purple;
+      case 5:
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
   }
 }

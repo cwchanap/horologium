@@ -7,7 +7,7 @@ import '../widgets/game/building_selection_panel.dart';
 import '../widgets/game/game_controls.dart';
 import '../widgets/game/game_overlay.dart';
 import '../widgets/game/hamburger_menu.dart';
-import '../widgets/game/delete_confirmation_dialog.dart';
+import '../widgets/game/building_options_dialog.dart';
 import '../widgets/game/resource_display.dart';
 import 'building/building.dart';
 import 'main_game.dart';
@@ -373,7 +373,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
   }
 
   void _onBuildingLongTapped(int x, int y, Building building) {
-    _showDeleteConfirmationDialog(x, y, building);
+    _showBuildingOptionsDialog(x, y, building);
   }
 
   void _onBuildingSelected(Building building) {
@@ -871,13 +871,17 @@ class _MainGameWidgetState extends State<MainGameWidget>
     });
   }
 
-  void _showDeleteConfirmationDialog(int x, int y, Building building) {
+  void _showBuildingOptionsDialog(int x, int y, Building building) {
     if (!_game.hasLoaded) return;
 
-    DeleteConfirmationDialog.show(
+    BuildingOptionsDialog.show(
       context: context,
       building: building,
-      onConfirm: () {
+      currentCash: widget.planet.resources.cash,
+      onUpgrade: () {
+        _upgradeBuilding(x, y, building);
+      },
+      onDelete: () {
         _game.grid.removeBuilding(x, y);
         setState(() {
           ResourceService.refundBuilding(widget.planet.resources, building);
@@ -885,5 +889,37 @@ class _MainGameWidgetState extends State<MainGameWidget>
         _onResourcesChanged();
       },
     );
+  }
+
+  void _upgradeBuilding(int x, int y, Building building) {
+    if (!building.canUpgrade) return;
+    if (widget.planet.resources.cash < building.upgradeCost) return;
+
+    setState(() {
+      // Deduct upgrade cost
+      widget.planet.resources.cash -= building.upgradeCost;
+
+      // Upgrade the building
+      building.upgrade();
+
+      // Update the planet's building data
+      _updatePlanetBuildingLevel(x, y, building.level);
+    });
+
+    _onResourcesChanged();
+  }
+
+  void _updatePlanetBuildingLevel(int x, int y, int newLevel) {
+    // Find and update the building data in the planet
+    final buildingIndex = widget.planet.buildings.indexWhere(
+      (b) => b.x == x && b.y == y,
+    );
+
+    if (buildingIndex != -1) {
+      final oldData = widget.planet.buildings[buildingIndex];
+      widget.planet.buildings[buildingIndex] = oldData.copyWith(
+        level: newLevel,
+      );
+    }
   }
 }
