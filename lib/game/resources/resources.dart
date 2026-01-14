@@ -1,6 +1,12 @@
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 
+// Shared happiness thresholds for consistent UI behavior across the app
+class HappinessThresholds {
+  static const double high = 60.0;
+  static const double low = 30.0;
+}
+
 class Resources {
   Map<ResourceType, double> resources = {
     ResourceType.electricity: 0,
@@ -210,16 +216,35 @@ class Resources {
     if (_populationGrowthAccumulator >= 30) {
       _populationGrowthAccumulator = 0;
 
-      if (happiness >= 60 && unshelteredPopulation <= 0) {
+      if (happiness >= HappinessThresholds.high && unshelteredPopulation <= 0) {
         // High happiness + housing available = population growth
         population++;
         availableWorkers++;
         _lowHappinessStreak = 0;
-      } else if (happiness <= 30) {
+      } else if (happiness <= HappinessThresholds.low) {
         // Low happiness = track streak
         _lowHappinessStreak++;
         // After 2 consecutive low happiness cycles (60s), population shrinks
         if (_lowHappinessStreak >= 2 && population > 1) {
+          // Calculate total assigned workers before population decrease
+          int totalAssignedWorkers = 0;
+          for (final building in buildings) {
+            totalAssignedWorkers += building.assignedWorkers;
+          }
+
+          // If availableWorkers is 0 but there are assigned workers,
+          // forcibly unassign one worker to maintain invariant
+          if (availableWorkers == 0 && totalAssignedWorkers > 0) {
+            // Find a building with assigned workers and unassign one
+            for (final building in buildings) {
+              if (building.assignedWorkers > 0) {
+                building.unassignWorker();
+                // availableWorkers will be recalculated at the end of update()
+                break;
+              }
+            }
+          }
+
           population--;
           if (availableWorkers > 0) {
             availableWorkers--;

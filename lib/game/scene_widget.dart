@@ -907,6 +907,9 @@ class _MainGameWidgetState extends State<MainGameWidget>
     });
 
     _onResourcesChanged();
+
+    // Persist the planet state (including upgraded building level)
+    SaveService.savePlanet(widget.planet);
   }
 
   void _updatePlanetBuildingLevel(int x, int y, int newLevel) {

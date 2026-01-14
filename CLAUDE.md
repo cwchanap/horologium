@@ -107,7 +107,7 @@ flutter test test/resources/resources_test.dart
 flutter analyze --fatal-infos
 
 # Format code (CI enforces this)
-dart format lib test
+dart format --output=none --set-exit-if-changed .
 
 # Build release APK
 flutter build apk
@@ -255,7 +255,7 @@ Procedural terrain generation with biome support. Parallax layers create depth. 
 ### Coding Style
 - Follow Flutter defaults: 2-space indentation, trailing commas for multi-line literals, and `lowerCamelCase` for members
 - Keep Flame components in dedicated files named `<Feature>Component` to ease discovery
-- Run `dart format lib test` before committing; CI enforces these rules
+- Run `dart format --output=none --set-exit-if-changed .` before committing; CI enforces these rules
 - Centralize constants in the relevant manager or `Assets` class rather than scattering magic values
 
 ### Commit Guidelines

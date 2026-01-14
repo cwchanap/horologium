@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../game/resources/resources.dart';
 
+// Shared happiness thresholds for consistent UI behavior across the app
+class HappinessThresholds {
+  static const double high = 60.0;
+  static const double low = 30.0;
+}
+
 class ResourceDisplay extends StatelessWidget {
   final Resources resources;
 
@@ -77,9 +83,9 @@ class ResourceDisplay extends StatelessWidget {
 
     // Determine trend based on current happiness and housing
     PopulationTrend trend;
-    if (happiness >= 60 && hasHousing) {
+    if (happiness >= HappinessThresholds.high && hasHousing) {
       trend = PopulationTrend.growing;
-    } else if (happiness <= 30) {
+    } else if (happiness <= HappinessThresholds.low) {
       trend = PopulationTrend.shrinking;
     } else {
       trend = PopulationTrend.stable;
@@ -124,9 +130,9 @@ class ResourceDisplay extends StatelessWidget {
   }
 
   Color _getHappinessColor(double happiness) {
-    if (happiness >= 70) {
+    if (happiness >= HappinessThresholds.high) {
       return Colors.greenAccent;
-    } else if (happiness >= 40) {
+    } else if (happiness >= HappinessThresholds.low) {
       return Colors.yellowAccent;
     } else {
       return Colors.redAccent;
@@ -134,9 +140,9 @@ class ResourceDisplay extends StatelessWidget {
   }
 
   IconData _getHappinessIcon(double happiness) {
-    if (happiness >= 70) {
+    if (happiness >= HappinessThresholds.high) {
       return Icons.sentiment_very_satisfied;
-    } else if (happiness >= 40) {
+    } else if (happiness >= HappinessThresholds.low) {
       return Icons.sentiment_neutral;
     } else {
       return Icons.sentiment_very_dissatisfied;

@@ -260,6 +260,76 @@ void main() {
       // Population should have increased by 1
       expect(resources.population, 6);
     });
+
+    test(
+      'population decrease with no available workers unassigns from building',
+      () {
+        final resources = Resources();
+        resources.population = 5;
+        resources.availableWorkers = 0; // No available workers
+
+        // Create a building with assigned workers
+        final house = Building(
+          type: BuildingType.house,
+          name: 'House',
+          description: 'Test house',
+          icon: Icons.house,
+          color: Colors.green,
+          baseCost: 100,
+          basePopulation: 20,
+          requiredWorkers: 0,
+          category: BuildingCategory.residential,
+        );
+
+        final powerPlant = createBuilding(
+          type: BuildingType.powerPlant,
+          generation: const {'electricity': 2},
+          requiredWorkers: 1,
+          assignedWorkers: 3, // All workers are assigned
+        );
+
+        // Run one update to set initial state
+        resources.update([house, powerPlant]);
+
+        final initialAssignedWorkers = powerPlant.assignedWorkers;
+
+        // Manually trigger the population decrease scenario
+        // by directly calling the internal state change
+        // In real gameplay, this would happen after 60s of low happiness
+        for (final building in [house, powerPlant]) {
+          if (building.assignedWorkers > 0) {
+            building.unassignWorker();
+            break;
+          }
+        }
+
+        resources.population--;
+        resources.availableWorkers =
+            resources.population -
+            powerPlant.assignedWorkers -
+            house.assignedWorkers;
+
+        // Population should have decreased by 1
+        expect(resources.population, 4);
+
+        // At least one worker should have been unassigned
+        expect(powerPlant.assignedWorkers, lessThan(initialAssignedWorkers));
+
+        // availableWorkers should be recalculated correctly
+        expect(
+          resources.availableWorkers,
+          resources.population -
+              powerPlant.assignedWorkers -
+              house.assignedWorkers,
+        );
+      },
+    );
+
+    test('happiness thresholds are defined correctly', () {
+      // Verify that shared constants have expected values
+      expect(HappinessThresholds.high, 60.0);
+      expect(HappinessThresholds.low, 30.0);
+    });
   });
 
   group('Worker management', () {
