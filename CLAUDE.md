@@ -268,7 +268,7 @@ Procedural terrain generation with biome support. Parallax layers create depth. 
 
 GitHub Actions runs on push/PR to main:
 - `flutter analyze --fatal-infos` - must pass with no warnings
-- `dart format --set-exit-if-changed .` - enforces formatting
+- `dart format --output=none --set-exit-if-changed .` - enforces formatting
 - `flutter test --coverage` - runs all tests
 - Builds debug APK and web artifacts
 

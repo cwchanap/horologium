@@ -226,29 +226,7 @@ class Resources {
         _lowHappinessStreak++;
         // After 2 consecutive low happiness cycles (60s), population shrinks
         if (_lowHappinessStreak >= 2 && population > 1) {
-          // Calculate total assigned workers before population decrease
-          int totalAssignedWorkers = 0;
-          for (final building in buildings) {
-            totalAssignedWorkers += building.assignedWorkers;
-          }
-
-          // If availableWorkers is 0 but there are assigned workers,
-          // forcibly unassign one worker to maintain invariant
-          if (availableWorkers == 0 && totalAssignedWorkers > 0) {
-            // Find a building with assigned workers and unassign one
-            for (final building in buildings) {
-              if (building.assignedWorkers > 0) {
-                building.unassignWorker();
-                // availableWorkers will be recalculated at the end of update()
-                break;
-              }
-            }
-          }
-
-          population--;
-          if (availableWorkers > 0) {
-            availableWorkers--;
-          }
+          decreasePopulation(buildings);
         }
       } else {
         // Medium happiness = reset low streak but no growth
@@ -317,6 +295,39 @@ class Resources {
     if (building.assignedWorkers > 0) {
       building.unassignWorker();
       availableWorkers++;
+    }
+  }
+
+  /// Decreases population by 1, handling worker unassignment if necessary.
+  /// Called when happiness is low for an extended period.
+  /// This maintains the invariant: population = availableWorkers + assignedWorkers
+  void decreasePopulation(List<Building> buildings) {
+    if (population <= 1) return;
+
+    // Calculate total assigned workers BEFORE any changes
+    int totalAssignedWorkers = 0;
+    for (final building in buildings) {
+      totalAssignedWorkers += building.assignedWorkers;
+    }
+
+    // Decrease population
+    population--;
+
+    // Case 1: We have available workers, just decrement them
+    if (availableWorkers > 0) {
+      availableWorkers--;
+    }
+    // Case 2: No available workers but some are assigned to buildings
+    // Unassign one worker from a building to reduce total assigned count
+    else if (totalAssignedWorkers > 0) {
+      for (final building in buildings) {
+        if (building.assignedWorkers > 0) {
+          building.unassignWorker();
+          break;
+        }
+      }
+      // availableWorkers stays 0, totalAssignedWorkers decreases by 1
+      // invariant maintained: (population - 1) = 0 + (totalAssignedWorkers - 1)
     }
   }
 

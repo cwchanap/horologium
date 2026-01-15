@@ -178,6 +178,108 @@ void main() {
     });
   });
 
+  group('Population management', () {
+    test('decreasePopulation does nothing when population is 1', () {
+      final resources = Resources();
+      resources.population = 1;
+      resources.availableWorkers = 0;
+
+      final powerPlant = createBuilding(
+        type: BuildingType.powerPlant,
+        generation: const {'electricity': 2},
+        requiredWorkers: 1,
+        assignedWorkers: 1,
+      );
+
+      final initialPopulation = resources.population;
+      final initialWorkers = powerPlant.assignedWorkers;
+
+      resources.decreasePopulation([powerPlant]);
+
+      // Population should remain at 1 (minimum)
+      expect(resources.population, initialPopulation);
+      // No worker should be unassigned
+      expect(powerPlant.assignedWorkers, initialWorkers);
+    });
+
+    test('decreasePopulation decreases available workers when available', () {
+      final resources = Resources();
+      resources.population = 10;
+      resources.availableWorkers = 3;
+
+      final powerPlant = createBuilding(
+        type: BuildingType.powerPlant,
+        generation: const {'electricity': 2},
+        requiredWorkers: 7, // Increase to allow 7 workers
+        assignedWorkers: 7,
+      );
+
+      resources.decreasePopulation([powerPlant]);
+
+      expect(resources.population, 9);
+      expect(resources.availableWorkers, 2);
+      expect(powerPlant.assignedWorkers, 7);
+    });
+
+    test('decreasePopulation unassigns worker when no available workers', () {
+      final resources = Resources();
+      resources.population = 10;
+      resources.availableWorkers = 0;
+
+      final powerPlant = createBuilding(
+        type: BuildingType.powerPlant,
+        generation: const {'electricity': 2},
+        requiredWorkers: 10, // Allow 10 workers
+        assignedWorkers: 10,
+      );
+
+      resources.decreasePopulation([powerPlant]);
+
+      expect(resources.population, 9);
+      expect(resources.availableWorkers, 0);
+      expect(powerPlant.assignedWorkers, 9);
+    });
+
+    test('decreasePopulation handles mixed building worker assignments', () {
+      final resources = Resources();
+      resources.population = 20;
+      resources.availableWorkers = 0;
+
+      final house = Building(
+        type: BuildingType.house,
+        name: 'House',
+        description: 'Test house',
+        icon: Icons.house,
+        color: Colors.green,
+        baseCost: 100,
+        basePopulation: 20,
+        requiredWorkers: 0,
+        category: BuildingCategory.residential,
+      );
+
+      final powerPlant = createBuilding(
+        type: BuildingType.powerPlant,
+        generation: const {'electricity': 2},
+        requiredWorkers: 10, // Allow 10 workers
+        assignedWorkers: 10,
+      );
+
+      final coalMine = createBuilding(
+        type: BuildingType.coalMine,
+        generation: const {'coal': 1},
+        requiredWorkers: 10, // Allow 10 workers
+        assignedWorkers: 10,
+      );
+
+      resources.decreasePopulation([house, powerPlant, coalMine]);
+
+      expect(resources.population, 19);
+      expect(resources.availableWorkers, 0);
+      // Total assigned workers should be 19
+      expect(powerPlant.assignedWorkers + coalMine.assignedWorkers, 19);
+    });
+  });
+
   group('Happiness system', () {
     test('happiness increases when all factors are satisfied', () {
       final resources = Resources();
@@ -266,7 +368,8 @@ void main() {
       () {
         final resources = Resources();
         resources.population = 5;
-        resources.availableWorkers = 0; // No available workers
+        // Don't set availableWorkers manually, let update() calculate it
+        // We'll call decreasePopulation directly to test the worker unassignment
 
         // Create a building with assigned workers
         final house = Building(
@@ -284,30 +387,17 @@ void main() {
         final powerPlant = createBuilding(
           type: BuildingType.powerPlant,
           generation: const {'electricity': 2},
-          requiredWorkers: 1,
-          assignedWorkers: 3, // All workers are assigned
+          requiredWorkers: 5, // Allow up to 5 workers
+          assignedWorkers: 5, // All workers are assigned
         );
 
-        // Run one update to set initial state
-        resources.update([house, powerPlant]);
+        // Set state to have no available workers (all 5 assigned to powerPlant)
+        resources.availableWorkers = 0;
 
         final initialAssignedWorkers = powerPlant.assignedWorkers;
 
-        // Manually trigger the population decrease scenario
-        // by directly calling the internal state change
-        // In real gameplay, this would happen after 60s of low happiness
-        for (final building in [house, powerPlant]) {
-          if (building.assignedWorkers > 0) {
-            building.unassignWorker();
-            break;
-          }
-        }
-
-        resources.population--;
-        resources.availableWorkers =
-            resources.population -
-            powerPlant.assignedWorkers -
-            house.assignedWorkers;
+        // Trigger population decrease using the production code
+        resources.decreasePopulation([house, powerPlant]);
 
         // Population should have decreased by 1
         expect(resources.population, 4);
