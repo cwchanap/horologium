@@ -420,6 +420,209 @@ void main() {
       expect(HappinessThresholds.high, 60.0);
       expect(HappinessThresholds.low, 30.0);
     });
+
+    test('happiness setter clamps value to valid range', () {
+      final resources = Resources();
+
+      // Test setting above max
+      resources.happiness = 150;
+      expect(resources.happiness, 100);
+
+      // Test setting below min
+      resources.happiness = -50;
+      expect(resources.happiness, 0);
+
+      // Test valid values
+      resources.happiness = 75;
+      expect(resources.happiness, 75);
+    });
+
+    test('population does NOT decrease after only 1 low happiness cycle', () {
+      final resources = Resources();
+      resources.population = 10;
+      resources.availableWorkers = 10;
+      resources.unshelteredPopulation = 10;
+      resources.happiness = 20; // Below low threshold (30)
+
+      final initialPopulation = resources.population;
+
+      // Run exactly 30 cycles (one growth check cycle)
+      for (int i = 0; i < 30; i++) {
+        resources.update([]);
+      }
+
+      // Population should NOT have decreased after just 1 low happiness cycle
+      expect(resources.population, initialPopulation);
+    });
+
+    test('population decreases after 2 consecutive low happiness cycles', () {
+      final resources = Resources();
+      resources.population = 10;
+      resources.availableWorkers = 10;
+      resources.unshelteredPopulation = 10;
+      resources.happiness = 20; // Below low threshold (30)
+
+      final initialPopulation = resources.population;
+
+      // Run 60 cycles (two growth check cycles at 30 seconds each)
+      for (int i = 0; i < 60; i++) {
+        resources.update([]);
+      }
+
+      // Population should have decreased after 2 consecutive low happiness cycles
+      expect(resources.population, initialPopulation - 1);
+    });
+
+    test('low happiness streak resets when happiness rises above threshold', () {
+      final resources = Resources();
+      resources.population = 10;
+      resources.availableWorkers = 10;
+      resources.unshelteredPopulation = 10;
+      resources.happiness = 20; // Below low threshold
+
+      final initialPopulation = resources.population;
+
+      // Run 30 cycles (one low happiness cycle) - no buildings means happiness stays low
+      for (int i = 0; i < 30; i++) {
+        resources.update([]);
+      }
+
+      // Population should still be the same (only 1 low cycle, need 2)
+      expect(resources.population, initialPopulation);
+
+      // Now provide moderate conditions that raise happiness above low threshold
+      // but below high threshold (so no growth triggers, just streak reset)
+      final house = Building(
+        type: BuildingType.house,
+        name: 'House',
+        description: 'Test house',
+        icon: Icons.house,
+        color: Colors.green,
+        baseCost: 100,
+        basePopulation: 10, // Full housing
+        requiredWorkers: 0,
+        category: BuildingCategory.residential,
+      );
+
+      // Add employment via a building with assigned workers (partial employment)
+      // Note: update() recalculates availableWorkers, so we need actual assigned workers
+      final factory = createBuilding(
+        type: BuildingType.woodFactory,
+        generation: const {'wood': 1},
+        requiredWorkers: 5, // Allow 5 workers
+        assignedWorkers: 5, // 5 workers employed = 50% employment
+      );
+
+      // With house + factory:
+      // Housing = 100% * 0.30 = 30
+      // Employment = 50% * 0.20 = 10
+      // Food = 0%, Services = 0%
+      // Target happiness = 40 (above 30, below 60)
+
+      for (int i = 0; i < 50; i++) {
+        // Run enough cycles for happiness to stabilize
+        resources.update([house, factory]);
+      }
+
+      // Happiness should be above low threshold (30) but below high (60)
+      expect(resources.happiness, greaterThan(HappinessThresholds.low));
+      expect(resources.happiness, lessThan(HappinessThresholds.high));
+      expect(resources.population, initialPopulation);
+
+      // Now remove housing and employment to drop happiness again
+      resources.availableWorkers = 10; // No one employed
+      resources.resources[ResourceType.bread] = 0;
+      resources.resources[ResourceType.water] = 0;
+      resources.resources[ResourceType.electricity] = 0;
+
+      // Run 60 more cycles with bad conditions (need 2 consecutive low cycles again)
+      for (int i = 0; i < 60; i++) {
+        resources.update([]);
+      }
+
+      // Now population should have decreased (after 2 fresh low happiness cycles)
+      expect(resources.population, initialPopulation - 1);
+    });
+
+    test(
+      'population does not grow when happiness is high but no housing available',
+      () {
+        final resources = Resources();
+        resources.population = 10;
+        resources.availableWorkers = 0;
+        resources.unshelteredPopulation = 5; // Some people unsheltered
+        resources.happiness = 80; // High happiness
+
+        final initialPopulation = resources.population;
+
+        // Run 31 update cycles (past one growth check)
+        for (int i = 0; i < 31; i++) {
+          resources.update([]);
+        }
+
+        // Population should NOT have increased because unshelteredPopulation > 0
+        expect(resources.population, initialPopulation);
+      },
+    );
+
+    test('happiness factor weights contribute proportionally', () {
+      // Create house that provides accommodation
+      final house = Building(
+        type: BuildingType.house,
+        name: 'House',
+        description: 'Test house',
+        icon: Icons.house,
+        color: Colors.green,
+        baseCost: 100,
+        basePopulation: 10, // Provides housing for 10
+        requiredWorkers: 0,
+        category: BuildingCategory.residential,
+      );
+
+      // Test housing-only scenario (30% weight)
+      final resourcesHousing = Resources();
+      resourcesHousing.population = 10;
+      resourcesHousing.availableWorkers = 10; // No employment
+      resourcesHousing.resources[ResourceType.bread] = 0; // No food
+      resourcesHousing.resources[ResourceType.water] = 0; // No services
+      resourcesHousing.resources[ResourceType.electricity] = 0;
+      resourcesHousing.happiness = 0;
+
+      // Run many cycles to let happiness stabilize with house providing shelter
+      for (int i = 0; i < 100; i++) {
+        resourcesHousing.update([house]);
+      }
+
+      // Housing = 100%, Food = 0%, Services = 0%, Employment = 0%
+      // Expected: 100*0.30 + 0*0.25 + 0*0.25 + 0*0.20 = 30
+      expect(resourcesHousing.happiness, closeTo(30, 5));
+
+      // Test employment-only scenario (20% weight)
+      // Need a building that has workers assigned to create employment
+      final coalMine = createBuilding(
+        type: BuildingType.coalMine,
+        generation: const {'coal': 1},
+        requiredWorkers: 10, // Allow 10 workers
+        assignedWorkers: 10, // All workers assigned = full employment
+      );
+
+      final resourcesEmployment = Resources();
+      resourcesEmployment.population = 10;
+      // update() will calculate availableWorkers from buildings
+      resourcesEmployment.resources[ResourceType.bread] = 0;
+      resourcesEmployment.resources[ResourceType.water] = 0;
+      resourcesEmployment.resources[ResourceType.electricity] = 0;
+      resourcesEmployment.happiness = 0;
+
+      // Run with no house (no housing) but with all workers employed
+      for (int i = 0; i < 100; i++) {
+        resourcesEmployment.update([coalMine]);
+      }
+
+      // Housing = 0%, Food = 0%, Services = 0%, Employment = 100%
+      // Expected: 0*0.30 + 0*0.25 + 0*0.25 + 100*0.20 = 20
+      expect(resourcesEmployment.happiness, closeTo(20, 5));
+    });
   });
 
   group('Worker management', () {

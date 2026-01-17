@@ -34,9 +34,15 @@ class Resources {
   int unshelteredPopulation = 20;
 
   // Happiness system (0-100 scale)
-  double happiness = 50.0;
+  double _happiness = 50.0;
   int _populationGrowthAccumulator = 0; // Counts seconds for 30s growth cycle
   int _lowHappinessStreak = 0; // Counts consecutive low happiness cycles
+
+  /// Happiness value clamped to valid range [0, 100]
+  double get happiness => _happiness;
+  set happiness(double value) {
+    _happiness = value.clamp(0, 100);
+  }
 
   // Track research accumulation (seconds)
   double _researchAccumulator = 0;
@@ -208,8 +214,7 @@ class Resources {
         (employmentFactor * employmentWeight);
 
     // Smooth transition (gradual change for better UX)
-    happiness = happiness * 0.9 + newHappiness * 0.1;
-    happiness = happiness.clamp(0, 100);
+    _happiness = (_happiness * 0.9 + newHappiness * 0.1).clamp(0, 100);
 
     // Population growth/shrinkage every 30 seconds
     _populationGrowthAccumulator++;

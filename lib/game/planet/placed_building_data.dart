@@ -16,7 +16,8 @@ class PlacedBuildingData {
     this.level = 1,
     this.assignedWorkers = 0,
     this.variant,
-  });
+  }) : assert(level >= 1, 'level must be at least 1'),
+       assert(assignedWorkers >= 0, 'assignedWorkers cannot be negative');
 
   /// Convert to string format for persistence
   /// Format: "x,y,BuildingName,level,assignedWorkers"
