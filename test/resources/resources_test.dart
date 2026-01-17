@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/building/category.dart';
 import 'package:horologium/game/resources/resources.dart';
 import 'package:horologium/game/resources/resource_type.dart';
+import 'package:horologium/game/research/research.dart';
+import 'package:horologium/game/services/save_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -677,6 +680,59 @@ void main() {
 
       expect(building.assignedWorkers, 0);
       expect(resources.availableWorkers, 6);
+    });
+  });
+
+  group('Happiness persistence', () {
+    test(
+      'saveGameState and loadGameState persist happiness correctly',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+
+        final resources = Resources();
+        resources.happiness = 75.0;
+        resources.cash = 500.0;
+        resources.population = 30;
+
+        final researchManager = ResearchManager();
+
+        // Save game state
+        await SaveService.saveGameState(
+          resources: resources,
+          researchManager: researchManager,
+        );
+
+        // Create new resources to load into
+        final loadedResources = Resources();
+        final loadedResearchManager = ResearchManager();
+
+        // Load game state
+        await SaveService.loadGameState(
+          resources: loadedResources,
+          researchManager: loadedResearchManager,
+        );
+
+        // Verify happiness was persisted correctly
+        expect(loadedResources.happiness, 75.0);
+        expect(loadedResources.cash, 500.0);
+        expect(loadedResources.population, 30);
+      },
+    );
+
+    test('loadGameState uses default happiness when not saved', () async {
+      SharedPreferences.setMockInitialValues({});
+
+      final resources = Resources();
+      final researchManager = ResearchManager();
+
+      // Load game state without any saved happiness
+      await SaveService.loadGameState(
+        resources: resources,
+        researchManager: researchManager,
+      );
+
+      // Verify default happiness value is used
+      expect(resources.happiness, 50.0);
     });
   });
 }

@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../game/resources/resources.dart';
 
-// Shared happiness thresholds for consistent UI behavior across the app
-class HappinessThresholds {
-  static const double high = 60.0;
-  static const double low = 30.0;
-}
-
 class ResourceDisplay extends StatelessWidget {
   final Resources resources;
 
