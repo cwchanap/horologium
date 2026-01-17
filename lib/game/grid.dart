@@ -152,6 +152,10 @@ class Grid extends PositionComponent with HasGameReference {
     return _buildings.values.toSet().map((b) => b.building).toList();
   }
 
+  List<PlacedBuilding> getAllPlacedBuildings() {
+    return _buildings.values.toSet().toList();
+  }
+
   bool isCellOccupied(int x, int y) {
     final key = '$x,$y';
     return _buildings.containsKey(key);

@@ -340,8 +340,37 @@ class _MainGameWidgetState extends State<MainGameWidget>
     await prefs.setDouble('terrain.edgeGamma', edgeGamma);
   }
 
+  void _syncPlanetFromGrid() {
+    // Sync current building state (level, assignedWorkers) from grid to planet
+    if (!_game.hasLoaded) return;
+
+    final placedBuildings = _game.grid.getAllPlacedBuildings();
+    for (final placedBuilding in placedBuildings) {
+      final building = placedBuilding.building;
+
+      // Update the planet's PlacedBuildingData with current state
+      final existingData = widget.planet.getBuildingAt(
+        placedBuilding.x,
+        placedBuilding.y,
+      );
+      if (existingData != null) {
+        final newData = existingData.copyWith(
+          level: building.level,
+          assignedWorkers: building.assignedWorkers,
+        );
+        widget.planet.updateBuildingAt(
+          placedBuilding.x,
+          placedBuilding.y,
+          newData,
+        );
+      }
+    }
+  }
+
   void _onResourcesChanged() {
     setState(() {
+      // Sync worker assignments from grid to planet before saving
+      _syncPlanetFromGrid();
       PersistenceManager.saveResources(
         widget.planet.resources,
         _gameStateManager.researchManager,
@@ -913,16 +942,11 @@ class _MainGameWidgetState extends State<MainGameWidget>
   }
 
   void _updatePlanetBuildingLevel(int x, int y, int newLevel) {
-    // Find and update the building data in the planet
-    final buildingIndex = widget.planet.buildings.indexWhere(
-      (b) => b.x == x && b.y == y,
-    );
-
-    if (buildingIndex != -1) {
-      final oldData = widget.planet.buildings[buildingIndex];
-      widget.planet.buildings[buildingIndex] = oldData.copyWith(
-        level: newLevel,
-      );
+    // Update the building data in the planet using the mutable API
+    final oldData = widget.planet.getBuildingAt(x, y);
+    if (oldData != null) {
+      final newData = oldData.copyWith(level: newLevel);
+      widget.planet.updateBuildingAt(x, y, newData);
     }
   }
 }
