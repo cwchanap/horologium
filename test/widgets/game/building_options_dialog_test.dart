@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/building/category.dart';
+import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/widgets/game/building_options_dialog.dart';
 
 void main() {
@@ -209,6 +210,127 @@ void main() {
 
       // Should show production stats
       expect(find.textContaining('electricity'), findsWidgets);
+    });
+
+    testWidgets(
+      'shows production stats for Field with crop generation override',
+      (WidgetTester tester) async {
+        final field = Field(
+          type: BuildingType.field,
+          name: 'Field',
+          description: 'Grows crops',
+          icon: Icons.grass,
+          color: Colors.lightGreen,
+          baseCost: 50,
+          requiredWorkers: 1,
+          category: BuildingCategory.foodResources,
+          cropType: CropType.wheat,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: BuildingOptionsDialog(
+                building: field,
+                currentCash: 1000,
+                onUpgrade: () {},
+                onDelete: () {},
+              ),
+            ),
+          ),
+        );
+
+        // Should show current level production
+        expect(find.textContaining('wheat'), findsWidgets);
+        expect(find.textContaining('1.0'), findsWidgets);
+
+        // Upgrade preview should show next level production
+        expect(find.textContaining('Level 2 Preview'), findsOneWidget);
+        expect(find.textContaining('2.0'), findsWidgets);
+      },
+    );
+
+    testWidgets(
+      'shows production and consumption stats for Bakery with override',
+      (WidgetTester tester) async {
+        final bakery = Bakery(
+          type: BuildingType.bakery,
+          name: 'Bakery',
+          description: 'Produces bread from flour.',
+          icon: Icons.bakery_dining,
+          color: Colors.orange,
+          baseCost: 150,
+          requiredWorkers: 1,
+          category: BuildingCategory.refinement,
+          productType: BakeryProduct.bread,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: BuildingOptionsDialog(
+                building: bakery,
+                currentCash: 1000,
+                onUpgrade: () {},
+                onDelete: () {},
+              ),
+            ),
+          ),
+        );
+
+        // Should show current level production and consumption
+        expect(find.textContaining('bread'), findsWidgets);
+        expect(find.textContaining('flour'), findsWidgets);
+        expect(find.textContaining('1.0'), findsWidgets);
+        expect(find.textContaining('2.0'), findsWidgets);
+
+        // Upgrade preview should show next level production and consumption
+        expect(find.textContaining('Level 2 Preview'), findsOneWidget);
+        expect(
+          find.textContaining('2.0'),
+          findsWidgets,
+        ); // Next level bread: 2.0
+        expect(
+          find.textContaining('4.0'),
+          findsWidgets,
+        ); // Next level flour: 4.0
+      },
+    );
+
+    testWidgets('shows correct stats for Bakery with pastries product type', (
+      WidgetTester tester,
+    ) async {
+      final bakery = Bakery(
+        type: BuildingType.bakery,
+        name: 'Bakery',
+        description: 'Produces pastries from flour.',
+        icon: Icons.bakery_dining,
+        color: Colors.orange,
+        baseCost: 150,
+        requiredWorkers: 1,
+        category: BuildingCategory.refinement,
+        productType: BakeryProduct.pastries,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: BuildingOptionsDialog(
+              building: bakery,
+              currentCash: 1000,
+              onUpgrade: () {},
+              onDelete: () {},
+            ),
+          ),
+        ),
+      );
+
+      // Should show pastries production
+      expect(find.textContaining('pastries'), findsWidgets);
+      expect(find.textContaining('1.0'), findsWidgets);
+
+      // Upgrade preview should show next level stats
+      expect(find.textContaining('Level 2 Preview'), findsOneWidget);
     });
   });
 }

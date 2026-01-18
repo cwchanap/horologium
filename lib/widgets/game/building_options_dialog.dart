@@ -181,6 +181,18 @@ class BuildingOptionsDialog extends StatelessWidget {
 
   Widget _buildUpgradePreview() {
     final nextLevel = building.level + 1;
+    final levelMultiplier = nextLevel / building.level;
+
+    // Calculate next level generation/consumption by scaling current values
+    final nextGeneration = <String, double>{};
+    for (final entry in building.generation.entries) {
+      nextGeneration[entry.key] = entry.value * levelMultiplier;
+    }
+
+    final nextConsumption = <String, double>{};
+    for (final entry in building.consumption.entries) {
+      nextConsumption[entry.key] = entry.value * levelMultiplier;
+    }
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -211,32 +223,26 @@ class BuildingOptionsDialog extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          if (building.baseGeneration.isNotEmpty)
+          if (nextGeneration.isNotEmpty)
             _buildStatRow(
               'Produces',
-              building.baseGeneration.entries
-                  .map(
-                    (e) =>
-                        '${(e.value * nextLevel).toStringAsFixed(1)} ${e.key}',
-                  )
+              nextGeneration.entries
+                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key}')
                   .join(', '),
               Colors.greenAccent,
             ),
-          if (building.baseConsumption.isNotEmpty)
+          if (nextConsumption.isNotEmpty)
             _buildStatRow(
               'Consumes',
-              building.baseConsumption.entries
-                  .map(
-                    (e) =>
-                        '${(e.value * nextLevel).toStringAsFixed(1)} ${e.key}',
-                  )
+              nextConsumption.entries
+                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key}')
                   .join(', '),
               Colors.orangeAccent,
             ),
-          if (building.basePopulation > 0)
+          if (building.accommodationCapacity > 0)
             _buildStatRow(
               'Houses',
-              '${building.basePopulation * nextLevel} people',
+              '${(building.accommodationCapacity * levelMultiplier).toStringAsFixed(0)} people',
               Colors.blueAccent,
             ),
         ],

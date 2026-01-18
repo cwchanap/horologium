@@ -334,6 +334,9 @@ class Resources {
       // availableWorkers stays 0, totalAssignedWorkers decreases by 1
       // invariant maintained: (population - 1) = 0 + (totalAssignedWorkers - 1)
     }
+
+    // Reset the low happiness streak to maintain 60s interval
+    _lowHappinessStreak = 0;
   }
 
   // Buy resource using cash (cost = resource value * 10)

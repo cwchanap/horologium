@@ -547,6 +547,40 @@ void main() {
       expect(resources.population, initialPopulation - 1);
     });
 
+    test('low happiness streak resets after population decreases', () {
+      final resources = Resources();
+      resources.population = 10;
+      resources.availableWorkers = 10;
+      resources.unshelteredPopulation = 10;
+      resources.happiness = 20; // Below low threshold
+
+      final initialPopulation = resources.population;
+
+      // Run 60 cycles to trigger first population decrease (2 consecutive low cycles)
+      for (int i = 0; i < 60; i++) {
+        resources.update([]);
+      }
+
+      // Population should have decreased by 1
+      expect(resources.population, initialPopulation - 1);
+
+      // Run another 30 cycles (one more low happiness cycle)
+      for (int i = 0; i < 30; i++) {
+        resources.update([]);
+      }
+
+      // Population should NOT have decreased again (streak should have reset)
+      expect(resources.population, initialPopulation - 1);
+
+      // Run another 30 cycles to complete the second 60s interval
+      for (int i = 0; i < 30; i++) {
+        resources.update([]);
+      }
+
+      // Now population should decrease again (after 2 fresh low cycles)
+      expect(resources.population, initialPopulation - 2);
+    });
+
     test(
       'population does not grow when happiness is high but no housing available',
       () {
