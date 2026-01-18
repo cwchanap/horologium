@@ -146,5 +146,96 @@ void main() {
       // Assert - Building removed from persistence
       expect(loadedPlanet.buildings, isEmpty);
     });
+
+    test('worker assignments are persisted with planet state', () async {
+      // Arrange - Place a building that requires workers
+      final building = BuildingRegistry.availableBuildings
+          .where(
+            (b) => b.type == BuildingType.powerPlant && b.requiredWorkers > 0,
+          )
+          .first;
+      grid.placeBuilding(5, 5, building);
+
+      // Act - Assign worker and update planet
+      final buildingInGrid = grid.getBuildingAt(5, 5)!;
+      buildingInGrid.assignWorker(); // Assign 1 worker
+
+      // Sync - worker assignments to planet (simulates _syncPlanetFromGrid)
+      final placedBuildings = grid.getAllPlacedBuildings();
+      for (final placedBuilding in placedBuildings) {
+        final b = placedBuilding.building;
+        final existingData = planet.getBuildingAt(
+          placedBuilding.x,
+          placedBuilding.y,
+        );
+        if (existingData != null) {
+          final newData = existingData.copyWith(
+            level: b.level,
+            assignedWorkers: b.assignedWorkers,
+          );
+          planet.updateBuildingAt(placedBuilding.x, placedBuilding.y, newData);
+        }
+      }
+
+      // Save planet (simulates what _onResourcesChanged should do)
+      await SaveService.savePlanet(planet);
+
+      // Assert - Verify planet has worker assignments
+      expect(planet.getBuildingAt(5, 5)!.assignedWorkers, equals(1));
+
+      // Act - Load fresh planet from storage
+      final loadedPlanet = await SaveService.loadOrCreatePlanet('earth');
+
+      // Assert - Worker assignments persisted correctly
+      final loadedBuilding = loadedPlanet.getBuildingAt(5, 5);
+      expect(loadedBuilding, isNotNull);
+      expect(loadedBuilding!.type, equals(BuildingType.powerPlant));
+      expect(loadedBuilding.assignedWorkers, equals(1));
+    });
+
+    test('building levels are persisted with planet state', () async {
+      // Arrange - Place a building
+      final building = BuildingRegistry.availableBuildings
+          .where((b) => b.type == BuildingType.house)
+          .first;
+      grid.placeBuilding(3, 3, building);
+
+      // Act - Upgrade building and update planet
+      final buildingInGrid = grid.getBuildingAt(3, 3)!;
+      buildingInGrid.upgrade();
+      buildingInGrid.upgrade(); // Level 3
+
+      // Sync the level changes to planet (simulates _syncPlanetFromGrid)
+      final placedBuildings = grid.getAllPlacedBuildings();
+      for (final placedBuilding in placedBuildings) {
+        final b = placedBuilding.building;
+        final existingData = planet.getBuildingAt(
+          placedBuilding.x,
+          placedBuilding.y,
+        );
+        if (existingData != null) {
+          final newData = existingData.copyWith(
+            level: b.level,
+            assignedWorkers: b.assignedWorkers,
+          );
+          planet.updateBuildingAt(placedBuilding.x, placedBuilding.y, newData);
+        }
+      }
+
+      // Save planet (simulates what _onResourcesChanged should do)
+      await SaveService.savePlanet(planet);
+
+      // Assert - Verify planet has the updated level
+      expect(planet.getBuildingAt(3, 3)!.level, equals(3));
+
+      // Act - Load fresh planet from storage
+      final loadedPlanet = await SaveService.loadOrCreatePlanet('earth');
+
+      // Assert - Building level persisted correctly
+      final loadedBuilding = loadedPlanet.getBuildingAt(3, 3);
+      expect(loadedBuilding, isNotNull);
+      expect(loadedBuilding!.type, equals(BuildingType.house));
+      expect(loadedBuilding.level, equals(3));
+    });
   });
 }

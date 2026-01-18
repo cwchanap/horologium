@@ -375,6 +375,8 @@ class _MainGameWidgetState extends State<MainGameWidget>
         widget.planet.resources,
         _gameStateManager.researchManager,
       );
+      // Persist the updated planet state (including assignedWorkers and building levels)
+      SaveService.savePlanet(widget.planet);
     });
   }
 
