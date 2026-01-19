@@ -602,6 +602,44 @@ void main() {
       },
     );
 
+    test(
+      'population does not grow when happiness is high but housing is exactly full',
+      () {
+        final resources = Resources();
+        resources.population = 10;
+        resources.availableWorkers = 0;
+        resources.unshelteredPopulation = 0; // Will be set to 0 (full housing)
+        resources.happiness = 80; // High happiness
+        resources.resources[ResourceType.bread] = 100;
+        resources.resources[ResourceType.water] = 100;
+        resources.resources[ResourceType.electricity] = 100;
+
+        // Create housing that exactly matches population
+        final house = Building(
+          type: BuildingType.house,
+          name: 'House',
+          description: 'Test house',
+          icon: Icons.house,
+          color: Colors.green,
+          baseCost: 100,
+          basePopulation: 10, // Exactly matches population
+          requiredWorkers: 0,
+          category: BuildingCategory.residential,
+        );
+
+        final initialPopulation = resources.population;
+
+        // Run 31 update cycles (past one growth check)
+        for (int i = 0; i < 31; i++) {
+          resources.update([house]);
+        }
+
+        // Population should NOT have increased because housing is exactly full
+        // (no spare capacity)
+        expect(resources.population, initialPopulation);
+      },
+    );
+
     test('happiness factor weights contribute proportionally', () {
       // Create house that provides accommodation
       final house = Building(

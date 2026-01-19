@@ -221,7 +221,8 @@ class Resources {
     if (_populationGrowthAccumulator >= 30) {
       _populationGrowthAccumulator = 0;
 
-      if (happiness >= HappinessThresholds.high && unshelteredPopulation <= 0) {
+      if (happiness >= HappinessThresholds.high &&
+          totalAccommodation > population) {
         // High happiness + housing available = population growth
         population++;
         availableWorkers++;
