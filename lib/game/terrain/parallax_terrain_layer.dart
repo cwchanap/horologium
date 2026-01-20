@@ -1,6 +1,7 @@
 import 'package:flame/components.dart';
 import 'package:flame/extensions.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'terrain_assets.dart';
 import 'terrain_biome.dart';
@@ -19,6 +20,8 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
   bool enableParallax = false;
 
   final Map<String, Sprite> _spriteCache = {};
+  Set<String>? _manifestAssets;
+  static const String _assetPrefix = 'assets/images/';
   late double _parallaxSpeed;
 
   ParallaxTerrainLayer({
@@ -57,6 +60,7 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
   Future<void> _loadSprites() async {
     // Load sprites for terrain types and features that appear on this depth
     final config = TerrainDepthManager.getConfig(depth);
+    _manifestAssets ??= await _loadManifestAssets();
 
     // Load terrain base sprites
     for (final terrainType in config.allowedTerrainTypes) {
@@ -83,6 +87,9 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
 
   /// Safely loads a sprite with fallback handling for missing assets
   Future<Sprite?> _loadSpriteWithFallback(String path) async {
+    if (!_assetExists(path)) {
+      return null;
+    }
     try {
       // Simple try-catch approach - if asset exists, load it
       // If not, return null and we'll use fallback rendering
@@ -92,6 +99,23 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
       // Return null to use fallback rendering
       return null;
     }
+  }
+
+  Future<Set<String>> _loadManifestAssets() async {
+    try {
+      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+      return manifest.listAssets().toSet();
+    } catch (_) {
+      return <String>{};
+    }
+  }
+
+  bool _assetExists(String path) {
+    final manifestAssets = _manifestAssets;
+    if (manifestAssets == null) {
+      return true;
+    }
+    return manifestAssets.contains('$_assetPrefix$path');
   }
 
   @override
