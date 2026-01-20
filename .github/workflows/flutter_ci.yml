@@ -57,7 +57,7 @@ jobs:
       run: flutter build apk --debug
       
     - name: Build Web
-      run: flutter build web --web-renderer html
+      run: flutter build web
       
     - name: Upload test results
       uses: actions/upload-artifact@v4
