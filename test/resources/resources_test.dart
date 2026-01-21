@@ -807,4 +807,104 @@ void main() {
       expect(resources.happiness, 50.0);
     });
   });
+
+  group('hasSpareHousingCapacity', () {
+    test('returns true when accommodation exceeds population', () {
+      final resources = Resources();
+      resources.population = 10;
+
+      // Create houses with total capacity > population (12 > 10)
+      // We need to create Building objects directly to set basePopulation
+      final buildings = List.generate(
+        6,
+        (i) => Building(
+          type: BuildingType.house,
+          name: 'House $i',
+          description: 'Test house',
+          icon: Icons.home,
+          color: Colors.green,
+          baseCost: 100,
+          baseGeneration: {},
+          baseConsumption: {},
+          basePopulation: 2, // Each house accommodates 2 people
+          requiredWorkers: 0,
+          category: BuildingCategory.residential,
+        ),
+      );
+      // 6 houses * 2 people = 12 total accommodation > 10 population
+
+      resources.update(buildings);
+
+      expect(resources.hasSpareHousingCapacity(), isTrue);
+      expect(resources.totalAccommodation, 12);
+    });
+
+    test('returns false when accommodation equals population', () {
+      final resources = Resources();
+      resources.population = 10;
+
+      // Create houses with exact capacity for population (10 = 10)
+      final houses = List.generate(
+        5,
+        (i) => Building(
+          type: BuildingType.house,
+          name: 'House $i',
+          description: 'Test house',
+          icon: Icons.home,
+          color: Colors.green,
+          baseCost: 100,
+          baseGeneration: {},
+          baseConsumption: {},
+          basePopulation: 2, // Each house accommodates 2 people
+          requiredWorkers: 0,
+          category: BuildingCategory.residential,
+        ),
+      );
+      // 5 houses * 2 people = 10 total accommodation = 10 population
+
+      resources.update(houses);
+
+      expect(resources.hasSpareHousingCapacity(), isFalse);
+      expect(resources.totalAccommodation, 10);
+    });
+
+    test('returns false when accommodation is less than population', () {
+      final resources = Resources();
+      resources.population = 20;
+
+      // Create houses with insufficient capacity (10 < 20)
+      final houses = List.generate(
+        5,
+        (i) => Building(
+          type: BuildingType.house,
+          name: 'House $i',
+          description: 'Test house',
+          icon: Icons.home,
+          color: Colors.green,
+          baseCost: 100,
+          baseGeneration: {},
+          baseConsumption: {},
+          basePopulation: 2, // Each house accommodates 2 people
+          requiredWorkers: 0,
+          category: BuildingCategory.residential,
+        ),
+      );
+      // 5 houses * 2 people = 10 total accommodation < 20 population
+
+      resources.update(houses);
+
+      expect(resources.hasSpareHousingCapacity(), isFalse);
+      expect(resources.totalAccommodation, 10);
+    });
+
+    test('returns false when no houses exist', () {
+      final resources = Resources();
+      resources.population = 10;
+
+      resources.update([]);
+
+      expect(resources.hasSpareHousingCapacity(), isFalse);
+      expect(resources.totalAccommodation, 0);
+    });
+  });
 }

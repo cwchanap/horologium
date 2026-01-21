@@ -32,6 +32,7 @@ class Resources {
   int population = 20; // Starting population
   int availableWorkers = 20; // Workers not assigned to buildings
   int unshelteredPopulation = 20;
+  int totalAccommodation = 0; // Total housing capacity from all buildings
 
   // Happiness system (0-100 scale)
   double _happiness = 50.0;
@@ -49,7 +50,7 @@ class Resources {
 
   void update(List<Building> buildings) {
     // Calculate accommodation capacity
-    int totalAccommodation = 0;
+    totalAccommodation = 0;
     for (final building in buildings) {
       if (building.type == BuildingType.house ||
           building.type == BuildingType.largeHouse) {
@@ -284,6 +285,11 @@ class Resources {
       resources[ResourceType.maltedBarley] = value;
   set bread(double value) => resources[ResourceType.bread] = value;
   set pastries(double value) => resources[ResourceType.pastries] = value;
+
+  /// Returns true if there is spare housing capacity for population growth
+  bool hasSpareHousingCapacity() {
+    return totalAccommodation > population;
+  }
 
   // Helper methods for worker management
   bool canAssignWorkerTo(Building building) {

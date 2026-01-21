@@ -73,11 +73,11 @@ class ResourceDisplay extends StatelessWidget {
 
   Widget _buildPopulationRow() {
     final happiness = resources.happiness;
-    final hasHousing = resources.unshelteredPopulation <= 0;
+    final hasSpareHousing = resources.hasSpareHousingCapacity();
 
-    // Determine trend based on current happiness and housing
+    // Determine trend based on current happiness and spare housing capacity
     PopulationTrend trend;
-    if (happiness >= HappinessThresholds.high && hasHousing) {
+    if (happiness >= HappinessThresholds.high && hasSpareHousing) {
       trend = PopulationTrend.growing;
     } else if (happiness <= HappinessThresholds.low) {
       trend = PopulationTrend.shrinking;
