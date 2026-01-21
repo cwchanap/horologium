@@ -115,6 +115,7 @@ void main() {
         expect(restored, isNotNull, reason: 'Failed for $type');
         expect(restored!.type, type);
         expect(restored.level, 2);
+        expect(restored.assignedWorkers, 1);
       }
     });
   });

@@ -33,7 +33,7 @@ void main() {
       expect(find.text('25'), findsOneWidget); // Research
       expect(find.text('75%'), findsOneWidget); // Happiness
       expect(find.text('100'), findsOneWidget); // Population
-      // Note: availableWorkers = 50, but happiness also shows 50 by default if not set
+      // Note: availableWorkers = 50; happiness is explicitly set to 75%.
 
       // Check that icons are present
       expect(find.byIcon(Icons.attach_money), findsOneWidget);
@@ -234,6 +234,7 @@ void main() {
         baseCost: 100,
         baseGeneration: {},
         baseConsumption: {},
+        basePopulation: 4,
         requiredWorkers: 0,
         category: BuildingCategory.residential,
       );
@@ -268,6 +269,7 @@ void main() {
         baseCost: 100,
         baseGeneration: {},
         baseConsumption: {},
+        basePopulation: 2,
         requiredWorkers: 0,
         category: BuildingCategory.residential,
       );
