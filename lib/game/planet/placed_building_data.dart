@@ -49,10 +49,14 @@ class PlacedBuildingData {
     if (type == null) return null;
 
     // Parse level (default to 1 for backward compatibility)
-    final level = parts.length > 3 ? int.tryParse(parts[3]) ?? 1 : 1;
+    final parsedLevel = parts.length > 3 ? int.tryParse(parts[3]) : null;
+    final level = (parsedLevel == null || parsedLevel < 1) ? 1 : parsedLevel;
 
     // Parse assigned workers (default to 0 for backward compatibility)
-    final assignedWorkers = parts.length > 4 ? int.tryParse(parts[4]) ?? 0 : 0;
+    final parsedWorkers = parts.length > 4 ? int.tryParse(parts[4]) : null;
+    final assignedWorkers = (parsedWorkers == null || parsedWorkers < 0)
+        ? 0
+        : parsedWorkers;
 
     return PlacedBuildingData(
       x: x,

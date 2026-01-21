@@ -17,6 +17,7 @@ import 'managers/input_handler.dart';
 import 'managers/persistence_manager.dart';
 import 'planet/index.dart';
 import 'services/resource_service.dart';
+import 'services/planet_save_debouncer.dart';
 import 'services/save_service.dart';
 
 class MainGameWidget extends StatefulWidget {
@@ -45,6 +46,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
   bool _musicEnabled = true;
   double _musicVolume = 0.5;
   AudioPlayer? _bgm;
+  final PlanetSaveDebouncer _planetSaveDebouncer = PlanetSaveDebouncer();
 
   @override
   void initState() {
@@ -112,6 +114,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
   @override
   void dispose() {
     _gameStateManager.dispose();
+    _planetSaveDebouncer.dispose();
     // Stop and dispose background music only if started
     if (_bgmStarted) {
       try {
@@ -368,6 +371,10 @@ class _MainGameWidgetState extends State<MainGameWidget>
   }
 
   void _onResourcesChanged() {
+    _handleResourcesChanged();
+  }
+
+  void _handleResourcesChanged({bool immediateSave = false}) {
     setState(() {
       // Sync worker assignments from grid to planet before saving
       _syncPlanetFromGrid();
@@ -375,9 +382,15 @@ class _MainGameWidgetState extends State<MainGameWidget>
         widget.planet.resources,
         _gameStateManager.researchManager,
       );
-      // Persist the updated planet state (including assignedWorkers and building levels)
-      SaveService.savePlanet(widget.planet);
     });
+    _schedulePlanetSave(immediateSave: immediateSave);
+  }
+
+  void _schedulePlanetSave({bool immediateSave = false}) {
+    _planetSaveDebouncer.schedule(
+      () => SaveService.savePlanet(widget.planet),
+      immediate: immediateSave,
+    );
   }
 
   void _onPlanetChanged(Planet planet) {
@@ -917,7 +930,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
         setState(() {
           ResourceService.refundBuilding(widget.planet.resources, building);
         });
-        _onResourcesChanged();
+        _handleResourcesChanged(immediateSave: true);
       },
     );
   }
@@ -937,10 +950,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
       _updatePlanetBuildingLevel(x, y, building.level);
     });
 
-    _onResourcesChanged();
-
-    // Persist the planet state (including upgraded building level)
-    SaveService.savePlanet(widget.planet);
+    _handleResourcesChanged(immediateSave: true);
   }
 
   void _updatePlanetBuildingLevel(int x, int y, int newLevel) {

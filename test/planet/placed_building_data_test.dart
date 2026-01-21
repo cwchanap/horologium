@@ -54,6 +54,16 @@ void main() {
       expect(result.assignedWorkers, 0); // Default workers
     });
 
+    test('fromLegacyString clamps invalid level and workers', () {
+      final result = PlacedBuildingData.fromLegacyString(
+        '5,10,powerPlant,-2,-1',
+      );
+
+      expect(result, isNotNull);
+      expect(result!.level, 1); // Clamp to minimum level
+      expect(result.assignedWorkers, 0); // Clamp to minimum workers
+    });
+
     test('createBuilding preserves level from PlacedBuildingData', () {
       final data = PlacedBuildingData(
         x: 5,
