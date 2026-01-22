@@ -33,7 +33,8 @@ void main() {
       expect(find.text('25'), findsOneWidget); // Research
       expect(find.text('75%'), findsOneWidget); // Happiness
       expect(find.text('100'), findsOneWidget); // Population
-      // Note: availableWorkers = 50; happiness is explicitly set to 75%.
+      expect(find.text('50'), findsOneWidget); // Workers
+      // Note: happiness is explicitly set to 75%.
 
       // Check that icons are present
       expect(find.byIcon(Icons.attach_money), findsOneWidget);
@@ -223,7 +224,7 @@ void main() {
       testResources.population = 10;
       testResources.happiness = 25.0; // Below low threshold (30)
 
-      // Has spare housing but low happiness
+      // Insufficient housing and low happiness
       final house = Building(
         type: BuildingType.house,
         name: 'House',
@@ -258,7 +259,7 @@ void main() {
       testResources.population = 10;
       testResources.happiness = 50.0; // Between low (30) and high (60)
 
-      // Has spare housing but medium happiness
+      // Insufficient housing and medium happiness
       final house = Building(
         type: BuildingType.house,
         name: 'House',
