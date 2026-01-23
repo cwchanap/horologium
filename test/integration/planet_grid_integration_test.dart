@@ -204,5 +204,150 @@ void main() {
       expect(planet.getBuildingAt(10, 10), isNotNull);
       expect(planet.getBuildingAt(10, 10)!.type, BuildingType.powerPlant);
     });
+
+    test('getAllPlacedBuildings returns correct positions', () async {
+      final grid = Grid();
+
+      final house = BuildingRegistry.availableBuildings.firstWhere(
+        (b) => b.type == BuildingType.house,
+      );
+      final powerPlant = BuildingRegistry.availableBuildings.firstWhere(
+        (b) => b.type == BuildingType.powerPlant,
+      );
+
+      // Place buildings at different positions
+      grid.placeBuilding(5, 5, house, notifyCallbacks: false);
+      grid.placeBuilding(10, 10, powerPlant, notifyCallbacks: false);
+
+      // Get all placed buildings with positions
+      final placedBuildings = grid.getAllPlacedBuildings();
+
+      expect(placedBuildings.length, 2);
+
+      // Verify positions are correct
+      expect(placedBuildings.any((pb) => pb.x == 5 && pb.y == 5), true);
+      expect(placedBuildings.any((pb) => pb.x == 10 && pb.y == 10), true);
+
+      // Verify building types
+      final housePlaced = placedBuildings.firstWhere(
+        (pb) => pb.x == 5 && pb.y == 5,
+      );
+      expect(housePlaced.building.type, BuildingType.house);
+
+      final powerPlantPlaced = placedBuildings.firstWhere(
+        (pb) => pb.x == 10 && pb.y == 10,
+      );
+      expect(powerPlantPlaced.building.type, BuildingType.powerPlant);
+    });
+
+    test('worker assignments can be synced from grid to planet', () async {
+      final planet = Planet(id: 'test', name: 'Test Planet');
+
+      void onBuildingPlaced(int x, int y, Building building) {
+        final buildingData = PlacedBuildingData(
+          x: x,
+          y: y,
+          type: building.type,
+          level: building.level,
+          assignedWorkers: building.assignedWorkers,
+        );
+        planet.addBuilding(buildingData);
+      }
+
+      final grid = Grid(onBuildingPlaced: onBuildingPlaced);
+
+      // Place a building that requires workers
+      final powerPlant = BuildingRegistry.availableBuildings.firstWhere(
+        (b) => b.type == BuildingType.powerPlant && b.requiredWorkers > 0,
+      );
+
+      grid.placeBuilding(5, 5, powerPlant);
+
+      // Verify initial state (no workers)
+      expect(planet.getBuildingAt(5, 5)!.assignedWorkers, 0);
+      expect(grid.getBuildingAt(5, 5)!.assignedWorkers, 0);
+
+      // Simulate worker assignment in grid
+      final buildingInGrid = grid.getBuildingAt(5, 5)!;
+      buildingInGrid.assignWorker();
+
+      // Verify grid has the worker
+      expect(buildingInGrid.assignedWorkers, 1);
+
+      // Sync from grid to planet
+      final placedBuildings = grid.getAllPlacedBuildings();
+      for (final placedBuilding in placedBuildings) {
+        final building = placedBuilding.building;
+        final existingData = planet.getBuildingAt(
+          placedBuilding.x,
+          placedBuilding.y,
+        );
+        if (existingData != null) {
+          final newData = existingData.copyWith(
+            level: building.level,
+            assignedWorkers: building.assignedWorkers,
+          );
+          planet.updateBuildingAt(placedBuilding.x, placedBuilding.y, newData);
+        }
+      }
+
+      // Verify planet now has the worker count
+      expect(planet.getBuildingAt(5, 5)!.assignedWorkers, 1);
+    });
+
+    test('level changes are synced from grid to planet', () async {
+      final planet = Planet(id: 'test', name: 'Test Planet');
+
+      void onBuildingPlaced(int x, int y, Building building) {
+        final buildingData = PlacedBuildingData(
+          x: x,
+          y: y,
+          type: building.type,
+          level: building.level,
+          assignedWorkers: building.assignedWorkers,
+        );
+        planet.addBuilding(buildingData);
+      }
+
+      final grid = Grid(onBuildingPlaced: onBuildingPlaced);
+
+      // Place a building
+      final powerPlant = BuildingRegistry.availableBuildings.firstWhere(
+        (b) => b.type == BuildingType.powerPlant,
+      );
+
+      grid.placeBuilding(5, 5, powerPlant);
+
+      // Verify initial level
+      expect(planet.getBuildingAt(5, 5)!.level, 1);
+      expect(grid.getBuildingAt(5, 5)!.level, 1);
+
+      // Upgrade building in grid
+      final buildingInGrid = grid.getBuildingAt(5, 5)!;
+      buildingInGrid.upgrade();
+
+      // Verify grid has the new level
+      expect(buildingInGrid.level, 2);
+
+      // Sync from grid to planet
+      final placedBuildings = grid.getAllPlacedBuildings();
+      for (final placedBuilding in placedBuildings) {
+        final building = placedBuilding.building;
+        final existingData = planet.getBuildingAt(
+          placedBuilding.x,
+          placedBuilding.y,
+        );
+        if (existingData != null) {
+          final newData = existingData.copyWith(
+            level: building.level,
+            assignedWorkers: building.assignedWorkers,
+          );
+          planet.updateBuildingAt(placedBuilding.x, placedBuilding.y, newData);
+        }
+      }
+
+      // Verify planet now has the new level
+      expect(planet.getBuildingAt(5, 5)!.level, 2);
+    });
   });
 }

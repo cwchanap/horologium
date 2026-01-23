@@ -66,15 +66,6 @@ flutter:
     - assets/images/building/
     - assets/images/resource/
     - assets/images/terrain/
-    - assets/images/terrain/base/
-    - assets/images/terrain/features/
-    - assets/images/terrain/features/trees/
-    - assets/images/terrain/features/rocks/
-    - assets/images/terrain/features/bushes/
-    - assets/images/terrain/features/water/
-    - assets/images/terrain/paths/
-    - assets/images/terrain/details/
-    - assets/images/terrain/effects/
     - assets/audio/
 
   # An image asset can refer to one or more resolution-specific "variants", see

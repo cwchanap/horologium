@@ -16,15 +16,17 @@ class PlacedBuildingData {
     this.level = 1,
     this.assignedWorkers = 0,
     this.variant,
-  });
+  }) : assert(level >= 1, 'level must be at least 1'),
+       assert(assignedWorkers >= 0, 'assignedWorkers cannot be negative');
 
-  /// Convert to string format for persistence (legacy format compatibility)
-  /// Format: "x,y,BuildingName"
+  /// Convert to string format for persistence
+  /// Format: "x,y,BuildingName,level,assignedWorkers"
   String toLegacyString() {
-    return '$x,$y,${type.toString().split('.').last}';
+    return '$x,$y,${type.toString().split('.').last},$level,$assignedWorkers';
   }
 
   /// Parse from legacy string format
+  /// Supports both old format "x,y,BuildingName" and new format "x,y,BuildingName,level,workers"
   static PlacedBuildingData? fromLegacyString(String data) {
     final parts = data.split(',');
     if (parts.length < 3) return null;
@@ -46,12 +48,22 @@ class PlacedBuildingData {
 
     if (type == null) return null;
 
+    // Parse level (default to 1 for backward compatibility)
+    final parsedLevel = parts.length > 3 ? int.tryParse(parts[3]) : null;
+    final level = (parsedLevel == null || parsedLevel < 1) ? 1 : parsedLevel;
+
+    // Parse assigned workers (default to 0 for backward compatibility)
+    final parsedWorkers = parts.length > 4 ? int.tryParse(parts[4]) : null;
+    final assignedWorkers = (parsedWorkers == null || parsedWorkers < 0)
+        ? 0
+        : parsedWorkers;
+
     return PlacedBuildingData(
       x: x,
       y: y,
       type: type,
-      level: 1, // Legacy format doesn't include level
-      assignedWorkers: 0, // Legacy format doesn't include worker count
+      level: level,
+      assignedWorkers: assignedWorkers,
     );
   }
 

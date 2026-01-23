@@ -16,6 +16,7 @@ class SaveService {
   static const String _keyElectricity = 'electricity';
   static const String _keyResearch = 'research';
   static const String _keyWater = 'water';
+  static const String _keyHappiness = 'happiness';
   static const String _keyCompletedResearch = 'completed_research';
   static const String _keyBuildings = 'buildings';
 
@@ -29,6 +30,8 @@ class SaveService {
       'planet.$planetId.population';
   static String _planetAvailableWorkersKey(String planetId) =>
       'planet.$planetId.availableWorkers';
+  static String _planetHappinessKey(String planetId) =>
+      'planet.$planetId.happiness';
   static String _planetResearchKey(String planetId) =>
       'planet.$planetId.research.completed';
   static String _planetBuildingLimitsKey(String planetId) =>
@@ -53,6 +56,7 @@ class SaveService {
     await prefs.setDouble(_keyElectricity, resources.electricity);
     await prefs.setDouble(_keyResearch, resources.research);
     await prefs.setDouble(_keyWater, resources.water);
+    await prefs.setDouble(_keyHappiness, resources.happiness);
 
     // Save research progress
     await prefs.setStringList(_keyCompletedResearch, researchManager.toList());
@@ -80,6 +84,7 @@ class SaveService {
     resources.electricity = prefs.getDouble(_keyElectricity) ?? 0.0;
     resources.research = prefs.getDouble(_keyResearch) ?? 0.0;
     resources.water = prefs.getDouble(_keyWater) ?? 0.0;
+    resources.happiness = prefs.getDouble(_keyHappiness) ?? 50.0;
 
     // Load research progress
     final completedResearch = prefs.getStringList(_keyCompletedResearch) ?? [];
@@ -198,6 +203,12 @@ class SaveService {
       planet.resources.availableWorkers,
     );
 
+    // Save happiness
+    await prefs.setDouble(
+      _planetHappinessKey(planetId),
+      planet.resources.happiness,
+    );
+
     // Save research progress
     await prefs.setStringList(
       _planetResearchKey(planetId),
@@ -284,6 +295,8 @@ class SaveService {
     resources.availableWorkers =
         prefs.getInt(_planetAvailableWorkersKey(planetId)) ??
         resources.population;
+    resources.happiness =
+        prefs.getDouble(_planetHappinessKey(planetId)) ?? 50.0;
 
     // Load research progress
     final researchManager = ResearchManager();
@@ -353,6 +366,8 @@ class SaveService {
     resources.electricity = prefs.getDouble(_keyElectricity) ?? 0.0;
     resources.research = prefs.getDouble(_keyResearch) ?? 0.0;
     resources.water = prefs.getDouble(_keyWater) ?? 0.0;
+    // Use default 50.0 for migrated games (legacy saves didn't have happiness)
+    resources.happiness = prefs.getDouble(_keyHappiness) ?? 50.0;
 
     final researchManager = ResearchManager();
     final completedResearch = prefs.getStringList(_keyCompletedResearch) ?? [];

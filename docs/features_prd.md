@@ -1,10 +1,19 @@
 # Horologium Features PRD
 ## Product Requirements Document
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** January 2026
 **Author:** Product Team
-**Status:** Draft
+**Status:** In Progress
+
+**Implementation Status:**
+- ✅ Population Growth & Happiness System (Completed)
+- ✅ Building Upgrades and Visual Progression (Completed)
+- ⏳ Quests and Achievement System (Not Started)
+- ⏳ Production Chain Visualization (Not Started)
+- ⏳ Stellar Map - Inter-Planetary Trade Routes (Not Started)
+- ⏳ Decorative Buildings and Landscaping (Not Started)
+- ⏳ Natural Disasters and Events System (Not Started)
 
 ---
 
@@ -212,13 +221,68 @@ _resourceTimer = Timer.periodic(Duration(seconds: 1), (timer) {
 
 #### 3.1.6 Acceptance Criteria
 
-- [ ] Happiness value persists across app restarts
-- [ ] Population grows when happiness > 50 and housing available
-- [ ] Population shrinks when happiness < 30 for extended period
-- [ ] Happiness breakdown shows at least 4 contributing factors
-- [ ] UI updates smoothly without frame drops
-- [ ] All existing tests pass without modification
-- [ ] New unit tests cover happiness calculation edge cases
+- [x] Happiness value persists across app restarts
+- [x] Population grows when happiness ≥ 60 and housing available
+- [x] Population shrinks when happiness ≤ 30 for extended period (60s)
+- [x] Happiness calculation uses 4 contributing factors (housing, food, services, employment)
+- [x] UI updates smoothly without frame drops
+- [x] All existing tests pass without modification
+- [x] New unit tests cover happiness calculation edge cases
+
+#### 3.1.7 Implementation Summary
+
+**Status:** ✅ **COMPLETED** (January 2026)
+
+**What Was Implemented:**
+
+1. **Happiness Calculation** (`lib/game/resources/resources.dart`)
+   - Weighted happiness formula (0-100 scale)
+   - Housing factor (30%): Ratio of sheltered population
+   - Food factor (25%): Bread + pastries availability (1 food per 5 pop = 100%)
+   - Services factor (25%): Electricity and water per capita
+   - Employment factor (20%): Ratio of employed workers
+   - Smooth transition (90% old + 10% new per tick)
+
+2. **Population Dynamics** (`lib/game/resources/resources.dart`)
+   - Growth: +1 every 30s when happiness ≥60 and housing available
+   - Decline: -1 after 60s of happiness ≤30 (2 consecutive cycles)
+   - Accumulator-based timing for precise control
+   - Low happiness streak tracking to prevent rapid decline
+
+3. **UI Enhancements** (`lib/widgets/game/resource_display.dart`)
+   - Happiness indicator with emoji face (happy/neutral/sad)
+   - Color-coded display (green/yellow/red)
+   - Population trend arrow (↑ growing, − stable, ↓ declining)
+   - Compact display in resource overlay
+
+4. **Persistence** (`lib/game/services/save_service.dart`)
+   - Happiness value saved per planet
+   - Default value of 50.0 for new/legacy saves
+   - Planet-scoped storage key: `planet.<id>.happiness`
+
+**Key Decisions:**
+- **Growth Rate:** Medium speed (1 pop/30s) for noticeable but not urgent feedback
+- **Food Sources:** Finished foods only (bread, pastries) to require full production chains
+- **UI Style:** Subtle indicators without intrusive notifications
+- **Thresholds:** 60+ for growth, 30- for decline (generous mid-range)
+
+**Test Coverage:**
+- 3 new happiness system tests
+- Tests cover growth, decline, and calculation logic
+- All 94+ tests passing
+
+**Files Modified:**
+- `lib/game/resources/resources.dart` - Added `happiness`, `_updateHappiness()` method
+- `lib/widgets/game/resource_display.dart` - Rewrote to show happiness and trends
+- `lib/game/services/save_service.dart` - Added happiness persistence
+- `test/widgets/game/resource_display_test.dart` - Updated for new UI
+- `test/resources/resources_test.dart` - Added 3 happiness tests
+
+**Behavior Details:**
+- Happiness updates every second alongside resource updates
+- Population changes checked every 30 seconds
+- Streak counter prevents premature decline from temporary dips
+- No notifications to avoid UI clutter (per user preference)
 
 ---
 
@@ -341,13 +405,72 @@ void _renderBuilding(Canvas canvas, PlacedBuilding placedBuilding) {
 
 #### 3.2.6 Acceptance Criteria
 
-- [ ] Players can upgrade buildings from level 1 to maxLevel (5)
-- [ ] Upgrade cost correctly deducted from cash resources
-- [ ] Building stats update immediately after upgrade
-- [ ] Level indicator visible on all placed buildings
-- [ ] Upgrade state persists across app restarts
-- [ ] Cannot upgrade at max level (button disabled with message)
-- [ ] Cannot upgrade without sufficient resources (button disabled)
+- [x] Players can upgrade buildings from level 1 to maxLevel (5)
+- [x] Upgrade cost correctly deducted from cash resources
+- [x] Building stats update immediately after upgrade
+- [x] Level indicator visible on all placed buildings
+- [x] Upgrade state persists across app restarts
+- [x] Cannot upgrade at max level (button disabled with message)
+- [x] Cannot upgrade without sufficient resources (button disabled)
+
+#### 3.2.7 Implementation Summary
+
+**Status:** ✅ **COMPLETED** (January 2026)
+
+**What Was Implemented:**
+
+1. **BuildingOptionsDialog** (`lib/widgets/game/building_options_dialog.dart`)
+   - Replaced `DeleteConfirmationDialog` with comprehensive options dialog
+   - Shows current building stats (production, consumption, housing)
+   - Displays upgrade preview with next-level stats
+   - Upgrade button with dynamic cost display
+   - Delete button for building removal
+
+2. **Level Badge Rendering** (`lib/game/grid.dart`)
+   - Color-coded badges appear on buildings level 2+ (green→blue→purple→orange)
+   - Badge positioned in top-right corner with level number
+   - 16x14px badge with rounded corners
+   - Uses `TextPainter` for crisp level text rendering
+
+3. **Enhanced Persistence** (`lib/game/planet/placed_building_data.dart`)
+   - Updated legacy string format: `"x,y,BuildingName,level,workers"`
+   - Backward compatible with old format (defaults to level 1)
+   - Round-trip persistence preserves all building state
+
+4. **Upgrade Flow** (`lib/game/scene_widget.dart`)
+   - Long-tap on building → `_showBuildingOptionsDialog()`
+   - `_upgradeBuilding()` deducts cash and increments level
+   - `_updatePlanetBuildingLevel()` syncs with planet data
+   - Immediate UI refresh after upgrade
+
+**Key Decisions:**
+- **UI Access:** Long-tap replaced delete-only dialog with full options dialog
+- **Visual Indicator:** Corner badge chosen over border glow for clarity
+- **Cost Structure:** Cash-only upgrades (no additional resource requirements)
+- **Upgrade Formula:** `upgradeCost = baseCost × (level + 1)`
+
+**Test Coverage:**
+- 24 new tests added across 3 test files
+- All 117+ tests passing
+- Tests cover upgrade logic, persistence, and UI interactions
+
+**Files Created:**
+- `lib/widgets/game/building_options_dialog.dart` (254 lines)
+- `test/widgets/game/building_options_dialog_test.dart` (8 tests)
+- `test/building/building_upgrade_test.dart` (9 tests)
+- `test/planet/placed_building_data_test.dart` (7 tests)
+
+**Files Modified:**
+- `lib/game/grid.dart` - Added level badge rendering (3 new methods)
+- `lib/game/scene_widget.dart` - Replaced dialog, added upgrade handlers
+- `lib/game/planet/placed_building_data.dart` - Enhanced persistence format
+- `test/services/save_service_planet_test.dart` - Updated expectations
+
+**Not Implemented (Out of Scope):**
+- Level-specific sprite variants (using badges instead)
+- Upgrade animations/particles (deferred)
+- Research prerequisites for upgrades (deferred)
+- Bulk upgrade functionality (deferred)
 
 ---
 

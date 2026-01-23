@@ -12,6 +12,35 @@ void main() {
     });
 
     group('savePlanet and loadOrCreatePlanet', () {
+      test('should save and load happiness correctly', () async {
+        // Create a test planet with custom happiness
+        final planet = Planet(id: 'test_happiness', name: 'Happiness Test');
+        planet.resources.happiness = 75.0;
+
+        // Save the planet
+        await SaveService.savePlanet(planet);
+
+        // Load the planet back
+        final loadedPlanet = await SaveService.loadOrCreatePlanet(
+          'test_happiness',
+          name: 'Happiness Test',
+        );
+
+        // Verify happiness is preserved
+        expect(loadedPlanet.resources.happiness, 75.0);
+      });
+
+      test('should default happiness to 50 when not saved', () async {
+        // Load a planet that doesn't exist
+        final planet = await SaveService.loadOrCreatePlanet(
+          'new_planet_happiness',
+          name: 'New Planet',
+        );
+
+        // Verify default happiness value
+        expect(planet.resources.happiness, 50.0);
+      });
+
       test('should save and load planet data correctly', () async {
         // Create a test planet with some data
         final planet = Planet(id: 'test', name: 'Test Planet');
@@ -89,22 +118,16 @@ void main() {
         );
         expect(house.x, 5);
         expect(house.y, 5);
-        expect(house.level, 1); // Legacy format doesn't preserve level
-        expect(
-          house.assignedWorkers,
-          0,
-        ); // Legacy format doesn't preserve worker count
+        expect(house.level, 2); // Level is now preserved
+        expect(house.assignedWorkers, 1); // Worker count is now preserved
 
         final powerPlant = loadedPlanet.buildings.firstWhere(
           (b) => b.type == BuildingType.powerPlant,
         );
         expect(powerPlant.x, 10);
         expect(powerPlant.y, 10);
-        expect(powerPlant.level, 1); // Legacy format doesn't preserve level
-        expect(
-          powerPlant.assignedWorkers,
-          0,
-        ); // Legacy format doesn't preserve worker count
+        expect(powerPlant.level, 1); // Default level
+        expect(powerPlant.assignedWorkers, 0); // Default worker count
       });
 
       test('should create new planet when no data exists', () async {

@@ -7,7 +7,7 @@ import '../widgets/game/building_selection_panel.dart';
 import '../widgets/game/game_controls.dart';
 import '../widgets/game/game_overlay.dart';
 import '../widgets/game/hamburger_menu.dart';
-import '../widgets/game/delete_confirmation_dialog.dart';
+import '../widgets/game/building_options_dialog.dart';
 import '../widgets/game/resource_display.dart';
 import 'building/building.dart';
 import 'main_game.dart';
@@ -17,6 +17,7 @@ import 'managers/input_handler.dart';
 import 'managers/persistence_manager.dart';
 import 'planet/index.dart';
 import 'services/resource_service.dart';
+import 'services/planet_save_debouncer.dart';
 import 'services/save_service.dart';
 
 class MainGameWidget extends StatefulWidget {
@@ -45,6 +46,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
   bool _musicEnabled = true;
   double _musicVolume = 0.5;
   AudioPlayer? _bgm;
+  final PlanetSaveDebouncer _planetSaveDebouncer = PlanetSaveDebouncer();
 
   @override
   void initState() {
@@ -112,6 +114,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
   @override
   void dispose() {
     _gameStateManager.dispose();
+    _planetSaveDebouncer.dispose();
     // Stop and dispose background music only if started
     if (_bgmStarted) {
       try {
@@ -340,13 +343,54 @@ class _MainGameWidgetState extends State<MainGameWidget>
     await prefs.setDouble('terrain.edgeGamma', edgeGamma);
   }
 
+  void _syncPlanetFromGrid() {
+    // Sync current building state (level, assignedWorkers) from grid to planet
+    if (!_game.hasLoaded) return;
+
+    final placedBuildings = _game.grid.getAllPlacedBuildings();
+    for (final placedBuilding in placedBuildings) {
+      final building = placedBuilding.building;
+
+      // Update the planet's PlacedBuildingData with current state
+      final existingData = widget.planet.getBuildingAt(
+        placedBuilding.x,
+        placedBuilding.y,
+      );
+      if (existingData != null) {
+        final newData = existingData.copyWith(
+          level: building.level,
+          assignedWorkers: building.assignedWorkers,
+        );
+        widget.planet.updateBuildingAt(
+          placedBuilding.x,
+          placedBuilding.y,
+          newData,
+        );
+      }
+    }
+  }
+
   void _onResourcesChanged() {
+    _handleResourcesChanged();
+  }
+
+  void _handleResourcesChanged({bool immediateSave = false}) {
     setState(() {
+      // Sync worker assignments from grid to planet before saving
+      _syncPlanetFromGrid();
       PersistenceManager.saveResources(
         widget.planet.resources,
         _gameStateManager.researchManager,
       );
     });
+    _schedulePlanetSave(immediateSave: immediateSave);
+  }
+
+  void _schedulePlanetSave({bool immediateSave = false}) {
+    _planetSaveDebouncer.schedule(
+      () => SaveService.savePlanet(widget.planet),
+      immediate: immediateSave,
+    );
   }
 
   void _onPlanetChanged(Planet planet) {
@@ -373,7 +417,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
   }
 
   void _onBuildingLongTapped(int x, int y, Building building) {
-    _showDeleteConfirmationDialog(x, y, building);
+    _showBuildingOptionsDialog(x, y, building);
   }
 
   void _onBuildingSelected(Building building) {
@@ -871,19 +915,50 @@ class _MainGameWidgetState extends State<MainGameWidget>
     });
   }
 
-  void _showDeleteConfirmationDialog(int x, int y, Building building) {
+  void _showBuildingOptionsDialog(int x, int y, Building building) {
     if (!_game.hasLoaded) return;
 
-    DeleteConfirmationDialog.show(
+    BuildingOptionsDialog.show(
       context: context,
       building: building,
-      onConfirm: () {
+      currentCash: widget.planet.resources.cash,
+      onUpgrade: () {
+        _upgradeBuilding(x, y, building);
+      },
+      onDelete: () {
         _game.grid.removeBuilding(x, y);
         setState(() {
           ResourceService.refundBuilding(widget.planet.resources, building);
         });
-        _onResourcesChanged();
+        _handleResourcesChanged(immediateSave: true);
       },
     );
+  }
+
+  void _upgradeBuilding(int x, int y, Building building) {
+    if (!building.canUpgrade) return;
+    if (widget.planet.resources.cash < building.upgradeCost) return;
+
+    setState(() {
+      // Deduct upgrade cost
+      widget.planet.resources.cash -= building.upgradeCost;
+
+      // Upgrade the building
+      building.upgrade();
+
+      // Update the planet's building data
+      _updatePlanetBuildingLevel(x, y, building.level);
+    });
+
+    _handleResourcesChanged(immediateSave: true);
+  }
+
+  void _updatePlanetBuildingLevel(int x, int y, int newLevel) {
+    // Update the building data in the planet using the mutable API
+    final oldData = widget.planet.getBuildingAt(x, y);
+    if (oldData != null) {
+      final newData = oldData.copyWith(level: newLevel);
+      widget.planet.updateBuildingAt(x, y, newData);
+    }
   }
 }

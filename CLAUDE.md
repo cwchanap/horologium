@@ -69,6 +69,8 @@ Update cycle runs every second:
 - `lib/game/planet/planet.dart` - Planet data model with multi-planet support
 - `lib/game/services/save_service.dart` - SaveService for planet persistence
 - `lib/game/services/resource_service.dart` - ResourceService for resource calculations
+- `lib/game/services/building_service.dart` - BuildingService for building operations
+- `lib/game/terrain/` - Procedural terrain generation with biomes and parallax
 
 ### UI Components
 - `lib/widgets/game/building_selection_panel.dart` - Building menu with BuildingCard widgets
@@ -101,11 +103,11 @@ flutter test
 # Run specific test file
 flutter test test/resources/resources_test.dart
 
-# Static analysis
-flutter analyze
+# Static analysis (CI uses --fatal-infos)
+flutter analyze --fatal-infos
 
-# Format code
-dart format lib test
+# Format code (CI enforces this)
+dart format --output=none --set-exit-if-changed .
 
 # Build release APK
 flutter build apk
@@ -226,7 +228,6 @@ if (building.hasWorkers) {
 - Background: Dark with starfield CustomPainter
 - Card backgrounds: `Colors.withAlpha((255 * 0.8).round())`
 - Consistent spacing: padding 16, margins 8-20
-- Font: 'Orbitron' for space aesthetic
 
 ### Common UI Patterns
 - **BuildingCard**: Shows building icon, name, cost, and count limits
@@ -254,7 +255,7 @@ Procedural terrain generation with biome support. Parallax layers create depth. 
 ### Coding Style
 - Follow Flutter defaults: 2-space indentation, trailing commas for multi-line literals, and `lowerCamelCase` for members
 - Keep Flame components in dedicated files named `<Feature>Component` to ease discovery
-- Run `dart format lib test` before committing; CI enforces these rules
+- Run `dart format --output=none --set-exit-if-changed .` before committing; CI enforces these rules
 - Centralize constants in the relevant manager or `Assets` class rather than scattering magic values
 
 ### Commit Guidelines
@@ -262,6 +263,14 @@ Procedural terrain generation with biome support. Parallax layers create depth. 
 - Keep commits focused: gameplay change, UI tweak, and tooling updates should land separately
 - Pull requests need a concise summary, testing notes (`flutter test`, manual device checks), and any relevant screenshots or screen recordings
 - Link issues or TODO references, and call out migrations that require data wipes or saved-game resets
+
+## CI/CD
+
+GitHub Actions runs on push/PR to main:
+- `flutter analyze --fatal-infos` - must pass with no warnings
+- `dart format --output=none --set-exit-if-changed .` - enforces formatting
+- `flutter test --coverage` - runs all tests
+- Builds debug APK and web artifacts
 
 ## Utility Scripts
 

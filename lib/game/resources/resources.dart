@@ -1,6 +1,12 @@
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 
+// Shared happiness thresholds for consistent UI behavior across the app
+class HappinessThresholds {
+  static const double high = 60.0;
+  static const double low = 30.0;
+}
+
 class Resources {
   Map<ResourceType, double> resources = {
     ResourceType.electricity: 0,
@@ -26,13 +32,25 @@ class Resources {
   int population = 20; // Starting population
   int availableWorkers = 20; // Workers not assigned to buildings
   int unshelteredPopulation = 20;
+  int totalAccommodation = 0; // Total housing capacity from all buildings
+
+  // Happiness system (0-100 scale)
+  double _happiness = 50.0;
+  int _populationGrowthAccumulator = 0; // Counts seconds for 30s growth cycle
+  int _lowHappinessStreak = 0; // Counts consecutive low happiness cycles
+
+  /// Happiness value clamped to valid range [0, 100]
+  double get happiness => _happiness;
+  set happiness(double value) {
+    _happiness = value.clamp(0, 100);
+  }
 
   // Track research accumulation (seconds)
   double _researchAccumulator = 0;
 
   void update(List<Building> buildings) {
     // Calculate accommodation capacity
-    int totalAccommodation = 0;
+    totalAccommodation = 0;
     for (final building in buildings) {
       if (building.type == BuildingType.house ||
           building.type == BuildingType.largeHouse) {
@@ -137,6 +155,91 @@ class Resources {
         _researchAccumulator = 0; // Reset accumulator
       }
     }
+
+    // Calculate happiness and handle population growth
+    _updateHappiness(buildings, totalAccommodation);
+  }
+
+  /// Calculates happiness based on housing, food, services, and employment.
+  /// Also handles population growth/shrinkage every 30 seconds.
+  void _updateHappiness(List<Building> buildings, int totalAccommodation) {
+    // Factor weights (must sum to 1.0)
+    const double housingWeight = 0.30;
+    const double foodWeight = 0.25;
+    const double servicesWeight = 0.25;
+    const double employmentWeight = 0.20;
+
+    // 1. Housing factor (0-100): ratio of sheltered population
+    double housingFactor = 0;
+    if (population > 0) {
+      final shelteredPop = population - unshelteredPopulation;
+      housingFactor = (shelteredPop / population) * 100;
+    }
+
+    // 2. Food factor (0-100): based on bread and pastries availability
+    // Target: 1 food per 5 population for 100% satisfaction
+    double foodFactor = 0;
+    if (population > 0) {
+      final totalFood = bread + pastries;
+      final targetFood = population / 5.0;
+      foodFactor = targetFood > 0
+          ? ((totalFood / targetFood) * 100).clamp(0, 100)
+          : 100;
+    }
+
+    // 3. Services factor (0-100): electricity and water per capita
+    // Target: 1 electricity + 2 water per 10 population for 100%
+    double servicesFactor = 0;
+    if (population > 0) {
+      final targetElectricity = population / 10.0;
+      final targetWater = population / 5.0;
+      final electricitySat = targetElectricity > 0
+          ? (electricity / targetElectricity).clamp(0, 1)
+          : 1;
+      final waterSat = targetWater > 0 ? (water / targetWater).clamp(0, 1) : 1;
+      servicesFactor = ((electricitySat + waterSat) / 2) * 100;
+    }
+
+    // 4. Employment factor (0-100): ratio of employed workers
+    double employmentFactor = 0;
+    if (population > 0) {
+      final employedWorkers = population - availableWorkers;
+      employmentFactor = (employedWorkers / population) * 100;
+    }
+
+    // Calculate weighted happiness
+    final newHappiness =
+        (housingFactor * housingWeight) +
+        (foodFactor * foodWeight) +
+        (servicesFactor * servicesWeight) +
+        (employmentFactor * employmentWeight);
+
+    // Smooth transition (gradual change for better UX)
+    _happiness = (_happiness * 0.9 + newHappiness * 0.1).clamp(0, 100);
+
+    // Population growth/shrinkage every 30 seconds
+    _populationGrowthAccumulator++;
+    if (_populationGrowthAccumulator >= 30) {
+      _populationGrowthAccumulator = 0;
+
+      if (happiness >= HappinessThresholds.high &&
+          totalAccommodation > population) {
+        // High happiness + housing available = population growth
+        population++;
+        availableWorkers++;
+        _lowHappinessStreak = 0;
+      } else if (happiness <= HappinessThresholds.low) {
+        // Low happiness = track streak
+        _lowHappinessStreak++;
+        // After 2 consecutive low happiness cycles (60s), population shrinks
+        if (_lowHappinessStreak >= 2 && population > 1) {
+          decreasePopulation(buildings);
+        }
+      } else {
+        // Medium happiness = reset low streak but no growth
+        _lowHappinessStreak = 0;
+      }
+    }
   }
 
   double get cash => resources[ResourceType.cash]!;
@@ -183,6 +286,11 @@ class Resources {
   set bread(double value) => resources[ResourceType.bread] = value;
   set pastries(double value) => resources[ResourceType.pastries] = value;
 
+  /// Returns true if there is spare housing capacity for population growth
+  bool hasSpareHousingCapacity() {
+    return totalAccommodation > population;
+  }
+
   // Helper methods for worker management
   bool canAssignWorkerTo(Building building) {
     return availableWorkers > 0 && building.canAssignWorker;
@@ -200,6 +308,42 @@ class Resources {
       building.unassignWorker();
       availableWorkers++;
     }
+  }
+
+  /// Decreases population by 1, handling worker unassignment if necessary.
+  /// Called when happiness is low for an extended period.
+  /// This maintains the invariant: population = availableWorkers + assignedWorkers
+  void decreasePopulation(List<Building> buildings) {
+    if (population <= 1) return;
+
+    // Calculate total assigned workers BEFORE any changes
+    int totalAssignedWorkers = 0;
+    for (final building in buildings) {
+      totalAssignedWorkers += building.assignedWorkers;
+    }
+
+    // Decrease population
+    population--;
+
+    // Case 1: We have available workers, just decrement them
+    if (availableWorkers > 0) {
+      availableWorkers--;
+    }
+    // Case 2: No available workers but some are assigned to buildings
+    // Unassign one worker from a building to reduce total assigned count
+    else if (totalAssignedWorkers > 0) {
+      for (final building in buildings) {
+        if (building.assignedWorkers > 0) {
+          building.unassignWorker();
+          break;
+        }
+      }
+      // availableWorkers stays 0, totalAssignedWorkers decreases by 1
+      // invariant maintained: (population - 1) = 0 + (totalAssignedWorkers - 1)
+    }
+
+    // Reset the low happiness streak to maintain 60s interval
+    _lowHappinessStreak = 0;
   }
 
   // Buy resource using cash (cost = resource value * 10)
