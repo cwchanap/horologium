@@ -3,8 +3,13 @@ import '../../game/resources/resources.dart';
 
 class ResourceDisplay extends StatelessWidget {
   final Resources resources;
+  final VoidCallback? onProductionChainTap;
 
-  const ResourceDisplay({super.key, required this.resources});
+  const ResourceDisplay({
+    super.key,
+    required this.resources,
+    this.onProductionChainTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +49,42 @@ class ResourceDisplay extends StatelessWidget {
             value: resources.availableWorkers.toDouble(),
             isSubItem: true,
           ),
+          if (onProductionChainTap != null) ...[
+            const SizedBox(height: 8),
+            const Divider(color: Colors.grey, height: 1),
+            const SizedBox(height: 8),
+            _buildProductionChainButton(),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildProductionChainButton() {
+    return GestureDetector(
+      onTap: onProductionChainTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.cyanAccent.withAlpha(26),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.cyanAccent.withAlpha(77)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.account_tree, color: Colors.cyanAccent, size: 16),
+            SizedBox(width: 6),
+            Text(
+              'Production',
+              style: TextStyle(
+                color: Colors.cyanAccent,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
