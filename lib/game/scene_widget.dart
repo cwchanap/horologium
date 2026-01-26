@@ -8,6 +8,7 @@ import '../widgets/game/game_controls.dart';
 import '../widgets/game/game_overlay.dart';
 import '../widgets/game/hamburger_menu.dart';
 import '../widgets/game/building_options_dialog.dart';
+import '../widgets/game/production_overlay/production_overlay.dart';
 import '../widgets/game/resource_display.dart';
 import 'building/building.dart';
 import 'main_game.dart';
@@ -40,6 +41,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
   int? _selectedGridY;
   bool _showBuildingSelection = false;
   bool _showHamburgerMenu = false;
+  bool _showProductionOverlay = false;
   bool _uiOverlayOpen = false; // gates pointer events to GameWidget
   bool _bgmStarted =
       false; // start audio after first user interaction (web-safe)
@@ -470,7 +472,8 @@ class _MainGameWidgetState extends State<MainGameWidget>
                 ignoring:
                     _uiOverlayOpen ||
                     _showHamburgerMenu ||
-                    _showBuildingSelection,
+                    _showBuildingSelection ||
+                    _showProductionOverlay,
                 child: GameWidget(game: _game),
               ),
             ),
@@ -483,7 +486,15 @@ class _MainGameWidgetState extends State<MainGameWidget>
               Positioned(
                 top: 20,
                 right: 20,
-                child: ResourceDisplay(resources: widget.planet.resources),
+                child: ResourceDisplay(
+                  resources: widget.planet.resources,
+                  onProductionChainTap: () {
+                    setState(() {
+                      _showProductionOverlay = true;
+                      _uiOverlayOpen = true;
+                    });
+                  },
+                ),
               ),
 
             // Hamburger Menu Button
@@ -497,7 +508,9 @@ class _MainGameWidgetState extends State<MainGameWidget>
                     _showHamburgerMenu = !_showHamburgerMenu;
                     // Only reflect current overlays; do not OR with existing value to avoid sticky state
                     _uiOverlayOpen =
-                        _showHamburgerMenu || _showBuildingSelection;
+                        _showHamburgerMenu ||
+                        _showBuildingSelection ||
+                        _showProductionOverlay;
                   });
                 },
                 backgroundColor: Colors.purple.withAlpha((255 * 0.8).round()),
@@ -526,7 +539,8 @@ class _MainGameWidgetState extends State<MainGameWidget>
                 onClose: () => setState(() {
                   _showHamburgerMenu = false;
                   _uiOverlayOpen =
-                      _showBuildingSelection; // remain open if building panel is open
+                      _showBuildingSelection ||
+                      _showProductionOverlay; // remain open if other panels are open
                 }),
                 resources: widget.planet.resources,
                 researchManager: _gameStateManager.researchManager,
@@ -547,12 +561,29 @@ class _MainGameWidgetState extends State<MainGameWidget>
                 selectedGridY: _selectedGridY,
                 onClose: () {
                   _closeBuildingSelection();
-                  setState(() => _uiOverlayOpen = _showHamburgerMenu);
+                  setState(
+                    () => _uiOverlayOpen =
+                        _showHamburgerMenu || _showProductionOverlay,
+                  );
                 },
                 onBuildingSelected: _onBuildingSelected,
                 researchManager: _gameStateManager.researchManager,
                 buildingLimitManager: _gameStateManager.buildingLimitManager,
                 grid: _game.grid,
+              ),
+
+            // Production Chain Overlay (only add when visible)
+            if (_game.hasLoaded && _showProductionOverlay)
+              ProductionOverlay(
+                getBuildings: () => _game.grid.getAllBuildings(),
+                getResources: () => widget.planet.resources,
+                onClose: () {
+                  setState(() {
+                    _showProductionOverlay = false;
+                    _uiOverlayOpen =
+                        _showHamburgerMenu || _showBuildingSelection;
+                  });
+                },
               ),
           ],
         ),
@@ -910,7 +941,10 @@ class _MainGameWidgetState extends State<MainGameWidget>
       );
       if (!mounted) return;
       setState(
-        () => _uiOverlayOpen = _showHamburgerMenu || _showBuildingSelection,
+        () => _uiOverlayOpen =
+            _showHamburgerMenu ||
+            _showBuildingSelection ||
+            _showProductionOverlay,
       );
     });
   }
