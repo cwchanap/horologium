@@ -83,6 +83,8 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       if (currentCount != _lastBuildingCount) {
         _lastBuildingCount = currentCount;
         _scheduleRefresh();
+        // Notify external listeners of building changes
+        widget.onBuildingsChanged?.call();
       }
     });
   }
@@ -140,10 +142,30 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       BuildingCategory.services,
     ];
 
+    // Find categories not in the predefined order
+    final remainingCategories = categoryGroups.keys
+        .where((c) => !categoryOrder.contains(c))
+        .toList();
+
     final updatedNodes = <BuildingNode>[];
     double xOffset = 50;
 
+    // Layout nodes in predefined category order
     for (final category in categoryOrder) {
+      final nodesInCategory = categoryGroups[category] ?? [];
+      if (nodesInCategory.isEmpty) continue;
+
+      double yOffset = 50;
+      for (final node in nodesInCategory) {
+        updatedNodes.add(node.copyWith(position: Offset(xOffset, yOffset)));
+        yOffset += _verticalSpacing;
+      }
+
+      xOffset += _horizontalSpacing;
+    }
+
+    // Layout remaining categories not in predefined order
+    for (final category in remainingCategories) {
       final nodesInCategory = categoryGroups[category] ?? [];
       if (nodesInCategory.isEmpty) continue;
 
@@ -423,7 +445,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       itemBuilder: (context, index) {
         final node = _graph!.nodes[index];
         return Card(
-          color: Colors.grey[850],
+          color: Colors.grey[800],
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
             leading: _getStatusIcon(node.status),
@@ -440,19 +462,14 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   }
 
   Widget _buildDetailPanel() {
+    // Find actual bottleneck or null if none exists
+    final matchingBottleneck = _graph?.bottlenecks
+        .where((b) => b.impactedNodeIds.contains(_selectedNode!.id))
+        .firstOrNull;
+
     return NodeDetailPanel(
       node: _selectedNode!,
-      bottleneck: _graph?.bottlenecks.firstWhere(
-        (b) => b.impactedNodeIds.contains(_selectedNode!.id),
-        orElse: () => const BottleneckInsight(
-          id: '',
-          resourceType: ResourceType.cash,
-          severity: BottleneckSeverity.low,
-          description: '',
-          recommendation: '',
-          impactedNodeIds: [],
-        ),
-      ),
+      bottleneck: matchingBottleneck,
       onClose: _onBackgroundTap,
     );
   }

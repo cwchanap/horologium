@@ -1,6 +1,8 @@
 /// Resource flow edge widget for the production overlay.
 library;
 
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:horologium/game/production/production_graph.dart';
 
@@ -56,19 +58,31 @@ class _ResourceFlowEdgeWidgetState extends State<ResourceFlowEdgeWidget>
     final endX = widget.endNode!.position.dx;
     final endY = widget.endNode!.position.dy + nodeHeight / 2;
 
+    // Calculate bounding box for local coordinates
+    final minX = min(startX, endX);
+    final minY = min(startY, endY);
+    final maxX = max(startX, endX);
+    final maxY = max(startY, endY);
+    const padding = 50.0;
+
+    // Convert to local coordinates within the CustomPaint
+    final localStartX = startX - minX + padding / 2;
+    final localStartY = startY - minY + padding / 2;
+    final localEndX = endX - minX + padding / 2;
+    final localEndY = endY - minY + padding / 2;
+
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
         return CustomPaint(
-          size: Size((endX - startX).abs() + 50, (endY - startY).abs() + 50),
+          size: Size(maxX - minX + padding, maxY - minY + padding),
           painter: _EdgePainter(
-            startOffset: Offset(startX, startY),
-            endOffset: Offset(endX, endY),
+            startOffset: Offset(localStartX, localStartY),
+            endOffset: Offset(localEndX, localEndY),
             status: widget.edge.status,
             isHighlighted: widget.edge.isHighlighted,
             isIncomplete: widget.edge.isIncomplete,
             rate: widget.edge.ratePerSecond,
-            resourceName: widget.edge.resourceType.name,
             animationProgress: _animationController.value,
           ),
         );
@@ -84,7 +98,6 @@ class _EdgePainter extends CustomPainter {
   final bool isHighlighted;
   final bool isIncomplete;
   final double rate;
-  final String resourceName;
   final double animationProgress;
 
   _EdgePainter({
@@ -94,7 +107,6 @@ class _EdgePainter extends CustomPainter {
     required this.isHighlighted,
     required this.isIncomplete,
     required this.rate,
-    required this.resourceName,
     this.animationProgress = 0.0,
   });
 
@@ -163,19 +175,18 @@ class _EdgePainter extends CustomPainter {
 
     final dx = end.dx - start.dx;
     final dy = end.dy - start.dy;
-    final distance = (dx * dx + dy * dy);
+    final distance = sqrt(dx * dx + dy * dy);
     if (distance == 0) return;
 
-    final length = distance > 0 ? (distance).abs() : 1.0;
-    final unitX = dx / length;
-    final unitY = dy / length;
+    final unitX = dx / distance;
+    final unitY = dy / distance;
 
     var currentX = start.dx;
     var currentY = start.dy;
     var drawn = 0.0;
 
-    while (drawn < length) {
-      final dashEnd = (drawn + dashWidth).clamp(0, length);
+    while (drawn < distance) {
+      final dashEnd = (drawn + dashWidth).clamp(0.0, distance);
       canvas.drawLine(
         Offset(currentX, currentY),
         Offset(start.dx + unitX * dashEnd, start.dy + unitY * dashEnd),
@@ -191,21 +202,25 @@ class _EdgePainter extends CustomPainter {
   void _drawArrowhead(Canvas canvas, Paint paint) {
     final dx = endOffset.dx - startOffset.dx;
     final dy = endOffset.dy - startOffset.dy;
-    final angle = dx != 0 || dy != 0 ? (dy / dx).abs() : 0.0;
+    final angle = atan2(dy, dx);
 
     const arrowSize = 10.0;
-    final arrowAngle = angle * 0.5;
+    const arrowSpread = 0.4; // ~23 degrees in radians
+
+    // Calculate the two points of the arrowhead
+    final arrowPoint1 = Offset(
+      endOffset.dx - arrowSize * cos(angle - arrowSpread),
+      endOffset.dy - arrowSize * sin(angle - arrowSpread),
+    );
+    final arrowPoint2 = Offset(
+      endOffset.dx - arrowSize * cos(angle + arrowSpread),
+      endOffset.dy - arrowSize * sin(angle + arrowSpread),
+    );
 
     final arrowPath = Path();
     arrowPath.moveTo(endOffset.dx, endOffset.dy);
-    arrowPath.lineTo(
-      endOffset.dx - arrowSize * (1 + arrowAngle),
-      endOffset.dy - arrowSize / 2,
-    );
-    arrowPath.lineTo(
-      endOffset.dx - arrowSize * (1 + arrowAngle),
-      endOffset.dy + arrowSize / 2,
-    );
+    arrowPath.lineTo(arrowPoint1.dx, arrowPoint1.dy);
+    arrowPath.lineTo(arrowPoint2.dx, arrowPoint2.dy);
     arrowPath.close();
 
     final arrowPaint = Paint()
