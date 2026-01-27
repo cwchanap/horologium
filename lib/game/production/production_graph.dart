@@ -175,6 +175,7 @@ class ProductionGraph {
   });
 
   /// Factory to build a production graph from buildings and resources.
+  // TODO(T011): Use resources parameter to calculate actual flow rates based on current resource levels
   factory ProductionGraph.fromBuildings(
     List<Building> buildings,
     Resources resources,

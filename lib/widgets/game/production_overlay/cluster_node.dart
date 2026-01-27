@@ -29,7 +29,7 @@ class ClusterNodeWidget extends StatelessWidget {
           width: 140,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.grey[850],
+            color: Colors.grey[800],
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: _getStatusColor(cluster.aggregateStatus).withAlpha(128),

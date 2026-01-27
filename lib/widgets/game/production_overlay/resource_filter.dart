@@ -36,7 +36,7 @@ class ResourceFilterWidget extends StatelessWidget {
             style: TextStyle(color: Colors.grey, fontSize: 14),
           ),
           icon: const Icon(Icons.filter_list, color: Colors.grey, size: 18),
-          dropdownColor: Colors.grey[850],
+          dropdownColor: Colors.grey[800],
           style: const TextStyle(color: Colors.white, fontSize: 14),
           items: [
             const DropdownMenuItem<ResourceType?>(

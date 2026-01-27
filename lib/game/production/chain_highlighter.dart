@@ -103,10 +103,14 @@ class ChainHighlighter {
     ProductionGraph graph,
     ChainHighlight highlight,
   ) {
+    // Cache the set to avoid recreating it for each node
+    final allNodeIds = highlight.allNodeIds;
+    final rootNodeId = highlight.rootNodeId;
+
     final highlightedNodes = graph.nodes.map((node) {
       return node.copyWith(
-        isHighlighted: highlight.allNodeIds.contains(node.id),
-        isSelected: node.id == highlight.rootNodeId,
+        isHighlighted: allNodeIds.contains(node.id),
+        isSelected: node.id == rootNodeId,
       );
     }).toList();
 

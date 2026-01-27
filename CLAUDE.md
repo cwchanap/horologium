@@ -279,10 +279,8 @@ GitHub Actions runs on push/PR to main:
 - Requirements: `pip install -r scripts/requirements.txt`
 
 ## Active Technologies
-- Dart 3.x (null safety) + Flutter 3.x, Flame (latest stable) (001-production-chain-visualization)
-- N/A (uses existing in-memory state; no new persistence) (001-production-chain-visualization)
-- Dart 3.x with null safety + Flutter 3.x (latest stable), Flame (latest stable) (001-production-chain-visualization)
-- N/A (uses existing in-memory state; no new persistence required) (001-production-chain-visualization)
+- **Language/Framework**: Dart 3.x (null safety), Flutter 3.x, Flame (latest stable)
+- **Persistence**: In-memory state with SharedPreferences for game saves
 
 ## Recent Changes
-- 001-production-chain-visualization: Added Dart 3.x (null safety) + Flutter 3.x, Flame (latest stable)
+- 001-production-chain-visualization: Added production chain visualization overlay

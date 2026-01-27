@@ -375,7 +375,7 @@ void main() {
           id: 'edge1',
           resourceType: ResourceType.coal,
           producerNodeId: 'node1',
-          consumerNodeId: 'node2',
+          consumerNodeId: 'node1',
           ratePerSecond: 1.0,
           status: FlowStatus.balanced,
           isHighlighted: true,
