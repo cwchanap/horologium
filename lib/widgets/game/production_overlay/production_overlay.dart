@@ -5,6 +5,7 @@
 library;
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:horologium/game/building/building.dart';
@@ -484,8 +485,23 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
 
   Offset _getEdgePosition(ResourceFlowEdge edge) {
     final startNode = _findNode(edge.producerNodeId);
-    if (startNode == null) return Offset.zero;
-    return startNode.position;
+    final endNode = _findNode(edge.consumerNodeId);
+    if (startNode == null || endNode == null) return Offset.zero;
+
+    // Dimensions must match those in ResourceFlowEdgeWidget and BuildingNodeWidget
+    const nodeWidth = 120.0;
+    const nodeHeight = 80.0;
+    const padding = 50.0;
+
+    final startX = startNode.position.dx + nodeWidth;
+    final startY = startNode.position.dy + nodeHeight / 2;
+    final endX = endNode.position.dx;
+    final endY = endNode.position.dy + nodeHeight / 2;
+
+    final minX = min(startX, endX);
+    final minY = min(startY, endY);
+
+    return Offset(minX - padding / 2, minY - padding / 2);
   }
 
   Widget _getStatusIcon(FlowStatus status) {

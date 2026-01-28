@@ -270,14 +270,73 @@ void main() {
       );
       expect(producer.status, equals(FlowStatus.balanced));
     });
+
+    test('excludes idle producers from production totals', () {
+      final nodes = [
+        _createNode('idle_producer', {}, {
+          ResourceType.coal: 1.0,
+        }, hasWorkers: false),
+        _createNode('consumer', {ResourceType.coal: 1.0}, {}),
+      ];
+      final graph = ProductionGraph(
+        id: 'test',
+        generatedAt: DateTime.now(),
+        nodes: nodes,
+        edges: [],
+        bottlenecks: [],
+      );
+
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
+
+      // Should have a bottleneck because the producer is idle (0 production vs 1 consumption)
+      expect(analyzedGraph.bottlenecks.isNotEmpty, isTrue);
+      expect(
+        analyzedGraph.bottlenecks.first.resourceType,
+        equals(ResourceType.coal),
+      );
+      // Consumer status should be deficit
+      final consumer = analyzedGraph.nodes.firstWhere(
+        (n) => n.id == 'consumer',
+      );
+      expect(consumer.status, equals(FlowStatus.deficit));
+    });
+
+    test('excludes idle consumers from consumption totals', () {
+      final nodes = [
+        _createNode('producer', {}, {ResourceType.coal: 1.0}),
+        _createNode(
+          'idle_consumer',
+          {ResourceType.coal: 2.0},
+          {},
+          hasWorkers: false,
+        ),
+      ];
+      final graph = ProductionGraph(
+        id: 'test',
+        generatedAt: DateTime.now(),
+        nodes: nodes,
+        edges: [],
+        bottlenecks: [],
+      );
+
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
+
+      // Should be surplus because consumer is idle (1 production vs 0 consumption)
+      // Or balanced if treating 0 consumption as balanced/surplus.
+      // FlowAnalyzer.calculateFlowStatus(1.0, 0.0) -> surplus.
+
+      // Check bottlenecks - should be empty as there is no deficit
+      expect(analyzedGraph.bottlenecks.isEmpty, isTrue);
+    });
   });
 }
 
 BuildingNode _createNode(
   String id,
   Map<ResourceType, double> inputs,
-  Map<ResourceType, double> outputs,
-) {
+  Map<ResourceType, double> outputs, {
+  bool hasWorkers = true,
+}) {
   return BuildingNode(
     id: id,
     name: id,
@@ -302,6 +361,6 @@ BuildingNode _createNode(
         )
         .toList(),
     status: FlowStatus.balanced,
-    hasWorkers: true,
+    hasWorkers: hasWorkers,
   );
 }

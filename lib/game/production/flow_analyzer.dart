@@ -43,6 +43,8 @@ class FlowAnalyzer {
 
     // Aggregate production and consumption per resource type
     for (final node in nodes) {
+      if (!node.hasWorkers) continue;
+
       for (final output in node.outputs) {
         resourceStats
                 .putIfAbsent(output.resourceType, () => _ResourceStats())
@@ -128,6 +130,8 @@ class FlowAnalyzer {
 
     // Collect stats
     for (final node in graph.nodes) {
+      if (!node.hasWorkers) continue;
+
       for (final output in node.outputs) {
         resourceStats
                 .putIfAbsent(output.resourceType, () => _ResourceStats())
