@@ -10,6 +10,7 @@ import 'package:horologium/widgets/game/production_overlay/cluster_node.dart';
 import 'package:horologium/widgets/game/production_overlay/empty_state.dart';
 import 'package:horologium/widgets/game/production_overlay/node_detail_panel.dart';
 import 'package:horologium/widgets/game/production_overlay/production_overlay.dart';
+import 'package:horologium/widgets/game/production_overlay/resource_flow_edge.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -423,7 +424,6 @@ void main() {
         id: 'cluster1',
         category: BuildingCategory.processing,
         nodeIds: ['node1', 'node2'],
-        nodeCount: 10,
         aggregateStatus: FlowStatus.balanced,
       );
 
@@ -441,7 +441,6 @@ void main() {
         id: 'cluster1',
         category: BuildingCategory.residential,
         nodeIds: List.generate(15, (i) => 'node_$i'),
-        nodeCount: 15,
         aggregateStatus: FlowStatus.surplus,
       );
 
@@ -460,7 +459,6 @@ void main() {
         id: 'cluster1',
         category: BuildingCategory.rawMaterials,
         nodeIds: ['node1'],
-        nodeCount: 5,
         aggregateStatus: FlowStatus.balanced,
       );
 
@@ -484,7 +482,6 @@ void main() {
         id: 'cluster1',
         category: BuildingCategory.services,
         nodeIds: ['node1'],
-        nodeCount: 5,
         aggregateStatus: FlowStatus.balanced,
         isExpanded: false,
       );
@@ -503,7 +500,6 @@ void main() {
         id: 'cluster1',
         category: BuildingCategory.services,
         nodeIds: ['node1'],
-        nodeCount: 5,
         aggregateStatus: FlowStatus.balanced,
         isExpanded: true,
       );
@@ -605,6 +601,210 @@ void main() {
 
       // Balanced shows dash/remove icon
       expect(find.byIcon(Icons.remove), findsOneWidget);
+    });
+  });
+
+  group('ResourceFlowEdgeWidget', () {
+    testWidgets('renders SizedBox.shrink when startNode is null', (
+      tester,
+    ) async {
+      final edge = ResourceFlowEdge(
+        id: 'edge1',
+        producerNodeId: 'node1',
+        consumerNodeId: 'node2',
+        resourceType: ResourceType.coal,
+        ratePerSecond: 1.0,
+        status: FlowStatus.balanced,
+        isIncomplete: false,
+        isHighlighted: false,
+      );
+
+      final endNode = BuildingNode(
+        id: 'node2',
+        type: BuildingType.powerPlant,
+        name: 'Power Plant',
+        category: BuildingCategory.primaryFactory,
+        position: const Offset(200, 100),
+        inputs: [],
+        outputs: [],
+        status: FlowStatus.balanced,
+        hasWorkers: true,
+        isSelected: false,
+        isHighlighted: false,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ResourceFlowEdgeWidget(
+            edge: edge,
+            startNode: null,
+            endNode: endNode,
+          ),
+        ),
+      );
+
+      // Widget should return SizedBox.shrink
+      final widget = tester.widget<SizedBox>(find.byType(SizedBox).first);
+      expect(widget.width, equals(0.0));
+      expect(widget.height, equals(0.0));
+    });
+
+    testWidgets('renders SizedBox.shrink when endNode is null', (tester) async {
+      final edge = ResourceFlowEdge(
+        id: 'edge1',
+        producerNodeId: 'node1',
+        consumerNodeId: 'node2',
+        resourceType: ResourceType.coal,
+        ratePerSecond: 1.0,
+        status: FlowStatus.balanced,
+        isIncomplete: false,
+        isHighlighted: false,
+      );
+
+      final startNode = BuildingNode(
+        id: 'node1',
+        type: BuildingType.coalMine,
+        name: 'Coal Mine',
+        category: BuildingCategory.rawMaterials,
+        position: const Offset(100, 100),
+        inputs: [],
+        outputs: [],
+        status: FlowStatus.balanced,
+        hasWorkers: true,
+        isSelected: false,
+        isHighlighted: false,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ResourceFlowEdgeWidget(
+            edge: edge,
+            startNode: startNode,
+            endNode: null,
+          ),
+        ),
+      );
+
+      // Widget should return SizedBox.shrink
+      final widget = tester.widget<SizedBox>(find.byType(SizedBox).first);
+      expect(widget.width, equals(0.0));
+      expect(widget.height, equals(0.0));
+    });
+
+    testWidgets('renders edge when both nodes exist', (tester) async {
+      final edge = ResourceFlowEdge(
+        id: 'edge1',
+        producerNodeId: 'node1',
+        consumerNodeId: 'node2',
+        resourceType: ResourceType.coal,
+        ratePerSecond: 1.0,
+        status: FlowStatus.balanced,
+        isIncomplete: false,
+        isHighlighted: false,
+      );
+
+      final startNode = BuildingNode(
+        id: 'node1',
+        type: BuildingType.coalMine,
+        name: 'Coal Mine',
+        category: BuildingCategory.rawMaterials,
+        position: const Offset(100, 100),
+        inputs: [],
+        outputs: [],
+        status: FlowStatus.balanced,
+        hasWorkers: true,
+        isSelected: false,
+        isHighlighted: false,
+      );
+
+      final endNode = BuildingNode(
+        id: 'node2',
+        type: BuildingType.powerPlant,
+        name: 'Power Plant',
+        category: BuildingCategory.primaryFactory,
+        position: const Offset(300, 100),
+        inputs: [],
+        outputs: [],
+        status: FlowStatus.balanced,
+        hasWorkers: true,
+        isSelected: false,
+        isHighlighted: false,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ResourceFlowEdgeWidget(
+              edge: edge,
+              startNode: startNode,
+              endNode: endNode,
+            ),
+          ),
+        ),
+      );
+
+      // Should render CustomPaint for the edge (may be multiple layers)
+      expect(find.byType(CustomPaint), findsWidgets);
+      expect(find.byType(SizedBox), findsNothing);
+    });
+
+    testWidgets('disposes animation controller properly', (tester) async {
+      final edge = ResourceFlowEdge(
+        id: 'edge1',
+        producerNodeId: 'node1',
+        consumerNodeId: 'node2',
+        resourceType: ResourceType.coal,
+        ratePerSecond: 1.0,
+        status: FlowStatus.balanced,
+        isIncomplete: false,
+        isHighlighted: false,
+      );
+
+      final startNode = BuildingNode(
+        id: 'node1',
+        type: BuildingType.coalMine,
+        name: 'Coal Mine',
+        category: BuildingCategory.rawMaterials,
+        position: const Offset(100, 100),
+        inputs: [],
+        outputs: [],
+        status: FlowStatus.balanced,
+        hasWorkers: true,
+        isSelected: false,
+        isHighlighted: false,
+      );
+
+      final endNode = BuildingNode(
+        id: 'node2',
+        type: BuildingType.powerPlant,
+        name: 'Power Plant',
+        category: BuildingCategory.primaryFactory,
+        position: const Offset(300, 100),
+        inputs: [],
+        outputs: [],
+        status: FlowStatus.balanced,
+        hasWorkers: true,
+        isSelected: false,
+        isHighlighted: false,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ResourceFlowEdgeWidget(
+              edge: edge,
+              startNode: startNode,
+              endNode: endNode,
+            ),
+          ),
+        ),
+      );
+
+      // Dispose the widget
+      await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+
+      // No assertion needed - if animation controller wasn't disposed,
+      // this would throw or cause memory leaks detectable in debug mode
     });
   });
 }

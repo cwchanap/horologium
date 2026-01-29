@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:horologium/game/production/production_graph.dart';
+import 'package:horologium/widgets/game/production_overlay/production_theme.dart';
 
 /// Widget representing a directed edge between two building nodes.
 /// Includes animated flow indicator showing resource direction.
@@ -46,36 +47,40 @@ class _ResourceFlowEdgeWidgetState extends State<ResourceFlowEdgeWidget>
   @override
   Widget build(BuildContext context) {
     if (widget.startNode == null || widget.endNode == null) {
+      debugPrint(
+        'Warning: ResourceFlowEdgeWidget missing node(s) for edge ${widget.edge.id} '
+        '(producer: ${widget.edge.producerNodeId}, consumer: ${widget.edge.consumerNodeId})',
+      );
       return const SizedBox.shrink();
     }
 
     // Calculate edge positions (from right side of start to left side of end)
-    const nodeWidth = 120.0;
-    const nodeHeight = 80.0;
-
-    final startX = widget.startNode!.position.dx + nodeWidth;
-    final startY = widget.startNode!.position.dy + nodeHeight / 2;
+    final startX = widget.startNode!.position.dx + ProductionTheme.nodeWidth;
+    final startY =
+        widget.startNode!.position.dy + ProductionTheme.nodeHeight / 2;
     final endX = widget.endNode!.position.dx;
-    final endY = widget.endNode!.position.dy + nodeHeight / 2;
+    final endY = widget.endNode!.position.dy + ProductionTheme.nodeHeight / 2;
 
     // Calculate bounding box for local coordinates
     final minX = min(startX, endX);
     final minY = min(startY, endY);
     final maxX = max(startX, endX);
     final maxY = max(startY, endY);
-    const padding = 50.0;
 
     // Convert to local coordinates within the CustomPaint
-    final localStartX = startX - minX + padding / 2;
-    final localStartY = startY - minY + padding / 2;
-    final localEndX = endX - minX + padding / 2;
-    final localEndY = endY - minY + padding / 2;
+    final localStartX = startX - minX + ProductionTheme.edgePadding / 2;
+    final localStartY = startY - minY + ProductionTheme.edgePadding / 2;
+    final localEndX = endX - minX + ProductionTheme.edgePadding / 2;
+    final localEndY = endY - minY + ProductionTheme.edgePadding / 2;
 
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
         return CustomPaint(
-          size: Size(maxX - minX + padding, maxY - minY + padding),
+          size: Size(
+            maxX - minX + ProductionTheme.edgePadding,
+            maxY - minY + ProductionTheme.edgePadding,
+          ),
           painter: _EdgePainter(
             startOffset: Offset(localStartX, localStartY),
             endOffset: Offset(localEndX, localEndY),
@@ -112,7 +117,7 @@ class _EdgePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final color = _getStatusColor();
+    final color = ProductionTheme.getStatusColor(status);
     final paint = Paint()
       ..color = isHighlighted ? color : color.withAlpha(128)
       ..strokeWidth = isHighlighted ? 3 : 2
@@ -239,7 +244,7 @@ class _EdgePainter extends CustomPainter {
     final textSpan = TextSpan(
       text: '${rate.toStringAsFixed(1)}/s',
       style: TextStyle(
-        color: _getStatusColor(),
+        color: ProductionTheme.getStatusColor(status),
         fontSize: 10,
         fontWeight: FontWeight.bold,
       ),
@@ -279,7 +284,7 @@ class _EdgePainter extends CustomPainter {
 
     // Draw small status indicator icon
     final iconPaint = Paint()
-      ..color = _getStatusColor()
+      ..color = ProductionTheme.getStatusColor(status)
       ..style = PaintingStyle.fill;
 
     switch (status) {
@@ -317,17 +322,6 @@ class _EdgePainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
         );
-    }
-  }
-
-  Color _getStatusColor() {
-    switch (status) {
-      case FlowStatus.surplus:
-        return const Color(0xFF4CAF50); // Green
-      case FlowStatus.balanced:
-        return const Color(0xFFFFEB3B); // Yellow
-      case FlowStatus.deficit:
-        return const Color(0xFFF44336); // Red
     }
   }
 

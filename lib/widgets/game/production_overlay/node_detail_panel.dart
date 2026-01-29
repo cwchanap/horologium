@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:horologium/game/production/production_graph.dart';
+import 'package:horologium/widgets/game/production_overlay/production_theme.dart';
 
 /// Panel displaying detailed information about a selected building node.
 class NodeDetailPanel extends StatelessWidget {
@@ -168,7 +169,7 @@ class NodeDetailPanel extends StatelessWidget {
   }
 
   Widget _buildResourceChip(ResourcePort port) {
-    final color = _getStatusColor(port.status);
+    final color = ProductionTheme.getStatusColor(port.status);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -201,8 +202,8 @@ class NodeDetailPanel extends StatelessWidget {
   }
 
   Widget _getStatusIcon(FlowStatus status) {
-    final color = _getStatusColor(status);
-    final icon = _getStatusIconData(status);
+    final color = ProductionTheme.getStatusColor(status);
+    final icon = ProductionTheme.getStatusIcon(status);
 
     return Container(
       padding: const EdgeInsets.all(6),
@@ -215,30 +216,8 @@ class NodeDetailPanel extends StatelessWidget {
   }
 
   Widget _getSmallStatusIcon(FlowStatus status) {
-    final icon = _getStatusIconData(status);
-    return Icon(icon, color: _getStatusColor(status), size: 12);
-  }
-
-  IconData _getStatusIconData(FlowStatus status) {
-    switch (status) {
-      case FlowStatus.surplus:
-        return Icons.check;
-      case FlowStatus.balanced:
-        return Icons.remove;
-      case FlowStatus.deficit:
-        return Icons.close;
-    }
-  }
-
-  Color _getStatusColor(FlowStatus status) {
-    switch (status) {
-      case FlowStatus.surplus:
-        return const Color(0xFF4CAF50);
-      case FlowStatus.balanced:
-        return const Color(0xFFFFEB3B);
-      case FlowStatus.deficit:
-        return const Color(0xFFF44336);
-    }
+    final icon = ProductionTheme.getStatusIcon(status);
+    return Icon(icon, color: ProductionTheme.getStatusColor(status), size: 12);
   }
 
   Color _getSeverityColor(BottleneckSeverity severity) {

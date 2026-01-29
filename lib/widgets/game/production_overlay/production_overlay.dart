@@ -21,6 +21,7 @@ import 'package:horologium/widgets/game/production_overlay/empty_state.dart';
 import 'package:horologium/widgets/game/production_overlay/node_detail_panel.dart';
 import 'package:horologium/widgets/game/production_overlay/resource_filter.dart';
 import 'package:horologium/widgets/game/production_overlay/resource_flow_edge.dart';
+import 'package:horologium/widgets/game/production_overlay/production_theme.dart';
 
 /// Callback to get current buildings.
 typedef GetBuildings = List<Building> Function();
@@ -103,17 +104,18 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     }
 
     // Create clusters for large graphs
-    final clusters = graph.isClustered
+    var clusters = graph.isClustered
         ? ProductionGraph.createClusters(graph.nodes)
         : <NodeCluster>[];
 
     // Apply layout to clusters
     if (clusters.isNotEmpty) {
       double xOffset = 50;
-      for (final cluster in clusters) {
-        cluster.position = Offset(xOffset, 100);
+      clusters = clusters.map((cluster) {
+        final positioned = cluster.copyWith(position: Offset(xOffset, 100));
         xOffset += _horizontalSpacing;
-      }
+        return positioned;
+      }).toList();
     }
 
     setState(() {
@@ -242,7 +244,10 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   }
 
   void _onNodeDoubleTap(BuildingNode node) {
-    if (_graph == null) return;
+    if (_graph == null) {
+      debugPrint('Warning: Double-tap on node ${node.id} but graph is null');
+      return;
+    }
 
     final highlight = ChainHighlighter.findConnectedChain(
       node.id,
@@ -258,7 +263,10 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   }
 
   void _onBackgroundTap() {
-    if (_graph == null) return;
+    if (_graph == null) {
+      debugPrint('Warning: Background tap but graph is null');
+      return;
+    }
 
     setState(() {
       _selectedNode = null;
@@ -476,10 +484,21 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   }
 
   BuildingNode? _findNode(String nodeId) {
+    if (_graph == null) {
+      debugPrint(
+        'Warning: _findNode called with null graph for nodeId: $nodeId',
+      );
+      return null;
+    }
     try {
       return _graph!.nodes.firstWhere((n) => n.id == nodeId);
-    } catch (_) {
+    } on StateError {
+      // Expected: node not found in graph (may have been filtered out)
       return null;
+    } catch (e, stackTrace) {
+      // Unexpected error - log for debugging
+      debugPrint('Error finding node $nodeId: $e\n$stackTrace');
+      rethrow;
     }
   }
 
@@ -488,31 +507,24 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     final endNode = _findNode(edge.consumerNodeId);
     if (startNode == null || endNode == null) return Offset.zero;
 
-    // Dimensions must match those in ResourceFlowEdgeWidget and BuildingNodeWidget
-    const nodeWidth = 120.0;
-    const nodeHeight = 80.0;
-    const padding = 50.0;
-
-    final startX = startNode.position.dx + nodeWidth;
-    final startY = startNode.position.dy + nodeHeight / 2;
+    final startX = startNode.position.dx + ProductionTheme.nodeWidth;
+    final startY = startNode.position.dy + ProductionTheme.nodeHeight / 2;
     final endX = endNode.position.dx;
-    final endY = endNode.position.dy + nodeHeight / 2;
+    final endY = endNode.position.dy + ProductionTheme.nodeHeight / 2;
 
     final minX = min(startX, endX);
     final minY = min(startY, endY);
 
-    return Offset(minX - padding / 2, minY - padding / 2);
+    return Offset(
+      minX - ProductionTheme.edgePadding / 2,
+      minY - ProductionTheme.edgePadding / 2,
+    );
   }
 
   Widget _getStatusIcon(FlowStatus status) {
-    switch (status) {
-      case FlowStatus.surplus:
-        return const Icon(Icons.check_circle, color: Colors.green);
-      case FlowStatus.balanced:
-        return const Icon(Icons.remove_circle, color: Colors.yellow);
-      case FlowStatus.deficit:
-        return const Icon(Icons.cancel, color: Colors.red);
-    }
+    final color = ProductionTheme.getStatusColor(status);
+    final icon = ProductionTheme.getStatusIcon(status);
+    return Icon(icon, color: color);
   }
 }
 

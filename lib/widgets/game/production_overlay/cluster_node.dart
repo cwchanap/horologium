@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:horologium/game/building/category.dart';
 import 'package:horologium/game/production/production_graph.dart';
+import 'package:horologium/widgets/game/production_overlay/production_theme.dart';
 
 /// Widget representing a cluster of buildings in the production graph.
 class ClusterNodeWidget extends StatelessWidget {
@@ -32,7 +33,9 @@ class ClusterNodeWidget extends StatelessWidget {
             color: Colors.grey[800],
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _getStatusColor(cluster.aggregateStatus).withAlpha(128),
+              color: ProductionTheme.getStatusColor(
+                cluster.aggregateStatus,
+              ).withAlpha(128),
               width: 2,
             ),
           ),
@@ -42,7 +45,7 @@ class ClusterNodeWidget extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _getCategoryIcon(cluster.category),
+                  ProductionTheme.getCategoryIcon(cluster.category, size: 24),
                   const SizedBox(width: 4),
                   _getStatusIndicator(cluster.aggregateStatus),
                 ],
@@ -82,38 +85,6 @@ class ClusterNodeWidget extends StatelessWidget {
     );
   }
 
-  Color _getStatusColor(FlowStatus status) {
-    switch (status) {
-      case FlowStatus.surplus:
-        return const Color(0xFF4CAF50);
-      case FlowStatus.balanced:
-        return const Color(0xFFFFEB3B);
-      case FlowStatus.deficit:
-        return const Color(0xFFF44336);
-    }
-  }
-
-  Widget _getCategoryIcon(BuildingCategory category) {
-    IconData iconData;
-    switch (category) {
-      case BuildingCategory.rawMaterials:
-        iconData = Icons.terrain;
-      case BuildingCategory.processing:
-      case BuildingCategory.primaryFactory:
-        iconData = Icons.factory;
-      case BuildingCategory.refinement:
-        iconData = Icons.science;
-      case BuildingCategory.residential:
-        iconData = Icons.home;
-      case BuildingCategory.services:
-        iconData = Icons.storefront;
-      case BuildingCategory.foodResources:
-        iconData = Icons.restaurant;
-    }
-
-    return Icon(iconData, size: 24, color: Colors.grey[400]);
-  }
-
   String _getCategoryName(BuildingCategory category) {
     switch (category) {
       case BuildingCategory.rawMaterials:
@@ -134,8 +105,8 @@ class ClusterNodeWidget extends StatelessWidget {
   }
 
   Widget _getStatusIndicator(FlowStatus status) {
-    final color = _getStatusColor(status);
-    final icon = _getStatusIcon(status);
+    final color = ProductionTheme.getStatusColor(status);
+    final icon = ProductionTheme.getStatusIcon(status);
 
     return Container(
       padding: const EdgeInsets.all(4),
@@ -145,16 +116,5 @@ class ClusterNodeWidget extends StatelessWidget {
       ),
       child: Icon(icon, size: 16, color: color),
     );
-  }
-
-  IconData _getStatusIcon(FlowStatus status) {
-    switch (status) {
-      case FlowStatus.surplus:
-        return Icons.check;
-      case FlowStatus.balanced:
-        return Icons.remove;
-      case FlowStatus.deficit:
-        return Icons.close;
-    }
   }
 }
