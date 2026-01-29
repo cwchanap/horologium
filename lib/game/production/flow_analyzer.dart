@@ -1,6 +1,7 @@
 /// Flow analysis logic for calculating production status and detecting bottlenecks.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:horologium/game/production/production_graph.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 
@@ -157,13 +158,19 @@ class FlowAnalyzer {
 
     // Update edges with calculated status
     final updatedEdges = graph.edges.map((edge) {
+      final status = resourceStatus[edge.resourceType];
+      if (status == null) {
+        debugPrint(
+          'Warning: No status computed for resource ${edge.resourceType.name} on edge ${edge.id}',
+        );
+      }
       return ResourceFlowEdge(
         id: edge.id,
         resourceType: edge.resourceType,
         producerNodeId: edge.producerNodeId,
         consumerNodeId: edge.consumerNodeId,
         ratePerSecond: edge.ratePerSecond,
-        status: resourceStatus[edge.resourceType] ?? FlowStatus.balanced,
+        status: status ?? FlowStatus.balanced,
         isHighlighted: edge.isHighlighted,
         isIncomplete: edge.isIncomplete,
       );
@@ -174,12 +181,17 @@ class FlowAnalyzer {
       FlowStatus nodeStatus = FlowStatus.balanced;
 
       for (final input in node.inputs) {
-        final status =
-            resourceStatus[input.resourceType] ?? FlowStatus.balanced;
-        if (status == FlowStatus.deficit) {
+        final status = resourceStatus[input.resourceType];
+        if (status == null) {
+          debugPrint(
+            'Warning: No status computed for resource ${input.resourceType.name} on node ${node.id}',
+          );
+        }
+        final actualStatus = status ?? FlowStatus.balanced;
+        if (actualStatus == FlowStatus.deficit) {
           nodeStatus = FlowStatus.deficit;
           break;
-        } else if (status == FlowStatus.surplus &&
+        } else if (actualStatus == FlowStatus.surplus &&
             nodeStatus != FlowStatus.deficit) {
           nodeStatus = FlowStatus.surplus;
         }

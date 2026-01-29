@@ -8,6 +8,7 @@ library;
 
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/building/category.dart';
 import 'package:horologium/game/resources/resource_type.dart';
@@ -60,9 +61,9 @@ class BuildingNode {
   final List<ResourcePort> outputs;
   final FlowStatus status;
   final bool hasWorkers;
-  Offset position;
-  bool isSelected;
-  bool isHighlighted;
+  final Offset position;
+  final bool isSelected;
+  final bool isHighlighted;
 
   BuildingNode({
     required this.id,
@@ -108,7 +109,7 @@ class ResourceFlowEdge {
   final String consumerNodeId;
   final double ratePerSecond;
   final FlowStatus status;
-  bool isHighlighted;
+  final bool isHighlighted;
   final bool isIncomplete;
 
   ResourceFlowEdge({
@@ -195,7 +196,13 @@ class ProductionGraph {
       for (final entry in building.baseConsumption.entries) {
         final resourceType = ResourceType.values.firstWhere(
           (r) => r.name == entry.key,
-          orElse: () => ResourceType.cash,
+          orElse: () {
+            debugPrint(
+              'Warning: Unknown resource type "${entry.key}" in building ${building.name}, falling back to cash',
+            );
+            assert(false, 'Unknown resource type: ${entry.key}');
+            return ResourceType.cash;
+          },
         );
         inputs.add(
           ResourcePort(
@@ -210,7 +217,13 @@ class ProductionGraph {
       for (final entry in building.baseGeneration.entries) {
         final resourceType = ResourceType.values.firstWhere(
           (r) => r.name == entry.key,
-          orElse: () => ResourceType.cash,
+          orElse: () {
+            debugPrint(
+              'Warning: Unknown resource type "${entry.key}" in building ${building.name}, falling back to cash',
+            );
+            assert(false, 'Unknown resource type: ${entry.key}');
+            return ResourceType.cash;
+          },
         );
         outputs.add(
           ResourcePort(
@@ -306,7 +319,6 @@ class ProductionGraph {
         id: 'cluster_${category.name}',
         category: category,
         nodeIds: nodesInCategory.map((n) => n.id).toList(),
-        nodeCount: nodesInCategory.length,
         aggregateStatus: aggregateStatus,
       );
     }).toList();
@@ -318,18 +330,31 @@ class NodeCluster {
   final String id;
   final BuildingCategory category;
   final List<String> nodeIds;
-  final int nodeCount;
   final FlowStatus aggregateStatus;
-  Offset position;
-  bool isExpanded;
+  final Offset position;
+  final bool isExpanded;
+
+  /// Count of nodes in this cluster.
+  int get nodeCount => nodeIds.length;
 
   NodeCluster({
     required this.id,
     required this.category,
     required this.nodeIds,
-    required this.nodeCount,
     required this.aggregateStatus,
     this.position = Offset.zero,
     this.isExpanded = false,
   });
+
+  /// Create a copy with updated position or expansion state.
+  NodeCluster copyWith({Offset? position, bool? isExpanded}) {
+    return NodeCluster(
+      id: id,
+      category: category,
+      nodeIds: nodeIds,
+      aggregateStatus: aggregateStatus,
+      position: position ?? this.position,
+      isExpanded: isExpanded ?? this.isExpanded,
+    );
+  }
 }
