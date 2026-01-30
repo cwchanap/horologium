@@ -67,9 +67,7 @@ void main() {
         _createNode('producer', {}, {ResourceType.coal: 0.5}),
         _createNode('consumer', {ResourceType.coal: 1.0}, {}),
       ];
-      final edges = <ResourceFlowEdge>[];
-
-      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes, edges);
+      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes);
 
       expect(bottlenecks.length, equals(1));
       expect(bottlenecks[0].resourceType, equals(ResourceType.coal));
@@ -88,9 +86,7 @@ void main() {
         _createNode('producer', {}, {ResourceType.coal: 0.3}),
         _createNode('consumer', {ResourceType.coal: 1.0}, {}),
       ];
-      final edges = <ResourceFlowEdge>[];
-
-      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes, edges);
+      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes);
 
       expect(bottlenecks[0].severity, equals(BottleneckSeverity.high));
     });
@@ -100,9 +96,7 @@ void main() {
         _createNode('producer', {}, {ResourceType.coal: 0.6}),
         _createNode('consumer', {ResourceType.coal: 1.0}, {}),
       ];
-      final edges = <ResourceFlowEdge>[];
-
-      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes, edges);
+      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes);
 
       expect(bottlenecks[0].severity, equals(BottleneckSeverity.medium));
     });
@@ -112,9 +106,7 @@ void main() {
         _createNode('producer', {}, {ResourceType.coal: 0.8}),
         _createNode('consumer', {ResourceType.coal: 1.0}, {}),
       ];
-      final edges = <ResourceFlowEdge>[];
-
-      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes, edges);
+      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes);
 
       expect(bottlenecks[0].severity, equals(BottleneckSeverity.low));
     });
@@ -124,9 +116,7 @@ void main() {
         _createNode('producer', {}, {ResourceType.coal: 1.0}),
         _createNode('consumer', {ResourceType.coal: 1.0}, {}),
       ];
-      final edges = <ResourceFlowEdge>[];
-
-      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes, edges);
+      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes);
 
       expect(bottlenecks.isEmpty, isTrue);
     });
@@ -136,9 +126,7 @@ void main() {
         _createNode('producer', {}, {ResourceType.coal: 0.5}),
         _createNode('consumer', {ResourceType.coal: 1.0}, {}),
       ];
-      final edges = <ResourceFlowEdge>[];
-
-      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes, edges);
+      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes);
 
       expect(bottlenecks[0].recommendation, contains('producer'));
     });
@@ -152,9 +140,7 @@ void main() {
           ResourceType.electricity: 1.0,
         }, {}),
       ];
-      final edges = <ResourceFlowEdge>[];
-
-      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes, edges);
+      final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes);
 
       // Coal has deficit (0.5 vs 1.0), electricity has surplus (2.0 vs 1.0)
       expect(bottlenecks.length, equals(1));

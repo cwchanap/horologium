@@ -35,10 +35,7 @@ class FlowAnalyzer {
   /// Detect bottlenecks in the production graph.
   ///
   /// Returns a list of [BottleneckInsight] for each resource with deficit.
-  static List<BottleneckInsight> detectBottlenecks(
-    List<BuildingNode> nodes,
-    List<ResourceFlowEdge> edges,
-  ) {
+  static List<BottleneckInsight> detectBottlenecks(List<BuildingNode> nodes) {
     final bottlenecks = <BottleneckInsight>[];
     final resourceStats = <ResourceType, _ResourceStats>{};
 
@@ -213,7 +210,7 @@ class FlowAnalyzer {
     }).toList();
 
     // Detect bottlenecks
-    final bottlenecks = detectBottlenecks(updatedNodes, updatedEdges);
+    final bottlenecks = detectBottlenecks(updatedNodes);
 
     return ProductionGraph(
       id: graph.id,

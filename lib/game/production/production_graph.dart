@@ -276,9 +276,10 @@ class ProductionGraph {
       }
     }
 
+    final now = DateTime.now();
     return ProductionGraph(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      generatedAt: DateTime.now(),
+      id: now.millisecondsSinceEpoch.toString(),
+      generatedAt: now,
       nodes: nodes,
       edges: edges,
       bottlenecks: bottlenecks,
