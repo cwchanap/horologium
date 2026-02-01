@@ -8,7 +8,6 @@ library;
 
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/building/category.dart';
 import 'package:horologium/game/resources/resource_type.dart';
@@ -24,11 +23,14 @@ enum FlowStatus {
 
   /// Consumption exceeds production by more than 10%
   deficit,
+
+  /// Status could not be computed (missing data or calculation error)
+  unknown,
 }
 
 /// Severity level for detected bottlenecks.
 enum BottleneckSeverity {
-  /// 10-25% deficit
+  /// Up to 25% deficit
   low,
 
   /// 25-50% deficit
@@ -70,14 +72,15 @@ class BuildingNode {
     required this.name,
     required this.type,
     required this.category,
-    required this.inputs,
-    required this.outputs,
+    required List<ResourcePort> inputs,
+    required List<ResourcePort> outputs,
     required this.status,
     required this.hasWorkers,
     this.position = Offset.zero,
     this.isSelected = false,
     this.isHighlighted = false,
-  });
+  }) : inputs = List.unmodifiable(inputs),
+       outputs = List.unmodifiable(outputs);
 
   /// Create a copy with updated selection/highlight state.
   BuildingNode copyWith({
@@ -147,14 +150,14 @@ class BottleneckInsight {
   final String recommendation;
   final List<String> impactedNodeIds;
 
-  const BottleneckInsight({
+  BottleneckInsight({
     required this.id,
     required this.resourceType,
     required this.severity,
     required this.description,
     required this.recommendation,
-    required this.impactedNodeIds,
-  });
+    required List<String> impactedNodeIds,
+  }) : impactedNodeIds = List.unmodifiable(impactedNodeIds);
 }
 
 /// The complete production graph snapshot.
@@ -164,24 +167,28 @@ class ProductionGraph {
   final List<BuildingNode> nodes;
   final List<ResourceFlowEdge> edges;
   final List<BottleneckInsight> bottlenecks;
-  final bool isClustered;
 
-  const ProductionGraph({
+  /// Whether this graph should use clustered visualization (>50 nodes).
+  bool get isClustered => nodes.length > 50;
+
+  ProductionGraph({
     required this.id,
     required this.generatedAt,
-    required this.nodes,
-    required this.edges,
-    required this.bottlenecks,
-    this.isClustered = false,
-  });
+    required List<BuildingNode> nodes,
+    required List<ResourceFlowEdge> edges,
+    required List<BottleneckInsight> bottlenecks,
+  }) : nodes = List.unmodifiable(nodes),
+       edges = List.unmodifiable(edges),
+       bottlenecks = List.unmodifiable(bottlenecks);
 
   /// Factory to build a production graph from buildings and resources.
+  ///
+  /// Currently uses base production/consumption rates from building definitions.
   // TODO(T011): Use resources parameter to calculate actual flow rates based on current resource levels
   factory ProductionGraph.fromBuildings(
     List<Building> buildings,
     Resources resources,
   ) {
-    // Implementation will be added in T011
     final nodes = <BuildingNode>[];
     final edges = <ResourceFlowEdge>[];
     final bottlenecks = <BottleneckInsight>[];
@@ -196,13 +203,10 @@ class ProductionGraph {
       for (final entry in building.baseConsumption.entries) {
         final resourceType = ResourceType.values.firstWhere(
           (r) => r.name == entry.key,
-          orElse: () {
-            debugPrint(
-              'Warning: Unknown resource type "${entry.key}" in building ${building.name}, falling back to cash',
-            );
-            assert(false, 'Unknown resource type: ${entry.key}');
-            return ResourceType.cash;
-          },
+          orElse: () => throw ArgumentError(
+            'Unknown resource type "${entry.key}" in building ${building.name}. '
+            'Check that all resource types in building definitions match the ResourceType enum.',
+          ),
         );
         inputs.add(
           ResourcePort(
@@ -217,13 +221,10 @@ class ProductionGraph {
       for (final entry in building.baseGeneration.entries) {
         final resourceType = ResourceType.values.firstWhere(
           (r) => r.name == entry.key,
-          orElse: () {
-            debugPrint(
-              'Warning: Unknown resource type "${entry.key}" in building ${building.name}, falling back to cash',
-            );
-            assert(false, 'Unknown resource type: ${entry.key}');
-            return ResourceType.cash;
-          },
+          orElse: () => throw ArgumentError(
+            'Unknown resource type "${entry.key}" in building ${building.name}. '
+            'Check that all resource types in building definitions match the ResourceType enum.',
+          ),
         );
         outputs.add(
           ResourcePort(
@@ -283,7 +284,6 @@ class ProductionGraph {
       nodes: nodes,
       edges: edges,
       bottlenecks: bottlenecks,
-      isClustered: nodes.length > 50,
     );
   }
 
@@ -341,11 +341,11 @@ class NodeCluster {
   NodeCluster({
     required this.id,
     required this.category,
-    required this.nodeIds,
+    required List<String> nodeIds,
     required this.aggregateStatus,
     this.position = Offset.zero,
     this.isExpanded = false,
-  });
+  }) : nodeIds = List.unmodifiable(nodeIds);
 
   /// Create a copy with updated position or expansion state.
   NodeCluster copyWith({Offset? position, bool? isExpanded}) {

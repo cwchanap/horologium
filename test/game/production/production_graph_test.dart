@@ -80,6 +80,51 @@ void main() {
 
       expect(graph.isClustered, isTrue);
     });
+
+    test('fromBuildings throws ArgumentError for unknown resource type', () {
+      final buildings = [
+        _createMockBuilding(
+          type: BuildingType.house,
+          category: BuildingCategory.residential,
+          generation: {'unknownResource': 1.0},
+        ),
+      ];
+
+      expect(
+        () => ProductionGraph.fromBuildings(buildings, Resources()),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('Unknown resource type "unknownResource"'),
+          ),
+        ),
+      );
+    });
+
+    test(
+      'fromBuildings throws ArgumentError for unknown consumption resource',
+      () {
+        final buildings = [
+          _createMockBuilding(
+            type: BuildingType.powerPlant,
+            category: BuildingCategory.processing,
+            consumption: {'invalidFuel': 0.5},
+          ),
+        ];
+
+        expect(
+          () => ProductionGraph.fromBuildings(buildings, Resources()),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('Unknown resource type "invalidFuel"'),
+            ),
+          ),
+        );
+      },
+    );
   });
 
   group('ChainHighlighter', () {
@@ -124,6 +169,74 @@ void main() {
       expect(highlight.upstreamNodeIds, contains('producer'));
       expect(highlight.downstreamNodeIds, contains('final'));
       expect(highlight.edgeIds.length, equals(2));
+    });
+
+    test(
+      'findConnectedChain handles circular dependencies without infinite loop',
+      () {
+        final nodes = [
+          _createBuildingNode(
+            'nodeA',
+            'Building A',
+            [ResourceType.electricity],
+            [ResourceType.coal],
+          ),
+          _createBuildingNode(
+            'nodeB',
+            'Building B',
+            [ResourceType.coal],
+            [ResourceType.electricity],
+          ),
+        ];
+
+        final edges = [
+          ResourceFlowEdge(
+            id: 'edge1',
+            resourceType: ResourceType.coal,
+            producerNodeId: 'nodeA',
+            consumerNodeId: 'nodeB',
+            ratePerSecond: 1.0,
+            status: FlowStatus.balanced,
+          ),
+          ResourceFlowEdge(
+            id: 'edge2',
+            resourceType: ResourceType.electricity,
+            producerNodeId: 'nodeB',
+            consumerNodeId: 'nodeA',
+            ratePerSecond: 1.0,
+            status: FlowStatus.balanced,
+          ),
+        ];
+
+        // Should complete without hanging
+        final highlight = ChainHighlighter.findConnectedChain(
+          'nodeA',
+          nodes,
+          edges,
+        );
+
+        expect(highlight.allNodeIds, containsAll(['nodeA', 'nodeB']));
+        expect(highlight.edgeIds, containsAll(['edge1', 'edge2']));
+      },
+    );
+
+    test('findConnectedChain returns only root node when no edges exist', () {
+      final nodes = [
+        _createBuildingNode('isolatedNode', 'Isolated', [], [
+          ResourceType.population,
+        ]),
+      ];
+
+      final highlight = ChainHighlighter.findConnectedChain(
+        'isolatedNode',
+        nodes,
+        [],
+      );
+
+      expect(highlight.rootNodeId, equals('isolatedNode'));
+      expect(highlight.upstreamNodeIds, isEmpty);
+      expect(highlight.downstreamNodeIds, isEmpty);
+      expect(highlight.edgeIds, isEmpty);
     });
   });
 

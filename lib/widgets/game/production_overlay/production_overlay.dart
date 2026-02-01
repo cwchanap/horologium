@@ -187,7 +187,6 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       nodes: updatedNodes,
       edges: graph.edges,
       bottlenecks: graph.bottlenecks,
-      isClustered: graph.isClustered,
     );
   }
 
@@ -223,7 +222,6 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       bottlenecks: graph.bottlenecks
           .where((b) => b.resourceType == filter)
           .toList(),
-      isClustered: graph.isClustered,
     );
   }
 
