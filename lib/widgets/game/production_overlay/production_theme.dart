@@ -21,6 +21,8 @@ class ProductionTheme {
         return const Color(0xFFFFEB3B); // Yellow
       case FlowStatus.deficit:
         return const Color(0xFFF44336); // Red
+      case FlowStatus.unknown:
+        return const Color(0xFF9E9E9E); // Gray
     }
   }
 
@@ -33,6 +35,8 @@ class ProductionTheme {
         return Icons.remove;
       case FlowStatus.deficit:
         return Icons.close;
+      case FlowStatus.unknown:
+        return Icons.help_outline;
     }
   }
 

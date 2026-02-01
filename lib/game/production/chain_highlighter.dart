@@ -124,7 +124,6 @@ class ChainHighlighter {
       nodes: highlightedNodes,
       edges: highlightedEdges,
       bottlenecks: graph.bottlenecks,
-      isClustered: graph.isClustered,
     );
   }
 
@@ -144,7 +143,6 @@ class ChainHighlighter {
       nodes: clearedNodes,
       edges: clearedEdges,
       bottlenecks: graph.bottlenecks,
-      isClustered: graph.isClustered,
     );
   }
 }

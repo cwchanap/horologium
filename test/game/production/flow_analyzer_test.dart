@@ -314,6 +314,43 @@ void main() {
       // Check bottlenecks - should be empty as there is no deficit
       expect(analyzedGraph.bottlenecks.isEmpty, isTrue);
     });
+
+    test('correctly distributes deficit across multiple consumers', () {
+      final nodes = [
+        _createNode('producer', {}, {ResourceType.coal: 1.0}),
+        _createNode('consumer1', {ResourceType.coal: 0.6}, {}),
+        _createNode('consumer2', {ResourceType.coal: 0.6}, {}),
+      ];
+      // Total consumption: 1.2, Production: 1.0 = 16.7% deficit
+
+      final graph = ProductionGraph(
+        id: 'test',
+        generatedAt: DateTime.now(),
+        nodes: nodes,
+        edges: [],
+        bottlenecks: [],
+      );
+
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
+
+      // Both consumers should show deficit status
+      final consumer1 = analyzedGraph.nodes.firstWhere(
+        (n) => n.id == 'consumer1',
+      );
+      final consumer2 = analyzedGraph.nodes.firstWhere(
+        (n) => n.id == 'consumer2',
+      );
+      expect(consumer1.status, equals(FlowStatus.deficit));
+      expect(consumer2.status, equals(FlowStatus.deficit));
+
+      // Should detect coal bottleneck
+      expect(
+        analyzedGraph.bottlenecks.any(
+          (b) => b.resourceType == ResourceType.coal,
+        ),
+        isTrue,
+      );
+    });
   });
 }
 

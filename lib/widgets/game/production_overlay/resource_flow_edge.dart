@@ -322,6 +322,15 @@ class _EdgePainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
         );
+      case FlowStatus.unknown:
+        // Question mark (circle for simplicity)
+        canvas.drawCircle(
+          iconPosition,
+          4,
+          iconPaint
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
     }
   }
 

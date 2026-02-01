@@ -167,7 +167,7 @@ class FlowAnalyzer {
         producerNodeId: edge.producerNodeId,
         consumerNodeId: edge.consumerNodeId,
         ratePerSecond: edge.ratePerSecond,
-        status: status ?? FlowStatus.balanced,
+        status: status ?? FlowStatus.unknown,
         isHighlighted: edge.isHighlighted,
         isIncomplete: edge.isIncomplete,
       );
@@ -184,12 +184,16 @@ class FlowAnalyzer {
             'Warning: No status computed for resource ${input.resourceType.name} on node ${node.id}',
           );
         }
-        final actualStatus = status ?? FlowStatus.balanced;
+        final actualStatus = status ?? FlowStatus.unknown;
         if (actualStatus == FlowStatus.deficit) {
           nodeStatus = FlowStatus.deficit;
           break;
+        } else if (actualStatus == FlowStatus.unknown &&
+            nodeStatus == FlowStatus.balanced) {
+          nodeStatus = FlowStatus.unknown;
         } else if (actualStatus == FlowStatus.surplus &&
-            nodeStatus != FlowStatus.deficit) {
+            nodeStatus != FlowStatus.deficit &&
+            nodeStatus != FlowStatus.unknown) {
           nodeStatus = FlowStatus.surplus;
         }
       }
@@ -218,7 +222,6 @@ class FlowAnalyzer {
       nodes: updatedNodes,
       edges: updatedEdges,
       bottlenecks: bottlenecks,
-      isClustered: graph.isClustered,
     );
   }
 }
