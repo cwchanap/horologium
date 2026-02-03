@@ -177,18 +177,22 @@ class FlowAnalyzer {
     final updatedNodes = graph.nodes.map((node) {
       FlowStatus nodeStatus = FlowStatus.balanced;
 
-      for (final input in node.inputs) {
-        final status = resourceStatus[input.resourceType];
+      FlowStatus resolveStatus(ResourceType resourceType) {
+        final status = resourceStatus[resourceType];
         if (status == null) {
           debugPrint(
-            'Warning: No status computed for resource ${input.resourceType.name} on node ${node.id}',
+            'Warning: No status computed for resource ${resourceType.name} on node ${node.id}',
           );
         }
-        final actualStatus = status ?? FlowStatus.unknown;
+        return status ?? FlowStatus.unknown;
+      }
+
+      void updateNodeStatus(FlowStatus actualStatus) {
         if (actualStatus == FlowStatus.deficit) {
           nodeStatus = FlowStatus.deficit;
-          break;
-        } else if (actualStatus == FlowStatus.unknown &&
+          return;
+        }
+        if (actualStatus == FlowStatus.unknown &&
             nodeStatus == FlowStatus.balanced) {
           nodeStatus = FlowStatus.unknown;
         } else if (actualStatus == FlowStatus.surplus &&
@@ -198,13 +202,50 @@ class FlowAnalyzer {
         }
       }
 
+      for (final input in node.inputs) {
+        final actualStatus = resolveStatus(input.resourceType);
+        updateNodeStatus(actualStatus);
+        if (nodeStatus == FlowStatus.deficit) {
+          break;
+        }
+      }
+
+      if (nodeStatus != FlowStatus.deficit) {
+        for (final output in node.outputs) {
+          final actualStatus = resolveStatus(output.resourceType);
+          updateNodeStatus(actualStatus);
+          if (nodeStatus == FlowStatus.deficit) {
+            break;
+          }
+        }
+      }
+
+      final updatedInputs = node.inputs
+          .map(
+            (input) => ResourcePort(
+              resourceType: input.resourceType,
+              ratePerSecond: input.ratePerSecond,
+              status: resolveStatus(input.resourceType),
+            ),
+          )
+          .toList();
+      final updatedOutputs = node.outputs
+          .map(
+            (output) => ResourcePort(
+              resourceType: output.resourceType,
+              ratePerSecond: output.ratePerSecond,
+              status: resolveStatus(output.resourceType),
+            ),
+          )
+          .toList();
+
       return BuildingNode(
         id: node.id,
         name: node.name,
         type: node.type,
         category: node.category,
-        inputs: node.inputs,
-        outputs: node.outputs,
+        inputs: updatedInputs,
+        outputs: updatedOutputs,
         status: nodeStatus,
         hasWorkers: node.hasWorkers,
         position: node.position,

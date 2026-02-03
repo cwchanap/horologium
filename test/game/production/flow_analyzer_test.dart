@@ -181,6 +181,12 @@ void main() {
           (n) => n.id == 'consumer',
         );
         expect(consumer.status, equals(FlowStatus.deficit));
+        expect(consumer.inputs.first.status, equals(FlowStatus.deficit));
+
+        final producer = analyzedGraph.nodes.firstWhere(
+          (n) => n.id == 'producer',
+        );
+        expect(producer.outputs.first.status, equals(FlowStatus.deficit));
       },
     );
 
@@ -235,7 +241,7 @@ void main() {
       expect(analyzedGraph.edges.first.status, equals(FlowStatus.deficit));
     });
 
-    test('producer node stays balanced when it has no inputs', () {
+    test('producer node reflects output status even with no inputs', () {
       final nodes = [
         _createNode('producer', {}, {ResourceType.coal: 2.0}),
         _createNode('consumer', {ResourceType.coal: 1.0}, {}),
@@ -250,11 +256,11 @@ void main() {
 
       final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
 
-      // Producer stays balanced - it has no inputs to evaluate
+      // Producer shows surplus because its output resource is in surplus
       final producer = analyzedGraph.nodes.firstWhere(
         (n) => n.id == 'producer',
       );
-      expect(producer.status, equals(FlowStatus.balanced));
+      expect(producer.status, equals(FlowStatus.surplus));
     });
 
     test('excludes idle producers from production totals', () {
