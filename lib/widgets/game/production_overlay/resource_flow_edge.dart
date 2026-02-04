@@ -300,6 +300,7 @@ class _EdgePainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
         );
+        break;
       case FlowStatus.balanced:
         // Dash
         canvas.drawLine(
@@ -309,6 +310,7 @@ class _EdgePainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
         );
+        break;
       case FlowStatus.deficit:
         // X mark
         final path = Path();
@@ -322,6 +324,7 @@ class _EdgePainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
         );
+        break;
       case FlowStatus.unknown:
         // Question mark (circle for simplicity)
         canvas.drawCircle(
@@ -331,6 +334,7 @@ class _EdgePainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
         );
+        break;
     }
   }
 

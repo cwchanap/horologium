@@ -46,17 +46,23 @@ class ProductionTheme {
     switch (category) {
       case BuildingCategory.rawMaterials:
         iconData = Icons.terrain;
+        break;
       case BuildingCategory.processing:
       case BuildingCategory.primaryFactory:
         iconData = Icons.factory;
+        break;
       case BuildingCategory.refinement:
         iconData = Icons.science;
+        break;
       case BuildingCategory.residential:
         iconData = Icons.home;
+        break;
       case BuildingCategory.services:
         iconData = Icons.storefront;
+        break;
       case BuildingCategory.foodResources:
         iconData = Icons.restaurant;
+        break;
     }
 
     return Icon(iconData, size: size, color: Colors.grey[400]);

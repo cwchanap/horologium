@@ -58,6 +58,34 @@ void main() {
       expect(find.byType(EmptyStateWidget), findsNothing);
     });
 
+    testWidgets('cluster stays visible after expanding', (tester) async {
+      final buildings = List.generate(
+        51,
+        (index) => _createTestBuilding(type: BuildingType.house),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => buildings,
+            getResources: () => Resources(),
+            onClose: () {},
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ClusterNodeWidget), findsOneWidget);
+      expect(find.byIcon(Icons.unfold_more), findsOneWidget);
+
+      await tester.tap(find.byType(ClusterNodeWidget));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ClusterNodeWidget), findsOneWidget);
+      expect(find.byIcon(Icons.unfold_less), findsOneWidget);
+    });
+
     testWidgets('close button calls onClose', (tester) async {
       var closeCalled = false;
 

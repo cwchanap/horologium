@@ -76,54 +76,71 @@ class ResourceFilterWidget extends StatelessWidget {
       case ResourceType.cash:
         iconData = Icons.attach_money;
         iconColor = Colors.green;
+        break;
       case ResourceType.gold:
         iconData = Icons.monetization_on;
         iconColor = Colors.amber;
+        break;
       case ResourceType.coal:
         iconData = Icons.terrain;
         iconColor = Colors.brown;
+        break;
       case ResourceType.electricity:
         iconData = Icons.bolt;
         iconColor = Colors.yellow;
+        break;
       case ResourceType.water:
         iconData = Icons.water_drop;
         iconColor = Colors.blue;
+        break;
       case ResourceType.wood:
         iconData = Icons.forest;
         iconColor = Colors.green;
+        break;
       case ResourceType.stone:
         iconData = Icons.landscape;
         iconColor = Colors.grey;
+        break;
       case ResourceType.population:
         iconData = Icons.people;
         iconColor = Colors.purple;
+        break;
       case ResourceType.research:
         iconData = Icons.science;
         iconColor = Colors.deepPurple;
+        break;
       case ResourceType.planks:
         iconData = Icons.view_column;
         iconColor = Colors.brown;
+        break;
       case ResourceType.wheat:
         iconData = Icons.grass;
         iconColor = Colors.amber;
+        break;
       case ResourceType.corn:
         iconData = Icons.grain;
         iconColor = Colors.yellow;
+        break;
       case ResourceType.rice:
         iconData = Icons.rice_bowl;
         iconColor = Colors.white70;
+        break;
       case ResourceType.barley:
         iconData = Icons.spa;
         iconColor = Colors.brown;
+        break;
       case ResourceType.flour:
         iconData = Icons.bakery_dining;
         iconColor = Colors.white;
+        break;
       case ResourceType.bread:
         iconData = Icons.breakfast_dining;
         iconColor = Colors.orange;
+        break;
       default:
         iconData = Icons.category;
         iconColor = Colors.grey;
+        break;
     }
 
     return Icon(iconData, size: 16, color: iconColor);
