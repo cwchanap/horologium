@@ -471,9 +471,15 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
 
   Widget _buildDetailPanel() {
     // Find actual bottleneck or null if none exists
-    final matchingBottleneck = _graph?.bottlenecks
-        .where((b) => b.impactedNodeIds.contains(_selectedNode!.id))
-        .firstOrNull;
+    BottleneckInsight? matchingBottleneck;
+    if (_graph != null) {
+      for (final bottleneck in _graph!.bottlenecks) {
+        if (bottleneck.impactedNodeIds.contains(_selectedNode!.id)) {
+          matchingBottleneck = bottleneck;
+          break;
+        }
+      }
+    }
 
     return NodeDetailPanel(
       node: _selectedNode!,
