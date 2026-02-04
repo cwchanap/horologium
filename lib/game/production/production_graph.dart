@@ -200,7 +200,7 @@ class ProductionGraph {
       final outputs = <ResourcePort>[];
 
       // Process consumption (inputs)
-      for (final entry in building.baseConsumption.entries) {
+      for (final entry in building.consumption.entries) {
         final resourceType = ResourceType.values.firstWhere(
           (r) => r.name == entry.key,
           orElse: () => throw ArgumentError(
@@ -218,7 +218,7 @@ class ProductionGraph {
       }
 
       // Process generation (outputs)
-      for (final entry in building.baseGeneration.entries) {
+      for (final entry in building.generation.entries) {
         final resourceType = ResourceType.values.firstWhere(
           (r) => r.name == entry.key,
           orElse: () => throw ArgumentError(

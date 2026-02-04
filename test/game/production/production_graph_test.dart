@@ -61,6 +61,37 @@ void main() {
       expect(graph.edges[0].resourceType, equals(ResourceType.coal));
     });
 
+    test(
+      'fromBuildings uses level-scaled rates for generation and consumption',
+      () {
+        final producer = _createMockBuilding(
+          type: BuildingType.coalMine,
+          category: BuildingCategory.rawMaterials,
+          generation: {'coal': 1.0},
+        )..level = 3;
+        final consumer = _createMockBuilding(
+          type: BuildingType.powerPlant,
+          category: BuildingCategory.processing,
+          consumption: {'coal': 0.5},
+        )..level = 2;
+
+        final graph = ProductionGraph.fromBuildings([
+          producer,
+          consumer,
+        ], Resources());
+
+        final producerNode = graph.nodes.firstWhere(
+          (node) => node.type == BuildingType.coalMine,
+        );
+        final consumerNode = graph.nodes.firstWhere(
+          (node) => node.type == BuildingType.powerPlant,
+        );
+
+        expect(producerNode.outputs.first.ratePerSecond, equals(3.0));
+        expect(consumerNode.inputs.first.ratePerSecond, equals(1.0));
+      },
+    );
+
     test('isEmpty returns true for empty buildings list', () {
       final graph = ProductionGraph.fromBuildings([], Resources());
       expect(graph.isEmpty, isTrue);
