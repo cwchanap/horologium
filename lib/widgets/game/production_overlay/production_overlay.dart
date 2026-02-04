@@ -404,15 +404,16 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
               // Render clusters (when clustered and not all expanded)
               if (_clusters.isNotEmpty)
                 for (final cluster in _clusters)
-                  if (!_expandedClusterIds.contains(cluster.id))
-                    Positioned(
-                      left: cluster.position.dx,
-                      top: cluster.position.dy,
-                      child: ClusterNodeWidget(
-                        cluster: cluster,
-                        onTap: () => _onClusterTap(cluster),
+                  Positioned(
+                    left: cluster.position.dx,
+                    top: cluster.position.dy,
+                    child: ClusterNodeWidget(
+                      cluster: cluster.copyWith(
+                        isExpanded: _expandedClusterIds.contains(cluster.id),
                       ),
+                      onTap: () => _onClusterTap(cluster),
                     ),
+                  ),
               // Render edges (behind nodes)
               for (final edge in visibleEdges)
                 Positioned(
