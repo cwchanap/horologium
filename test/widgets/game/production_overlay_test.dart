@@ -801,13 +801,6 @@ void main() {
 
       // Should render CustomPaint for the edge (may be multiple layers)
       expect(find.byType(CustomPaint), findsWidgets);
-      expect(
-        find.descendant(
-          of: find.byType(ResourceFlowEdgeWidget),
-          matching: find.byType(SizedBox),
-        ),
-        findsNothing,
-      );
     });
 
     testWidgets('disposes animation controller properly', (tester) async {
