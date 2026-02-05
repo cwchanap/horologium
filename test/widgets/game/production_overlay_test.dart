@@ -86,6 +86,34 @@ void main() {
       expect(find.byIcon(Icons.unfold_less), findsOneWidget);
     });
 
+    testWidgets('graph view uses a larger canvas for panning', (tester) async {
+      final buildings = [
+        _createTestBuilding(
+          type: BuildingType.coalMine,
+          generation: {'coal': 1.0},
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => buildings,
+            getResources: () => Resources(),
+            onClose: () {},
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final sizedBoxes = tester.widgetList<SizedBox>(find.byType(SizedBox));
+      final hasCanvas = sizedBoxes.any(
+        (box) => box.width == 2000 && box.height == 2000,
+      );
+
+      expect(hasCanvas, isTrue);
+    });
+
     testWidgets('close button calls onClose', (tester) async {
       var closeCalled = false;
 
