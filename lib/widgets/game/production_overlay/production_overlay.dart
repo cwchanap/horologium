@@ -62,6 +62,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   // Layout constants
   static const double _horizontalSpacing = 180;
   static const double _verticalSpacing = 100;
+  static const double _graphCanvasSize = 2000;
 
   @override
   void initState() {
@@ -394,52 +395,55 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
         minScale: 0.5,
         maxScale: 3.0,
         child: CustomPaint(
-          size: const Size(2000, 2000),
           painter: _ProductionGraphPainter(
             graph: _graph!,
             chainHighlight: _chainHighlight,
           ),
-          child: Stack(
-            children: [
-              // Render clusters (when clustered and not all expanded)
-              if (_clusters.isNotEmpty)
-                for (final cluster in _clusters)
-                  Positioned(
-                    left: cluster.position.dx,
-                    top: cluster.position.dy,
-                    child: ClusterNodeWidget(
-                      cluster: cluster.copyWith(
-                        isExpanded: _expandedClusterIds.contains(cluster.id),
+          child: SizedBox(
+            width: _graphCanvasSize,
+            height: _graphCanvasSize,
+            child: Stack(
+              children: [
+                // Render clusters (when clustered and not all expanded)
+                if (_clusters.isNotEmpty)
+                  for (final cluster in _clusters)
+                    Positioned(
+                      left: cluster.position.dx,
+                      top: cluster.position.dy,
+                      child: ClusterNodeWidget(
+                        cluster: cluster.copyWith(
+                          isExpanded: _expandedClusterIds.contains(cluster.id),
+                        ),
+                        onTap: () => _onClusterTap(cluster),
                       ),
-                      onTap: () => _onClusterTap(cluster),
+                    ),
+                // Render edges (behind nodes)
+                for (final edge in visibleEdges)
+                  Positioned(
+                    left: _getEdgePosition(edge).dx,
+                    top: _getEdgePosition(edge).dy,
+                    child: ResourceFlowEdgeWidget(
+                      edge: edge,
+                      startNode: _findNode(edge.producerNodeId),
+                      endNode: _findNode(edge.consumerNodeId),
                     ),
                   ),
-              // Render edges (behind nodes)
-              for (final edge in visibleEdges)
-                Positioned(
-                  left: _getEdgePosition(edge).dx,
-                  top: _getEdgePosition(edge).dy,
-                  child: ResourceFlowEdgeWidget(
-                    edge: edge,
-                    startNode: _findNode(edge.producerNodeId),
-                    endNode: _findNode(edge.consumerNodeId),
+                // Render visible nodes
+                for (final node in visibleNodes)
+                  Positioned(
+                    left: node.position.dx,
+                    top: node.position.dy,
+                    child: BuildingNodeWidget(
+                      node: node,
+                      onTap: () => _onNodeTap(node),
+                      onDoubleTap: () => _onNodeDoubleTap(node),
+                      isDimmed:
+                          _chainHighlight != null &&
+                          !_chainHighlight!.allNodeIds.contains(node.id),
+                    ),
                   ),
-                ),
-              // Render visible nodes
-              for (final node in visibleNodes)
-                Positioned(
-                  left: node.position.dx,
-                  top: node.position.dy,
-                  child: BuildingNodeWidget(
-                    node: node,
-                    onTap: () => _onNodeTap(node),
-                    onDoubleTap: () => _onNodeDoubleTap(node),
-                    isDimmed:
-                        _chainHighlight != null &&
-                        !_chainHighlight!.allNodeIds.contains(node.id),
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
