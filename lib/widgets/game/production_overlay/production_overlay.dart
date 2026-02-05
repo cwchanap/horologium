@@ -55,7 +55,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   ResourceType? _activeFilter;
   Timer? _refreshDebounce;
   Timer? _autoRefreshTimer;
-  int _lastBuildingCount = 0;
+  String _lastBuildingsSignature = '';
   List<NodeCluster> _clusters = [];
   final Set<String> _expandedClusterIds = {};
 
@@ -67,9 +67,19 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   @override
   void initState() {
     super.initState();
-    _lastBuildingCount = widget.getBuildings().length;
+    _lastBuildingsSignature = _computeBuildingsSignature(widget.getBuildings());
     _buildGraph();
     _startAutoRefresh();
+  }
+
+  /// Compute a stable signature of the building list for change detection.
+  String _computeBuildingsSignature(List<Building> buildings) {
+    // Create signature from building types, levels, and worker assignments
+    // Sort to ensure consistent ordering
+    final signatures = buildings.map((b) {
+      return '${b.type.name}:${b.level}:${b.assignedWorkers}';
+    }).toList()..sort();
+    return signatures.join(',');
   }
 
   @override
@@ -82,9 +92,11 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   /// Start periodic check for building changes (every 1 second).
   void _startAutoRefresh() {
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final currentCount = widget.getBuildings().length;
-      if (currentCount != _lastBuildingCount) {
-        _lastBuildingCount = currentCount;
+      final currentSignature = _computeBuildingsSignature(
+        widget.getBuildings(),
+      );
+      if (currentSignature != _lastBuildingsSignature) {
+        _lastBuildingsSignature = currentSignature;
         _scheduleRefresh();
         // Notify external listeners of building changes
         widget.onBuildingsChanged?.call();
@@ -312,6 +324,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   void _scheduleRefresh() {
     _refreshDebounce?.cancel();
     _refreshDebounce = Timer(const Duration(seconds: 1), () {
+      if (!mounted) return;
       _buildGraph();
     });
   }

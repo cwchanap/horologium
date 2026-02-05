@@ -68,7 +68,9 @@ class ClusterNodeWidget extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '${cluster.nodeCount} buildings',
+                  cluster.nodeCount == 1
+                      ? '1 building'
+                      : '${cluster.nodeCount} buildings',
                   style: TextStyle(color: Colors.grey[400], fontSize: 10),
                 ),
               ),
