@@ -14,22 +14,29 @@ class EmptyStateWidget extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey[800],
+              color: Colors.black.withAlpha(128),
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.cyanAccent.withAlpha(51),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
             child: Icon(
               Icons.account_tree_outlined,
               size: 64,
-              color: Colors.grey[600],
+              color: Colors.cyanAccent.withAlpha(179),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           Text(
             'No production buildings',
             style: TextStyle(
-              color: Colors.grey[400],
+              color: Colors.white,
               fontSize: 20,
               fontWeight: FontWeight.w500,
             ),
@@ -38,17 +45,17 @@ class EmptyStateWidget extends StatelessWidget {
           Text(
             'Build production buildings to see\nresource flows and dependencies',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            style: TextStyle(color: Colors.grey[400], fontSize: 14),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
           OutlinedButton.icon(
             onPressed: null,
             icon: const Icon(Icons.add),
             label: const Text('Build something'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.grey[500],
-              side: BorderSide(color: Colors.grey[700]!),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              foregroundColor: Colors.cyanAccent,
+              side: BorderSide(color: Colors.cyanAccent.withAlpha(128)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
           ),
         ],

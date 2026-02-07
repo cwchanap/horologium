@@ -13,6 +13,19 @@ import 'package:horologium/game/building/category.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/game/resources/resources.dart';
 
+/// Helper class for edge candidate collection.
+class _EdgeCandidate {
+  final BuildingNode producer;
+  final BuildingNode consumer;
+  final ResourcePort input;
+
+  _EdgeCandidate({
+    required this.producer,
+    required this.consumer,
+    required this.input,
+  });
+}
+
 /// Flow status indicating production vs consumption balance.
 enum FlowStatus {
   /// Production exceeds consumption by more than 10%
@@ -250,9 +263,15 @@ class ProductionGraph {
     }
 
     // Build edges by matching producers to consumers
+    // First, collect all potential producer-consumer pairs
+    final edgeCandidates = <String, List<_EdgeCandidate>>{};
+
     for (final consumer in nodes) {
       for (final input in consumer.inputs) {
-        // Find producers of this resource
+        final key = '${consumer.id}_${input.resourceType.name}';
+        edgeCandidates[key] = [];
+
+        // Find all producers of this resource (excluding self)
         for (final producer in nodes) {
           if (producer.id == consumer.id) continue;
 
@@ -261,19 +280,42 @@ class ProductionGraph {
           );
 
           if (producesResource) {
-            edges.add(
-              ResourceFlowEdge(
-                id: '${producer.id}_to_${consumer.id}_${input.resourceType.name}',
-                resourceType: input.resourceType,
-                producerNodeId: producer.id,
-                consumerNodeId: consumer.id,
-                ratePerSecond: input.ratePerSecond,
-                status:
-                    FlowStatus.balanced, // Will be calculated by FlowAnalyzer
+            edgeCandidates[key]!.add(
+              _EdgeCandidate(
+                producer: producer,
+                consumer: consumer,
+                input: input,
               ),
             );
           }
         }
+      }
+    }
+
+    // Create edges with allocated rates split among producers
+    for (final candidates in edgeCandidates.values) {
+      if (candidates.isEmpty) continue;
+
+      final input = candidates.first.input;
+      final consumer = candidates.first.consumer;
+      final matchingProducers = candidates.map((c) => c.producer).toList();
+
+      // Split demand evenly among all matching producers
+      final allocatedRate = matchingProducers.isEmpty
+          ? 0.0
+          : input.ratePerSecond / matchingProducers.length;
+
+      for (final producer in matchingProducers) {
+        edges.add(
+          ResourceFlowEdge(
+            id: '${producer.id}_to_${consumer.id}_${input.resourceType.name}',
+            resourceType: input.resourceType,
+            producerNodeId: producer.id,
+            consumerNodeId: consumer.id,
+            ratePerSecond: allocatedRate,
+            status: FlowStatus.balanced,
+          ),
+        );
       }
     }
 
