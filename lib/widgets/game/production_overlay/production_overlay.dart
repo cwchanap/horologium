@@ -53,7 +53,6 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   BuildingNode? _selectedNode;
   ChainHighlight? _chainHighlight;
   ResourceType? _activeFilter;
-  Timer? _refreshDebounce;
   Timer? _autoRefreshTimer;
   String _lastBuildingsSignature = '';
   List<NodeCluster> _clusters = [];
@@ -84,7 +83,6 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
 
   @override
   void dispose() {
-    _refreshDebounce?.cancel();
     _autoRefreshTimer?.cancel();
     super.dispose();
   }
@@ -97,7 +95,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       );
       if (currentSignature != _lastBuildingsSignature) {
         _lastBuildingsSignature = currentSignature;
-        _scheduleRefresh();
+        _buildGraph();
         // Notify external listeners of building changes
         widget.onBuildingsChanged?.call();
       }
@@ -250,7 +248,10 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   void _onNodeTap(BuildingNode node) {
     setState(() {
       _selectedNode = node;
-      _chainHighlight = null;
+      if (_chainHighlight != null) {
+        _chainHighlight = null;
+        _graph = ChainHighlighter.clearHighlight(_graph!);
+      }
     });
   }
 
@@ -318,15 +319,6 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     return _graph!.nodes
         .where((node) => expandedNodeIds.contains(node.id))
         .toList();
-  }
-
-  /// Debounced refresh when buildings change.
-  void _scheduleRefresh() {
-    _refreshDebounce?.cancel();
-    _refreshDebounce = Timer(const Duration(seconds: 1), () {
-      if (!mounted) return;
-      _buildGraph();
-    });
   }
 
   @override

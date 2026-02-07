@@ -134,6 +134,65 @@ void main() {
     });
 
     test(
+      'fromBuildings creates incomplete edge when consumer has no producer',
+      () {
+        // Power plant consumes coal but no coal mine exists
+        final buildings = [
+          _createMockBuilding(
+            type: BuildingType.powerPlant,
+            category: BuildingCategory.processing,
+            generation: {'electricity': 2.0},
+            consumption: {'coal': 0.5},
+          ),
+        ];
+        final resources = Resources();
+
+        final graph = ProductionGraph.fromBuildings(buildings, resources);
+
+        expect(graph.nodes.length, equals(1));
+        // Should have an incomplete edge for the unmatched coal input
+        final incompleteEdges = graph.edges
+            .where((e) => e.isIncomplete)
+            .toList();
+        expect(incompleteEdges.length, equals(1));
+        expect(incompleteEdges[0].resourceType, equals(ResourceType.coal));
+        expect(incompleteEdges[0].status, equals(FlowStatus.deficit));
+        expect(incompleteEdges[0].ratePerSecond, equals(0));
+      },
+    );
+
+    test(
+      'fromBuildings does not create incomplete edge when producer exists',
+      () {
+        final buildings = [
+          _createMockBuilding(
+            type: BuildingType.coalMine,
+            category: BuildingCategory.rawMaterials,
+            generation: {'coal': 1.0},
+            consumption: {},
+          ),
+          _createMockBuilding(
+            type: BuildingType.powerPlant,
+            category: BuildingCategory.processing,
+            generation: {'electricity': 2.0},
+            consumption: {'coal': 0.5},
+          ),
+        ];
+        final resources = Resources();
+
+        final graph = ProductionGraph.fromBuildings(buildings, resources);
+
+        final incompleteEdges = graph.edges
+            .where((e) => e.isIncomplete)
+            .toList();
+        expect(incompleteEdges, isEmpty);
+        // Should have one normal edge
+        expect(graph.edges.length, equals(1));
+        expect(graph.edges[0].isIncomplete, isFalse);
+      },
+    );
+
+    test(
       'fromBuildings throws ArgumentError for unknown consumption resource',
       () {
         final buildings = [
@@ -538,6 +597,76 @@ void main() {
       expect(clearedGraph.nodes.first.isSelected, isFalse);
       expect(clearedGraph.nodes.first.isHighlighted, isFalse);
       expect(clearedGraph.edges.first.isHighlighted, isFalse);
+    });
+  });
+
+  group('ChainHighlighter clear after apply', () {
+    test('clearHighlight resets all flags after applyHighlight', () {
+      final nodes = [
+        _createBuildingNode('node1', 'Node 1', [], [ResourceType.coal]),
+        _createBuildingNode(
+          'node2',
+          'Node 2',
+          [ResourceType.coal],
+          [ResourceType.electricity],
+        ),
+        _createBuildingNode('node3', 'Node 3', [ResourceType.electricity], []),
+      ];
+      final edges = [
+        ResourceFlowEdge(
+          id: 'edge1',
+          resourceType: ResourceType.coal,
+          producerNodeId: 'node1',
+          consumerNodeId: 'node2',
+          ratePerSecond: 1.0,
+          status: FlowStatus.balanced,
+        ),
+        ResourceFlowEdge(
+          id: 'edge2',
+          resourceType: ResourceType.electricity,
+          producerNodeId: 'node2',
+          consumerNodeId: 'node3',
+          ratePerSecond: 2.0,
+          status: FlowStatus.balanced,
+        ),
+      ];
+      final graph = ProductionGraph(
+        id: 'test',
+        generatedAt: DateTime.now(),
+        nodes: nodes,
+        edges: edges,
+        bottlenecks: [],
+      );
+
+      // Apply highlight on node1's chain
+      final highlight = ChainHighlighter.findConnectedChain(
+        'node1',
+        nodes,
+        edges,
+      );
+      final highlighted = ChainHighlighter.applyHighlight(graph, highlight);
+
+      // Verify highlight was applied
+      expect(
+        highlighted.nodes.firstWhere((n) => n.id == 'node1').isSelected,
+        isTrue,
+      );
+      expect(
+        highlighted.nodes.firstWhere((n) => n.id == 'node2').isHighlighted,
+        isTrue,
+      );
+
+      // Clear highlight (simulates single-tap on a different node)
+      final cleared = ChainHighlighter.clearHighlight(highlighted);
+
+      // Verify all flags are reset
+      for (final node in cleared.nodes) {
+        expect(node.isSelected, isFalse, reason: '${node.id} isSelected');
+        expect(node.isHighlighted, isFalse, reason: '${node.id} isHighlighted');
+      }
+      for (final edge in cleared.edges) {
+        expect(edge.isHighlighted, isFalse, reason: '${edge.id} isHighlighted');
+      }
     });
   });
 
