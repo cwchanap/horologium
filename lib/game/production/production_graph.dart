@@ -293,8 +293,31 @@ class ProductionGraph {
     }
 
     // Create edges with allocated rates split among producers
-    for (final candidates in edgeCandidates.values) {
-      if (candidates.isEmpty) continue;
+    for (final entry in edgeCandidates.entries) {
+      final candidates = entry.value;
+
+      // When no producer exists for this input, emit an incomplete edge
+      if (candidates.isEmpty) {
+        // Parse consumer ID and resource type from the key (format: consumerId_resourceName)
+        final keyParts = entry.key.split('_');
+        final resourceName = keyParts.last;
+        final consumerId = keyParts.sublist(0, keyParts.length - 1).join('_');
+        final resourceType = ResourceType.values.firstWhere(
+          (r) => r.name == resourceName,
+        );
+        edges.add(
+          ResourceFlowEdge(
+            id: 'incomplete_${entry.key}',
+            resourceType: resourceType,
+            producerNodeId: consumerId,
+            consumerNodeId: consumerId,
+            ratePerSecond: 0,
+            status: FlowStatus.deficit,
+            isIncomplete: true,
+          ),
+        );
+        continue;
+      }
 
       final input = candidates.first.input;
       final consumer = candidates.first.consumer;
