@@ -57,8 +57,11 @@ void main() {
 
       final graph = ProductionGraph.fromBuildings(buildings, resources);
 
-      expect(graph.edges.length, equals(1));
-      expect(graph.edges[0].resourceType, equals(ResourceType.coal));
+      // 1 normal edge (coal) + 1 incomplete producer edge (electricity has no consumer)
+      expect(graph.edges.length, equals(2));
+      final normalEdges = graph.edges.where((e) => !e.isIncomplete).toList();
+      expect(normalEdges.length, equals(1));
+      expect(normalEdges[0].resourceType, equals(ResourceType.coal));
     });
 
     test(
@@ -150,14 +153,20 @@ void main() {
         final graph = ProductionGraph.fromBuildings(buildings, resources);
 
         expect(graph.nodes.length, equals(1));
-        // Should have an incomplete edge for the unmatched coal input
+        // Should have incomplete edges: coal (no producer, deficit) + electricity (no consumer, surplus)
         final incompleteEdges = graph.edges
             .where((e) => e.isIncomplete)
             .toList();
-        expect(incompleteEdges.length, equals(1));
-        expect(incompleteEdges[0].resourceType, equals(ResourceType.coal));
-        expect(incompleteEdges[0].status, equals(FlowStatus.deficit));
-        expect(incompleteEdges[0].ratePerSecond, equals(0));
+        expect(incompleteEdges.length, equals(2));
+        final coalEdge = incompleteEdges.firstWhere(
+          (e) => e.resourceType == ResourceType.coal,
+        );
+        expect(coalEdge.status, equals(FlowStatus.deficit));
+        expect(coalEdge.ratePerSecond, equals(0));
+        final elecEdge = incompleteEdges.firstWhere(
+          (e) => e.resourceType == ResourceType.electricity,
+        );
+        expect(elecEdge.status, equals(FlowStatus.surplus));
       },
     );
 
@@ -185,10 +194,82 @@ void main() {
         final incompleteEdges = graph.edges
             .where((e) => e.isIncomplete)
             .toList();
-        expect(incompleteEdges, isEmpty);
-        // Should have one normal edge
-        expect(graph.edges.length, equals(1));
-        expect(graph.edges[0].isIncomplete, isFalse);
+        // Coal edge is complete (producer exists), but electricity has no consumer
+        expect(
+          incompleteEdges.length,
+          equals(1),
+          reason: 'Only electricity should be incomplete (no consumer)',
+        );
+        expect(
+          incompleteEdges[0].resourceType,
+          equals(ResourceType.electricity),
+        );
+        expect(incompleteEdges[0].status, equals(FlowStatus.surplus));
+        // Should have one normal edge for coal
+        final normalEdges = graph.edges.where((e) => !e.isIncomplete).toList();
+        expect(normalEdges.length, equals(1));
+        expect(normalEdges[0].resourceType, equals(ResourceType.coal));
+      },
+    );
+
+    test(
+      'fromBuildings creates incomplete edge for producer-only resource',
+      () {
+        // Coal mine produces coal but nothing consumes it
+        final buildings = [
+          _createMockBuilding(
+            type: BuildingType.coalMine,
+            category: BuildingCategory.rawMaterials,
+            generation: {'coal': 1.0},
+            consumption: {},
+          ),
+        ];
+        final resources = Resources();
+
+        final graph = ProductionGraph.fromBuildings(buildings, resources);
+
+        expect(graph.nodes.length, equals(1));
+        final incompleteEdges = graph.edges
+            .where((e) => e.isIncomplete)
+            .toList();
+        expect(incompleteEdges.length, equals(1));
+        expect(incompleteEdges[0].resourceType, equals(ResourceType.coal));
+        expect(incompleteEdges[0].status, equals(FlowStatus.surplus));
+        expect(incompleteEdges[0].ratePerSecond, equals(1.0));
+        expect(incompleteEdges[0].producerNodeId, equals('coalMine_0'));
+      },
+    );
+
+    test(
+      'fromBuildings does not create producer incomplete edge when consumer exists',
+      () {
+        // Coal mine produces coal, power plant consumes it
+        final buildings = [
+          _createMockBuilding(
+            type: BuildingType.coalMine,
+            category: BuildingCategory.rawMaterials,
+            generation: {'coal': 1.0},
+            consumption: {},
+          ),
+          _createMockBuilding(
+            type: BuildingType.powerPlant,
+            category: BuildingCategory.processing,
+            generation: {},
+            consumption: {'coal': 0.5},
+          ),
+        ];
+        final resources = Resources();
+
+        final graph = ProductionGraph.fromBuildings(buildings, resources);
+
+        // Coal has a consumer, so no incomplete producer edge for coal
+        final coalIncomplete = graph.edges.where(
+          (e) =>
+              e.isIncomplete &&
+              e.resourceType == ResourceType.coal &&
+              e.status == FlowStatus.surplus,
+        );
+        expect(coalIncomplete, isEmpty);
       },
     );
 

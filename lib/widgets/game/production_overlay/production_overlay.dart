@@ -61,7 +61,8 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   // Layout constants
   static const double _horizontalSpacing = 180;
   static const double _verticalSpacing = 100;
-  static const double _graphCanvasSize = 2000;
+  static const double _minCanvasWidth = 800;
+  static const double _minCanvasHeight = 600;
 
   @override
   void initState() {
@@ -236,6 +237,64 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     );
   }
 
+  /// Compute canvas width from the rightmost node position.
+  double _computeCanvasWidth() {
+    if (_graph == null || _graph!.nodes.isEmpty) return _minCanvasWidth;
+    double maxX = 0;
+    for (final node in _graph!.nodes) {
+      final right = node.position.dx + ProductionTheme.nodeWidth;
+      if (right > maxX) maxX = right;
+    }
+    for (final cluster in _clusters) {
+      final right = cluster.position.dx + ProductionTheme.nodeWidth;
+      if (right > maxX) maxX = right;
+    }
+    // Add padding so the rightmost node isn't flush with the edge
+    return max(maxX + _horizontalSpacing, _minCanvasWidth);
+  }
+
+  /// Compute canvas height from the bottommost node position.
+  double _computeCanvasHeight() {
+    if (_graph == null || _graph!.nodes.isEmpty) return _minCanvasHeight;
+    double maxY = 0;
+    for (final node in _graph!.nodes) {
+      final bottom = node.position.dy + ProductionTheme.nodeHeight;
+      if (bottom > maxY) maxY = bottom;
+    }
+    for (final cluster in _clusters) {
+      final bottom = cluster.position.dy + ProductionTheme.nodeHeight;
+      if (bottom > maxY) maxY = bottom;
+    }
+    // Add padding so the bottommost node isn't flush with the edge
+    return max(maxY + _verticalSpacing, _minCanvasHeight);
+  }
+
+  /// Clear selection flag from all nodes in the graph.
+  ProductionGraph _clearSelection(ProductionGraph graph) {
+    return ProductionGraph(
+      id: graph.id,
+      generatedAt: graph.generatedAt,
+      nodes: graph.nodes
+          .map((n) => n.isSelected ? n.copyWith(isSelected: false) : n)
+          .toList(),
+      edges: graph.edges,
+      bottlenecks: graph.bottlenecks,
+    );
+  }
+
+  /// Mark a single node as selected in the graph.
+  ProductionGraph _applySelection(ProductionGraph graph, String nodeId) {
+    return ProductionGraph(
+      id: graph.id,
+      generatedAt: graph.generatedAt,
+      nodes: graph.nodes
+          .map((n) => n.id == nodeId ? n.copyWith(isSelected: true) : n)
+          .toList(),
+      edges: graph.edges,
+      bottlenecks: graph.bottlenecks,
+    );
+  }
+
   void _onFilterChanged(ResourceType? filter) {
     setState(() {
       _activeFilter = filter;
@@ -247,11 +306,17 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
 
   void _onNodeTap(BuildingNode node) {
     setState(() {
-      _selectedNode = node;
+      // Clear any existing chain highlight
       if (_chainHighlight != null) {
         _chainHighlight = null;
         _graph = ChainHighlighter.clearHighlight(_graph!);
+      } else {
+        // Clear previous selection in graph state
+        _graph = _clearSelection(_graph!);
       }
+      // Mark tapped node as selected in graph state
+      _graph = _applySelection(_graph!, node.id);
+      _selectedNode = _graph!.nodes.firstWhere((n) => n.id == node.id);
     });
   }
 
@@ -405,8 +470,8 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
             chainHighlight: _chainHighlight,
           ),
           child: SizedBox(
-            width: _graphCanvasSize,
-            height: _graphCanvasSize,
+            width: _computeCanvasWidth(),
+            height: _computeCanvasHeight(),
             child: Stack(
               children: [
                 // Render clusters (when clustered and not all expanded)

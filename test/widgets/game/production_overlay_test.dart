@@ -52,7 +52,10 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      // Use pump() instead of pumpAndSettle() because the auto-refresh timer
+      // prevents settling.
+      await tester.pump();
+      await tester.pump();
 
       // Should not show empty state
       expect(find.byType(EmptyStateWidget), findsNothing);
@@ -86,7 +89,7 @@ void main() {
       expect(find.byIcon(Icons.unfold_less), findsOneWidget);
     });
 
-    testWidgets('graph view uses a larger canvas for panning', (tester) async {
+    testWidgets('graph view canvas is sized from node layout', (tester) async {
       final buildings = [
         _createTestBuilding(
           type: BuildingType.coalMine,
@@ -104,14 +107,27 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      // Use pump() instead of pumpAndSettle() because the auto-refresh timer
+      // prevents settling.
+      await tester.pump();
+      await tester.pump();
 
+      // Canvas should be at least the minimum size (800x600) and
+      // no longer a hard-coded 2000x2000.
       final sizedBoxes = tester.widgetList<SizedBox>(find.byType(SizedBox));
-      final hasCanvas = sizedBoxes.any(
+      final canvasBox = sizedBoxes.where(
+        (box) =>
+            box.width != null &&
+            box.height != null &&
+            box.width! >= 800 &&
+            box.height! >= 600,
+      );
+      expect(canvasBox, isNotEmpty);
+      // Should NOT have the old hard-coded 2000x2000
+      final hasOldCanvas = sizedBoxes.any(
         (box) => box.width == 2000 && box.height == 2000,
       );
-
-      expect(hasCanvas, isTrue);
+      expect(hasOldCanvas, isFalse);
     });
 
     testWidgets('close button calls onClose', (tester) async {
