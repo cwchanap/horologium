@@ -292,6 +292,31 @@ class ProductionGraph {
       }
     }
 
+    // Emit incomplete edges for producer-only resources (no consumers)
+    for (final producer in nodes) {
+      for (final output in producer.outputs) {
+        final hasConsumer = nodes.any(
+          (consumer) =>
+              consumer.id != producer.id &&
+              consumer.inputs.any((i) => i.resourceType == output.resourceType),
+        );
+
+        if (!hasConsumer) {
+          edges.add(
+            ResourceFlowEdge(
+              id: 'incomplete_producer_${producer.id}_${output.resourceType.name}',
+              resourceType: output.resourceType,
+              producerNodeId: producer.id,
+              consumerNodeId: producer.id,
+              ratePerSecond: output.ratePerSecond,
+              status: FlowStatus.surplus,
+              isIncomplete: true,
+            ),
+          );
+        }
+      }
+    }
+
     // Create edges with allocated rates split among producers
     for (final entry in edgeCandidates.entries) {
       final candidates = entry.value;
