@@ -42,10 +42,13 @@ class ChainHighlighter {
     final highlightedEdgeIds = <String>{};
 
     // Build adjacency maps for efficient lookup
+    // Filter out incomplete edges - they represent phantom resource ports
+    // not actual connections between distinct buildings
     final incomingEdges = <String, List<ResourceFlowEdge>>{};
     final outgoingEdges = <String, List<ResourceFlowEdge>>{};
 
     for (final edge in edges) {
+      if (edge.isIncomplete) continue; // Skip phantom self-referencing edges
       incomingEdges.putIfAbsent(edge.consumerNodeId, () => []).add(edge);
       outgoingEdges.putIfAbsent(edge.producerNodeId, () => []).add(edge);
     }

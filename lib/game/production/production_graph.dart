@@ -250,7 +250,11 @@ class ProductionGraph {
 
       nodes.add(
         BuildingNode(
-          id: '${building.type.name}_$i',
+          // ID includes type, level, and index for uniqueness
+          // Note: Without a persistent UUID in Building class, IDs may shift
+          // if buildings are reordered. The production_overlay handles this
+          // by checking if selected node IDs still exist after rebuild.
+          id: '${building.type.name}_L${building.level}_$i',
           name: building.name,
           type: building.type,
           category: building.category,

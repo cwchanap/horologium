@@ -103,14 +103,14 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       );
       if (currentSignature != _lastBuildingsSignature) {
         _lastBuildingsSignature = currentSignature;
-        _buildGraph();
+        _buildGraph(preserveSelection: true);
         // Notify external listeners of building changes
         widget.onBuildingsChanged?.call();
       }
     });
   }
 
-  void _buildGraph() {
+  void _buildGraph({bool preserveSelection = false}) {
     final buildings = widget.getBuildings();
     final resources = widget.getResources();
 
@@ -137,9 +137,44 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       }).toList();
     }
 
+    // Re-apply selection/highlight if requested and IDs still exist in new graph
+    BuildingNode? updatedSelectedNode;
+    ChainHighlight? updatedChainHighlight;
+    if (preserveSelection && _selectedNode != null) {
+      try {
+        updatedSelectedNode = graph.nodes.firstWhere(
+          (n) => n.id == _selectedNode!.id,
+        );
+        // Re-apply selection flag to the new node
+        graph = _applySelection(graph, _selectedNode!.id);
+      } on StateError {
+        // Selected node no longer exists in new graph, clear selection
+        updatedSelectedNode = null;
+      }
+    }
+    if (preserveSelection && _chainHighlight != null) {
+      final allNodeIds = _chainHighlight!.allNodeIds;
+      final allNodesExist = allNodeIds.every(
+        (id) => graph.nodes.any((n) => n.id == id),
+      );
+      if (allNodesExist) {
+        updatedChainHighlight = _chainHighlight;
+        graph = ChainHighlighter.applyHighlight(graph, updatedChainHighlight!);
+      } else {
+        updatedChainHighlight = null;
+      }
+    }
+
     setState(() {
       _graph = graph;
       _clusters = clusters;
+      if (!preserveSelection) {
+        _selectedNode = null;
+        _chainHighlight = null;
+      } else {
+        _selectedNode = updatedSelectedNode;
+        _chainHighlight = updatedChainHighlight;
+      }
     });
   }
 
@@ -307,8 +342,8 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       _activeFilter = filter;
       _selectedNode = null;
       _chainHighlight = null;
+      _buildGraph();
     });
-    _buildGraph();
   }
 
   void _onNodeTap(BuildingNode node) {
@@ -340,9 +375,10 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     );
 
     setState(() {
-      _selectedNode = node;
       _chainHighlight = highlight;
       _graph = ChainHighlighter.applyHighlight(_graph!, highlight);
+      // Fetch the updated node from the new graph (after applyHighlight)
+      _selectedNode = _graph!.nodes.firstWhere((n) => n.id == node.id);
     });
   }
 
