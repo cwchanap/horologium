@@ -11,6 +11,8 @@ class ProductionTheme {
   static const double nodeWidth = 120.0;
   static const double nodeHeight = 80.0;
   static const double edgePadding = 50.0;
+  static const double clusterWidth = 140.0;
+  static const double clusterHeight = 140.0; // Estimated for canvas sizing
 
   /// Get color for a given flow status.
   static Color getStatusColor(FlowStatus status) {

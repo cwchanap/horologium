@@ -4,6 +4,7 @@ import 'package:horologium/game/building/category.dart';
 import 'package:horologium/game/production/flow_analyzer.dart';
 import 'package:horologium/game/production/production_graph.dart';
 import 'package:horologium/game/resources/resource_type.dart';
+import 'package:horologium/game/resources/resources.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -174,7 +175,7 @@ void main() {
           bottlenecks: [],
         );
 
-        final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
+        final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
 
         // Consumer shows deficit because its input resource (coal) is in deficit
         final consumer = analyzedGraph.nodes.firstWhere(
@@ -203,7 +204,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
 
       expect(analyzedGraph.bottlenecks.isNotEmpty, isTrue);
       expect(
@@ -235,7 +236,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
 
       // Edge should show deficit since production < consumption
       expect(analyzedGraph.edges.first.status, equals(FlowStatus.deficit));
@@ -254,7 +255,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
 
       // Producer shows surplus because its output resource is in surplus
       final producer = analyzedGraph.nodes.firstWhere(
@@ -278,7 +279,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
 
       // Should have a bottleneck because the producer is idle (0 production vs 1 consumption)
       expect(analyzedGraph.bottlenecks.isNotEmpty, isTrue);
@@ -311,7 +312,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
 
       // Should be surplus because consumer is idle (1 production vs 0 consumption)
       // Or balanced if treating 0 consumption as balanced/surplus.
@@ -337,7 +338,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
 
       // Both consumers should show deficit status
       final consumer1 = analyzedGraph.nodes.firstWhere(

@@ -27,7 +27,7 @@ class ClusterNodeWidget extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         opacity: isDimmed ? 0.3 : 1.0,
         child: Container(
-          width: 140,
+          width: ProductionTheme.clusterWidth,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.grey[800],

@@ -4,6 +4,7 @@ library;
 import 'package:flutter/foundation.dart';
 import 'package:horologium/game/production/production_graph.dart';
 import 'package:horologium/game/resources/resource_type.dart';
+import 'package:horologium/game/resources/resources.dart';
 
 /// Analyzes resource flows to determine status and bottlenecks.
 class FlowAnalyzer {
@@ -123,24 +124,53 @@ class FlowAnalyzer {
   }
 
   /// Analyze the graph and update flow status on all nodes and edges.
-  static ProductionGraph analyzeGraph(ProductionGraph graph) {
+  ///
+  /// Takes [resources] into account to calculate actual (not theoretical) flows.
+  /// Only includes production/consumption from buildings that have both
+  /// workers AND sufficient input resources.
+  static ProductionGraph analyzeGraph(
+    ProductionGraph graph,
+    Resources resources,
+  ) {
     final resourceStats = <ResourceType, _ResourceStats>{};
 
-    // Collect stats
+    // Build a map for checking node resource availability
+    final nodeCanProduce = <String, bool>{};
     for (final node in graph.nodes) {
-      if (!node.hasWorkers) continue;
+      if (!node.hasWorkers) {
+        nodeCanProduce[node.id] = false;
+        continue;
+      }
+
+      // Check if all input resources are available
+      bool canProduce = true;
+      for (final input in node.inputs) {
+        if ((resources.resources[input.resourceType] ?? 0) <
+            input.ratePerSecond) {
+          canProduce = false;
+          break;
+        }
+      }
+      nodeCanProduce[node.id] = canProduce;
+    }
+
+    // Collect stats only from buildings that can actually produce
+    for (final node in graph.nodes) {
+      if (!nodeCanProduce[node.id]!) continue;
 
       for (final output in node.outputs) {
         resourceStats
                 .putIfAbsent(output.resourceType, () => _ResourceStats())
                 .totalProduction +=
             output.ratePerSecond;
+        resourceStats[output.resourceType]!.producerIds.add(node.id);
       }
       for (final input in node.inputs) {
         resourceStats
                 .putIfAbsent(input.resourceType, () => _ResourceStats())
                 .totalConsumption +=
             input.ratePerSecond;
+        resourceStats[input.resourceType]!.consumerIds.add(node.id);
       }
     }
 
