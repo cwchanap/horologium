@@ -115,7 +115,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     final resources = widget.getResources();
 
     var graph = ProductionGraph.fromBuildings(buildings, resources);
-    graph = FlowAnalyzer.analyzeGraph(graph);
+    graph = FlowAnalyzer.analyzeGraph(graph, resources);
     graph = _applyLayout(graph);
 
     if (_activeFilter != null) {
@@ -288,7 +288,8 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       if (right > maxX) maxX = right;
     }
     for (final cluster in _clusters) {
-      final right = cluster.position.dx + ProductionTheme.nodeWidth;
+      // Use cluster-specific width instead of node width
+      final right = cluster.position.dx + ProductionTheme.clusterWidth;
       if (right > maxX) maxX = right;
     }
     // Add padding so the rightmost node isn't flush with the edge
@@ -304,7 +305,8 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       if (bottom > maxY) maxY = bottom;
     }
     for (final cluster in _clusters) {
-      final bottom = cluster.position.dy + ProductionTheme.nodeHeight;
+      // Use cluster-specific height instead of node height
+      final bottom = cluster.position.dy + ProductionTheme.clusterHeight;
       if (bottom > maxY) maxY = bottom;
     }
     // Add padding so the bottommost node isn't flush with the edge
@@ -631,8 +633,16 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
 
     final startX = startNode.position.dx + ProductionTheme.nodeWidth;
     final startY = startNode.position.dy + ProductionTheme.nodeHeight / 2;
-    final endX = endNode.position.dx;
-    final endY = endNode.position.dy + ProductionTheme.nodeHeight / 2;
+
+    // For incomplete edges (producer == consumer), offset endpoint
+    // so the edge is visible instead of zero-length
+    final isIncomplete = edge.producerNodeId == edge.consumerNodeId;
+    final endX = isIncomplete
+        ? startX + ProductionTheme.nodeWidth * 0.8
+        : endNode.position.dx;
+    final endY = isIncomplete
+        ? startY + ProductionTheme.nodeHeight * 0.5
+        : endNode.position.dy + ProductionTheme.nodeHeight / 2;
 
     final minX = min(startX, endX);
     final minY = min(startY, endY);
