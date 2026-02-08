@@ -308,6 +308,135 @@ void main() {
     });
   });
 
+  group('BuildingSignature change detection', () {
+    testWidgets('rebuilds graph when Field cropType changes', (tester) async {
+      final field = Field(
+        type: BuildingType.field,
+        name: 'Field',
+        description: 'Grows crops',
+        icon: Icons.grass,
+        color: Colors.lightGreen,
+        baseCost: 50,
+        requiredWorkers: 1,
+        category: BuildingCategory.foodResources,
+      );
+
+      var buildingsChanged = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => [field],
+            getResources: () => Resources(),
+            onClose: () {},
+            onBuildingsChanged: () => buildingsChanged++,
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      // Initial graph built
+      expect(buildingsChanged, 0);
+
+      // Change crop type
+      field.cropType = CropType.corn;
+
+      // Wait for auto-refresh timer (1 second)
+      await tester.pump(const Duration(seconds: 1));
+
+      // Graph should have been rebuilt due to signature change
+      expect(buildingsChanged, greaterThan(0));
+    });
+
+    testWidgets('rebuilds graph when Bakery productType changes', (
+      tester,
+    ) async {
+      final bakery = Bakery(
+        type: BuildingType.bakery,
+        name: 'Bakery',
+        description: 'Produces bread or pastries',
+        icon: Icons.bakery_dining,
+        color: Colors.orange,
+        baseCost: 150,
+        requiredWorkers: 1,
+        category: BuildingCategory.refinement,
+      );
+
+      var buildingsChanged = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => [bakery],
+            getResources: () => Resources(),
+            onClose: () {},
+            onBuildingsChanged: () => buildingsChanged++,
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      // Initial graph built
+      expect(buildingsChanged, 0);
+
+      // Change product type
+      bakery.productType = BakeryProduct.pastries;
+
+      // Wait for auto-refresh timer (1 second)
+      await tester.pump(const Duration(seconds: 1));
+
+      // Graph should have been rebuilt due to signature change
+      expect(buildingsChanged, greaterThan(0));
+    });
+
+    testWidgets('stable signature for regular buildings without crop/product', (
+      tester,
+    ) async {
+      final mine = Building(
+        type: BuildingType.coalMine,
+        name: 'Coal Mine',
+        description: 'Produces coal',
+        icon: Icons.fireplace,
+        color: Colors.grey,
+        baseCost: 90,
+        baseGeneration: {'coal': 1},
+        requiredWorkers: 1,
+        category: BuildingCategory.rawMaterials,
+      );
+      // Ensure assigned workers matches required workers for stable signature
+      mine.assignedWorkers = 1;
+
+      var buildingsChanged = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => [mine],
+            getResources: () => Resources(),
+            onClose: () {},
+            onBuildingsChanged: () => buildingsChanged++,
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      // Initial graph built
+      expect(buildingsChanged, 0);
+
+      // Wait for auto-refresh timer (1 second) - no changes made
+      await tester.pump(const Duration(seconds: 1));
+
+      // No rebuild should occur when nothing changed
+      expect(buildingsChanged, 0);
+    });
+  });
+
   group('ResourceFilterWidget', () {
     testWidgets('filter dropdown shows all resources option', (tester) async {
       await tester.pumpWidget(
