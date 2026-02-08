@@ -73,11 +73,18 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   }
 
   /// Compute a stable signature of the building list for change detection.
+  /// Includes type, level, workers, and crop/product selections (which affect
+  /// generation/consumption for Field and Bakery buildings).
   String _computeBuildingsSignature(List<Building> buildings) {
-    // Create signature from building types, levels, and worker assignments
-    // Sort to ensure consistent ordering
     final signatures = buildings.map((b) {
-      return '${b.type.name}:${b.level}:${b.assignedWorkers}';
+      var signature = '${b.type.name}:${b.level}:${b.assignedWorkers}';
+      // Include crop/product selections that affect resource flows
+      if (b is Field) {
+        signature += ':${b.cropType.name}';
+      } else if (b is Bakery) {
+        signature += ':${b.productType.name}';
+      }
+      return signature;
     }).toList()..sort();
     return signatures.join(',');
   }
