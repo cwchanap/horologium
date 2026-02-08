@@ -50,18 +50,27 @@ class ResourceFilterWidget extends StatelessWidget {
                 ],
               ),
             ),
-            ...ResourceType.values.map((type) {
-              return DropdownMenuItem<ResourceType?>(
-                value: type,
-                child: Row(
-                  children: [
-                    ResourceIcon(resourceType: type, size: 16),
-                    const SizedBox(width: 8),
-                    Text(_formatResourceName(type.name)),
-                  ],
-                ),
-              );
-            }),
+            // Filter out non-production resource types that aren't meaningful
+            // for production chain visualization
+            ...ResourceType.values
+                .where(
+                  (type) =>
+                      type != ResourceType.cash &&
+                      type != ResourceType.population &&
+                      type != ResourceType.availableWorkers,
+                )
+                .map((type) {
+                  return DropdownMenuItem<ResourceType?>(
+                    value: type,
+                    child: Row(
+                      children: [
+                        ResourceIcon(resourceType: type, size: 16),
+                        const SizedBox(width: 8),
+                        Text(_formatResourceName(type.name)),
+                      ],
+                    ),
+                  );
+                }),
           ],
           onChanged: onFilterChanged,
         ),

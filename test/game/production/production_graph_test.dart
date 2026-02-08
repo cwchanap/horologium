@@ -236,7 +236,7 @@ void main() {
         expect(incompleteEdges[0].resourceType, equals(ResourceType.coal));
         expect(incompleteEdges[0].status, equals(FlowStatus.surplus));
         expect(incompleteEdges[0].ratePerSecond, equals(1.0));
-        expect(incompleteEdges[0].producerNodeId, equals('coalMine_0'));
+        expect(incompleteEdges[0].producerNodeId, equals('coalMine_L1_0'));
       },
     );
 
