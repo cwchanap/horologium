@@ -98,6 +98,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   /// Start periodic check for building changes (every 1 second).
   void _startAutoRefresh() {
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
       final currentSignature = _computeBuildingsSignature(
         widget.getBuildings(),
       );
@@ -142,9 +143,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     ChainHighlight? updatedChainHighlight;
     if (preserveSelection && _selectedNode != null) {
       try {
-        updatedSelectedNode = graph.nodes.firstWhere(
-          (n) => n.id == _selectedNode!.id,
-        );
+        graph.nodes.firstWhere((n) => n.id == _selectedNode!.id);
         // Re-apply selection flag to the new node
         graph = _applySelection(graph, _selectedNode!.id);
       } on StateError {
@@ -162,6 +161,20 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
         graph = ChainHighlighter.applyHighlight(graph, updatedChainHighlight!);
       } else {
         updatedChainHighlight = null;
+      }
+    }
+
+    // Look up selected node from the final transformed graph
+    // so it includes isSelected/isHighlighted flags.
+    if (preserveSelection &&
+        _selectedNode != null &&
+        updatedSelectedNode == null) {
+      try {
+        updatedSelectedNode = graph.nodes.firstWhere(
+          (n) => n.id == _selectedNode!.id,
+        );
+      } on StateError {
+        updatedSelectedNode = null;
       }
     }
 
@@ -344,8 +357,8 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       _activeFilter = filter;
       _selectedNode = null;
       _chainHighlight = null;
-      _buildGraph();
     });
+    _buildGraph();
   }
 
   void _onNodeTap(BuildingNode node) {
