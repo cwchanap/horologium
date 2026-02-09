@@ -23,6 +23,7 @@ void main() {
       grid = Grid(
         onBuildingPlaced: (x, y, building) {
           final buildingData = PlacedBuildingData(
+            id: '${building.type.name}-$x-$y',
             x: x,
             y: y,
             type: building.type,

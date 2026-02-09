@@ -138,6 +138,7 @@ class MainGame extends FlameGame
     if (_planet == null) return;
 
     final buildingData = PlacedBuildingData(
+      id: building.id,
       x: x,
       y: y,
       type: building.type,

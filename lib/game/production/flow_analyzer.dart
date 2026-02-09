@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/foundation.dart';
+import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/production/production_graph.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 
@@ -35,7 +36,12 @@ class FlowAnalyzer {
   /// Detect bottlenecks in the production graph.
   ///
   /// Returns a list of [BottleneckInsight] for each resource with deficit.
-  static List<BottleneckInsight> detectBottlenecks(List<BuildingNode> nodes) {
+  /// Only counts production from nodes that can actually produce (have workers
+  /// AND sufficient input resources).
+  static List<BottleneckInsight> detectBottlenecks(
+    List<BuildingNode> nodes, {
+    Map<String, bool>? nodeCanProduce,
+  }) {
     final bottlenecks = <BottleneckInsight>[];
     final resourceStats = <ResourceType, _ResourceStats>{};
 
@@ -43,12 +49,15 @@ class FlowAnalyzer {
     for (final node in nodes) {
       if (!node.hasWorkers) continue;
 
-      for (final output in node.outputs) {
-        resourceStats
-                .putIfAbsent(output.resourceType, () => _ResourceStats())
-                .totalProduction +=
-            output.ratePerSecond;
-        resourceStats[output.resourceType]!.producerIds.add(node.id);
+      // Only count production from nodes that can actually produce
+      if (nodeCanProduce == null || (nodeCanProduce[node.id] ?? false)) {
+        for (final output in node.outputs) {
+          resourceStats
+                  .putIfAbsent(output.resourceType, () => _ResourceStats())
+                  .totalProduction +=
+              output.ratePerSecond;
+          resourceStats[output.resourceType]!.producerIds.add(node.id);
+        }
       }
 
       for (final input in node.inputs) {
@@ -110,16 +119,27 @@ class FlowAnalyzer {
     double deficitAmount,
     int currentProducers,
   ) {
-    if (currentProducers == 0) {
-      return 'Add a ${resourceType.name} producer';
+    // Find a building that produces this resource
+    final producerBuilding = BuildingRegistry.availableBuildings
+        .where((b) => b.generation.containsKey(resourceType.name))
+        .firstOrNull;
+
+    if (producerBuilding == null) {
+      return 'No producer available for ${resourceType.name}';
     }
 
-    // Estimate needed producers (rough heuristic)
-    final neededProducers = (deficitAmount / 2).ceil();
-    if (neededProducers <= 1) {
-      return 'Add 1 more ${resourceType.name} producer';
+    if (currentProducers == 0) {
+      return 'Add a ${producerBuilding.name}';
     }
-    return 'Add $neededProducers ${resourceType.name} producers';
+
+    // Calculate needed producers based on actual production rate
+    final ratePerBuilding = producerBuilding.generation[resourceType.name]!;
+    final neededProducers = (deficitAmount / ratePerBuilding).ceil();
+
+    if (neededProducers <= 1) {
+      return 'Add 1 more ${producerBuilding.name}';
+    }
+    return 'Add $neededProducers more ${producerBuilding.name}s';
   }
 
   /// Analyze the graph and update flow status on all nodes and edges.
@@ -322,8 +342,11 @@ class FlowAnalyzer {
       );
     }).toList();
 
-    // Detect bottlenecks
-    final bottlenecks = detectBottlenecks(updatedNodes);
+    // Detect bottlenecks (only count actual production, not theoretical)
+    final bottlenecks = detectBottlenecks(
+      updatedNodes,
+      nodeCanProduce: nodeCanProduce,
+    );
 
     return ProductionGraph(
       id: graph.id,

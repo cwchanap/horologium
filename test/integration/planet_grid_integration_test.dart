@@ -21,6 +21,7 @@ void main() {
       // Create callbacks that simulate MainGame behavior
       void onBuildingPlaced(int x, int y, Building building) {
         final buildingData = PlacedBuildingData(
+          id: 'test-${building.type.name}-$x-$y',
           x: x,
           y: y,
           type: building.type,
@@ -75,7 +76,12 @@ void main() {
       // Create a planet with existing buildings
       final planet = Planet(id: 'test', name: 'Test Planet');
       planet.addBuilding(
-        const PlacedBuildingData(x: 10, y: 10, type: BuildingType.house),
+        const PlacedBuildingData(
+          id: 'house-1',
+          x: 10,
+          y: 10,
+          type: BuildingType.house,
+        ),
       );
 
       expect(planet.buildings.length, 1);
@@ -121,10 +127,20 @@ void main() {
       // Create a planet with buildings
       final planet = Planet(id: 'test', name: 'Test Planet');
       planet.addBuilding(
-        const PlacedBuildingData(x: 5, y: 5, type: BuildingType.powerPlant),
+        const PlacedBuildingData(
+          id: 'power-1',
+          x: 5,
+          y: 5,
+          type: BuildingType.powerPlant,
+        ),
       );
       planet.addBuilding(
-        const PlacedBuildingData(x: 10, y: 10, type: BuildingType.house),
+        const PlacedBuildingData(
+          id: 'house-2',
+          x: 10,
+          y: 10,
+          type: BuildingType.house,
+        ),
       );
 
       expect(planet.buildings.length, 2);
@@ -163,6 +179,7 @@ void main() {
 
       void onBuildingPlaced(int x, int y, Building building) {
         final buildingData = PlacedBuildingData(
+          id: 'test-${building.type.name}-$x-$y',
           x: x,
           y: y,
           type: building.type,
@@ -245,6 +262,7 @@ void main() {
 
       void onBuildingPlaced(int x, int y, Building building) {
         final buildingData = PlacedBuildingData(
+          id: 'test-${building.type.name}-$x-$y',
           x: x,
           y: y,
           type: building.type,
@@ -300,6 +318,7 @@ void main() {
 
       void onBuildingPlaced(int x, int y, Building building) {
         final buildingData = PlacedBuildingData(
+          id: 'test-${building.type.name}-$x-$y',
           x: x,
           y: y,
           type: building.type,

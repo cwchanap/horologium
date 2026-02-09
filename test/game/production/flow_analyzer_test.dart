@@ -128,7 +128,7 @@ void main() {
       ];
       final bottlenecks = FlowAnalyzer.detectBottlenecks(nodes);
 
-      expect(bottlenecks[0].recommendation, contains('producer'));
+      expect(bottlenecks[0].recommendation, contains('Coal Mine'));
     });
 
     test('handles multiple resource types independently', () {

@@ -294,7 +294,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
 
   /// Compute canvas width from the rightmost visible node position.
   double _computeCanvasWidth(List<BuildingNode> visibleNodes) {
-    if (_graph == null || _graph!.nodes.isEmpty) return _minCanvasWidth;
+    if (_graph == null || visibleNodes.isEmpty) return _minCanvasWidth;
     double maxX = 0;
     for (final node in visibleNodes) {
       final right = node.position.dx + ProductionTheme.nodeWidth;
@@ -311,7 +311,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
 
   /// Compute canvas height from the bottommost visible node position.
   double _computeCanvasHeight(List<BuildingNode> visibleNodes) {
-    if (_graph == null || _graph!.nodes.isEmpty) return _minCanvasHeight;
+    if (_graph == null || visibleNodes.isEmpty) return _minCanvasHeight;
     double maxY = 0;
     for (final node in visibleNodes) {
       final bottom = node.position.dy + ProductionTheme.nodeHeight;
@@ -340,13 +340,21 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   }
 
   /// Mark a single node as selected in the graph.
+  /// Clears any existing selection first to ensure only one node is selected.
   ProductionGraph _applySelection(ProductionGraph graph, String nodeId) {
+    // First clear all selections, then apply to the target node
+    final clearedNodes = graph.nodes
+        .map((n) => n.isSelected ? n.copyWith(isSelected: false) : n)
+        .toList();
+
+    final updatedNodes = clearedNodes
+        .map((n) => n.id == nodeId ? n.copyWith(isSelected: true) : n)
+        .toList();
+
     return ProductionGraph(
       id: graph.id,
       generatedAt: graph.generatedAt,
-      nodes: graph.nodes
-          .map((n) => n.id == nodeId ? n.copyWith(isSelected: true) : n)
-          .toList(),
+      nodes: updatedNodes,
       edges: graph.edges,
       bottlenecks: graph.bottlenecks,
     );
@@ -357,8 +365,9 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       _activeFilter = filter;
       _selectedNode = null;
       _chainHighlight = null;
+      // Defer graph rebuild to avoid double setState
+      WidgetsBinding.instance.addPostFrameCallback((_) => _buildGraph());
     });
-    _buildGraph();
   }
 
   void _onNodeTap(BuildingNode node) {
@@ -584,6 +593,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
                       edge: edge,
                       startNode: _findNode(edge.producerNodeId),
                       endNode: _findNode(edge.consumerNodeId),
+                      isIncomplete: edge.isIncomplete,
                     ),
                   ),
                 // Render visible nodes
