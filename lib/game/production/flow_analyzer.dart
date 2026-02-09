@@ -147,65 +147,98 @@ class FlowAnalyzer {
   /// Calculates actual (not theoretical) flows based on steady-state rates.
   /// Only includes production/consumption from buildings that have both
   /// workers AND sufficient input resources.
+  ///
+  /// Uses an iterative approach to handle multi-hop production chains correctly:
+  /// - Nodes with no inputs can always produce if they have workers
+  /// - Nodes with inputs can only produce if their input resources are
+  ///   actually available from upstream nodes that can produce
+  /// - This is resolved iteratively until convergence
   static ProductionGraph analyzeGraph(ProductionGraph graph) {
     final resourceStats = <ResourceType, _ResourceStats>{};
 
-    // Compute steady-state incoming rates per resource type
-    // by summing output rates from all nodes that have workers.
-    final incomingRates = <ResourceType, double>{};
-    for (final node in graph.nodes) {
-      if (!node.hasWorkers) continue;
-      for (final output in node.outputs) {
-        incomingRates.update(
-          output.resourceType,
-          (v) => v + output.ratePerSecond,
-          ifAbsent: () => output.ratePerSecond,
-        );
-      }
-    }
-
-    // Build a map for checking node resource availability
+    // Build a map for checking node resource availability using iterative resolution
     final nodeCanProduce = <String, bool>{};
-
-    // First pass: compute total demand per resource
-    final totalDemand = <ResourceType, double>{};
     for (final node in graph.nodes) {
-      if (!node.hasWorkers) continue;
-      for (final input in node.inputs) {
-        totalDemand.update(
-          input.resourceType,
-          (v) => v + input.ratePerSecond,
-          ifAbsent: () => input.ratePerSecond,
-        );
-      }
+      nodeCanProduce[node.id] = false;
     }
 
-    // Second pass: determine which nodes can produce based on allocated shares
-    for (final node in graph.nodes) {
-      if (!node.hasWorkers) {
-        nodeCanProduce[node.id] = false;
-        continue;
+    // Iteratively determine which nodes can produce
+    // This handles multi-hop chains correctly by only counting production from
+    // nodes that have been confirmed as able to produce
+    bool changed;
+    do {
+      changed = false;
+
+      // First pass: compute total actual production per resource
+      // based on nodes that CAN produce (from previous iteration)
+      final actualProduction = <ResourceType, double>{};
+      for (final node in graph.nodes) {
+        if (!node.hasWorkers || !nodeCanProduce[node.id]!) continue;
+        for (final output in node.outputs) {
+          actualProduction.update(
+            output.resourceType,
+            (v) => v + output.ratePerSecond,
+            ifAbsent: () => output.ratePerSecond,
+          );
+        }
       }
 
-      // Check if all input resources have sufficient allocated share
-      bool canProduce = true;
-      for (final input in node.inputs) {
-        final resourceType = input.resourceType;
-        final totalDemandForResource = totalDemand[resourceType] ?? 0;
-        if (totalDemandForResource == 0) {
-          canProduce = false;
-          break;
-        }
-        final allocatedShare =
-            (incomingRates[resourceType] ?? 0) *
-            (input.ratePerSecond / totalDemandForResource);
-        if (allocatedShare < input.ratePerSecond) {
-          canProduce = false;
-          break;
+      // Second pass: compute total demand per resource
+      final totalDemand = <ResourceType, double>{};
+      for (final node in graph.nodes) {
+        if (!node.hasWorkers) continue;
+        for (final input in node.inputs) {
+          totalDemand.update(
+            input.resourceType,
+            (v) => v + input.ratePerSecond,
+            ifAbsent: () => input.ratePerSecond,
+          );
         }
       }
-      nodeCanProduce[node.id] = canProduce;
-    }
+
+      // Third pass: determine which nodes can produce based on actual availability
+      for (final node in graph.nodes) {
+        if (!node.hasWorkers) {
+          if (nodeCanProduce[node.id]!) {
+            nodeCanProduce[node.id] = false;
+            changed = true;
+          }
+          continue;
+        }
+
+        // Nodes with no inputs can always produce if they have workers
+        if (node.inputs.isEmpty) {
+          if (!nodeCanProduce[node.id]!) {
+            nodeCanProduce[node.id] = true;
+            changed = true;
+          }
+          continue;
+        }
+
+        // Check if all input resources have sufficient actual production
+        bool canProduce = true;
+        for (final input in node.inputs) {
+          final resourceType = input.resourceType;
+          final totalDemandForResource = totalDemand[resourceType] ?? 0;
+          if (totalDemandForResource == 0) {
+            canProduce = false;
+            break;
+          }
+          final actualShare =
+              (actualProduction[resourceType] ?? 0) *
+              (input.ratePerSecond / totalDemandForResource);
+          if (actualShare < input.ratePerSecond) {
+            canProduce = false;
+            break;
+          }
+        }
+
+        if (nodeCanProduce[node.id]! != canProduce) {
+          nodeCanProduce[node.id] = canProduce;
+          changed = true;
+        }
+      }
+    } while (changed);
 
     // Collect consumption stats from ALL nodes with workers (demand exists
     // even when a building can't operate due to insufficient incoming rate).

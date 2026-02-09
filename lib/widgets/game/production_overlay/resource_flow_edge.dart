@@ -104,7 +104,7 @@ class _ResourceFlowEdgeWidgetState extends State<ResourceFlowEdgeWidget>
             endOffset: Offset(localEndX, localEndY),
             status: widget.edge.status,
             isHighlighted: widget.edge.isHighlighted,
-            isIncomplete: widget.edge.isIncomplete,
+            isIncomplete: isIncomplete,
             rate: widget.edge.ratePerSecond,
             animationProgress: _animationController.value,
           ),
