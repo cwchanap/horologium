@@ -4,7 +4,6 @@ library;
 import 'package:flutter/foundation.dart';
 import 'package:horologium/game/production/production_graph.dart';
 import 'package:horologium/game/resources/resource_type.dart';
-import 'package:horologium/game/resources/resources.dart';
 
 /// Analyzes resource flows to determine status and bottlenecks.
 class FlowAnalyzer {
@@ -125,13 +124,10 @@ class FlowAnalyzer {
 
   /// Analyze the graph and update flow status on all nodes and edges.
   ///
-  /// Takes [resources] into account to calculate actual (not theoretical) flows.
+  /// Calculates actual (not theoretical) flows based on steady-state rates.
   /// Only includes production/consumption from buildings that have both
   /// workers AND sufficient input resources.
-  static ProductionGraph analyzeGraph(
-    ProductionGraph graph,
-    Resources resources,
-  ) {
+  static ProductionGraph analyzeGraph(ProductionGraph graph) {
     final resourceStats = <ResourceType, _ResourceStats>{};
 
     // Compute steady-state incoming rates per resource type
@@ -150,16 +146,40 @@ class FlowAnalyzer {
 
     // Build a map for checking node resource availability
     final nodeCanProduce = <String, bool>{};
+
+    // First pass: compute total demand per resource
+    final totalDemand = <ResourceType, double>{};
+    for (final node in graph.nodes) {
+      if (!node.hasWorkers) continue;
+      for (final input in node.inputs) {
+        totalDemand.update(
+          input.resourceType,
+          (v) => v + input.ratePerSecond,
+          ifAbsent: () => input.ratePerSecond,
+        );
+      }
+    }
+
+    // Second pass: determine which nodes can produce based on allocated shares
     for (final node in graph.nodes) {
       if (!node.hasWorkers) {
         nodeCanProduce[node.id] = false;
         continue;
       }
 
-      // Check if all input resources have sufficient incoming rate
+      // Check if all input resources have sufficient allocated share
       bool canProduce = true;
       for (final input in node.inputs) {
-        if ((incomingRates[input.resourceType] ?? 0) < input.ratePerSecond) {
+        final resourceType = input.resourceType;
+        final totalDemandForResource = totalDemand[resourceType] ?? 0;
+        if (totalDemandForResource == 0) {
+          canProduce = false;
+          break;
+        }
+        final allocatedShare =
+            (incomingRates[resourceType] ?? 0) *
+            (input.ratePerSecond / totalDemandForResource);
+        if (allocatedShare < input.ratePerSecond) {
           canProduce = false;
           break;
         }

@@ -116,7 +116,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     final resources = widget.getResources();
 
     var graph = ProductionGraph.fromBuildings(buildings, resources);
-    graph = FlowAnalyzer.analyzeGraph(graph, resources);
+    graph = FlowAnalyzer.analyzeGraph(graph);
     graph = _applyLayout(graph);
 
     if (_activeFilter != null) {
