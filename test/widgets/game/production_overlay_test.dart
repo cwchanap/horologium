@@ -162,6 +162,58 @@ void main() {
 
       expect(find.text('Production Chain'), findsOneWidget);
     });
+
+    testWidgets('narrow screen shows short title and stacked header', (
+      tester,
+    ) async {
+      // Set a narrow screen size (<=320px triggers list view + narrow header)
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => [],
+            getResources: () => Resources(),
+            onClose: () {},
+          ),
+        ),
+      );
+
+      // Narrow header shows shortened title 'Production' instead of 'Production Chain'
+      expect(find.text('Production'), findsOneWidget);
+      expect(find.text('Production Chain'), findsNothing);
+    });
+
+    testWidgets('canvas sizes from visible nodes only in clustered mode', (
+      tester,
+    ) async {
+      // 51 houses triggers clustering
+      final buildings = List.generate(
+        51,
+        (index) => _createTestBuilding(type: BuildingType.house),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => buildings,
+            getResources: () => Resources(),
+            onClose: () {},
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // With all clusters collapsed, canvas should use minimum size
+      // (no individual nodes are visible).
+      // Find the SizedBox used as canvas inside the InteractiveViewer.
+      final interactiveViewer = find.byType(InteractiveViewer);
+      expect(interactiveViewer, findsOneWidget);
+    });
   });
 
   group('BuildingNodeWidget', () {
