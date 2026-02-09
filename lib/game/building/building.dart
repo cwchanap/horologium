@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:horologium/constants/assets_path.dart';
 import 'package:horologium/game/building/category.dart';
 import 'package:horologium/game/resources/resource_type.dart';
+import 'package:uuid/uuid.dart';
 
 enum BuildingType {
   powerPlant,
@@ -23,6 +24,7 @@ enum BuildingType {
 }
 
 class Building {
+  final String id;
   final BuildingType type;
   final String name;
   final String description;
@@ -42,6 +44,7 @@ class Building {
   int assignedWorkers;
 
   Building({
+    String? id,
     required this.type,
     required this.name,
     required this.description,
@@ -58,7 +61,8 @@ class Building {
     this.requiredWorkers = 1,
     required this.category,
     this.level = 1,
-  }) : assignedWorkers = 0;
+  }) : id = id ?? const Uuid().v4(),
+       assignedWorkers = 0;
 
   // Getters for level-scaled values
   int get cost => baseCost * level;

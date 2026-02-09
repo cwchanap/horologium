@@ -1,7 +1,9 @@
+import 'package:uuid/uuid.dart';
 import '../building/building.dart';
 
 /// Data structure representing a building placed on the planet grid
 class PlacedBuildingData {
+  final String id;
   final int x;
   final int y;
   final BuildingType type;
@@ -10,6 +12,7 @@ class PlacedBuildingData {
   final String? variant; // For future use
 
   const PlacedBuildingData({
+    required this.id,
     required this.x,
     required this.y,
     required this.type,
@@ -20,20 +23,49 @@ class PlacedBuildingData {
        assert(assignedWorkers >= 0, 'assignedWorkers cannot be negative');
 
   /// Convert to string format for persistence
-  /// Format: "x,y,BuildingName,level,assignedWorkers"
+  /// Format: "id,x,y,BuildingName,level,assignedWorkers"
   String toLegacyString() {
-    return '$x,$y,${type.toString().split('.').last},$level,$assignedWorkers';
+    return '$id,$x,$y,${type.toString().split('.').last},$level,$assignedWorkers';
   }
 
   /// Parse from legacy string format
-  /// Supports both old format "x,y,BuildingName" and new format "x,y,BuildingName,level,workers"
+  /// Supports:
+  /// - New format: "id,x,y,BuildingName,level,workers"
+  /// - Old format: "x,y,BuildingName,level,workers" (generates new ID)
+  /// - Very old format: "x,y,BuildingName" (generates new ID, level=1, workers=0)
   static PlacedBuildingData? fromLegacyString(String data) {
     final parts = data.split(',');
-    if (parts.length < 3) return null;
+    if (parts.isEmpty) return null;
 
-    final x = int.tryParse(parts[0]);
-    final y = int.tryParse(parts[1]);
-    final typeName = parts[2];
+    // Detect format: if first part is not a pure integer and contains a dash or is long,
+    // assume it's the ID in new format. Otherwise, it's the old format.
+    final firstPart = parts[0];
+    final isInteger = int.tryParse(firstPart) != null;
+    final looksLikeId =
+        !isInteger && (firstPart.contains('-') || firstPart.length > 8);
+
+    String id;
+    int xIndex, yIndex, typeIndex;
+
+    if (looksLikeId && parts.length >= 4) {
+      // New format: id,x,y,type,...
+      id = firstPart;
+      xIndex = 1;
+      yIndex = 2;
+      typeIndex = 3;
+    } else if (parts.length >= 3) {
+      // Old format without ID: x,y,type,...
+      id = const Uuid().v4();
+      xIndex = 0;
+      yIndex = 1;
+      typeIndex = 2;
+    } else {
+      return null;
+    }
+
+    final x = int.tryParse(parts[xIndex]);
+    final y = int.tryParse(parts[yIndex]);
+    final typeName = parts[typeIndex];
 
     if (x == null || y == null) return null;
 
@@ -48,17 +80,24 @@ class PlacedBuildingData {
 
     if (type == null) return null;
 
-    // Parse level (default to 1 for backward compatibility)
-    final parsedLevel = parts.length > 3 ? int.tryParse(parts[3]) : null;
+    // Parse level and workers based on format
+    final levelIndex = typeIndex + 1;
+    final workersIndex = typeIndex + 2;
+
+    final parsedLevel = parts.length > levelIndex
+        ? int.tryParse(parts[levelIndex])
+        : null;
     final level = (parsedLevel == null || parsedLevel < 1) ? 1 : parsedLevel;
 
-    // Parse assigned workers (default to 0 for backward compatibility)
-    final parsedWorkers = parts.length > 4 ? int.tryParse(parts[4]) : null;
+    final parsedWorkers = parts.length > workersIndex
+        ? int.tryParse(parts[workersIndex])
+        : null;
     final assignedWorkers = (parsedWorkers == null || parsedWorkers < 0)
         ? 0
         : parsedWorkers;
 
     return PlacedBuildingData(
+      id: id,
       x: x,
       y: y,
       type: type,
@@ -74,6 +113,7 @@ class PlacedBuildingData {
     );
 
     return Building(
+      id: id,
       type: template.type,
       name: template.name,
       description: template.description,
@@ -95,6 +135,7 @@ class PlacedBuildingData {
 
   /// Create a copy with modified values
   PlacedBuildingData copyWith({
+    String? id,
     int? x,
     int? y,
     BuildingType? type,
@@ -103,6 +144,7 @@ class PlacedBuildingData {
     String? variant,
   }) {
     return PlacedBuildingData(
+      id: id ?? this.id,
       x: x ?? this.x,
       y: y ?? this.y,
       type: type ?? this.type,
@@ -116,6 +158,7 @@ class PlacedBuildingData {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is PlacedBuildingData &&
+        other.id == id &&
         other.x == x &&
         other.y == y &&
         other.type == type &&
@@ -126,11 +169,11 @@ class PlacedBuildingData {
 
   @override
   int get hashCode {
-    return Object.hash(x, y, type, level, assignedWorkers, variant);
+    return Object.hash(id, x, y, type, level, assignedWorkers, variant);
   }
 
   @override
   String toString() {
-    return 'PlacedBuildingData(x: $x, y: $y, type: $type, level: $level, assignedWorkers: $assignedWorkers, variant: $variant)';
+    return 'PlacedBuildingData(id: $id, x: $x, y: $y, type: $type, level: $level, assignedWorkers: $assignedWorkers, variant: $variant)';
   }
 }

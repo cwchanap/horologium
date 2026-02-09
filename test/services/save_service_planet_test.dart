@@ -62,6 +62,7 @@ void main() {
         // Add some buildings
         planet.addBuilding(
           const PlacedBuildingData(
+            id: 'house-1',
             x: 5,
             y: 5,
             type: BuildingType.house,
@@ -70,7 +71,12 @@ void main() {
           ),
         );
         planet.addBuilding(
-          const PlacedBuildingData(x: 10, y: 10, type: BuildingType.powerPlant),
+          const PlacedBuildingData(
+            id: 'power-1',
+            x: 10,
+            y: 10,
+            type: BuildingType.powerPlant,
+          ),
         );
 
         // Save the planet

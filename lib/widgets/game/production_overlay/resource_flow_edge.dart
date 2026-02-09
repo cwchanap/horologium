@@ -13,12 +13,14 @@ class ResourceFlowEdgeWidget extends StatefulWidget {
   final ResourceFlowEdge edge;
   final BuildingNode? startNode;
   final BuildingNode? endNode;
+  final bool isIncomplete;
 
   const ResourceFlowEdgeWidget({
     super.key,
     required this.edge,
     this.startNode,
     this.endNode,
+    this.isIncomplete = false,
   });
 
   @override
@@ -54,12 +56,28 @@ class _ResourceFlowEdgeWidgetState extends State<ResourceFlowEdgeWidget>
       return const SizedBox.shrink();
     }
 
-    // Calculate edge positions (from right side of start to left side of end)
-    final startX = widget.startNode!.position.dx + ProductionTheme.nodeWidth;
-    final startY =
-        widget.startNode!.position.dy + ProductionTheme.nodeHeight / 2;
-    final endX = widget.endNode!.position.dx;
-    final endY = widget.endNode!.position.dy + ProductionTheme.nodeHeight / 2;
+    // Calculate edge positions
+    final isIncomplete =
+        widget.isIncomplete || (widget.startNode!.id == widget.endNode!.id);
+
+    late final double startX;
+    late final double startY;
+    late final double endX;
+    late final double endY;
+
+    if (isIncomplete) {
+      // For incomplete edges, draw a stub from the right side extending outward
+      startX = widget.startNode!.position.dx + ProductionTheme.nodeWidth;
+      startY = widget.startNode!.position.dy + ProductionTheme.nodeHeight / 2;
+      endX = startX + ProductionTheme.nodeWidth * 0.8;
+      endY = startY + ProductionTheme.nodeHeight * 0.5;
+    } else {
+      // Normal edge: from right side of start to left side of end
+      startX = widget.startNode!.position.dx + ProductionTheme.nodeWidth;
+      startY = widget.startNode!.position.dy + ProductionTheme.nodeHeight / 2;
+      endX = widget.endNode!.position.dx;
+      endY = widget.endNode!.position.dy + ProductionTheme.nodeHeight / 2;
+    }
 
     // Calculate bounding box for local coordinates
     final minX = min(startX, endX);
@@ -282,10 +300,7 @@ class _EdgePainter extends CustomPainter {
       (startOffset.dy + endOffset.dy) / 2 + 8,
     );
 
-    // Draw small status indicator icon
-    final iconPaint = Paint()
-      ..color = ProductionTheme.getStatusColor(status)
-      ..style = PaintingStyle.fill;
+    final baseColor = ProductionTheme.getStatusColor(status);
 
     switch (status) {
       case FlowStatus.surplus:
@@ -296,7 +311,8 @@ class _EdgePainter extends CustomPainter {
         path.lineTo(iconPosition.dx + 4, iconPosition.dy - 2);
         canvas.drawPath(
           path,
-          iconPaint
+          Paint()
+            ..color = baseColor
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
         );
@@ -306,7 +322,8 @@ class _EdgePainter extends CustomPainter {
         canvas.drawLine(
           Offset(iconPosition.dx - 4, iconPosition.dy),
           Offset(iconPosition.dx + 4, iconPosition.dy),
-          iconPaint
+          Paint()
+            ..color = baseColor
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
         );
@@ -320,7 +337,8 @@ class _EdgePainter extends CustomPainter {
         path.lineTo(iconPosition.dx - 3, iconPosition.dy + 3);
         canvas.drawPath(
           path,
-          iconPaint
+          Paint()
+            ..color = baseColor
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
         );
@@ -330,7 +348,8 @@ class _EdgePainter extends CustomPainter {
         canvas.drawCircle(
           iconPosition,
           4,
-          iconPaint
+          Paint()
+            ..color = baseColor
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
         );
