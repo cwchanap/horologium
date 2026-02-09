@@ -292,11 +292,11 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     );
   }
 
-  /// Compute canvas width from the rightmost node position.
-  double _computeCanvasWidth() {
+  /// Compute canvas width from the rightmost visible node position.
+  double _computeCanvasWidth(List<BuildingNode> visibleNodes) {
     if (_graph == null || _graph!.nodes.isEmpty) return _minCanvasWidth;
     double maxX = 0;
-    for (final node in _graph!.nodes) {
+    for (final node in visibleNodes) {
       final right = node.position.dx + ProductionTheme.nodeWidth;
       if (right > maxX) maxX = right;
     }
@@ -309,11 +309,11 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     return max(maxX + _horizontalSpacing, _minCanvasWidth);
   }
 
-  /// Compute canvas height from the bottommost node position.
-  double _computeCanvasHeight() {
+  /// Compute canvas height from the bottommost visible node position.
+  double _computeCanvasHeight(List<BuildingNode> visibleNodes) {
     if (_graph == null || _graph!.nodes.isEmpty) return _minCanvasHeight;
     double maxY = 0;
-    for (final node in _graph!.nodes) {
+    for (final node in visibleNodes) {
       final bottom = node.position.dy + ProductionTheme.nodeHeight;
       if (bottom > maxY) maxY = bottom;
     }
@@ -454,7 +454,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       child: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
+            _buildHeader(isNarrow: useListView),
             Expanded(
               child: _graph == null || _graph!.isEmpty
                   ? const EmptyStateWidget()
@@ -469,37 +469,67 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader({bool isNarrow = false}) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isNarrow ? 8 : 16),
       decoration: BoxDecoration(
         color: Colors.grey[900],
         border: Border(
           bottom: BorderSide(color: Colors.cyanAccent.withAlpha(128)),
         ),
       ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.close, color: Colors.white),
-            onPressed: widget.onClose,
-          ),
-          const SizedBox(width: 8),
-          const Text(
-            'Production Chain',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+      child: isNarrow
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: widget.onClose,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Production',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ResourceFilterWidget(
+                  selectedFilter: _activeFilter,
+                  onFilterChanged: _onFilterChanged,
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: widget.onClose,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Production Chain',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                ResourceFilterWidget(
+                  selectedFilter: _activeFilter,
+                  onFilterChanged: _onFilterChanged,
+                ),
+              ],
             ),
-          ),
-          const Spacer(),
-          ResourceFilterWidget(
-            selectedFilter: _activeFilter,
-            onFilterChanged: _onFilterChanged,
-          ),
-        ],
-      ),
     );
   }
 
@@ -528,8 +558,8 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
             chainHighlight: _chainHighlight,
           ),
           child: SizedBox(
-            width: _computeCanvasWidth(),
-            height: _computeCanvasHeight(),
+            width: _computeCanvasWidth(visibleNodes),
+            height: _computeCanvasHeight(visibleNodes),
             child: Stack(
               children: [
                 // Render clusters (when clustered and not all expanded)
