@@ -268,11 +268,16 @@ class ProductionGraph {
 
     // Build edges by matching producers to consumers
     // First, collect all potential producer-consumer pairs
-    final edgeCandidates = <String, List<_EdgeCandidate>>{};
+    // Use record keys to avoid fragile string splitting when reconstructing consumer/resource.
+    final edgeCandidates =
+        <
+          (String consumerId, ResourceType resourceType),
+          List<_EdgeCandidate>
+        >{};
 
     for (final consumer in nodes) {
       for (final input in consumer.inputs) {
-        final key = '${consumer.id}_${input.resourceType.name}';
+        final key = (consumer.id, input.resourceType);
         edgeCandidates[key] = [];
 
         // Find all producers of this resource (excluding self)
@@ -323,20 +328,14 @@ class ProductionGraph {
 
     // Create edges with allocated rates split among producers
     for (final entry in edgeCandidates.entries) {
+      final (consumerId, resourceType) = entry.key;
       final candidates = entry.value;
 
       // When no producer exists for this input, emit an incomplete edge
       if (candidates.isEmpty) {
-        // Parse consumer ID and resource type from the key (format: consumerId_resourceName)
-        final keyParts = entry.key.split('_');
-        final resourceName = keyParts.last;
-        final consumerId = keyParts.sublist(0, keyParts.length - 1).join('_');
-        final resourceType = ResourceType.values.firstWhere(
-          (r) => r.name == resourceName,
-        );
         edges.add(
           ResourceFlowEdge(
-            id: 'incomplete_${entry.key}',
+            id: 'incomplete_${consumerId}_${resourceType.name}',
             resourceType: resourceType,
             producerNodeId: consumerId,
             consumerNodeId: consumerId,
@@ -399,13 +398,18 @@ class ProductionGraph {
       final nodesInCategory = entry.value;
 
       // Determine aggregate status (worst status wins)
+      // Priority: deficit > unknown > surplus > balanced
       var aggregateStatus = FlowStatus.balanced;
       for (final node in nodesInCategory) {
         if (node.status == FlowStatus.deficit) {
           aggregateStatus = FlowStatus.deficit;
           break;
-        } else if (node.status == FlowStatus.surplus &&
+        } else if (node.status == FlowStatus.unknown &&
             aggregateStatus != FlowStatus.deficit) {
+          aggregateStatus = FlowStatus.unknown;
+        } else if (node.status == FlowStatus.surplus &&
+            aggregateStatus != FlowStatus.deficit &&
+            aggregateStatus != FlowStatus.unknown) {
           aggregateStatus = FlowStatus.surplus;
         }
       }

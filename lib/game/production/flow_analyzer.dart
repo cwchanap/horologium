@@ -134,6 +134,20 @@ class FlowAnalyzer {
   ) {
     final resourceStats = <ResourceType, _ResourceStats>{};
 
+    // Compute steady-state incoming rates per resource type
+    // by summing output rates from all nodes that have workers.
+    final incomingRates = <ResourceType, double>{};
+    for (final node in graph.nodes) {
+      if (!node.hasWorkers) continue;
+      for (final output in node.outputs) {
+        incomingRates.update(
+          output.resourceType,
+          (v) => v + output.ratePerSecond,
+          ifAbsent: () => output.ratePerSecond,
+        );
+      }
+    }
+
     // Build a map for checking node resource availability
     final nodeCanProduce = <String, bool>{};
     for (final node in graph.nodes) {
@@ -142,11 +156,10 @@ class FlowAnalyzer {
         continue;
       }
 
-      // Check if all input resources are available
+      // Check if all input resources have sufficient incoming rate
       bool canProduce = true;
       for (final input in node.inputs) {
-        if ((resources.resources[input.resourceType] ?? 0) <
-            input.ratePerSecond) {
+        if ((incomingRates[input.resourceType] ?? 0) < input.ratePerSecond) {
           canProduce = false;
           break;
         }
@@ -154,23 +167,28 @@ class FlowAnalyzer {
       nodeCanProduce[node.id] = canProduce;
     }
 
-    // Collect stats only from buildings that can actually produce
+    // Collect consumption stats from ALL nodes with workers (demand exists
+    // even when a building can't operate due to insufficient incoming rate).
+    // Collect production stats only from buildings that can actually produce.
     for (final node in graph.nodes) {
-      if (!nodeCanProduce[node.id]!) continue;
+      if (!node.hasWorkers) continue;
 
-      for (final output in node.outputs) {
-        resourceStats
-                .putIfAbsent(output.resourceType, () => _ResourceStats())
-                .totalProduction +=
-            output.ratePerSecond;
-        resourceStats[output.resourceType]!.producerIds.add(node.id);
-      }
       for (final input in node.inputs) {
         resourceStats
                 .putIfAbsent(input.resourceType, () => _ResourceStats())
                 .totalConsumption +=
             input.ratePerSecond;
         resourceStats[input.resourceType]!.consumerIds.add(node.id);
+      }
+
+      if (nodeCanProduce[node.id]!) {
+        for (final output in node.outputs) {
+          resourceStats
+                  .putIfAbsent(output.resourceType, () => _ResourceStats())
+                  .totalProduction +=
+              output.ratePerSecond;
+          resourceStats[output.resourceType]!.producerIds.add(node.id);
+        }
       }
     }
 
@@ -223,7 +241,7 @@ class FlowAnalyzer {
           return;
         }
         if (actualStatus == FlowStatus.unknown &&
-            nodeStatus == FlowStatus.balanced) {
+            nodeStatus != FlowStatus.deficit) {
           nodeStatus = FlowStatus.unknown;
         } else if (actualStatus == FlowStatus.surplus &&
             nodeStatus != FlowStatus.deficit &&

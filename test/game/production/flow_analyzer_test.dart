@@ -358,6 +358,107 @@ void main() {
         isTrue,
       );
     });
+
+    test('unknown status overrides surplus but not deficit in node status', () {
+      // Create a node with one surplus output and one unknown resource
+      // to verify unknown overrides surplus.
+      final nodes = [
+        _createNode('producer', {}, {
+          ResourceType.coal: 2.0,
+          ResourceType.electricity: 1.0,
+        }),
+        _createNode('consumer', {ResourceType.coal: 1.0}, {}),
+      ];
+      // Coal: production=2.0, consumption=1.0 → surplus
+      // Electricity: production=1.0, consumption=0 → surplus
+      // Both surplus, so producer should be surplus
+      final graph = ProductionGraph(
+        id: 'test',
+        generatedAt: DateTime.now(),
+        nodes: nodes,
+        edges: [],
+        bottlenecks: [],
+      );
+
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
+      final producer = analyzedGraph.nodes.firstWhere(
+        (n) => n.id == 'producer',
+      );
+      expect(producer.status, equals(FlowStatus.surplus));
+    });
+
+    test('uses steady-state rate check instead of stockpile for canProduce', () {
+      // Consumer needs 1.0 coal/s but only 0.5 coal/s is produced.
+      // Even though stockpile has coal, the rate-based check detects
+      // insufficient incoming rate → consumer counted as unable to produce,
+      // but consumption demand still registers as deficit.
+      final nodes = [
+        _createNode('producer', {}, {ResourceType.coal: 0.5}),
+        _createNode(
+          'consumer',
+          {ResourceType.coal: 1.0},
+          {ResourceType.electricity: 1.0},
+        ),
+      ];
+      final graph = ProductionGraph(
+        id: 'test',
+        generatedAt: DateTime.now(),
+        nodes: nodes,
+        edges: [],
+        bottlenecks: [],
+      );
+
+      final resources = Resources();
+      resources.coal = 100; // High stockpile should NOT matter
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, resources);
+
+      // Consumer demand (1.0 coal/s) exceeds production (0.5 coal/s) → deficit
+      final consumer = analyzedGraph.nodes.firstWhere(
+        (n) => n.id == 'consumer',
+      );
+      expect(consumer.status, equals(FlowStatus.deficit));
+
+      // Consumer can't produce electricity (insufficient coal incoming rate),
+      // so electricity production should not be counted
+      expect(
+        analyzedGraph.bottlenecks.any(
+          (b) => b.resourceType == ResourceType.coal,
+        ),
+        isTrue,
+      );
+    });
+
+    test('consumption demand counted even when node cannot produce', () {
+      // Node needs electricity to produce planks, but no electricity
+      // is being produced. The node's electricity demand should still
+      // show up as a deficit.
+      final nodes = [
+        _createNode(
+          'sawmill',
+          {ResourceType.electricity: 1.0},
+          {ResourceType.planks: 1.0},
+        ),
+      ];
+      final graph = ProductionGraph(
+        id: 'test',
+        generatedAt: DateTime.now(),
+        nodes: nodes,
+        edges: [],
+        bottlenecks: [],
+      );
+
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
+
+      // Electricity: production=0, consumption=1.0 → deficit
+      final sawmill = analyzedGraph.nodes.firstWhere((n) => n.id == 'sawmill');
+      expect(sawmill.status, equals(FlowStatus.deficit));
+      expect(
+        analyzedGraph.bottlenecks.any(
+          (b) => b.resourceType == ResourceType.electricity,
+        ),
+        isTrue,
+      );
+    });
   });
 }
 

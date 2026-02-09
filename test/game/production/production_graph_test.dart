@@ -517,6 +517,68 @@ void main() {
         expect(clusters.first.aggregateStatus, equals(FlowStatus.surplus));
       },
     );
+
+    test('createClusters ranks unknown above surplus but below deficit', () {
+      final nodes = <BuildingNode>[];
+      for (var i = 0; i < 51; i++) {
+        FlowStatus status;
+        if (i == 10) {
+          status = FlowStatus.unknown;
+        } else if (i == 20) {
+          status = FlowStatus.surplus;
+        } else {
+          status = FlowStatus.balanced;
+        }
+        nodes.add(
+          BuildingNode(
+            id: 'node_$i',
+            name: 'Node $i',
+            type: BuildingType.house,
+            category: BuildingCategory.residential,
+            inputs: [],
+            outputs: [],
+            status: status,
+            hasWorkers: true,
+          ),
+        );
+      }
+
+      final clusters = ProductionGraph.createClusters(nodes);
+
+      // unknown is worse than surplus, so aggregate should be unknown
+      expect(clusters.first.aggregateStatus, equals(FlowStatus.unknown));
+    });
+
+    test('createClusters deficit still takes precedence over unknown', () {
+      final nodes = <BuildingNode>[];
+      for (var i = 0; i < 51; i++) {
+        FlowStatus status;
+        if (i == 10) {
+          status = FlowStatus.unknown;
+        } else if (i == 20) {
+          status = FlowStatus.deficit;
+        } else {
+          status = FlowStatus.balanced;
+        }
+        nodes.add(
+          BuildingNode(
+            id: 'node_$i',
+            name: 'Node $i',
+            type: BuildingType.house,
+            category: BuildingCategory.residential,
+            inputs: [],
+            outputs: [],
+            status: status,
+            hasWorkers: true,
+          ),
+        );
+      }
+
+      final clusters = ProductionGraph.createClusters(nodes);
+
+      // deficit is worst → aggregate should be deficit
+      expect(clusters.first.aggregateStatus, equals(FlowStatus.deficit));
+    });
   });
 
   group('ChainHighlighter.applyHighlight', () {
