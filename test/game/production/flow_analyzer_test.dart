@@ -4,7 +4,6 @@ import 'package:horologium/game/building/category.dart';
 import 'package:horologium/game/production/flow_analyzer.dart';
 import 'package:horologium/game/production/production_graph.dart';
 import 'package:horologium/game/resources/resource_type.dart';
-import 'package:horologium/game/resources/resources.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -175,7 +174,7 @@ void main() {
           bottlenecks: [],
         );
 
-        final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
+        final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
 
         // Consumer shows deficit because its input resource (coal) is in deficit
         final consumer = analyzedGraph.nodes.firstWhere(
@@ -204,7 +203,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
 
       expect(analyzedGraph.bottlenecks.isNotEmpty, isTrue);
       expect(
@@ -236,7 +235,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
 
       // Edge should show deficit since production < consumption
       expect(analyzedGraph.edges.first.status, equals(FlowStatus.deficit));
@@ -255,7 +254,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
 
       // Producer shows surplus because its output resource is in surplus
       final producer = analyzedGraph.nodes.firstWhere(
@@ -279,7 +278,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
 
       // Should have a bottleneck because the producer is idle (0 production vs 1 consumption)
       expect(analyzedGraph.bottlenecks.isNotEmpty, isTrue);
@@ -312,7 +311,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
 
       // Should be surplus because consumer is idle (1 production vs 0 consumption)
       // Or balanced if treating 0 consumption as balanced/surplus.
@@ -338,7 +337,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
 
       // Both consumers should show deficit status
       final consumer1 = analyzedGraph.nodes.firstWhere(
@@ -359,7 +358,7 @@ void main() {
       );
     });
 
-    test('unknown status overrides surplus but not deficit in node status', () {
+    test('producer with multiple surplus outputs has surplus status', () {
       // Create a node with one surplus output and one unknown resource
       // to verify unknown overrides surplus.
       final nodes = [
@@ -380,7 +379,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
       final producer = analyzedGraph.nodes.firstWhere(
         (n) => n.id == 'producer',
       );
@@ -408,9 +407,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final resources = Resources();
-      resources.coal = 100; // High stockpile should NOT matter
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, resources);
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
 
       // Consumer demand (1.0 coal/s) exceeds production (0.5 coal/s) → deficit
       final consumer = analyzedGraph.nodes.firstWhere(
@@ -447,7 +444,7 @@ void main() {
         bottlenecks: [],
       );
 
-      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph, Resources());
+      final analyzedGraph = FlowAnalyzer.analyzeGraph(graph);
 
       // Electricity: production=0, consumption=1.0 → deficit
       final sawmill = analyzedGraph.nodes.firstWhere((n) => n.id == 'sawmill');
