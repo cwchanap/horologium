@@ -49,7 +49,15 @@ class Resources {
   double _researchAccumulator = 0;
 
   void update(List<Building> buildings) {
-    // Calculate accommodation capacity
+    _calculateAccommodation(buildings);
+    _updateAvailableWorkers(buildings);
+    _processNonConsumingBuildings(buildings);
+    final activeResearchLabs = _processConsumingBuildings(buildings);
+    _accumulateResearch(activeResearchLabs);
+    _updateHappiness(buildings, totalAccommodation);
+  }
+
+  void _calculateAccommodation(List<Building> buildings) {
     totalAccommodation = 0;
     for (final building in buildings) {
       if (building.type == BuildingType.house ||
@@ -57,33 +65,27 @@ class Resources {
         totalAccommodation += building.accommodationCapacity;
       }
     }
+    unshelteredPopulation = (population - totalAccommodation).clamp(
+      0,
+      population,
+    );
+  }
 
-    // Update unsheltered population
-    unshelteredPopulation = population - totalAccommodation;
-    if (unshelteredPopulation < 0) {
-      unshelteredPopulation = 0;
-    }
-
-    // Update available workers (total population minus assigned workers)
+  void _updateAvailableWorkers(List<Building> buildings) {
     int totalAssignedWorkers = 0;
     for (final building in buildings) {
       totalAssignedWorkers += building.assignedWorkers;
     }
     availableWorkers = population - totalAssignedWorkers;
-    // Count active research labs for time-based generation
-    int activeResearchLabs = 0;
+  }
 
-    // First, generate resources from buildings that don't require consumption
+  void _processNonConsumingBuildings(List<Building> buildings) {
     for (final building in buildings) {
       if (building.consumption.isEmpty) {
-        // Buildings with no consumption generate if they have workers (except houses)
         if (building.type == BuildingType.house ||
             building.type == BuildingType.largeHouse ||
             building.hasWorkers) {
-          building.generation.forEach((key, value) {
-            final resourceType = ResourceType.values.firstWhere(
-              (e) => e.toString() == 'ResourceType.$key',
-            );
+          building.generation.forEach((resourceType, value) {
             resources.update(
               resourceType,
               (v) => v + value,
@@ -93,71 +95,58 @@ class Resources {
         }
       }
     }
+  }
 
-    // Then, handle buildings with consumption requirements
+  int _processConsumingBuildings(List<Building> buildings) {
+    int activeResearchLabs = 0;
     for (final building in buildings) {
-      if (building.consumption.isNotEmpty) {
-        bool canProduce = true;
+      if (building.consumption.isEmpty) continue;
 
-        // Check if this building can consume what it needs
-        building.consumption.forEach((key, value) {
-          final resourceType = ResourceType.values.firstWhere(
-            (e) => e.toString() == 'ResourceType.$key',
+      bool canProduce = true;
+      building.consumption.forEach((resourceType, value) {
+        if ((resources[resourceType] ?? 0) < value) {
+          canProduce = false;
+        }
+      });
+
+      if (canProduce && building.hasWorkers) {
+        building.consumption.forEach((resourceType, value) {
+          resources.update(
+            resourceType,
+            (v) => v - value,
+            ifAbsent: () => -value,
           );
-          if ((resources[resourceType] ?? 0) < value) {
-            canProduce = false;
-          }
         });
 
-        if (canProduce && building.hasWorkers) {
-          // Consume resources
-          building.consumption.forEach((key, value) {
-            final resourceType = ResourceType.values.firstWhere(
-              (e) => e.toString() == 'ResourceType.$key',
-            );
+        building.generation.forEach((resourceType, value) {
+          if (resourceType == ResourceType.research) {
+            activeResearchLabs++;
+          } else {
             resources.update(
               resourceType,
-              (v) => v - value,
-              ifAbsent: () => -value,
+              (v) => v + value,
+              ifAbsent: () => value,
             );
-          });
-
-          // Generate resources and count research labs
-          building.generation.forEach((key, value) {
-            final resourceType = ResourceType.values.firstWhere(
-              (e) => e.toString() == 'ResourceType.$key',
-            );
-            if (key == 'research') {
-              activeResearchLabs++;
-            } else {
-              resources.update(
-                resourceType,
-                (v) => v + value,
-                ifAbsent: () => value,
-              );
-            }
-          });
-        }
+          }
+        });
       }
     }
+    return activeResearchLabs;
+  }
 
-    // Handle research point accumulation (1 point every 10 seconds per active lab)
+  void _accumulateResearch(int activeResearchLabs) {
     if (activeResearchLabs > 0) {
-      _researchAccumulator += 1.0; // Add 1 second of time
+      _researchAccumulator += 1.0;
       if (_researchAccumulator >= 10) {
-        int pointsToAdd =
-            activeResearchLabs; // 1 point per lab every 10 seconds
+        final pointsToAdd = activeResearchLabs;
         resources.update(
           ResourceType.research,
           (v) => v + pointsToAdd,
           ifAbsent: () => pointsToAdd.toDouble(),
         );
-        _researchAccumulator = 0; // Reset accumulator
+        _researchAccumulator = 0;
       }
     }
-
-    // Calculate happiness and handle population growth
-    _updateHappiness(buildings, totalAccommodation);
   }
 
   /// Calculates happiness based on housing, food, services, and employment.
@@ -286,6 +275,9 @@ class Resources {
   set bread(double value) => resources[ResourceType.bread] = value;
   set pastries(double value) => resources[ResourceType.pastries] = value;
 
+  double getResource(ResourceType type) => resources[type] ?? 0;
+  void setResource(ResourceType type, double value) => resources[type] = value;
+
   /// Returns true if there is spare housing capacity for population growth
   bool hasSpareHousingCapacity() {
     return totalAccommodation > population;
@@ -400,3 +392,5 @@ class Resources {
     }
   }
 }
+
+enum PopulationTrend { growing, stable, shrinking }

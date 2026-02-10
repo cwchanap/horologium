@@ -32,8 +32,8 @@ class Building {
   final String? assetPath;
   final Color color;
   final int baseCost;
-  final Map<String, double> baseGeneration;
-  final Map<String, double> baseConsumption;
+  final Map<ResourceType, double> baseGeneration;
+  final Map<ResourceType, double> baseConsumption;
   final int basePopulation;
   final int maxLevel;
   final int gridSize;
@@ -66,9 +66,9 @@ class Building {
 
   // Getters for level-scaled values
   int get cost => baseCost * level;
-  Map<String, double> get generation =>
+  Map<ResourceType, double> get generation =>
       baseGeneration.map((key, value) => MapEntry(key, value * level));
-  Map<String, double> get consumption =>
+  Map<ResourceType, double> get consumption =>
       baseConsumption.map((key, value) => MapEntry(key, value * level));
   int get accommodationCapacity => basePopulation * level; // For houses only
 
@@ -123,8 +123,9 @@ class Field extends Building {
   });
 
   @override
-  Map<String, double> get generation {
-    return {cropType.toString().split('.').last: 1.0 * level};
+  Map<ResourceType, double> get generation {
+    final resourceType = ResourceType.values.byName(cropType.name);
+    return {resourceType: 1.0 * level};
   }
 }
 
@@ -152,22 +153,22 @@ class Bakery extends Building {
   });
 
   @override
-  Map<String, double> get generation {
+  Map<ResourceType, double> get generation {
     switch (productType) {
       case BakeryProduct.bread:
-        return {'bread': 1.0 * level};
+        return {ResourceType.bread: 1.0 * level};
       case BakeryProduct.pastries:
-        return {'pastries': 1.0 * level};
+        return {ResourceType.pastries: 1.0 * level};
     }
   }
 
   @override
-  Map<String, double> get consumption {
+  Map<ResourceType, double> get consumption {
     switch (productType) {
       case BakeryProduct.bread:
-        return {'flour': 2.0 * level};
+        return {ResourceType.flour: 2.0 * level};
       case BakeryProduct.pastries:
-        return {'flour': 3.0 * level};
+        return {ResourceType.flour: 3.0 * level};
     }
   }
 }
@@ -195,11 +196,12 @@ class BuildingLimitManager {
   void loadFromMap(Map<String, int> upgrades) {
     _limitUpgrades.clear();
     for (final entry in upgrades.entries) {
-      final type = BuildingType.values.firstWhere(
-        (t) => t.toString().split('.').last == entry.key,
-        orElse: () => BuildingType.powerPlant,
-      );
-      _limitUpgrades[type] = entry.value;
+      final type = BuildingType.values
+          .where((t) => t.name == entry.key)
+          .firstOrNull;
+      if (type != null) {
+        _limitUpgrades[type] = entry.value;
+      }
     }
   }
 
@@ -219,8 +221,8 @@ class BuildingRegistry {
       icon: Icons.bolt,
       color: Colors.yellow,
       baseCost: 100,
-      baseGeneration: {'electricity': 1},
-      baseConsumption: {'coal': 1},
+      baseGeneration: {ResourceType.electricity: 1},
+      baseConsumption: {ResourceType.coal: 1},
       maxLevel: 5,
       requiredWorkers: 1,
       category: BuildingCategory.services,
@@ -233,7 +235,7 @@ class BuildingRegistry {
       assetPath: Assets.researchLab,
       color: Colors.blue,
       baseCost: 200,
-      baseGeneration: {'research': 0.1},
+      baseGeneration: {ResourceType.research: 0.1},
       maxLevel: 5,
       requiredWorkers: 1,
       category: BuildingCategory.services,
@@ -247,8 +249,8 @@ class BuildingRegistry {
       color: Colors.green,
       baseCost: 120,
       basePopulation: 2,
-      baseGeneration: {'cash': 1},
-      baseConsumption: {'wood': 1, 'water': 1},
+      baseGeneration: {ResourceType.cash: 1},
+      baseConsumption: {ResourceType.wood: 1, ResourceType.water: 1},
       maxLevel: 5,
       requiredWorkers: 0,
       category: BuildingCategory.residential,
@@ -262,8 +264,8 @@ class BuildingRegistry {
       color: Colors.lightGreen,
       baseCost: 250,
       basePopulation: 8,
-      baseGeneration: {'cash': 3},
-      baseConsumption: {'electricity': 1, 'water': 2},
+      baseGeneration: {ResourceType.cash: 3},
+      baseConsumption: {ResourceType.electricity: 1, ResourceType.water: 2},
       maxLevel: 5,
       requiredWorkers: 0,
       category: BuildingCategory.residential,
@@ -276,7 +278,7 @@ class BuildingRegistry {
       assetPath: Assets.goldMine,
       color: Colors.amber,
       baseCost: 300,
-      baseGeneration: {'gold': 0.1},
+      baseGeneration: {ResourceType.gold: 0.1},
       maxLevel: 5,
       requiredWorkers: 1,
       category: BuildingCategory.rawMaterials,
@@ -289,7 +291,7 @@ class BuildingRegistry {
       assetPath: Assets.woodFactory,
       color: Colors.brown,
       baseCost: 80,
-      baseGeneration: {'wood': 1},
+      baseGeneration: {ResourceType.wood: 1},
       maxLevel: 5,
       requiredWorkers: 1,
       category: BuildingCategory.rawMaterials,
@@ -302,7 +304,7 @@ class BuildingRegistry {
       assetPath: Assets.coalMine,
       color: Colors.grey,
       baseCost: 90,
-      baseGeneration: {'coal': 1},
+      baseGeneration: {ResourceType.coal: 1},
       maxLevel: 5,
       requiredWorkers: 1,
       category: BuildingCategory.rawMaterials,
@@ -315,7 +317,7 @@ class BuildingRegistry {
       assetPath: Assets.waterTreatmentPlant,
       color: Colors.lightBlue,
       baseCost: 150,
-      baseGeneration: {'water': 2},
+      baseGeneration: {ResourceType.water: 2},
       maxLevel: 5,
       requiredWorkers: 1,
       category: BuildingCategory.foodResources,
@@ -328,8 +330,8 @@ class BuildingRegistry {
       assetPath: Assets.sawmill,
       color: Colors.brown,
       baseCost: 100,
-      baseConsumption: {'wood': 10},
-      baseGeneration: {'planks': 1},
+      baseConsumption: {ResourceType.wood: 10},
+      baseGeneration: {ResourceType.planks: 1},
       requiredWorkers: 1,
       category: BuildingCategory.primaryFactory,
     ),
@@ -341,7 +343,7 @@ class BuildingRegistry {
       assetPath: Assets.quarry,
       color: Colors.grey,
       baseCost: 150,
-      baseGeneration: {'stone': 1},
+      baseGeneration: {ResourceType.stone: 1},
       requiredWorkers: 1,
       category: BuildingCategory.rawMaterials,
     ),
@@ -363,8 +365,8 @@ class BuildingRegistry {
       assetPath: Assets.windMill,
       color: Colors.brown,
       baseCost: 100,
-      baseConsumption: {'wheat': 5},
-      baseGeneration: {'flour': 1},
+      baseConsumption: {ResourceType.wheat: 5},
+      baseGeneration: {ResourceType.flour: 1},
       requiredWorkers: 1,
       category: BuildingCategory.processing,
     ),
@@ -376,8 +378,8 @@ class BuildingRegistry {
       assetPath: Assets.grinderMill,
       color: Colors.brown,
       baseCost: 100,
-      baseConsumption: {'corn': 4},
-      baseGeneration: {'cornmeal': 1},
+      baseConsumption: {ResourceType.corn: 4},
+      baseGeneration: {ResourceType.cornmeal: 1},
       requiredWorkers: 1,
       category: BuildingCategory.processing,
     ),
@@ -389,8 +391,8 @@ class BuildingRegistry {
       assetPath: Assets.riceHuller,
       color: Colors.brown,
       baseCost: 100,
-      baseConsumption: {'rice': 2},
-      baseGeneration: {'polishedRice': 1},
+      baseConsumption: {ResourceType.rice: 2},
+      baseGeneration: {ResourceType.polishedRice: 1},
       requiredWorkers: 1,
       category: BuildingCategory.processing,
     ),
@@ -402,8 +404,8 @@ class BuildingRegistry {
       assetPath: Assets.maltHouse,
       color: Colors.brown,
       baseCost: 100,
-      baseConsumption: {'barley': 2},
-      baseGeneration: {'maltedBarley': 1},
+      baseConsumption: {ResourceType.barley: 2},
+      baseGeneration: {ResourceType.maltedBarley: 1},
       requiredWorkers: 1,
       category: BuildingCategory.processing,
     ),

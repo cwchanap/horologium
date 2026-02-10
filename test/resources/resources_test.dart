@@ -13,8 +13,8 @@ void main() {
 
   Building createBuilding({
     required BuildingType type,
-    Map<String, double> generation = const {},
-    Map<String, double> consumption = const {},
+    Map<ResourceType, double> generation = const {},
+    Map<ResourceType, double> consumption = const {},
     int requiredWorkers = 1,
     int assignedWorkers = 0,
     int level = 1,
@@ -50,7 +50,7 @@ void main() {
 
         final building = createBuilding(
           type: BuildingType.powerPlant,
-          generation: const {'electricity': 2},
+          generation: const {ResourceType.electricity: 2},
           requiredWorkers: 1,
           assignedWorkers: 1,
         );
@@ -72,8 +72,8 @@ void main() {
 
       final building = createBuilding(
         type: BuildingType.powerPlant,
-        generation: const {'electricity': 3},
-        consumption: const {'coal': 5},
+        generation: const {ResourceType.electricity: 3},
+        consumption: const {ResourceType.coal: 5},
         requiredWorkers: 1,
         assignedWorkers: 1,
       );
@@ -91,8 +91,8 @@ void main() {
 
       final building = createBuilding(
         type: BuildingType.powerPlant,
-        generation: const {'electricity': 3},
-        consumption: const {'coal': 5},
+        generation: const {ResourceType.electricity: 3},
+        consumption: const {ResourceType.coal: 5},
         requiredWorkers: 1,
         assignedWorkers: 1,
       );
@@ -110,8 +110,8 @@ void main() {
 
       final researchLab = createBuilding(
         type: BuildingType.researchLab,
-        generation: const {'research': 1},
-        consumption: const {'electricity': 1},
+        generation: const {ResourceType.research: 1},
+        consumption: const {ResourceType.electricity: 1},
         requiredWorkers: 1,
         assignedWorkers: 1,
       );
@@ -189,7 +189,7 @@ void main() {
 
       final powerPlant = createBuilding(
         type: BuildingType.powerPlant,
-        generation: const {'electricity': 2},
+        generation: const {ResourceType.electricity: 2},
         requiredWorkers: 1,
         assignedWorkers: 1,
       );
@@ -212,7 +212,7 @@ void main() {
 
       final powerPlant = createBuilding(
         type: BuildingType.powerPlant,
-        generation: const {'electricity': 2},
+        generation: const {ResourceType.electricity: 2},
         requiredWorkers: 7, // Increase to allow 7 workers
         assignedWorkers: 7,
       );
@@ -231,7 +231,7 @@ void main() {
 
       final powerPlant = createBuilding(
         type: BuildingType.powerPlant,
-        generation: const {'electricity': 2},
+        generation: const {ResourceType.electricity: 2},
         requiredWorkers: 10, // Allow 10 workers
         assignedWorkers: 10,
       );
@@ -262,14 +262,14 @@ void main() {
 
       final powerPlant = createBuilding(
         type: BuildingType.powerPlant,
-        generation: const {'electricity': 2},
+        generation: const {ResourceType.electricity: 2},
         requiredWorkers: 10, // Allow 10 workers
         assignedWorkers: 10,
       );
 
       final coalMine = createBuilding(
         type: BuildingType.coalMine,
-        generation: const {'coal': 1},
+        generation: const {ResourceType.coal: 1},
         requiredWorkers: 10, // Allow 10 workers
         assignedWorkers: 10,
       );
@@ -389,7 +389,7 @@ void main() {
 
         final powerPlant = createBuilding(
           type: BuildingType.powerPlant,
-          generation: const {'electricity': 2},
+          generation: const {ResourceType.electricity: 2},
           requiredWorkers: 5, // Allow up to 5 workers
           assignedWorkers: 5, // All workers are assigned
         );
@@ -511,7 +511,7 @@ void main() {
       // Note: update() recalculates availableWorkers, so we need actual assigned workers
       final factory = createBuilding(
         type: BuildingType.woodFactory,
-        generation: const {'wood': 1},
+        generation: const {ResourceType.wood: 1},
         requiredWorkers: 5, // Allow 5 workers
         assignedWorkers: 5, // 5 workers employed = 50% employment
       );
@@ -676,7 +676,7 @@ void main() {
       // Need a building that has workers assigned to create employment
       final coalMine = createBuilding(
         type: BuildingType.coalMine,
-        generation: const {'coal': 1},
+        generation: const {ResourceType.coal: 1},
         requiredWorkers: 10, // Allow 10 workers
         assignedWorkers: 10, // All workers assigned = full employment
       );
@@ -707,7 +707,7 @@ void main() {
 
       final building = createBuilding(
         type: BuildingType.coalMine,
-        generation: const {'coal': 1},
+        generation: const {ResourceType.coal: 1},
         requiredWorkers: 1,
       );
 
@@ -725,7 +725,7 @@ void main() {
 
       final building = createBuilding(
         type: BuildingType.coalMine,
-        generation: const {'coal': 1},
+        generation: const {ResourceType.coal: 1},
         requiredWorkers: 1,
       );
 
@@ -743,7 +743,7 @@ void main() {
 
       final building = createBuilding(
         type: BuildingType.coalMine,
-        generation: const {'coal': 1},
+        generation: const {ResourceType.coal: 1},
         requiredWorkers: 1,
         assignedWorkers: 1,
       );

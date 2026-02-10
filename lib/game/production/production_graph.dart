@@ -214,16 +214,9 @@ class ProductionGraph {
 
       // Process consumption (inputs)
       for (final entry in building.consumption.entries) {
-        final resourceType = ResourceType.values.firstWhere(
-          (r) => r.name == entry.key,
-          orElse: () => throw ArgumentError(
-            'Unknown resource type "${entry.key}" in building ${building.name}. '
-            'Check that all resource types in building definitions match the ResourceType enum.',
-          ),
-        );
         inputs.add(
           ResourcePort(
-            resourceType: resourceType,
+            resourceType: entry.key,
             ratePerSecond: entry.value,
             status: FlowStatus.balanced, // Will be calculated by FlowAnalyzer
           ),
@@ -232,16 +225,9 @@ class ProductionGraph {
 
       // Process generation (outputs)
       for (final entry in building.generation.entries) {
-        final resourceType = ResourceType.values.firstWhere(
-          (r) => r.name == entry.key,
-          orElse: () => throw ArgumentError(
-            'Unknown resource type "${entry.key}" in building ${building.name}. '
-            'Check that all resource types in building definitions match the ResourceType enum.',
-          ),
-        );
         outputs.add(
           ResourcePort(
-            resourceType: resourceType,
+            resourceType: entry.key,
             ratePerSecond: entry.value,
             status: FlowStatus.balanced, // Will be calculated by FlowAnalyzer
           ),

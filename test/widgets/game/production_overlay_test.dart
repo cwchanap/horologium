@@ -38,7 +38,7 @@ void main() {
       final buildings = [
         _createTestBuilding(
           type: BuildingType.coalMine,
-          generation: {'coal': 1.0},
+          generation: {ResourceType.coal: 1.0},
         ),
       ];
 
@@ -93,7 +93,7 @@ void main() {
       final buildings = [
         _createTestBuilding(
           type: BuildingType.coalMine,
-          generation: {'coal': 1.0},
+          generation: {ResourceType.coal: 1.0},
         ),
       ];
 
@@ -455,7 +455,7 @@ void main() {
         icon: Icons.fireplace,
         color: Colors.grey,
         baseCost: 90,
-        baseGeneration: {'coal': 1},
+        baseGeneration: {ResourceType.coal: 1},
         requiredWorkers: 1,
         category: BuildingCategory.rawMaterials,
       );
@@ -1063,8 +1063,8 @@ void main() {
 
 Building _createTestBuilding({
   required BuildingType type,
-  Map<String, double> generation = const {},
-  Map<String, double> consumption = const {},
+  Map<ResourceType, double> generation = const {},
+  Map<ResourceType, double> consumption = const {},
 }) {
   return Building(
     type: type,

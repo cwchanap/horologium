@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/building/category.dart';
+import 'package:horologium/game/resources/resource_type.dart';
 
 void main() {
   group('Building Upgrade Tests', () {
@@ -15,8 +16,8 @@ void main() {
         icon: Icons.bolt,
         color: Colors.yellow,
         baseCost: 100,
-        baseGeneration: {'electricity': 1},
-        baseConsumption: {'coal': 1},
+        baseGeneration: {ResourceType.electricity: 1},
+        baseConsumption: {ResourceType.coal: 1},
         maxLevel: 5,
         requiredWorkers: 1,
         category: BuildingCategory.services,
@@ -36,7 +37,7 @@ void main() {
         icon: Icons.bolt,
         color: Colors.yellow,
         baseCost: 100,
-        baseGeneration: {'electricity': 1},
+        baseGeneration: {ResourceType.electricity: 1},
         maxLevel: 5,
         requiredWorkers: 1,
         category: BuildingCategory.services,
@@ -71,7 +72,7 @@ void main() {
         icon: Icons.bolt,
         color: Colors.yellow,
         baseCost: 100,
-        baseGeneration: {'electricity': 1},
+        baseGeneration: {ResourceType.electricity: 1},
         maxLevel: 5,
         requiredWorkers: 1,
         category: BuildingCategory.services,
@@ -85,24 +86,24 @@ void main() {
 
     test('generation scales with level', () {
       // Level 1: 1 electricity
-      expect(testBuilding.generation['electricity'], 1);
+      expect(testBuilding.generation[ResourceType.electricity], 1);
 
       testBuilding.upgrade();
       // Level 2: 2 electricity
-      expect(testBuilding.generation['electricity'], 2);
+      expect(testBuilding.generation[ResourceType.electricity], 2);
 
       testBuilding.upgrade();
       // Level 3: 3 electricity
-      expect(testBuilding.generation['electricity'], 3);
+      expect(testBuilding.generation[ResourceType.electricity], 3);
     });
 
     test('consumption scales with level', () {
       // Level 1: 1 coal
-      expect(testBuilding.consumption['coal'], 1);
+      expect(testBuilding.consumption[ResourceType.coal], 1);
 
       testBuilding.upgrade();
       // Level 2: 2 coal
-      expect(testBuilding.consumption['coal'], 2);
+      expect(testBuilding.consumption[ResourceType.coal], 2);
     });
 
     test('accommodationCapacity scales with level for houses', () {

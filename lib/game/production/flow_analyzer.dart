@@ -121,7 +121,7 @@ class FlowAnalyzer {
   ) {
     // Find a building that produces this resource
     final producerBuilding = BuildingRegistry.availableBuildings
-        .where((b) => b.generation.containsKey(resourceType.name))
+        .where((b) => b.generation.containsKey(resourceType))
         .firstOrNull;
 
     if (producerBuilding == null) {
@@ -133,7 +133,7 @@ class FlowAnalyzer {
     }
 
     // Calculate needed producers based on actual production rate
-    final ratePerBuilding = producerBuilding.generation[resourceType.name]!;
+    final ratePerBuilding = producerBuilding.generation[resourceType]!;
     final neededProducers = (deficitAmount / ratePerBuilding).ceil();
 
     if (neededProducers <= 1) {

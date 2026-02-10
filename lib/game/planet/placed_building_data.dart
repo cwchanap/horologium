@@ -1,5 +1,6 @@
 import 'package:uuid/uuid.dart';
 import '../building/building.dart';
+import '../resources/resource_type.dart';
 
 /// Data structure representing a building placed on the planet grid
 class PlacedBuildingData {
@@ -23,9 +24,12 @@ class PlacedBuildingData {
        assert(assignedWorkers >= 0, 'assignedWorkers cannot be negative');
 
   /// Convert to string format for persistence
-  /// Format: "id,x,y,BuildingName,level,assignedWorkers"
+  /// Format: "id,x,y,BuildingName,level,assignedWorkers,variant"
   String toLegacyString() {
-    return '$id,$x,$y,${type.toString().split('.').last},$level,$assignedWorkers';
+    final base =
+        '$id,$x,$y,${type.toString().split('.').last},$level,$assignedWorkers';
+    if (variant != null) return '$base,$variant';
+    return base;
   }
 
   /// Parse from legacy string format
@@ -96,6 +100,10 @@ class PlacedBuildingData {
         ? 0
         : parsedWorkers;
 
+    // Parse optional variant field
+    final variantIndex = typeIndex + 3;
+    final variant = parts.length > variantIndex ? parts[variantIndex] : null;
+
     return PlacedBuildingData(
       id: id,
       x: x,
@@ -103,14 +111,64 @@ class PlacedBuildingData {
       type: type,
       level: level,
       assignedWorkers: assignedWorkers,
+      variant: variant,
     );
   }
 
-  /// Create a Building instance from this placement data
+  /// Create a Building instance from this placement data.
+  /// Restores Field/Bakery subtypes using the variant field.
   Building createBuilding() {
     final template = BuildingRegistry.availableBuildings.firstWhere(
       (b) => b.type == type,
     );
+
+    if (template is Field) {
+      final cropType = variant != null
+          ? CropType.values.where((e) => e.name == variant).firstOrNull ??
+                CropType.wheat
+          : CropType.wheat;
+      return Field(
+        type: template.type,
+        name: template.name,
+        description: template.description,
+        icon: template.icon,
+        assetPath: template.assetPath,
+        color: template.color,
+        baseCost: template.baseCost,
+        basePopulation: template.basePopulation,
+        maxLevel: template.maxLevel,
+        gridSize: template.gridSize,
+        baseBuildingLimit: template.baseBuildingLimit,
+        requiredWorkers: template.requiredWorkers,
+        category: template.category,
+        level: level,
+        cropType: cropType,
+      )..assignedWorkers = assignedWorkers;
+    }
+
+    if (template is Bakery) {
+      final productType = variant != null
+          ? BakeryProduct.values.where((e) => e.name == variant).firstOrNull ??
+                BakeryProduct.bread
+          : BakeryProduct.bread;
+      return Bakery(
+        type: template.type,
+        name: template.name,
+        description: template.description,
+        icon: template.icon,
+        assetPath: template.assetPath,
+        color: template.color,
+        baseCost: template.baseCost,
+        basePopulation: template.basePopulation,
+        maxLevel: template.maxLevel,
+        gridSize: template.gridSize,
+        baseBuildingLimit: template.baseBuildingLimit,
+        requiredWorkers: template.requiredWorkers,
+        category: template.category,
+        level: level,
+        productType: productType,
+      )..assignedWorkers = assignedWorkers;
+    }
 
     return Building(
       id: id,

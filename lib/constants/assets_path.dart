@@ -40,6 +40,11 @@ class Assets {
   static const String breadIcon = 'resource/bread.png';
   static const String pastriesIcon = 'resource/pastries.png';
 
+  /// Convert a Flame asset path (relative to `assets/images/`) to a Flutter
+  /// asset path usable with `Image.asset()`.
+  static String flutterAssetPath(String flamePath) =>
+      'assets/images/$flamePath';
+
   // Terrain assets - included for reference but managed by TerrainAssets class
   // Base terrain textures
   static const String terrainGrassBase = 'terrain/base/grass_base.png';
