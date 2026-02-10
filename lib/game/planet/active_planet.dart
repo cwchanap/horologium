@@ -118,6 +118,7 @@ class ActivePlanet {
 
   /// Dispose resources (mainly for testing)
   void dispose() {
+    _disposed = true;
     _active?.dispose();
     _active = null;
   }

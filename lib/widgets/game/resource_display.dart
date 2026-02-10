@@ -208,5 +208,3 @@ class ResourceDisplay extends StatelessWidget {
     );
   }
 }
-
-enum PopulationTrend { growing, stable, shrinking }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../game/building/building.dart';
+import '../../game/resources/resource_type.dart';
 
 class BuildingOptionsDialog extends StatelessWidget {
   final Building building;
@@ -156,7 +157,7 @@ class BuildingOptionsDialog extends StatelessWidget {
             _buildStatRow(
               'Produces',
               building.generation.entries
-                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key}')
+                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key.name}')
                   .join(', '),
               Colors.greenAccent,
             ),
@@ -164,7 +165,7 @@ class BuildingOptionsDialog extends StatelessWidget {
             _buildStatRow(
               'Consumes',
               building.consumption.entries
-                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key}')
+                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key.name}')
                   .join(', '),
               Colors.orangeAccent,
             ),
@@ -184,12 +185,12 @@ class BuildingOptionsDialog extends StatelessWidget {
     final levelMultiplier = nextLevel / building.level;
 
     // Calculate next level generation/consumption by scaling current values
-    final nextGeneration = <String, double>{};
+    final nextGeneration = <ResourceType, double>{};
     for (final entry in building.generation.entries) {
       nextGeneration[entry.key] = entry.value * levelMultiplier;
     }
 
-    final nextConsumption = <String, double>{};
+    final nextConsumption = <ResourceType, double>{};
     for (final entry in building.consumption.entries) {
       nextConsumption[entry.key] = entry.value * levelMultiplier;
     }
@@ -227,7 +228,7 @@ class BuildingOptionsDialog extends StatelessWidget {
             _buildStatRow(
               'Produces',
               nextGeneration.entries
-                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key}')
+                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key.name}')
                   .join(', '),
               Colors.greenAccent,
             ),
@@ -235,7 +236,7 @@ class BuildingOptionsDialog extends StatelessWidget {
             _buildStatRow(
               'Consumes',
               nextConsumption.entries
-                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key}')
+                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key.name}')
                   .join(', '),
               Colors.orangeAccent,
             ),

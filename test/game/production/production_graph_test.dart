@@ -19,14 +19,14 @@ void main() {
         _createMockBuilding(
           type: BuildingType.coalMine,
           category: BuildingCategory.rawMaterials,
-          generation: {'coal': 1.0},
+          generation: {ResourceType.coal: 1.0},
           consumption: {},
         ),
         _createMockBuilding(
           type: BuildingType.powerPlant,
           category: BuildingCategory.processing,
-          generation: {'electricity': 2.0},
-          consumption: {'coal': 0.5},
+          generation: {ResourceType.electricity: 2.0},
+          consumption: {ResourceType.coal: 0.5},
         ),
       ];
       final resources = Resources();
@@ -43,14 +43,14 @@ void main() {
         _createMockBuilding(
           type: BuildingType.coalMine,
           category: BuildingCategory.rawMaterials,
-          generation: {'coal': 1.0},
+          generation: {ResourceType.coal: 1.0},
           consumption: {},
         ),
         _createMockBuilding(
           type: BuildingType.powerPlant,
           category: BuildingCategory.processing,
-          generation: {'electricity': 2.0},
-          consumption: {'coal': 0.5},
+          generation: {ResourceType.electricity: 2.0},
+          consumption: {ResourceType.coal: 0.5},
         ),
       ];
       final resources = Resources();
@@ -70,12 +70,12 @@ void main() {
         final producer = _createMockBuilding(
           type: BuildingType.coalMine,
           category: BuildingCategory.rawMaterials,
-          generation: {'coal': 1.0},
+          generation: {ResourceType.coal: 1.0},
         )..level = 3;
         final consumer = _createMockBuilding(
           type: BuildingType.powerPlant,
           category: BuildingCategory.processing,
-          consumption: {'coal': 0.5},
+          consumption: {ResourceType.coal: 0.5},
         )..level = 2;
 
         final graph = ProductionGraph.fromBuildings([
@@ -115,27 +115,6 @@ void main() {
       expect(graph.isClustered, isTrue);
     });
 
-    test('fromBuildings throws ArgumentError for unknown resource type', () {
-      final buildings = [
-        _createMockBuilding(
-          type: BuildingType.house,
-          category: BuildingCategory.residential,
-          generation: {'unknownResource': 1.0},
-        ),
-      ];
-
-      expect(
-        () => ProductionGraph.fromBuildings(buildings, Resources()),
-        throwsA(
-          isA<ArgumentError>().having(
-            (e) => e.message,
-            'message',
-            contains('Unknown resource type "unknownResource"'),
-          ),
-        ),
-      );
-    });
-
     test(
       'fromBuildings creates incomplete edge when consumer has no producer',
       () {
@@ -144,8 +123,8 @@ void main() {
           _createMockBuilding(
             type: BuildingType.powerPlant,
             category: BuildingCategory.processing,
-            generation: {'electricity': 2.0},
-            consumption: {'coal': 0.5},
+            generation: {ResourceType.electricity: 2.0},
+            consumption: {ResourceType.coal: 0.5},
           ),
         ];
         final resources = Resources();
@@ -177,14 +156,14 @@ void main() {
           _createMockBuilding(
             type: BuildingType.coalMine,
             category: BuildingCategory.rawMaterials,
-            generation: {'coal': 1.0},
+            generation: {ResourceType.coal: 1.0},
             consumption: {},
           ),
           _createMockBuilding(
             type: BuildingType.powerPlant,
             category: BuildingCategory.processing,
-            generation: {'electricity': 2.0},
-            consumption: {'coal': 0.5},
+            generation: {ResourceType.electricity: 2.0},
+            consumption: {ResourceType.coal: 0.5},
           ),
         ];
         final resources = Resources();
@@ -220,7 +199,7 @@ void main() {
           _createMockBuilding(
             type: BuildingType.coalMine,
             category: BuildingCategory.rawMaterials,
-            generation: {'coal': 1.0},
+            generation: {ResourceType.coal: 1.0},
             consumption: {},
           ),
         ];
@@ -249,14 +228,14 @@ void main() {
           _createMockBuilding(
             type: BuildingType.coalMine,
             category: BuildingCategory.rawMaterials,
-            generation: {'coal': 1.0},
+            generation: {ResourceType.coal: 1.0},
             consumption: {},
           ),
           _createMockBuilding(
             type: BuildingType.powerPlant,
             category: BuildingCategory.processing,
             generation: {},
-            consumption: {'coal': 0.5},
+            consumption: {ResourceType.coal: 0.5},
           ),
         ];
         final resources = Resources();
@@ -271,30 +250,6 @@ void main() {
               e.status == FlowStatus.surplus,
         );
         expect(coalIncomplete, isEmpty);
-      },
-    );
-
-    test(
-      'fromBuildings throws ArgumentError for unknown consumption resource',
-      () {
-        final buildings = [
-          _createMockBuilding(
-            type: BuildingType.powerPlant,
-            category: BuildingCategory.processing,
-            consumption: {'invalidFuel': 0.5},
-          ),
-        ];
-
-        expect(
-          () => ProductionGraph.fromBuildings(buildings, Resources()),
-          throwsA(
-            isA<ArgumentError>().having(
-              (e) => e.message,
-              'message',
-              contains('Unknown resource type "invalidFuel"'),
-            ),
-          ),
-        );
       },
     );
   });
@@ -835,8 +790,8 @@ void main() {
 Building _createMockBuilding({
   required BuildingType type,
   required BuildingCategory category,
-  Map<String, double> generation = const {},
-  Map<String, double> consumption = const {},
+  Map<ResourceType, double> generation = const {},
+  Map<ResourceType, double> consumption = const {},
 }) {
   return Building(
     type: type,

@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flame/game.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,12 +11,13 @@ import '../widgets/game/hamburger_menu.dart';
 import '../widgets/game/building_options_dialog.dart';
 import '../widgets/game/production_overlay/production_overlay.dart';
 import '../widgets/game/resource_display.dart';
+import '../widgets/game/terrain_debug_sheet.dart';
+import 'audio_manager.dart';
 import 'building/building.dart';
 import 'main_game.dart';
 import 'managers/building_placement_manager.dart';
 import 'managers/game_state_manager.dart';
 import 'managers/input_handler.dart';
-import 'managers/persistence_manager.dart';
 import 'planet/index.dart';
 import 'services/resource_service.dart';
 import 'services/planet_save_debouncer.dart';
@@ -43,11 +45,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
   bool _showHamburgerMenu = false;
   bool _showProductionOverlay = false;
   bool _uiOverlayOpen = false; // gates pointer events to GameWidget
-  bool _bgmStarted =
-      false; // start audio after first user interaction (web-safe)
-  bool _musicEnabled = true;
-  double _musicVolume = 0.5;
-  AudioPlayer? _bgm;
+  final AudioManager _audioManager = AudioManager();
   final PlanetSaveDebouncer _planetSaveDebouncer = PlanetSaveDebouncer();
 
   @override
@@ -56,34 +54,9 @@ class _MainGameWidgetState extends State<MainGameWidget>
     WidgetsBinding.instance.addObserver(this);
     _initializeGame();
     _loadSavedData();
-    _loadAudioPrefs();
+    _audioManager.loadPrefs().then((_) => setState(() {}));
     _startResourceGeneration();
     _applyTerrainPrefsWhenReady();
-    // Do not auto-start audio; start on first user interaction to satisfy web autoplay policy
-  }
-
-  // Helper for labeled slider rows in debug sheet
-  Widget _buildSliderRow({
-    required String label,
-    required String valueText,
-    required Widget child,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(label, style: const TextStyle(color: Colors.white70)),
-              Text(valueText, style: const TextStyle(color: Colors.white54)),
-            ],
-          ),
-          child,
-        ],
-      ),
-    );
   }
 
   void _initializeGame() {
@@ -110,139 +83,32 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _game.onGridCellTapped = _handleGridCellTapped;
     _game.onGridCellLongTapped = _inputHandler.handleGridCellLongTapped;
     _game.onGridCellSecondaryTapped = _inputHandler.handleGridCellLongTapped;
-    _game.onUserInteracted = _maybeStartBgm;
+    _game.onUserInteracted = () {
+      _audioManager.maybeStartBgm();
+      if (_audioManager.bgmStarted) setState(() {});
+    };
   }
 
   @override
   void dispose() {
     _gameStateManager.dispose();
     _planetSaveDebouncer.dispose();
-    // Stop and dispose background music only if started
-    if (_bgmStarted) {
-      try {
-        _bgm?.stop();
-        _bgm?.dispose();
-      } catch (e) {
-        debugPrint('BGM dispose error: $e');
-      }
-    }
+    _audioManager.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
-  }
-
-  Future<void> _initAudio() async {
-    try {
-      _bgm ??= AudioPlayer();
-      await _bgm!.setReleaseMode(ReleaseMode.loop);
-      await _bgm!.setVolume(_musicVolume);
-      await _bgm!.play(AssetSource('audio/background.mp3'));
-      debugPrint('BGM started (volume=$_musicVolume).');
-    } catch (e) {
-      debugPrint('Failed to initialize/play BGM: $e');
-    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    try {
-      if (!_bgmStarted) return; // nothing to do until BGM has started
-      switch (state) {
-        case AppLifecycleState.paused:
-        case AppLifecycleState.inactive:
-          _bgm?.pause();
-          debugPrint('BGM paused due to lifecycle.');
-          break;
-        case AppLifecycleState.resumed:
-          if (_musicEnabled) {
-            _bgm?.resume();
-            debugPrint('BGM resumed due to lifecycle.');
-          }
-          break;
-        case AppLifecycleState.detached:
-          // App is terminating; ensure BGM is stopped
-          _bgm?.stop();
-          debugPrint('BGM stopped due to lifecycle detach.');
-          break;
-        default:
-          break;
-      }
-    } catch (e) {
-      debugPrint('BGM lifecycle handling error: $e');
-    }
+    _audioManager.handleLifecycleChange(state);
   }
 
-  void _maybeStartBgm() {
-    if (_bgmStarted || !_musicEnabled) return;
-    setState(() => _bgmStarted = true);
-    _initAudio();
-  }
-
-  Future<void> _loadAudioPrefs() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final enabled = prefs.getBool('audio.musicEnabled');
-      final volume = prefs.getDouble('audio.musicVolume');
-      setState(() {
-        if (enabled != null) _musicEnabled = enabled;
-        if (volume != null) _musicVolume = volume.clamp(0.0, 1.0);
-      });
-    } catch (e) {
-      debugPrint('Failed to load audio prefs: $e');
-    }
-  }
-
-  Future<void> _saveAudioPrefs() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('audio.musicEnabled', _musicEnabled);
-      await prefs.setDouble('audio.musicVolume', _musicVolume);
-    } catch (e) {
-      debugPrint('Failed to save audio prefs: $e');
-    }
-  }
-
-  void _setMusicEnabled(bool value) {
-    setState(() => _musicEnabled = value);
-    _saveAudioPrefs();
-    if (!_bgmStarted && value) {
-      // Start after the user's explicit toggle (gesture) on web
-      _maybeStartBgm();
-    } else if (_bgmStarted && !value) {
-      try {
-        _bgm?.pause();
-        debugPrint('BGM paused by user.');
-      } catch (e) {
-        debugPrint('Failed to pause BGM: $e');
-      }
-    } else if (_bgmStarted && value) {
-      try {
-        _bgm?.resume();
-        debugPrint('BGM resumed by user.');
-      } catch (e) {
-        debugPrint('Failed to resume BGM: $e');
-      }
-    }
-  }
-
-  void _setMusicVolume(double value) {
-    setState(() => _musicVolume = value.clamp(0.0, 1.0));
-    _saveAudioPrefs();
-    if (_bgmStarted) {
-      // Change volume without restarting playback
-      try {
-        _bgm?.setVolume(_musicVolume);
-        debugPrint('BGM volume changed to $_musicVolume.');
-      } catch (e) {
-        debugPrint('Failed to change BGM volume: $e');
-      }
-    }
-  }
-
-  Future<void> _loadSavedData() async {
-    await PersistenceManager.loadSavedData(
-      widget.planet.resources,
-      _gameStateManager.researchManager,
+  void _loadSavedData() {
+    // Planet data is already loaded before this widget is created.
+    // Research state is synced from the planet.
+    _gameStateManager.researchManager.loadFromList(
+      widget.planet.researchManager.toList(),
     );
     setState(() {});
   }
@@ -263,10 +129,9 @@ class _MainGameWidgetState extends State<MainGameWidget>
     final showEdges = prefs.getBool('terrain.showEdges') ?? false;
     final gridDebug = prefs.getBool('grid.debug') ?? false;
 
-    // Wait until game is loaded
-    while (mounted && !_game.hasLoaded) {
-      await Future.delayed(const Duration(milliseconds: 50));
-    }
+    // Wait until game is loaded using a Completer-like polling with
+    // a bounded retry instead of an unbounded busy-wait.
+    await _game.isLoadedFuture;
     if (!mounted || !_game.hasLoaded) return;
 
     // Apply toggles
@@ -313,38 +178,6 @@ class _MainGameWidgetState extends State<MainGameWidget>
     }
   }
 
-  Future<void> _saveTerrainTogglePrefs({
-    required bool terrainDebug,
-    required bool showCenters,
-    required bool showEdges,
-    required bool gridDebug,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('terrain.debug', terrainDebug);
-    await prefs.setBool('terrain.showCenters', showCenters);
-    await prefs.setBool('terrain.showEdges', showEdges);
-    await prefs.setBool('grid.debug', gridDebug);
-  }
-
-  Future<void> _saveTerrainParamPrefs({
-    required int patchSizeBase,
-    required int patchJitter,
-    required double primaryWeight,
-    required double warpAmplitude,
-    required double warpFrequency,
-    required double edgeWidth,
-    required double edgeGamma,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('terrain.patchSizeBase', patchSizeBase);
-    await prefs.setInt('terrain.patchJitter', patchJitter);
-    await prefs.setDouble('terrain.primaryWeight', primaryWeight);
-    await prefs.setDouble('terrain.warpAmplitude', warpAmplitude);
-    await prefs.setDouble('terrain.warpFrequency', warpFrequency);
-    await prefs.setDouble('terrain.edgeWidth', edgeWidth);
-    await prefs.setDouble('terrain.edgeGamma', edgeGamma);
-  }
-
   void _syncPlanetFromGrid() {
     // Sync current building state (level, assignedWorkers) from grid to planet
     if (!_game.hasLoaded) return;
@@ -359,9 +192,18 @@ class _MainGameWidgetState extends State<MainGameWidget>
         placedBuilding.y,
       );
       if (existingData != null) {
+        // Sync variant for Field/Bakery subtypes
+        String? variant = existingData.variant;
+        if (building is Field) {
+          variant = building.cropType.name;
+        } else if (building is Bakery) {
+          variant = building.productType.name;
+        }
+
         final newData = existingData.copyWith(
           level: building.level,
           assignedWorkers: building.assignedWorkers,
+          variant: variant,
         );
         widget.planet.updateBuildingAt(
           placedBuilding.x,
@@ -380,10 +222,6 @@ class _MainGameWidgetState extends State<MainGameWidget>
     setState(() {
       // Sync worker assignments from grid to planet before saving
       _syncPlanetFromGrid();
-      PersistenceManager.saveResources(
-        widget.planet.resources,
-        _gameStateManager.researchManager,
-      );
     });
     _schedulePlanetSave(immediateSave: immediateSave);
   }
@@ -406,7 +244,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
   }
 
   void _handleGridCellTapped(int x, int y) {
-    _maybeStartBgm();
+    _audioManager.maybeStartBgm();
     _inputHandler.handleGridCellTapped(x, y, context);
   }
 
@@ -503,7 +341,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
               right: 20,
               child: FloatingActionButton(
                 onPressed: () {
-                  _maybeStartBgm();
+                  _audioManager.maybeStartBgm();
                   setState(() {
                     _showHamburgerMenu = !_showHamburgerMenu;
                     // Only reflect current overlays; do not OR with existing value to avoid sticky state
@@ -524,7 +362,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
               child: FloatingActionButton.small(
                 heroTag: 'debug_tools_button',
                 onPressed: () {
-                  _maybeStartBgm();
+                  _audioManager.maybeStartBgm();
                   _openDebugSheet();
                 },
                 backgroundColor: Colors.teal.withAlpha((255 * 0.8).round()),
@@ -547,10 +385,16 @@ class _MainGameWidgetState extends State<MainGameWidget>
                 buildingLimitManager: _gameStateManager.buildingLimitManager,
                 grid: _game.grid,
                 onResourcesChanged: _onResourcesChanged,
-                musicEnabled: _musicEnabled,
-                musicVolume: _musicVolume,
-                onMusicEnabledChanged: _setMusicEnabled,
-                onMusicVolumeChanged: _setMusicVolume,
+                musicEnabled: _audioManager.musicEnabled,
+                musicVolume: _audioManager.musicVolume,
+                onMusicEnabledChanged: (v) {
+                  _audioManager.setMusicEnabled(v);
+                  setState(() {});
+                },
+                onMusicVolumeChanged: (v) {
+                  _audioManager.setMusicVolume(v);
+                  setState(() {});
+                },
               ),
 
             // Building Selection Panel (only add when visible)
@@ -593,352 +437,10 @@ class _MainGameWidgetState extends State<MainGameWidget>
 
   void _openDebugSheet() {
     if (!_game.hasLoaded) return;
-    // Gate pointer events to the game and defer the modal until the next frame
     setState(() => _uiOverlayOpen = true);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      final initialTerrainDebug = _game.terrain?.showDebug ?? false;
-      final initialGridDebug = _game.grid.showDebug;
-      await showModalBottomSheet(
-        context: context,
-        backgroundColor: Colors.black.withAlpha((255 * 0.95).round()),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        isScrollControlled: true,
-        builder: (ctx) {
-          bool terrainDebug = initialTerrainDebug;
-          bool gridDebug = initialGridDebug;
-          bool showCenters = _game.terrain?.showPatchCentersDebug ?? false;
-          bool showEdges = _game.terrain?.showEdgeZonesDebug ?? false;
-          // Terrain generator parameters
-          final gen = _game.terrain!.generator;
-          int patchSizeBase = gen.patchSizeBase;
-          int patchJitter = gen.patchJitter;
-          double primaryWeight = gen.primaryWeight;
-          double warpAmplitude = gen.warpAmplitude;
-          double warpFrequency = gen.warpFrequency;
-          double edgeWidth = gen.edgeWidth;
-          double edgeGamma = gen.edgeGamma;
-          return StatefulBuilder(
-            builder: (context, setSheetState) {
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Developer Tools',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Close',
-                            onPressed: () => Navigator.of(context).pop(),
-                            icon: const Icon(
-                              Icons.close,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      SwitchListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'Terrain debug overlays',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                        value: terrainDebug,
-                        onChanged: (v) {
-                          setSheetState(() => terrainDebug = v);
-                          _game.terrain?.setDebugOverlays(v);
-                          _saveTerrainTogglePrefs(
-                            terrainDebug: terrainDebug,
-                            showCenters: showCenters,
-                            showEdges: showEdges,
-                            gridDebug: gridDebug,
-                          );
-                        },
-                      ),
-                      // Patch overlay toggles
-                      SwitchListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'Show patch centers',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                        value: showCenters,
-                        onChanged: (v) {
-                          setSheetState(() => showCenters = v);
-                          _game.terrain?.setPatchDebugOverlays(showCenters: v);
-                          _saveTerrainTogglePrefs(
-                            terrainDebug: terrainDebug,
-                            showCenters: showCenters,
-                            showEdges: showEdges,
-                            gridDebug: gridDebug,
-                          );
-                        },
-                      ),
-                      SwitchListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'Show edge zones',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                        value: showEdges,
-                        onChanged: (v) {
-                          setSheetState(() => showEdges = v);
-                          _game.terrain?.setPatchDebugOverlays(showEdges: v);
-                          _saveTerrainTogglePrefs(
-                            terrainDebug: terrainDebug,
-                            showCenters: showCenters,
-                            showEdges: showEdges,
-                            gridDebug: gridDebug,
-                          );
-                        },
-                      ),
-                      SwitchListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'Grid debug overlays',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                        value: gridDebug,
-                        onChanged: (v) {
-                          setSheetState(() => gridDebug = v);
-                          _game.grid.showDebug = v;
-                          _saveTerrainTogglePrefs(
-                            terrainDebug: terrainDebug,
-                            showCenters: showCenters,
-                            showEdges: showEdges,
-                            gridDebug: gridDebug,
-                          );
-                        },
-                      ),
-                      const Divider(color: Colors.white24),
-                      const Text(
-                        'Presets',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          OutlinedButton(
-                            onPressed: () {
-                              setSheetState(() {
-                                // Smooth Plains
-                                patchSizeBase = 12;
-                                patchJitter = 1;
-                                primaryWeight = 0.90;
-                                warpAmplitude = 1.0;
-                                warpFrequency = 0.12;
-                                edgeWidth = 1.1;
-                                edgeGamma = 1.4;
-                              });
-                            },
-                            child: const Text('Plains'),
-                          ),
-                          OutlinedButton(
-                            onPressed: () {
-                              setSheetState(() {
-                                // Rugged / patchy
-                                patchSizeBase = 8;
-                                patchJitter = 2;
-                                primaryWeight = 0.80;
-                                warpAmplitude = 2.0;
-                                warpFrequency = 0.22;
-                                edgeWidth = 1.4;
-                                edgeGamma = 1.8;
-                              });
-                            },
-                            child: const Text('Rugged'),
-                          ),
-                          OutlinedButton(
-                            onPressed: () {
-                              setSheetState(() {
-                                // Coastal / accentuated borders
-                                patchSizeBase = 10;
-                                patchJitter = 2;
-                                primaryWeight = 0.75;
-                                warpAmplitude = 1.6;
-                                warpFrequency = 0.18;
-                                edgeWidth = 1.6;
-                                edgeGamma = 1.6;
-                              });
-                            },
-                            child: const Text('Coastal'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Terrain parameters',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Patch size
-                      _buildSliderRow(
-                        label: 'Patch Size',
-                        valueText: '$patchSizeBase',
-                        child: Slider(
-                          value: patchSizeBase.toDouble(),
-                          min: 5,
-                          max: 15,
-                          divisions: 10,
-                          label: '$patchSizeBase',
-                          onChanged: (v) =>
-                              setSheetState(() => patchSizeBase = v.round()),
-                        ),
-                      ),
-                      // Patch jitter
-                      _buildSliderRow(
-                        label: 'Patch Jitter',
-                        valueText: '$patchJitter',
-                        child: Slider(
-                          value: patchJitter.toDouble(),
-                          min: 0,
-                          max: 4,
-                          divisions: 4,
-                          label: '$patchJitter',
-                          onChanged: (v) =>
-                              setSheetState(() => patchJitter = v.round()),
-                        ),
-                      ),
-                      // Primary weight
-                      _buildSliderRow(
-                        label: 'Primary Weight',
-                        valueText: primaryWeight.toStringAsFixed(2),
-                        child: Slider(
-                          value: primaryWeight,
-                          min: 0.6,
-                          max: 1.0,
-                          divisions: 20,
-                          label: primaryWeight.toStringAsFixed(2),
-                          onChanged: (v) =>
-                              setSheetState(() => primaryWeight = v),
-                        ),
-                      ),
-                      // Warp amplitude
-                      _buildSliderRow(
-                        label: 'Warp Amplitude',
-                        valueText: warpAmplitude.toStringAsFixed(2),
-                        child: Slider(
-                          value: warpAmplitude,
-                          min: 0.0,
-                          max: 3.0,
-                          divisions: 30,
-                          label: warpAmplitude.toStringAsFixed(2),
-                          onChanged: (v) =>
-                              setSheetState(() => warpAmplitude = v),
-                        ),
-                      ),
-                      // Warp frequency
-                      _buildSliderRow(
-                        label: 'Warp Frequency',
-                        valueText: warpFrequency.toStringAsFixed(2),
-                        child: Slider(
-                          value: warpFrequency,
-                          min: 0.05,
-                          max: 0.4,
-                          divisions: 35,
-                          label: warpFrequency.toStringAsFixed(2),
-                          onChanged: (v) =>
-                              setSheetState(() => warpFrequency = v),
-                        ),
-                      ),
-                      // Edge width
-                      _buildSliderRow(
-                        label: 'Edge Width',
-                        valueText: edgeWidth.toStringAsFixed(2),
-                        child: Slider(
-                          value: edgeWidth,
-                          min: 0.5,
-                          max: 2.5,
-                          divisions: 20,
-                          label: edgeWidth.toStringAsFixed(2),
-                          onChanged: (v) => setSheetState(() => edgeWidth = v),
-                        ),
-                      ),
-                      // Edge gamma
-                      _buildSliderRow(
-                        label: 'Edge Gamma',
-                        valueText: edgeGamma.toStringAsFixed(2),
-                        child: Slider(
-                          value: edgeGamma,
-                          min: 1.0,
-                          max: 2.5,
-                          divisions: 15,
-                          label: edgeGamma.toStringAsFixed(2),
-                          onChanged: (v) => setSheetState(() => edgeGamma = v),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              await _game.terrain?.updateTerrainParams(
-                                patchSizeBase: patchSizeBase,
-                                patchJitter: patchJitter,
-                                primaryWeight: primaryWeight,
-                                warpAmplitude: warpAmplitude,
-                                warpFrequency: warpFrequency,
-                                edgeWidth: edgeWidth,
-                                edgeGamma: edgeGamma,
-                              );
-                              _saveTerrainParamPrefs(
-                                patchSizeBase: patchSizeBase,
-                                patchJitter: patchJitter,
-                                primaryWeight: primaryWeight,
-                                warpAmplitude: warpAmplitude,
-                                warpFrequency: warpFrequency,
-                                edgeWidth: edgeWidth,
-                                edgeGamma: edgeGamma,
-                              );
-                            },
-                            icon: const Icon(Icons.tune),
-                            label: const Text('Apply Params'),
-                          ),
-                          const SizedBox(width: 12),
-                          OutlinedButton.icon(
-                            onPressed: () => _game.terrain?.shuffleSeed(),
-                            icon: const Icon(Icons.shuffle),
-                            label: const Text('Shuffle Seed'),
-                          ),
-                        ],
-                      ),
-                      // Parallax is enabled by default and no longer toggled here.
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      );
+      await TerrainDebugSheet.show(context, _game);
       if (!mounted) return;
       setState(
         () => _uiOverlayOpen =

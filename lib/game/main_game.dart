@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flame/components.dart';
@@ -40,11 +41,16 @@ class MainGame extends FlameGame
   final PlacementPreview placementPreview = PlacementPreview()
     ..priority = 30; // Ensure preview renders above grid
 
+  final Completer<void> _loadedCompleter = Completer<void>();
+
   MainGame({Planet? planet}) : _planet = planet;
 
   Grid get grid => _grid!;
   ParallaxTerrainComponent? get terrain => _terrain;
   bool get hasLoaded => _grid != null && _terrain != null;
+
+  /// Future that completes when the game has finished loading.
+  Future<void> get isLoadedFuture => _loadedCompleter.future;
 
   @override
   Future<void> onLoad() async {
@@ -108,6 +114,7 @@ class MainGame extends FlameGame
     _centerCameraOnTerrain();
 
     await loadBuildings();
+    _loadedCompleter.complete();
   }
 
   Future<void> loadBuildings() async {
@@ -137,6 +144,14 @@ class MainGame extends FlameGame
   void _onBuildingPlaced(int x, int y, Building building) {
     if (_planet == null) return;
 
+    // Store variant for Field/Bakery subtypes
+    String? variant;
+    if (building is Field) {
+      variant = building.cropType.name;
+    } else if (building is Bakery) {
+      variant = building.productType.name;
+    }
+
     final buildingData = PlacedBuildingData(
       id: building.id,
       x: x,
@@ -144,6 +159,7 @@ class MainGame extends FlameGame
       type: building.type,
       level: building.level,
       assignedWorkers: building.assignedWorkers,
+      variant: variant,
     );
 
     _planet!.addBuilding(buildingData);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:horologium/constants/assets_path.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/game/resources/resources.dart';
@@ -21,12 +22,8 @@ class BuildingMenu {
           builder: (context, setState) {
             bool meetsConsumptionRequirements = true;
             if (building.consumption.isNotEmpty) {
-              building.consumption.forEach((key, value) {
-                final rt = ResourceType.values.firstWhere(
-                  (e) => e.toString().split('.').last == key,
-                  orElse: () => ResourceType.cash,
-                );
-                final amount = resources.resources[rt] ?? 0;
+              building.consumption.forEach((resourceType, value) {
+                final amount = resources.resources[resourceType] ?? 0;
                 if (amount < value) {
                   meetsConsumptionRequirements = false;
                 }
@@ -162,8 +159,11 @@ class BuildingMenu {
                             building.hasWorkers;
                         final actualRate = isProducing ? entry.value : 0.0;
                         final color = isProducing ? Colors.green : Colors.grey;
+                        final displayName =
+                            ResourceRegistry.find(entry.key)?.name ??
+                            entry.key.name;
                         return _buildDetailRow(
-                          _capitalizeResource(entry.key),
+                          displayName,
                           '+$actualRate/sec',
                           color,
                         );
@@ -195,14 +195,14 @@ class BuildingMenu {
                       ),
                       const SizedBox(height: 4),
                       ...building.consumption.entries.map((entry) {
-                        final rt = ResourceType.values.firstWhere(
-                          (e) => e.toString().split('.').last == entry.key,
-                          orElse: () => ResourceType.cash,
-                        );
                         final hasEnough =
-                            (resources.resources[rt] ?? 0) >= entry.value;
+                            (resources.resources[entry.key] ?? 0) >=
+                            entry.value;
+                        final displayName =
+                            ResourceRegistry.find(entry.key)?.name ??
+                            entry.key.name;
                         return _buildDetailRow(
-                          _capitalizeResource(entry.key),
+                          displayName,
                           '-${entry.value}/sec',
                           !hasEnough ? Colors.red : Colors.grey,
                         );
@@ -325,31 +325,10 @@ class BuildingMenu {
     );
   }
 
-  static String _capitalizeResource(String resource) {
-    switch (resource) {
-      case 'cash':
-        return 'Cash';
-      case 'electricity':
-        return 'Electricity';
-      case 'coal':
-        return 'Coal';
-      case 'water':
-        return 'Water';
-      case 'wood':
-        return 'Wood';
-      case 'gold':
-        return 'Gold';
-      case 'research':
-        return 'Research';
-      default:
-        return resource[0].toUpperCase() + resource.substring(1);
-    }
-  }
-
   static Widget _buildBuildingImage(Building building, {double size = 24}) {
     if (building.assetPath != null) {
       return Image.asset(
-        'assets/images/${building.assetPath!}',
+        Assets.flutterAssetPath(building.assetPath!),
         width: size,
         height: size,
       );

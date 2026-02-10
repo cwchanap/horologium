@@ -18,8 +18,8 @@ class ResourcesPage extends StatefulWidget {
 }
 
 class _ResourcesPageState extends State<ResourcesPage> {
-  Map<String, double> _productionRates = {};
-  Map<String, double> _consumptionRates = {};
+  Map<ResourceType, double> _productionRates = {};
+  Map<ResourceType, double> _consumptionRates = {};
   Timer? _updateTimer;
   ResourceCategory _selectedCategory = ResourceCategory.rawMaterials;
 
@@ -39,8 +39,8 @@ class _ResourcesPageState extends State<ResourcesPage> {
   void _calculateRates() {
     final buildings = widget.grid.getAllBuildings();
 
-    final production = <String, double>{};
-    final consumption = <String, double>{};
+    final production = <ResourceType, double>{};
+    final consumption = <ResourceType, double>{};
 
     for (final building in buildings) {
       // Only calculate production if building has workers (except houses which don't need workers)
@@ -48,12 +48,20 @@ class _ResourcesPageState extends State<ResourcesPage> {
           building.type == BuildingType.largeHouse ||
           building.hasWorkers) {
         // Calculate production
-        building.generation.forEach((resource, rate) {
-          if (resource == 'research') {
+        building.generation.forEach((resourceType, rate) {
+          if (resourceType == ResourceType.research) {
             // Research has special handling - 1 point every 10 seconds
-            production.update(resource, (v) => v + 0.1, ifAbsent: () => 0.1);
+            production.update(
+              resourceType,
+              (v) => v + 0.1,
+              ifAbsent: () => 0.1,
+            );
           } else {
-            production.update(resource, (v) => v + rate, ifAbsent: () => rate);
+            production.update(
+              resourceType,
+              (v) => v + rate,
+              ifAbsent: () => rate,
+            );
           }
         });
       }
@@ -63,18 +71,19 @@ class _ResourcesPageState extends State<ResourcesPage> {
         bool canConsume = true;
 
         // Check if building can consume what it needs
-        building.consumption.forEach((key, value) {
-          final resourceType = ResourceType.values.firstWhere(
-            (e) => e.toString() == 'ResourceType.$key',
-          );
+        building.consumption.forEach((resourceType, value) {
           if ((widget.resources.resources[resourceType] ?? 0) < value) {
             canConsume = false;
           }
         });
 
         if (canConsume) {
-          building.consumption.forEach((resource, rate) {
-            consumption.update(resource, (v) => v + rate, ifAbsent: () => rate);
+          building.consumption.forEach((resourceType, rate) {
+            consumption.update(
+              resourceType,
+              (v) => v + rate,
+              ifAbsent: () => rate,
+            );
           });
         }
       }
@@ -201,13 +210,14 @@ class _ResourcesPageState extends State<ResourcesPage> {
   List<Widget> _buildResourceCardsForCategory(ResourceCategory category) {
     final resourcesInCategory = _getResourcesForCategory(category);
     return resourcesInCategory.map((resourceData) {
+      final resourceType = resourceData['resourceType'] as ResourceType;
       return ResourceCard(
         name: resourceData['name'],
         amount: resourceData['amount'],
         color: resourceData['color'],
-        resourceType: resourceData['resourceType'],
-        productionRate: _productionRates[resourceData['key']] ?? 0.0,
-        consumptionRate: _consumptionRates[resourceData['key']] ?? 0.0,
+        resourceType: resourceType,
+        productionRate: _productionRates[resourceType] ?? 0.0,
+        consumptionRate: _consumptionRates[resourceType] ?? 0.0,
       );
     }).toList();
   }
@@ -223,49 +233,42 @@ class _ResourcesPageState extends State<ResourcesPage> {
             'amount': widget.resources.gold,
             'color': Colors.amber,
             'resourceType': ResourceType.gold,
-            'key': 'gold',
           },
           {
             'name': 'Coal',
             'amount': widget.resources.coal,
             'color': Colors.grey,
             'resourceType': ResourceType.coal,
-            'key': 'coal',
           },
           {
             'name': 'Electricity',
             'amount': widget.resources.electricity,
             'color': Colors.yellow,
             'resourceType': ResourceType.electricity,
-            'key': 'electricity',
           },
           {
             'name': 'Wood',
             'amount': widget.resources.wood,
             'color': Colors.brown,
             'resourceType': ResourceType.wood,
-            'key': 'wood',
           },
           {
             'name': 'Water',
             'amount': widget.resources.water,
             'color': Colors.cyan,
             'resourceType': ResourceType.water,
-            'key': 'water',
           },
           {
             'name': 'Planks',
             'amount': widget.resources.planks,
             'color': Colors.brown,
             'resourceType': ResourceType.planks,
-            'key': 'planks',
           },
           {
             'name': 'Stone',
             'amount': widget.resources.stone,
             'color': Colors.grey,
             'resourceType': ResourceType.stone,
-            'key': 'stone',
           },
         ];
       case ResourceCategory.foodResources:
@@ -275,28 +278,24 @@ class _ResourcesPageState extends State<ResourcesPage> {
             'amount': widget.resources.wheat,
             'color': Colors.orange,
             'resourceType': ResourceType.wheat,
-            'key': 'wheat',
           },
           {
             'name': 'Corn',
             'amount': widget.resources.corn,
             'color': Colors.yellow,
             'resourceType': ResourceType.corn,
-            'key': 'corn',
           },
           {
             'name': 'Rice',
             'amount': widget.resources.rice,
             'color': Colors.lightGreen,
             'resourceType': ResourceType.rice,
-            'key': 'rice',
           },
           {
             'name': 'Barley',
             'amount': widget.resources.barley,
             'color': Colors.amber,
             'resourceType': ResourceType.barley,
-            'key': 'barley',
           },
         ];
       case ResourceCategory.stapleGrains:
@@ -306,28 +305,24 @@ class _ResourcesPageState extends State<ResourcesPage> {
             'amount': widget.resources.flour,
             'color': Colors.orange,
             'resourceType': ResourceType.flour,
-            'key': 'flour',
           },
           {
             'name': 'Cornmeal',
             'amount': widget.resources.cornmeal,
             'color': Colors.yellow,
             'resourceType': ResourceType.cornmeal,
-            'key': 'cornmeal',
           },
           {
             'name': 'Polished Rice',
             'amount': widget.resources.polishedRice,
             'color': Colors.lightGreen,
             'resourceType': ResourceType.polishedRice,
-            'key': 'polishedRice',
           },
           {
             'name': 'Malted Barley',
             'amount': widget.resources.maltedBarley,
             'color': Colors.amber,
             'resourceType': ResourceType.maltedBarley,
-            'key': 'maltedBarley',
           },
         ];
       case ResourceCategory.refinement:
@@ -337,14 +332,12 @@ class _ResourcesPageState extends State<ResourcesPage> {
             'amount': widget.resources.bread,
             'color': Colors.orange,
             'resourceType': ResourceType.bread,
-            'key': 'bread',
           },
           {
             'name': 'Pastries',
             'amount': widget.resources.pastries,
             'color': Colors.orange,
             'resourceType': ResourceType.pastries,
-            'key': 'pastries',
           },
         ];
     }
