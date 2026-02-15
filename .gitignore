@@ -51,3 +51,6 @@ app.*.map.json
 assets/**/original
 coverage/
 specs/
+
+# Claude AI local settings
+.claude/settings.local.json
