@@ -103,6 +103,7 @@ class Field extends Building {
   CropType cropType;
 
   Field({
+    super.id,
     required super.type,
     required super.name,
     required super.description,
@@ -124,7 +125,12 @@ class Field extends Building {
 
   @override
   Map<ResourceType, double> get generation {
-    final resourceType = ResourceType.values.byName(cropType.name);
+    final resourceType = switch (cropType) {
+      CropType.wheat => ResourceType.wheat,
+      CropType.corn => ResourceType.corn,
+      CropType.rice => ResourceType.rice,
+      CropType.barley => ResourceType.barley,
+    };
     return {resourceType: 1.0 * level};
   }
 }
@@ -133,6 +139,7 @@ class Bakery extends Building {
   BakeryProduct productType;
 
   Bakery({
+    super.id,
     required super.type,
     required super.name,
     required super.description,

@@ -20,14 +20,15 @@ class TerrainDebugSheet {
         bool gridDebug = initialGridDebug;
         bool showCenters = game.terrain?.showPatchCentersDebug ?? false;
         bool showEdges = game.terrain?.showEdgeZonesDebug ?? false;
-        final gen = game.terrain!.generator;
-        int patchSizeBase = gen.patchSizeBase;
-        int patchJitter = gen.patchJitter;
-        double primaryWeight = gen.primaryWeight;
-        double warpAmplitude = gen.warpAmplitude;
-        double warpFrequency = gen.warpFrequency;
-        double edgeWidth = gen.edgeWidth;
-        double edgeGamma = gen.edgeGamma;
+        // Guard against null terrain - use sensible defaults if unavailable
+        final gen = game.terrain?.generator;
+        int patchSizeBase = gen?.patchSizeBase ?? 10;
+        int patchJitter = gen?.patchJitter ?? 1;
+        double primaryWeight = gen?.primaryWeight ?? 0.85;
+        double warpAmplitude = gen?.warpAmplitude ?? 1.0;
+        double warpFrequency = gen?.warpFrequency ?? 0.15;
+        double edgeWidth = gen?.edgeWidth ?? 1.2;
+        double edgeGamma = gen?.edgeGamma ?? 1.5;
 
         Future<void> saveTogglePrefs() async {
           final prefs = await SharedPreferences.getInstance();

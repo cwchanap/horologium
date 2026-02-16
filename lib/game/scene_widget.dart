@@ -54,7 +54,9 @@ class _MainGameWidgetState extends State<MainGameWidget>
     WidgetsBinding.instance.addObserver(this);
     _initializeGame();
     _loadSavedData();
-    _audioManager.loadPrefs().then((_) => setState(() {}));
+    _audioManager.loadPrefs().then((_) {
+      if (mounted) setState(() {});
+    });
     _startResourceGeneration();
     _applyTerrainPrefsWhenReady();
   }
