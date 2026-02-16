@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../building/building.dart';
@@ -199,7 +200,12 @@ class SaveService {
             resources.resources[type] = (entry.value as num).toDouble();
           }
         }
-      } catch (e) {
+      } catch (e, stackTrace) {
+        // Log parse errors with context to aid debugging
+        final rawJson = prefs.getString(_planetResourcesJsonKey(planetId));
+        debugPrint('Failed to parse resources JSON for planet $planetId: $e');
+        debugPrint('Stack trace: $stackTrace');
+        debugPrint('Raw JSON: $rawJson');
         // If parsing fails, use defaults
       }
     } else {

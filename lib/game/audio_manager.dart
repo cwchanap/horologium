@@ -43,6 +43,8 @@ class AudioManager {
       debugPrint('BGM started (volume=$_musicVolume).');
     } catch (e) {
       debugPrint('Failed to initialize/play BGM: $e');
+      // Reset flag so failed initialization doesn't block future retries
+      _bgmStarted = false;
     }
   }
 

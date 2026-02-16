@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../building/building.dart';
 import '../resources/resource_type.dart';
@@ -25,10 +26,14 @@ class PlacedBuildingData {
 
   /// Convert to string format for persistence
   /// Format: "id,x,y,BuildingName,level,assignedWorkers,variant"
+  /// Note: variant is percent-encoded to safely handle commas
   String toLegacyString() {
     final base =
         '$id,$x,$y,${type.toString().split('.').last},$level,$assignedWorkers';
-    if (variant != null) return '$base,$variant';
+    if (variant != null) {
+      // Percent-encode variant to prevent comma injection
+      return '$base,${Uri.encodeComponent(variant!)}';
+    }
     return base;
   }
 
@@ -100,9 +105,18 @@ class PlacedBuildingData {
         ? 0
         : parsedWorkers;
 
-    // Parse optional variant field
+    // Parse optional variant field (percent-decoded for safety)
     final variantIndex = typeIndex + 3;
-    final variant = parts.length > variantIndex ? parts[variantIndex] : null;
+    String? variant;
+    if (parts.length > variantIndex) {
+      try {
+        variant = Uri.decodeComponent(parts[variantIndex]);
+      } catch (e) {
+        // If decoding fails, use raw value for backward compatibility
+        variant = parts[variantIndex];
+        debugPrint('Failed to decode variant: $e, using raw value');
+      }
+    }
 
     return PlacedBuildingData(
       id: id,
@@ -128,6 +142,7 @@ class PlacedBuildingData {
                 CropType.wheat
           : CropType.wheat;
       return Field(
+        id: id,
         type: template.type,
         name: template.name,
         description: template.description,
@@ -152,6 +167,7 @@ class PlacedBuildingData {
                 BakeryProduct.bread
           : BakeryProduct.bread;
       return Bakery(
+        id: id,
         type: template.type,
         name: template.name,
         description: template.description,
