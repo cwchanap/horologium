@@ -207,7 +207,11 @@ class PlacedBuildingData {
     )..assignedWorkers = assignedWorkers;
   }
 
-  /// Create a copy with modified values
+  // Sentinel value to distinguish between "not provided" and "explicitly null"
+  static const _sentinelVariant = Object();
+
+  /// Create a copy with modified values.
+  /// Use [variant] = null to explicitly clear the variant to null.
   PlacedBuildingData copyWith({
     String? id,
     int? x,
@@ -215,7 +219,7 @@ class PlacedBuildingData {
     BuildingType? type,
     int? level,
     int? assignedWorkers,
-    String? variant,
+    Object? variant = _sentinelVariant,
   }) {
     return PlacedBuildingData(
       id: id ?? this.id,
@@ -224,7 +228,7 @@ class PlacedBuildingData {
       type: type ?? this.type,
       level: level ?? this.level,
       assignedWorkers: assignedWorkers ?? this.assignedWorkers,
-      variant: variant ?? this.variant,
+      variant: variant == _sentinelVariant ? this.variant : variant as String?,
     );
   }
 

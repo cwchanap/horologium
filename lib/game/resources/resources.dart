@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 
@@ -114,7 +115,13 @@ class Resources {
           resources.update(
             resourceType,
             (v) => v - value,
-            ifAbsent: () => -value,
+            ifAbsent: () {
+              // Log warning when consuming from a resource that doesn't exist
+              debugPrint(
+                'Warning: Building consumption attempted for unknown resource: ${resourceType.name}. Starting from 0.',
+              );
+              return 0;
+            },
           );
         });
 

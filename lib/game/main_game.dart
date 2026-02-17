@@ -54,67 +54,74 @@ class MainGame extends FlameGame
 
   @override
   Future<void> onLoad() async {
-    await super.onLoad();
-    // Ensure BGM listener is registered early so lifecycle events are handled
     try {
-      await FlameAudio.bgm.initialize();
-    } catch (_) {}
-    camera.viewfinder.anchor = Anchor.center;
-    camera.viewfinder.zoom = _startZoom;
+      await super.onLoad();
+      // Ensure BGM listener is registered early so lifecycle events are handled
+      try {
+        await FlameAudio.bgm.initialize();
+      } catch (e, stackTrace) {
+        debugPrint('FlameAudio.bgm.initialize failed: $e\n$stackTrace');
+      }
+      camera.viewfinder.anchor = Anchor.center;
+      camera.viewfinder.zoom = _startZoom;
 
-    // Create terrain first (renders beneath everything)
-    _terrain = ParallaxTerrainComponent(
-      gridSize: 50, // Match grid size
-      seed:
-          _planet?.id.hashCode ??
-          42, // Use planet ID as seed for consistent terrain
-    );
-    // Keep terrain perfectly aligned with the grid (no parallax drift)
-    _terrain!.parallaxEnabled = false;
-    _terrain!.size = Vector2(
-      _terrain!.gridSize * cellWidth,
-      _terrain!.gridSize * cellHeight,
-    );
-    _terrain!.anchor = Anchor.center;
-    _terrain!.position = Vector2.zero();
-    _terrain!.priority = 10; // Terrain underlay for normal gameplay
+      // Create terrain first (renders beneath everything)
+      _terrain = ParallaxTerrainComponent(
+        gridSize: 50, // Match grid size
+        seed:
+            _planet?.id.hashCode ??
+            42, // Use planet ID as seed for consistent terrain
+      );
+      // Keep terrain perfectly aligned with the grid (no parallax drift)
+      _terrain!.parallaxEnabled = false;
+      _terrain!.size = Vector2(
+        _terrain!.gridSize * cellWidth,
+        _terrain!.gridSize * cellHeight,
+      );
+      _terrain!.anchor = Anchor.center;
+      _terrain!.position = Vector2.zero();
+      _terrain!.priority = 10; // Terrain underlay for normal gameplay
 
-    world.add(_terrain!);
+      world.add(_terrain!);
 
-    // Create grid (renders above terrain)
-    _grid = Grid(
-      onBuildingPlaced: _onBuildingPlaced,
-      onBuildingRemoved: _onBuildingRemoved,
-    );
-    _grid!.size = Vector2(
-      _grid!.gridSize * cellWidth,
-      _grid!.gridSize * cellHeight,
-    );
-    _grid!.anchor = Anchor.center;
-    _grid!.position = Vector2.zero();
-    _grid!.terrainComponent = _terrain; // Connect terrain to grid
-    _grid!.priority = 20; // Grid above terrain
+      // Create grid (renders above terrain)
+      _grid = Grid(
+        onBuildingPlaced: _onBuildingPlaced,
+        onBuildingRemoved: _onBuildingRemoved,
+      );
+      _grid!.size = Vector2(
+        _grid!.gridSize * cellWidth,
+        _grid!.gridSize * cellHeight,
+      );
+      _grid!.anchor = Anchor.center;
+      _grid!.position = Vector2.zero();
+      _grid!.terrainComponent = _terrain; // Connect terrain to grid
+      _grid!.priority = 20; // Grid above terrain
 
-    world.add(_grid!);
+      world.add(_grid!);
 
-    // Calculate proper zoom level to fit the terrain in the viewport
-    final terrainSize = _terrain!.size;
-    final viewportSize = camera.viewport.size;
-    final zoomX = viewportSize.x / terrainSize.x;
-    final zoomY = viewportSize.y / terrainSize.y;
-    // Zoom to fit the entire terrain in the viewport. Do NOT go below fit,
-    // otherwise the viewport becomes larger than the world and clamping breaks.
-    final properZoom = math.min(zoomX, zoomY);
-    _fitZoom =
-        properZoom; // Save fit zoom so we never allow zooming out beyond full-terrain view
+      // Calculate proper zoom level to fit the terrain in the viewport
+      final terrainSize = _terrain!.size;
+      final viewportSize = camera.viewport.size;
+      final zoomX = viewportSize.x / terrainSize.x;
+      final zoomY = viewportSize.y / terrainSize.y;
+      // Zoom to fit the entire terrain in the viewport. Do NOT go below fit,
+      // otherwise the viewport becomes larger than the world and clamping breaks.
+      final properZoom = math.min(zoomX, zoomY);
+      _fitZoom =
+          properZoom; // Save fit zoom so we never allow zooming out beyond full-terrain view
 
-    // Apply the proper zoom to fit terrain in viewport
-    camera.viewfinder.zoom = properZoom.clamp(_minZoom, _maxZoom);
-    // Center the camera on the terrain and clamp within bounds
-    _centerCameraOnTerrain();
+      // Apply the proper zoom to fit terrain in viewport
+      camera.viewfinder.zoom = properZoom.clamp(_minZoom, _maxZoom);
+      // Center the camera on the terrain and clamp within bounds
+      _centerCameraOnTerrain();
 
-    await loadBuildings();
-    _loadedCompleter.complete();
+      await loadBuildings();
+      _loadedCompleter.complete();
+    } catch (error, stackTrace) {
+      _loadedCompleter.completeError(error, stackTrace);
+      rethrow;
+    }
   }
 
   Future<void> loadBuildings() async {

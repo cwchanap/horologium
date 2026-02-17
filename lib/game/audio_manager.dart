@@ -34,31 +34,34 @@ class AudioManager {
     }
   }
 
-  Future<void> _initAudio() async {
+  Future<bool> _initAudio() async {
     try {
       _bgm ??= AudioPlayer();
       await _bgm!.setReleaseMode(ReleaseMode.loop);
       await _bgm!.setVolume(_musicVolume);
       await _bgm!.play(AssetSource('audio/background.mp3'));
       debugPrint('BGM started (volume=$_musicVolume).');
+      return true;
     } catch (e) {
       debugPrint('Failed to initialize/play BGM: $e');
-      // Reset flag so failed initialization doesn't block future retries
-      _bgmStarted = false;
+      return false;
     }
   }
 
-  void maybeStartBgm() {
+  Future<void> maybeStartBgm() async {
     if (_bgmStarted || !_musicEnabled) return;
-    _bgmStarted = true;
-    _initAudio();
+    final success = await _initAudio();
+    // Only set flag after successful initialization/playback
+    if (success) {
+      _bgmStarted = true;
+    }
   }
 
-  void setMusicEnabled(bool value) {
+  Future<void> setMusicEnabled(bool value) async {
     _musicEnabled = value;
     _savePrefs();
     if (!_bgmStarted && value) {
-      maybeStartBgm();
+      await maybeStartBgm();
     } else if (_bgmStarted && !value) {
       try {
         _bgm?.pause();
@@ -117,13 +120,16 @@ class AudioManager {
   }
 
   void dispose() {
-    if (_bgmStarted) {
+    if (_bgm != null) {
       try {
-        _bgm?.stop();
+        if (_bgmStarted) {
+          _bgm?.stop();
+        }
         _bgm?.dispose();
       } catch (e) {
         debugPrint('BGM dispose error: $e');
       }
+      _bgm = null;
     }
   }
 }

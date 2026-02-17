@@ -213,9 +213,7 @@ class BuildingLimitManager {
   }
 
   Map<String, int> toMap() {
-    return _limitUpgrades.map(
-      (key, value) => MapEntry(key.toString().split('.').last, value),
-    );
+    return _limitUpgrades.map((key, value) => MapEntry(key.name, value));
   }
 }
 
