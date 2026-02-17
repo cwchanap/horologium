@@ -117,9 +117,13 @@ class MainGame extends FlameGame
       _centerCameraOnTerrain();
 
       await loadBuildings();
-      _loadedCompleter.complete();
+      if (!_loadedCompleter.isCompleted) {
+        _loadedCompleter.complete();
+      }
     } catch (error, stackTrace) {
-      _loadedCompleter.completeError(error, stackTrace);
+      if (!_loadedCompleter.isCompleted) {
+        _loadedCompleter.completeError(error, stackTrace);
+      }
       rethrow;
     }
   }

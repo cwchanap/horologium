@@ -214,7 +214,53 @@ class SaveService {
         debugPrint('Failed to parse resources JSON for planet $planetId: $e');
         debugPrint('Stack trace: $stackTrace');
         debugPrint('Raw JSON: $rawJson');
-        // If parsing fails, use defaults
+
+        // Attempt to load from old per-resource keys as fallback
+        if (hasOldData) {
+          debugPrint('Attempting to load from legacy per-resource keys...');
+          resources.cash =
+              prefs.getDouble(_planetResourceKey(planetId, 'cash')) ?? 1000.0;
+          resources.gold =
+              prefs.getDouble(_planetResourceKey(planetId, 'gold')) ?? 0.0;
+          resources.wood =
+              prefs.getDouble(_planetResourceKey(planetId, 'wood')) ?? 0.0;
+          resources.coal =
+              prefs.getDouble(_planetResourceKey(planetId, 'coal')) ?? 10.0;
+          resources.electricity =
+              prefs.getDouble(_planetResourceKey(planetId, 'electricity')) ??
+              0.0;
+          resources.research =
+              prefs.getDouble(_planetResourceKey(planetId, 'research')) ?? 0.0;
+          resources.water =
+              prefs.getDouble(_planetResourceKey(planetId, 'water')) ?? 0.0;
+          resources.planks =
+              prefs.getDouble(_planetResourceKey(planetId, 'planks')) ?? 0.0;
+          resources.stone =
+              prefs.getDouble(_planetResourceKey(planetId, 'stone')) ?? 0.0;
+          resources.wheat =
+              prefs.getDouble(_planetResourceKey(planetId, 'wheat')) ?? 0.0;
+          resources.corn =
+              prefs.getDouble(_planetResourceKey(planetId, 'corn')) ?? 0.0;
+          resources.rice =
+              prefs.getDouble(_planetResourceKey(planetId, 'rice')) ?? 0.0;
+          resources.barley =
+              prefs.getDouble(_planetResourceKey(planetId, 'barley')) ?? 0.0;
+          resources.flour =
+              prefs.getDouble(_planetResourceKey(planetId, 'flour')) ?? 0.0;
+          resources.cornmeal =
+              prefs.getDouble(_planetResourceKey(planetId, 'cornmeal')) ?? 0.0;
+          resources.polishedRice =
+              prefs.getDouble(_planetResourceKey(planetId, 'polishedRice')) ??
+              0.0;
+          resources.maltedBarley =
+              prefs.getDouble(_planetResourceKey(planetId, 'maltedBarley')) ??
+              0.0;
+          resources.bread =
+              prefs.getDouble(_planetResourceKey(planetId, 'bread')) ?? 0.0;
+          resources.pastries =
+              prefs.getDouble(_planetResourceKey(planetId, 'pastries')) ?? 0.0;
+        }
+        // If no old data exists, use defaults (already set in Resources constructor)
       }
     } else {
       // Migrate from old per-resource keys
