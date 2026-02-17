@@ -7,6 +7,21 @@ import '../game/building/building.dart';
 import '../game/grid.dart';
 import '../widgets/cards/cards.dart';
 
+/// Immutable data class for resource information
+class _ResourceData {
+  final String name;
+  final double amount;
+  final Color color;
+  final ResourceType resourceType;
+
+  const _ResourceData({
+    required this.name,
+    required this.amount,
+    required this.color,
+    required this.resourceType,
+  });
+}
+
 class ResourcesPage extends StatefulWidget {
   final Resources resources;
   final Grid grid;
@@ -210,135 +225,132 @@ class _ResourcesPageState extends State<ResourcesPage> {
   List<Widget> _buildResourceCardsForCategory(ResourceCategory category) {
     final resourcesInCategory = _getResourcesForCategory(category);
     return resourcesInCategory.map((resourceData) {
-      final resourceType = resourceData['resourceType'] as ResourceType;
       return ResourceCard(
-        name: resourceData['name'],
-        amount: resourceData['amount'],
-        color: resourceData['color'],
-        resourceType: resourceType,
-        productionRate: _productionRates[resourceType] ?? 0.0,
-        consumptionRate: _consumptionRates[resourceType] ?? 0.0,
+        name: resourceData.name,
+        amount: resourceData.amount,
+        color: resourceData.color,
+        resourceType: resourceData.resourceType,
+        productionRate: _productionRates[resourceData.resourceType] ?? 0.0,
+        consumptionRate: _consumptionRates[resourceData.resourceType] ?? 0.0,
       );
     }).toList();
   }
 
-  List<Map<String, dynamic>> _getResourcesForCategory(
-    ResourceCategory category,
-  ) {
+  List<_ResourceData> _getResourcesForCategory(ResourceCategory category) {
     switch (category) {
       case ResourceCategory.rawMaterials:
         return [
-          {
-            'name': 'Gold',
-            'amount': widget.resources.gold,
-            'color': Colors.amber,
-            'resourceType': ResourceType.gold,
-          },
-          {
-            'name': 'Coal',
-            'amount': widget.resources.coal,
-            'color': Colors.grey,
-            'resourceType': ResourceType.coal,
-          },
-          {
-            'name': 'Electricity',
-            'amount': widget.resources.electricity,
-            'color': Colors.yellow,
-            'resourceType': ResourceType.electricity,
-          },
-          {
-            'name': 'Wood',
-            'amount': widget.resources.wood,
-            'color': Colors.brown,
-            'resourceType': ResourceType.wood,
-          },
-          {
-            'name': 'Water',
-            'amount': widget.resources.water,
-            'color': Colors.cyan,
-            'resourceType': ResourceType.water,
-          },
-          {
-            'name': 'Planks',
-            'amount': widget.resources.planks,
-            'color': Colors.brown,
-            'resourceType': ResourceType.planks,
-          },
-          {
-            'name': 'Stone',
-            'amount': widget.resources.stone,
-            'color': Colors.grey,
-            'resourceType': ResourceType.stone,
-          },
+          _ResourceData(
+            name: 'Gold',
+            amount: widget.resources.gold,
+            color: Colors.amber,
+            resourceType: ResourceType.gold,
+          ),
+          _ResourceData(
+            name: 'Coal',
+            amount: widget.resources.coal,
+            color: Colors.grey,
+            resourceType: ResourceType.coal,
+          ),
+          _ResourceData(
+            name: 'Electricity',
+            amount: widget.resources.electricity,
+            color: Colors.yellow,
+            resourceType: ResourceType.electricity,
+          ),
+          _ResourceData(
+            name: 'Wood',
+            amount: widget.resources.wood,
+            color: Colors.brown,
+            resourceType: ResourceType.wood,
+          ),
+          _ResourceData(
+            name: 'Water',
+            amount: widget.resources.water,
+            color: Colors.cyan,
+            resourceType: ResourceType.water,
+          ),
+          _ResourceData(
+            name: 'Planks',
+            amount: widget.resources.planks,
+            color: Colors.brown,
+            resourceType: ResourceType.planks,
+          ),
+          _ResourceData(
+            name: 'Stone',
+            amount: widget.resources.stone,
+            color: Colors.grey,
+            resourceType: ResourceType.stone,
+          ),
         ];
       case ResourceCategory.foodResources:
         return [
-          {
-            'name': 'Wheat',
-            'amount': widget.resources.wheat,
-            'color': Colors.orange,
-            'resourceType': ResourceType.wheat,
-          },
-          {
-            'name': 'Corn',
-            'amount': widget.resources.corn,
-            'color': Colors.yellow,
-            'resourceType': ResourceType.corn,
-          },
-          {
-            'name': 'Rice',
-            'amount': widget.resources.rice,
-            'color': Colors.lightGreen,
-            'resourceType': ResourceType.rice,
-          },
-          {
-            'name': 'Barley',
-            'amount': widget.resources.barley,
-            'color': Colors.amber,
-            'resourceType': ResourceType.barley,
-          },
+          _ResourceData(
+            name: 'Wheat',
+            amount: widget.resources.wheat,
+            color: Colors.orange,
+            resourceType: ResourceType.wheat,
+          ),
+          _ResourceData(
+            name: 'Corn',
+            amount: widget.resources.corn,
+            color: Colors.yellow,
+            resourceType: ResourceType.corn,
+          ),
+          _ResourceData(
+            name: 'Rice',
+            amount: widget.resources.rice,
+            color: Colors.lightGreen,
+            resourceType: ResourceType.rice,
+          ),
+          _ResourceData(
+            name: 'Barley',
+            amount: widget.resources.barley,
+            color: Colors.amber,
+            resourceType: ResourceType.barley,
+          ),
         ];
       case ResourceCategory.stapleGrains:
         return [
-          {
-            'name': 'Flour',
-            'amount': widget.resources.flour,
-            'color': Colors.orange,
-            'resourceType': ResourceType.flour,
-          },
-          {
-            'name': 'Cornmeal',
-            'amount': widget.resources.cornmeal,
-            'color': Colors.yellow,
-            'resourceType': ResourceType.cornmeal,
-          },
-          {
-            'name': 'Polished Rice',
-            'amount': widget.resources.polishedRice,
-            'color': Colors.lightGreen,
-            'resourceType': ResourceType.polishedRice,
-          },
-          {
-            'name': 'Malted Barley',
-            'amount': widget.resources.maltedBarley,
-            'color': Colors.amber,
-            'resourceType': ResourceType.maltedBarley,
-          },
+          _ResourceData(
+            name: 'Flour',
+            amount: widget.resources.flour,
+            color: Colors.orange,
+            resourceType: ResourceType.flour,
+          ),
+          _ResourceData(
+            name: 'Cornmeal',
+            amount: widget.resources.cornmeal,
+            color: Colors.yellow,
+            resourceType: ResourceType.cornmeal,
+          ),
+          _ResourceData(
+            name: 'Polished Rice',
+            amount: widget.resources.polishedRice,
+            color: Colors.lightGreen,
+            resourceType: ResourceType.polishedRice,
+          ),
+          _ResourceData(
+            name: 'Malted Barley',
+            amount: widget.resources.maltedBarley,
+            color: Colors.amber,
+            resourceType: ResourceType.maltedBarley,
+          ),
         ];
       case ResourceCategory.refinement:
         return [
-          {
-            'name': 'Bread',
-            'amount': widget.resources.bread,
-            'color': Colors.orange,
-            'resourceType': ResourceType.bread,
-          },
-          {
-            'name': 'Pastries',
-            'amount': widget.resources.pastries,
-            'color': Colors.orange,
-            'resourceType': ResourceType.pastries,
-          },
+          _ResourceData(
+            name: 'Bread',
+            amount: widget.resources.bread,
+            color: Colors.orange,
+            resourceType: ResourceType.bread,
+          ),
+          _ResourceData(
+            name: 'Pastries',
+            amount: widget.resources.pastries,
+            color: Colors.orange,
+            resourceType: ResourceType.pastries,
+          ),
         ];
     }
   }

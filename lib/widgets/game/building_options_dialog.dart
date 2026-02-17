@@ -3,6 +3,12 @@ import 'package:flutter/material.dart';
 import '../../game/building/building.dart';
 import '../../game/resources/resource_type.dart';
 
+String _getResourceDisplayName(ResourceType type) {
+  // Use the registry display name if available, fallback to enum name
+  final resource = ResourceRegistry.find(type);
+  return resource?.name ?? type.name;
+}
+
 class BuildingOptionsDialog extends StatelessWidget {
   final Building building;
   final double currentCash;
@@ -157,7 +163,10 @@ class BuildingOptionsDialog extends StatelessWidget {
             _buildStatRow(
               'Produces',
               building.generation.entries
-                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key.name}')
+                  .map(
+                    (e) =>
+                        '${e.value.toStringAsFixed(1)} ${_getResourceDisplayName(e.key)}',
+                  )
                   .join(', '),
               Colors.greenAccent,
             ),
@@ -165,7 +174,10 @@ class BuildingOptionsDialog extends StatelessWidget {
             _buildStatRow(
               'Consumes',
               building.consumption.entries
-                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key.name}')
+                  .map(
+                    (e) =>
+                        '${e.value.toStringAsFixed(1)} ${_getResourceDisplayName(e.key)}',
+                  )
                   .join(', '),
               Colors.orangeAccent,
             ),
@@ -228,7 +240,10 @@ class BuildingOptionsDialog extends StatelessWidget {
             _buildStatRow(
               'Produces',
               nextGeneration.entries
-                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key.name}')
+                  .map(
+                    (e) =>
+                        '${e.value.toStringAsFixed(1)} ${_getResourceDisplayName(e.key)}',
+                  )
                   .join(', '),
               Colors.greenAccent,
             ),
@@ -236,7 +251,10 @@ class BuildingOptionsDialog extends StatelessWidget {
             _buildStatRow(
               'Consumes',
               nextConsumption.entries
-                  .map((e) => '${e.value.toStringAsFixed(1)} ${e.key.name}')
+                  .map(
+                    (e) =>
+                        '${e.value.toStringAsFixed(1)} ${_getResourceDisplayName(e.key)}',
+                  )
                   .join(', '),
               Colors.orangeAccent,
             ),

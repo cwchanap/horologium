@@ -85,8 +85,8 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _game.onGridCellTapped = _handleGridCellTapped;
     _game.onGridCellLongTapped = _inputHandler.handleGridCellLongTapped;
     _game.onGridCellSecondaryTapped = _inputHandler.handleGridCellLongTapped;
-    _game.onUserInteracted = () {
-      _audioManager.maybeStartBgm();
+    _game.onUserInteracted = () async {
+      await _audioManager.maybeStartBgm();
       if (_audioManager.bgmStarted) setState(() {});
     };
   }
@@ -246,8 +246,11 @@ class _MainGameWidgetState extends State<MainGameWidget>
   }
 
   void _handleGridCellTapped(int x, int y) {
-    _audioManager.maybeStartBgm();
-    _inputHandler.handleGridCellTapped(x, y, context);
+    _audioManager.maybeStartBgm().then((_) {
+      if (mounted) {
+        _inputHandler.handleGridCellTapped(x, y, context);
+      }
+    });
   }
 
   void _onEmptyGridTapped(int x, int y) {
@@ -342,8 +345,8 @@ class _MainGameWidgetState extends State<MainGameWidget>
               bottom: 20,
               right: 20,
               child: FloatingActionButton(
-                onPressed: () {
-                  _audioManager.maybeStartBgm();
+                onPressed: () async {
+                  await _audioManager.maybeStartBgm();
                   setState(() {
                     _showHamburgerMenu = !_showHamburgerMenu;
                     // Only reflect current overlays; do not OR with existing value to avoid sticky state
@@ -363,8 +366,8 @@ class _MainGameWidgetState extends State<MainGameWidget>
               left: 20,
               child: FloatingActionButton.small(
                 heroTag: 'debug_tools_button',
-                onPressed: () {
-                  _audioManager.maybeStartBgm();
+                onPressed: () async {
+                  await _audioManager.maybeStartBgm();
                   _openDebugSheet();
                 },
                 backgroundColor: Colors.teal.withAlpha((255 * 0.8).round()),
@@ -389,8 +392,8 @@ class _MainGameWidgetState extends State<MainGameWidget>
                 onResourcesChanged: _onResourcesChanged,
                 musicEnabled: _audioManager.musicEnabled,
                 musicVolume: _audioManager.musicVolume,
-                onMusicEnabledChanged: (v) {
-                  _audioManager.setMusicEnabled(v);
+                onMusicEnabledChanged: (v) async {
+                  await _audioManager.setMusicEnabled(v);
                   setState(() {});
                 },
                 onMusicVolumeChanged: (v) {

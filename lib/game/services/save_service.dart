@@ -43,6 +43,14 @@ class SaveService {
   static String _planetBuildingsKey(String planetId) =>
       'planet.$planetId.buildings';
 
+  /// Deprecated: Use [savePlanet] instead.
+  ///
+  /// This method writes individual resource keys which conflicts with the new
+  /// JSON-based savePlanet format. Migrate to savePlanet for consolidated
+  /// planet persistence.
+  @Deprecated(
+    'Use savePlanet instead. This method will be removed in a future version.',
+  )
   static Future<void> saveGameState({
     required Resources resources,
     required ResearchManager researchManager,

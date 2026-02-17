@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/building/category.dart';
+import 'package:horologium/game/planet/planet.dart';
 import 'package:horologium/game/resources/resources.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/game/research/research.dart';
@@ -757,7 +758,7 @@ void main() {
 
   group('Happiness persistence', () {
     test(
-      'saveGameState and loadGameState persist happiness correctly',
+      'savePlanet and loadOrCreatePlanet persist happiness correctly',
       () async {
         SharedPreferences.setMockInitialValues({});
 
@@ -768,43 +769,36 @@ void main() {
 
         final researchManager = ResearchManager();
 
-        // Save game state
-        await SaveService.saveGameState(
+        final planet = Planet(
+          id: 'test-planet-1',
+          name: 'Test Planet',
           resources: resources,
           researchManager: researchManager,
         );
 
-        // Create new resources to load into
-        final loadedResources = Resources();
-        final loadedResearchManager = ResearchManager();
+        // Save planet state
+        await SaveService.savePlanet(planet);
 
-        // Load game state
-        await SaveService.loadGameState(
-          resources: loadedResources,
-          researchManager: loadedResearchManager,
+        // Load the planet state
+        final loadedPlanet = await SaveService.loadOrCreatePlanet(
+          'test-planet-1',
         );
 
         // Verify happiness was persisted correctly
-        expect(loadedResources.happiness, 75.0);
-        expect(loadedResources.cash, 500.0);
-        expect(loadedResources.population, 30);
+        expect(loadedPlanet.resources.happiness, 75.0);
+        expect(loadedPlanet.resources.cash, 500.0);
+        expect(loadedPlanet.resources.population, 30);
       },
     );
 
-    test('loadGameState uses default happiness when not saved', () async {
+    test('loadOrCreatePlanet uses default happiness when not saved', () async {
       SharedPreferences.setMockInitialValues({});
 
-      final resources = Resources();
-      final researchManager = ResearchManager();
-
-      // Load game state without any saved happiness
-      await SaveService.loadGameState(
-        resources: resources,
-        researchManager: researchManager,
-      );
+      // Load planet without any saved happiness (new planet)
+      final planet = await SaveService.loadOrCreatePlanet('new-planet');
 
       // Verify default happiness value is used
-      expect(resources.happiness, 50.0);
+      expect(planet.resources.happiness, 50.0);
     });
   });
 

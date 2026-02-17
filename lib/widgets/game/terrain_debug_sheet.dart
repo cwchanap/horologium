@@ -31,22 +31,30 @@ class TerrainDebugSheet {
         double edgeGamma = gen?.edgeGamma ?? 1.5;
 
         Future<void> saveTogglePrefs() async {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('terrain.debug', terrainDebug);
-          await prefs.setBool('terrain.showCenters', showCenters);
-          await prefs.setBool('terrain.showEdges', showEdges);
-          await prefs.setBool('grid.debug', gridDebug);
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('terrain.debug', terrainDebug);
+            await prefs.setBool('terrain.showCenters', showCenters);
+            await prefs.setBool('terrain.showEdges', showEdges);
+            await prefs.setBool('grid.debug', gridDebug);
+          } catch (e) {
+            debugPrint('saveTogglePrefs failed: $e');
+          }
         }
 
         Future<void> saveParamPrefs() async {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setInt('terrain.patchSizeBase', patchSizeBase);
-          await prefs.setInt('terrain.patchJitter', patchJitter);
-          await prefs.setDouble('terrain.primaryWeight', primaryWeight);
-          await prefs.setDouble('terrain.warpAmplitude', warpAmplitude);
-          await prefs.setDouble('terrain.warpFrequency', warpFrequency);
-          await prefs.setDouble('terrain.edgeWidth', edgeWidth);
-          await prefs.setDouble('terrain.edgeGamma', edgeGamma);
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setInt('terrain.patchSizeBase', patchSizeBase);
+            await prefs.setInt('terrain.patchJitter', patchJitter);
+            await prefs.setDouble('terrain.primaryWeight', primaryWeight);
+            await prefs.setDouble('terrain.warpAmplitude', warpAmplitude);
+            await prefs.setDouble('terrain.warpFrequency', warpFrequency);
+            await prefs.setDouble('terrain.edgeWidth', edgeWidth);
+            await prefs.setDouble('terrain.edgeGamma', edgeGamma);
+          } catch (e) {
+            debugPrint('saveParamPrefs failed: $e');
+          }
         }
 
         return StatefulBuilder(
