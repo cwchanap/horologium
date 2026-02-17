@@ -131,8 +131,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
     final showEdges = prefs.getBool('terrain.showEdges') ?? false;
     final gridDebug = prefs.getBool('grid.debug') ?? false;
 
-    // Wait until game is loaded using a Completer-like polling with
-    // a bounded retry instead of an unbounded busy-wait.
+    // Wait for the game to finish loading before applying terrain-related prefs.
     await _game.isLoadedFuture;
     if (!mounted || !_game.hasLoaded) return;
 
