@@ -87,7 +87,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _game.onGridCellSecondaryTapped = _inputHandler.handleGridCellLongTapped;
     _game.onUserInteracted = () async {
       await _audioManager.maybeStartBgm();
-      if (_audioManager.bgmStarted) setState(() {});
+      if (_audioManager.bgmStarted && mounted) setState(() {});
     };
   }
 
@@ -223,6 +223,14 @@ class _MainGameWidgetState extends State<MainGameWidget>
     setState(() {
       // Sync worker assignments from grid to planet before saving
       _syncPlanetFromGrid();
+      // Sync research state from GameStateManager back to planet
+      widget.planet.researchManager.loadFromList(
+        _gameStateManager.researchManager.toList(),
+      );
+      // Sync building limits from GameStateManager back to planet
+      widget.planet.buildingLimitManager.loadFromMap(
+        _gameStateManager.buildingLimitManager.toMap(),
+      );
     });
     _schedulePlanetSave(immediateSave: immediateSave);
   }

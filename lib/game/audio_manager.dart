@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AudioManager {
   AudioPlayer? _bgm;
   bool _bgmStarted = false;
+  bool _bgmInitializing = false;
   bool _musicEnabled = true;
   double _musicVolume = 0.5;
 
@@ -49,12 +50,14 @@ class AudioManager {
   }
 
   Future<void> maybeStartBgm() async {
-    if (_bgmStarted || !_musicEnabled) return;
+    if (_bgmStarted || !_musicEnabled || _bgmInitializing) return;
+    _bgmInitializing = true;
+
     final success = await _initAudio();
-    // Only set flag after successful initialization/playback
     if (success) {
       _bgmStarted = true;
     }
+    _bgmInitializing = false;
   }
 
   Future<void> setMusicEnabled(bool value) async {
