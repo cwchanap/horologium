@@ -105,6 +105,7 @@ void main() {
       // Simulate loading buildings (like MainGame.loadBuildings does)
       for (final buildingData in planet.buildings) {
         final building = buildingData.createBuilding();
+        if (building == null) continue;
         grid.placeBuilding(
           buildingData.x,
           buildingData.y,
@@ -149,6 +150,7 @@ void main() {
       final grid = Grid();
       for (final buildingData in planet.buildings) {
         final building = buildingData.createBuilding();
+        if (building == null) continue;
         grid.placeBuilding(
           buildingData.x,
           buildingData.y,

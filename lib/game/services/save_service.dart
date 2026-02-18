@@ -124,6 +124,17 @@ class SaveService {
 
   /// Save a planet's complete state to SharedPreferences
   static Future<void> savePlanet(Planet planet) async {
+    try {
+      await _savePlanetInternal(planet);
+    } catch (e, stackTrace) {
+      debugPrint(
+        'Failed to save planet ${planet.id}: $e\nStack trace: $stackTrace',
+      );
+      rethrow;
+    }
+  }
+
+  static Future<void> _savePlanetInternal(Planet planet) async {
     final prefs = await SharedPreferences.getInstance();
     final planetId = planet.id;
 
@@ -206,6 +217,11 @@ class SaveService {
               .firstOrNull;
           if (type != null) {
             resources.resources[type] = (entry.value as num).toDouble();
+          } else {
+            debugPrint(
+              'Warning: Ignoring unknown resource type "${entry.key}" '
+              'when loading planet $planetId',
+            );
           }
         }
       } catch (e, stackTrace) {
@@ -327,8 +343,13 @@ class SaveService {
         final limitsMap =
             jsonDecode(buildingLimitsJson) as Map<String, dynamic>;
         buildingLimitManager.loadFromMap(limitsMap.cast<String, int>());
-      } catch (e) {
-        // If parsing fails, use defaults
+      } catch (e, stackTrace) {
+        debugPrint(
+          'Failed to parse building limits JSON for planet $planetId: $e\n'
+          'Raw JSON: $buildingLimitsJson\n'
+          'Stack trace: $stackTrace',
+        );
+        // Defaults will be used; limits data is lost
       }
     }
 

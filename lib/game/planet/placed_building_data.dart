@@ -131,16 +131,35 @@ class PlacedBuildingData {
 
   /// Create a Building instance from this placement data.
   /// Restores Field/Bakery subtypes using the variant field.
-  Building createBuilding() {
-    final template = BuildingRegistry.availableBuildings.firstWhere(
-      (b) => b.type == type,
-    );
+  /// Returns null if the building type is no longer in the registry.
+  Building? createBuilding() {
+    final template = BuildingRegistry.availableBuildings
+        .where((b) => b.type == type)
+        .firstOrNull;
+
+    if (template == null) {
+      debugPrint(
+        'Warning: No template found for building type $type at ($x,$y). '
+        'Skipping building creation.',
+      );
+      return null;
+    }
 
     if (template is Field) {
-      final cropType = variant != null
-          ? CropType.values.where((e) => e.name == variant).firstOrNull ??
-                CropType.wheat
-          : CropType.wheat;
+      CropType cropType = CropType.wheat;
+      if (variant != null) {
+        final matched = CropType.values
+            .where((e) => e.name == variant)
+            .firstOrNull;
+        if (matched != null) {
+          cropType = matched;
+        } else {
+          debugPrint(
+            'Warning: Unknown crop variant "$variant" for Field at ($x,$y). '
+            'Falling back to wheat.',
+          );
+        }
+      }
       return Field(
         id: id,
         type: template.type,
@@ -162,10 +181,20 @@ class PlacedBuildingData {
     }
 
     if (template is Bakery) {
-      final productType = variant != null
-          ? BakeryProduct.values.where((e) => e.name == variant).firstOrNull ??
-                BakeryProduct.bread
-          : BakeryProduct.bread;
+      BakeryProduct productType = BakeryProduct.bread;
+      if (variant != null) {
+        final matched = BakeryProduct.values
+            .where((e) => e.name == variant)
+            .firstOrNull;
+        if (matched != null) {
+          productType = matched;
+        } else {
+          debugPrint(
+            'Warning: Unknown bakery variant "$variant" for Bakery at ($x,$y). '
+            'Falling back to bread.',
+          );
+        }
+      }
       return Bakery(
         id: id,
         type: template.type,

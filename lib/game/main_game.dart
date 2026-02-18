@@ -135,6 +135,7 @@ class MainGame extends FlameGame
 
     for (final buildingData in _planet!.buildings) {
       final building = buildingData.createBuilding();
+      if (building == null) continue;
       _grid!.placeBuilding(
         buildingData.x,
         buildingData.y,

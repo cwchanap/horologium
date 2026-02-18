@@ -82,7 +82,8 @@ void main() {
 
       final building = data.createBuilding();
 
-      expect(building.id, 'preserve-id-123');
+      expect(building, isNotNull);
+      expect(building!.id, 'preserve-id-123');
       expect(building.level, 3);
       expect(building.assignedWorkers, 1);
     });
