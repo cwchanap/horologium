@@ -6,9 +6,8 @@ void main() {
   group('SaveService Fallback Tests', () {
     const testPlanetId = 'test_fallback_planet';
 
-    setUp(() async {
+    setUp(() {
       SharedPreferences.setMockInitialValues({});
-      await SharedPreferences.getInstance().then((prefs) => prefs.clear());
     });
 
     test('loads from old per-resource keys when JSON is corrupted', () async {

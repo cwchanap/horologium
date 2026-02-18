@@ -83,14 +83,11 @@ class _ResourcesPageState extends State<ResourcesPage> {
 
       // Only calculate consumption if building has workers and can actually consume
       if (building.consumption.isNotEmpty && building.hasWorkers) {
-        bool canConsume = true;
-
-        // Check if building can consume what it needs
-        building.consumption.forEach((resourceType, value) {
-          if ((widget.resources.resources[resourceType] ?? 0) < value) {
-            canConsume = false;
-          }
-        });
+        // Short-circuit check: can consume only if all required resources available
+        final canConsume = building.consumption.entries.every(
+          (entry) =>
+              (widget.resources.resources[entry.key] ?? 0) >= entry.value,
+        );
 
         if (canConsume) {
           building.consumption.forEach((resourceType, rate) {

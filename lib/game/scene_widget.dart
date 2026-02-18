@@ -54,9 +54,15 @@ class _MainGameWidgetState extends State<MainGameWidget>
     WidgetsBinding.instance.addObserver(this);
     _initializeGame();
     _loadSavedData();
-    _audioManager.loadPrefs().then((_) {
-      if (mounted) setState(() {});
-    });
+    _audioManager
+        .loadPrefs()
+        .then((_) {
+          if (mounted) setState(() {});
+        })
+        .catchError((Object e, StackTrace s) {
+          debugPrint('Failed to load audio preferences: $e\n$s');
+          if (mounted) setState(() {});
+        });
     _startResourceGeneration();
     _applyTerrainPrefsWhenReady();
   }
@@ -85,9 +91,15 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _game.onGridCellTapped = _handleGridCellTapped;
     _game.onGridCellLongTapped = _inputHandler.handleGridCellLongTapped;
     _game.onGridCellSecondaryTapped = _inputHandler.handleGridCellLongTapped;
-    _game.onUserInteracted = () async {
-      await _audioManager.maybeStartBgm();
-      if (_audioManager.bgmStarted && mounted) setState(() {});
+    _game.onUserInteracted = () {
+      _audioManager
+          .maybeStartBgm()
+          .then((_) {
+            if (_audioManager.bgmStarted && mounted) setState(() {});
+          })
+          .catchError((Object e, StackTrace s) {
+            debugPrint('Failed to start BGM on user interaction: $e\n$s');
+          });
     };
   }
 
@@ -357,8 +369,11 @@ class _MainGameWidgetState extends State<MainGameWidget>
               bottom: 20,
               right: 20,
               child: FloatingActionButton(
-                onPressed: () async {
-                  await _audioManager.maybeStartBgm();
+                onPressed: () {
+                  // Fire-and-forget audio start to avoid blocking UI
+                  _audioManager.maybeStartBgm().catchError((Object e) {
+                    debugPrint('Audio start failed during menu tap: $e');
+                  });
                   setState(() {
                     _showHamburgerMenu = !_showHamburgerMenu;
                     // Only reflect current overlays; do not OR with existing value to avoid sticky state
@@ -378,8 +393,11 @@ class _MainGameWidgetState extends State<MainGameWidget>
               left: 20,
               child: FloatingActionButton.small(
                 heroTag: 'debug_tools_button',
-                onPressed: () async {
-                  await _audioManager.maybeStartBgm();
+                onPressed: () {
+                  // Fire-and-forget audio start to avoid blocking UI
+                  _audioManager.maybeStartBgm().catchError((Object e) {
+                    debugPrint('Audio start failed during debug tap: $e');
+                  });
                   _openDebugSheet();
                 },
                 backgroundColor: Colors.teal.withAlpha((255 * 0.8).round()),
