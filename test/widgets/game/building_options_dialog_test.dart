@@ -209,7 +209,7 @@ void main() {
       );
 
       // Should show production stats
-      expect(find.textContaining('electricity'), findsWidgets);
+      expect(find.textContaining('Electricity'), findsWidgets);
     });
 
     testWidgets(
@@ -241,7 +241,7 @@ void main() {
         );
 
         // Should show current level production
-        expect(find.textContaining('wheat'), findsWidgets);
+        expect(find.textContaining('Wheat'), findsWidgets);
         expect(find.textContaining('1.0'), findsWidgets);
 
         // Upgrade preview should show next level production
@@ -279,8 +279,8 @@ void main() {
         );
 
         // Should show current level production and consumption
-        expect(find.textContaining('bread'), findsWidgets);
-        expect(find.textContaining('flour'), findsWidgets);
+        expect(find.textContaining('Bread'), findsWidgets);
+        expect(find.textContaining('Flour'), findsWidgets);
         expect(find.textContaining('1.0'), findsWidgets);
         expect(find.textContaining('2.0'), findsWidgets);
 
@@ -326,7 +326,7 @@ void main() {
       );
 
       // Should show pastries production
-      expect(find.textContaining('pastries'), findsWidgets);
+      expect(find.textContaining('Pastries'), findsWidgets);
       expect(find.textContaining('1.0'), findsWidgets);
 
       // Upgrade preview should show next level stats

@@ -208,6 +208,11 @@ class BuildingLimitManager {
           .firstOrNull;
       if (type != null) {
         _limitUpgrades[type] = entry.value;
+      } else {
+        debugPrint(
+          'Warning: Ignoring unknown building type "${entry.key}" '
+          'when loading building limits',
+        );
       }
     }
   }

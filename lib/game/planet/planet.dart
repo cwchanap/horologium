@@ -29,7 +29,10 @@ class Planet {
 
   /// Get active Building instances from the placement data
   List<Building> getActiveBuildings() {
-    return _buildings.map((data) => data.createBuilding()).toList();
+    return _buildings
+        .map((data) => data.createBuilding())
+        .whereType<Building>()
+        .toList();
   }
 
   /// Replace all buildings with a new list

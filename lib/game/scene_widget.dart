@@ -132,7 +132,12 @@ class _MainGameWidgetState extends State<MainGameWidget>
     final gridDebug = prefs.getBool('grid.debug') ?? false;
 
     // Wait for the game to finish loading before applying terrain-related prefs.
-    await _game.isLoadedFuture;
+    try {
+      await _game.isLoadedFuture;
+    } catch (e) {
+      debugPrint('Game failed to load, skipping terrain prefs: $e');
+      return;
+    }
     if (!mounted || !_game.hasLoaded) return;
 
     // Apply toggles
@@ -253,11 +258,11 @@ class _MainGameWidgetState extends State<MainGameWidget>
   }
 
   void _handleGridCellTapped(int x, int y) {
-    _audioManager.maybeStartBgm().then((_) {
-      if (mounted) {
-        _inputHandler.handleGridCellTapped(x, y, context);
-      }
+    // Fire-and-forget audio start to avoid blocking the tap with audio latency
+    _audioManager.maybeStartBgm().catchError((Object e) {
+      debugPrint('Audio start failed during tap: $e');
     });
+    _inputHandler.handleGridCellTapped(x, y, context);
   }
 
   void _onEmptyGridTapped(int x, int y) {

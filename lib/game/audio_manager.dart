@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -62,7 +64,7 @@ class AudioManager {
 
   Future<void> setMusicEnabled(bool value) async {
     _musicEnabled = value;
-    _savePrefs();
+    unawaited(_savePrefs());
     if (!_bgmStarted && value) {
       await maybeStartBgm();
     } else if (_bgmStarted && !value) {
@@ -84,7 +86,7 @@ class AudioManager {
 
   void setMusicVolume(double value) {
     _musicVolume = value.clamp(0.0, 1.0);
-    _savePrefs();
+    unawaited(_savePrefs());
     if (_bgmStarted) {
       try {
         _bgm?.setVolume(_musicVolume);
