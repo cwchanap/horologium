@@ -143,7 +143,8 @@ class Resources {
     if (activeResearchGeneration > 0) {
       _researchAccumulator += 1.0;
       if (_researchAccumulator >= 10) {
-        final pointsToAdd = activeResearchGeneration;
+        // Multiply by 10 seconds to get accumulated research points
+        final pointsToAdd = activeResearchGeneration * 10;
         resources.update(
           ResourceType.research,
           (v) => v + pointsToAdd,
