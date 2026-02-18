@@ -124,6 +124,10 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _gameStateManager.researchManager.loadFromList(
       widget.planet.researchManager.toList(),
     );
+    // Sync building limits from the planet to GameStateManager
+    _gameStateManager.buildingLimitManager.loadFromMap(
+      widget.planet.buildingLimitManager.toMap(),
+    );
     setState(() {});
   }
 
