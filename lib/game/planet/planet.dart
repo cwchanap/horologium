@@ -12,6 +12,12 @@ class Planet {
   final BuildingLimitManager buildingLimitManager;
   final List<PlacedBuildingData> _buildings;
 
+  /// Indicates if building limits JSON failed to parse during load
+  final bool buildingLimitsParseError;
+
+  /// Raw JSON that failed to parse, preserved for manual recovery
+  final String? buildingLimitsRawJson;
+
   Planet({
     required this.id,
     required this.name,
@@ -19,6 +25,8 @@ class Planet {
     ResearchManager? researchManager,
     BuildingLimitManager? buildingLimitManager,
     List<PlacedBuildingData>? buildings,
+    this.buildingLimitsParseError = false,
+    this.buildingLimitsRawJson,
   }) : resources = resources ?? Resources(),
        researchManager = researchManager ?? ResearchManager(),
        buildingLimitManager = buildingLimitManager ?? BuildingLimitManager(),
@@ -90,6 +98,8 @@ class Planet {
     ResearchManager? researchManager,
     BuildingLimitManager? buildingLimitManager,
     List<PlacedBuildingData>? buildings,
+    bool? buildingLimitsParseError,
+    String? buildingLimitsRawJson,
   }) {
     return Planet(
       id: id ?? this.id,
@@ -98,6 +108,10 @@ class Planet {
       researchManager: researchManager ?? this.researchManager,
       buildingLimitManager: buildingLimitManager ?? this.buildingLimitManager,
       buildings: buildings ?? List.from(_buildings),
+      buildingLimitsParseError:
+          buildingLimitsParseError ?? this.buildingLimitsParseError,
+      buildingLimitsRawJson:
+          buildingLimitsRawJson ?? this.buildingLimitsRawJson,
     );
   }
 
