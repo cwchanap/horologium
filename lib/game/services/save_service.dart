@@ -308,18 +308,25 @@ class SaveService {
     final buildingLimitsJson = prefs.getString(
       _planetBuildingLimitsKey(planetId),
     );
+    bool buildingLimitsParseError = false;
+    String? buildingLimitsRawJson;
     if (buildingLimitsJson != null) {
       try {
         final limitsMap =
             jsonDecode(buildingLimitsJson) as Map<String, dynamic>;
         buildingLimitManager.loadFromMap(limitsMap.cast<String, int>());
       } catch (e, stackTrace) {
+        buildingLimitsParseError = true;
+        buildingLimitsRawJson = buildingLimitsJson;
+        // Log error with full context for debugging
         debugPrint(
-          'Failed to parse building limits JSON for planet $planetId: $e\n'
+          'ERROR: Failed to parse building limits JSON for planet $planetId: $e\n'
           'Raw JSON: $buildingLimitsJson\n'
           'Stack trace: $stackTrace',
         );
-        // Defaults will be used; limits data is lost
+        // Report to error tracking in production
+        // TODO: Integrate with error reporting service (e.g., Sentry, Firebase Crashlytics)
+        // Example: reportError(e, stackTrace, {'planetId': planetId, 'rawJson': buildingLimitsJson});
       }
     }
 
@@ -339,6 +346,8 @@ class SaveService {
       researchManager: researchManager,
       buildingLimitManager: buildingLimitManager,
       buildings: buildings,
+      buildingLimitsParseError: buildingLimitsParseError,
+      buildingLimitsRawJson: buildingLimitsRawJson,
     );
   }
 

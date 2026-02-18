@@ -55,11 +55,14 @@ class AudioManager {
     if (_bgmStarted || !_musicEnabled || _bgmInitializing) return;
     _bgmInitializing = true;
 
-    final success = await _initAudio();
-    if (success) {
-      _bgmStarted = true;
+    try {
+      final success = await _initAudio();
+      if (success) {
+        _bgmStarted = true;
+      }
+    } finally {
+      _bgmInitializing = false;
     }
-    _bgmInitializing = false;
   }
 
   Future<void> setMusicEnabled(bool value) async {

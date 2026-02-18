@@ -98,8 +98,8 @@ class Resources {
     }
   }
 
-  int _processConsumingBuildings(List<Building> buildings) {
-    int activeResearchLabs = 0;
+  double _processConsumingBuildings(List<Building> buildings) {
+    double activeResearchGeneration = 0;
     for (final building in buildings) {
       if (building.consumption.isEmpty) continue;
 
@@ -125,7 +125,7 @@ class Resources {
 
         building.generation.forEach((resourceType, value) {
           if (resourceType == ResourceType.research) {
-            activeResearchLabs++;
+            activeResearchGeneration += value;
           } else {
             resources.update(
               resourceType,
@@ -136,18 +136,18 @@ class Resources {
         });
       }
     }
-    return activeResearchLabs;
+    return activeResearchGeneration;
   }
 
-  void _accumulateResearch(int activeResearchLabs) {
-    if (activeResearchLabs > 0) {
+  void _accumulateResearch(double activeResearchGeneration) {
+    if (activeResearchGeneration > 0) {
       _researchAccumulator += 1.0;
       if (_researchAccumulator >= 10) {
-        final pointsToAdd = activeResearchLabs;
+        final pointsToAdd = activeResearchGeneration;
         resources.update(
           ResourceType.research,
           (v) => v + pointsToAdd,
-          ifAbsent: () => pointsToAdd.toDouble(),
+          ifAbsent: () => pointsToAdd,
         );
         _researchAccumulator = 0;
       }
