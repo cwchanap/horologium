@@ -103,12 +103,10 @@ class Resources {
     for (final building in buildings) {
       if (building.consumption.isEmpty) continue;
 
-      bool canProduce = true;
-      building.consumption.forEach((resourceType, value) {
-        if ((resources[resourceType] ?? 0) < value) {
-          canProduce = false;
-        }
-      });
+      // Short-circuit check: can produce only if all required resources available
+      final canProduce = building.consumption.entries.every(
+        (entry) => (resources[entry.key] ?? 0) >= entry.value,
+      );
 
       if (canProduce && building.hasWorkers) {
         building.consumption.forEach((resourceType, value) {

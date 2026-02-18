@@ -287,10 +287,8 @@ class MainGame extends FlameGame
     if (!currentScale.isIdentity()) {
       // Amplify pinch zooming speed
       final scaleFactor = 1 + (currentScale.y - 1) * _zoomSpeedMultiplier;
-      camera.viewfinder.zoom = (_scaleStartZoom * scaleFactor).clamp(
-        _minZoom,
-        _maxZoom,
-      );
+      camera.viewfinder.zoom = _scaleStartZoom * scaleFactor;
+      clampZoom();
       _clampCameraToTerrain();
     } else {
       // Handle pan/drag when not scaling

@@ -109,12 +109,15 @@ class PlacedBuildingData {
     final variantIndex = typeIndex + 3;
     String? variant;
     if (parts.length > variantIndex) {
+      final rawVariant = parts[variantIndex];
       try {
-        variant = Uri.decodeComponent(parts[variantIndex]);
+        variant = Uri.decodeComponent(rawVariant);
       } catch (e) {
         // If decoding fails, use raw value for backward compatibility
-        variant = parts[variantIndex];
-        debugPrint('Failed to decode variant: $e, using raw value');
+        variant = rawVariant;
+        debugPrint(
+          'Failed to decode variant "$rawVariant": $e, using raw value',
+        );
       }
     }
 
