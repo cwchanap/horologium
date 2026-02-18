@@ -109,9 +109,10 @@ void main() {
       resources.resources[ResourceType.electricity] = 20;
       resources.resources[ResourceType.research] = 0;
 
+      // Use actual Research Lab generation rate (0.1 per second)
       final researchLab = createBuilding(
         type: BuildingType.researchLab,
-        generation: const {ResourceType.research: 1},
+        generation: const {ResourceType.research: 0.1},
         consumption: const {ResourceType.electricity: 1},
         requiredWorkers: 1,
         assignedWorkers: 1,
@@ -121,12 +122,14 @@ void main() {
         resources.update([researchLab]);
       }
 
+      // No research added yet (only 9 seconds accumulated)
       expect(resources.research, 0);
       expect(resources.electricity, 11);
 
       resources.update([researchLab]);
 
-      expect(resources.research, 1);
+      // After 10 seconds: 0.1 * 10 = 1.0 research points
+      expect(resources.research, 1.0);
       expect(resources.electricity, 10);
     });
   });
