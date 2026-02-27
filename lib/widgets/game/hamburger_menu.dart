@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../game/quests/quest_manager.dart';
+import '../../game/quests/quest.dart';
+import '../../game/achievements/achievement_manager.dart';
 import '../../game/research/research.dart';
 import '../../game/resources/resources.dart';
 import '../../game/building/building.dart';
 import '../../pages/research_tree_page.dart';
 import '../../pages/resources_page.dart';
 import '../../pages/trade_page.dart';
+import '../../pages/quest_log_page.dart';
 import '../../game/grid.dart';
 import '../planet_switcher.dart';
 
@@ -17,6 +21,10 @@ class HamburgerMenu extends StatelessWidget {
   final BuildingLimitManager buildingLimitManager;
   final Grid grid;
   final VoidCallback onResourcesChanged;
+  // Quest & achievement managers
+  final QuestManager? questManager;
+  final AchievementManager? achievementManager;
+  final void Function(Quest)? onClaimQuestReward;
   // Audio controls
   final bool musicEnabled;
   final double musicVolume;
@@ -32,6 +40,9 @@ class HamburgerMenu extends StatelessWidget {
     required this.buildingLimitManager,
     required this.grid,
     required this.onResourcesChanged,
+    this.questManager,
+    this.achievementManager,
+    this.onClaimQuestReward,
     this.musicEnabled = true,
     this.musicVolume = 0.5,
     this.onMusicEnabledChanged,
@@ -109,6 +120,39 @@ class HamburgerMenu extends StatelessWidget {
               },
             ),
             const Divider(color: Colors.grey, height: 1),
+            if (questManager != null && achievementManager != null) ...[
+              ListTile(
+                leading: const Icon(Icons.assignment, color: Colors.amber),
+                title: const Text(
+                  'Quests',
+                  style: TextStyle(color: Colors.white),
+                ),
+                trailing: questManager!.hasUnclaimedRewards
+                    ? Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      )
+                    : null,
+                onTap: () {
+                  onClose();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => QuestLogPage(
+                        questManager: questManager!,
+                        achievementManager: achievementManager!,
+                        onClaimReward: onClaimQuestReward,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const Divider(color: Colors.grey, height: 1),
+            ],
             ListTile(
               leading: const Icon(Icons.public, color: Colors.blue),
               title: const Text(
