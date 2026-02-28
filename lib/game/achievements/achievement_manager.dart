@@ -104,7 +104,23 @@ class AchievementManager {
     for (final entry in progress.entries) {
       final a = _achievements[entry.key];
       if (a == null) continue;
-      a.currentAmount = entry.value as int;
+
+      // Parse progress value defensively
+      int? value;
+      final raw = entry.value;
+      if (raw is int) {
+        value = raw;
+      } else if (raw is num) {
+        value = raw.toInt();
+      } else if (raw is String) {
+        value = int.tryParse(raw);
+      }
+      // Skip unknown or unparsable values
+      if (value == null) continue;
+
+      // Clamp to valid range: >= 0 and <= targetAmount
+      final clamped = value.clamp(0, a.targetAmount);
+      a.currentAmount = clamped;
     }
   }
 }
