@@ -50,6 +50,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
   final AudioManager _audioManager = AudioManager();
   final PlanetSaveDebouncer _planetSaveDebouncer = PlanetSaveDebouncer();
   String? _questNotificationName;
+  Timer? _questNotificationTimer;
 
   @override
   void initState() {
@@ -80,7 +81,11 @@ class _MainGameWidgetState extends State<MainGameWidget>
     // Wire quest completion notifications
     widget.planet.questManager.onQuestCompleted = (quest) {
       if (mounted) {
+        _questNotificationTimer?.cancel();
         setState(() => _questNotificationName = quest.name);
+        _questNotificationTimer = Timer(const Duration(seconds: 4), () {
+          if (mounted) setState(() => _questNotificationName = null);
+        });
       }
     };
 
@@ -120,6 +125,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
 
   @override
   void dispose() {
+    _questNotificationTimer?.cancel();
     _gameStateManager.dispose();
     _planetSaveDebouncer.dispose();
     _audioManager.dispose();
@@ -130,6 +136,9 @@ class _MainGameWidgetState extends State<MainGameWidget>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _gameStateManager.refreshRotatingQuests();
+    }
     _audioManager.handleLifecycleChange(state);
   }
 
@@ -496,8 +505,10 @@ class _MainGameWidgetState extends State<MainGameWidget>
                 child: Center(
                   child: QuestNotification(
                     questName: _questNotificationName!,
-                    onDismissed: () =>
-                        setState(() => _questNotificationName = null),
+                    onDismissed: () {
+                      _questNotificationTimer?.cancel();
+                      setState(() => _questNotificationName = null);
+                    },
                   ),
                 ),
               ),

@@ -77,5 +77,17 @@ void main() {
       achievement.isUnlocked = true;
       expect(achievement.isUnlocked, isTrue);
     });
+
+    test('progress is 1.0 when targetAmount is 0', () {
+      final achievement = Achievement(
+        id: 'ach_test',
+        name: 'Test',
+        description: 'Test',
+        type: AchievementType.buildingCount,
+        targetAmount: 0,
+      );
+
+      expect(achievement.progress, 1.0);
+    });
   });
 }

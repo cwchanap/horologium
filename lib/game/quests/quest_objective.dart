@@ -51,7 +51,10 @@ class QuestObjective {
 
   factory QuestObjective.fromJson(Map<String, dynamic> json) {
     return QuestObjective(
-      type: QuestObjectiveType.values.firstWhere((t) => t.name == json['type']),
+      type: QuestObjectiveType.values.firstWhere(
+        (t) => t.name == json['type'],
+        orElse: () => QuestObjectiveType.buildBuilding,
+      ),
       targetId: json['targetId'] as String,
       targetAmount: json['targetAmount'] as int,
       currentAmount: json['currentAmount'] as int? ?? 0,

@@ -224,7 +224,7 @@ if (achievementJson != null) achievementManager.loadFromJson(jsonDecode(achievem
 
 #### Component Hierarchy
 
-```
+```text
 Quest Log Page (full-screen page, pushed via Navigator)
 ├── AppBar
 │   ├── Title: "Quest Log"
@@ -305,7 +305,7 @@ stateDiagram-v2
 
 ## File System — New Files
 
-```
+```text
 lib/
   game/
     quests/

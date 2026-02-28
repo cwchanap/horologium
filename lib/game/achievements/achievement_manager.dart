@@ -16,8 +16,6 @@ class AchievementManager {
 
   List<Achievement> get achievements => _achievements.values.toList();
 
-  List<Achievement> getAll() => _achievements.values.toList();
-
   List<Achievement> getUnlocked() =>
       _achievements.values.where((a) => a.isUnlocked).toList();
 

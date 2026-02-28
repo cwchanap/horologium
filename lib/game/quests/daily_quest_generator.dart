@@ -79,8 +79,12 @@ class DailyQuestGenerator {
 
   /// Generate a deterministic weekly seed from a date (ISO week boundary).
   static int weeklySeedForDate(DateTime date) {
-    // Normalize to the Monday of the ISO week
-    final monday = date.subtract(Duration(days: (date.weekday - 1)));
+    // Normalize to midnight to prevent time-of-day from shifting week boundaries.
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    // Normalize to the Monday of the ISO week.
+    final monday = normalizedDate.subtract(
+      Duration(days: (normalizedDate.weekday - 1)),
+    );
     return monday.year * 10000 + monday.month * 100 + monday.day;
   }
 
@@ -130,11 +134,8 @@ class DailyQuestGenerator {
       final displayTarget = _targetDisplayNames[targetId] ?? targetId;
       final name = '${template.namePrefix} $displayTarget';
 
-      // Ensure unique IDs within a single generation batch
-      var questId = '${prefix}_${seed}_$i';
-      while (usedIds.contains(questId)) {
-        questId = '${prefix}_${seed}_${i}_${rng.nextInt(9999)}';
-      }
+      // IDs are unique by construction: prefix + seed + index.
+      final questId = '${prefix}_${seed}_$i';
       usedIds.add(questId);
 
       quests.add(
