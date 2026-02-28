@@ -132,7 +132,9 @@ class DailyQuestGenerator {
           rewardRange[0] + rng.nextInt(rewardRange[1] - rewardRange[0] + 1);
 
       final displayTarget = _targetDisplayNames[targetId] ?? targetId;
-      final name = '${template.namePrefix} $displayTarget';
+      final name = displayTarget.isEmpty
+          ? template.namePrefix
+          : '${template.namePrefix} $displayTarget';
 
       // IDs are unique by construction: prefix + seed + index.
       final questId = '${prefix}_${seed}_$i';

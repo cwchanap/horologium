@@ -126,6 +126,8 @@ class _MainGameWidgetState extends State<MainGameWidget>
   @override
   void dispose() {
     _questNotificationTimer?.cancel();
+    _questNotificationName = null;
+    widget.planet.questManager.onQuestCompleted = null;
     _gameStateManager.dispose();
     _planetSaveDebouncer.dispose();
     _audioManager.dispose();

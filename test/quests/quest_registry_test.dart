@@ -78,16 +78,25 @@ void main() {
 
       bool hasCircularDependency(String startId) {
         final visited = <String>{};
-        final stack = <String>[startId];
-        while (stack.isNotEmpty) {
-          final current = stack.removeLast();
-          if (visited.contains(current)) return true;
-          visited.add(current);
-          final quest = questMap[current];
-          if (quest == null) continue;
-          stack.addAll(quest.prerequisiteQuestIds);
+        final visiting = <String>{};
+
+        bool dfs(String id) {
+          if (visiting.contains(id)) return true; // Found a cycle
+          if (visited.contains(id)) return false; // Already fully explored
+
+          visiting.add(id);
+          final quest = questMap[id];
+          if (quest != null) {
+            for (final prereqId in quest.prerequisiteQuestIds) {
+              if (dfs(prereqId)) return true;
+            }
+          }
+          visiting.remove(id);
+          visited.add(id);
+          return false;
         }
-        return false;
+
+        return dfs(startId);
       }
 
       for (final quest in QuestRegistry.starterQuests) {

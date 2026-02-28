@@ -256,21 +256,23 @@ class QuestManager {
     for (final entry in objectiveProgress.entries) {
       final quest = _quests[entry.key];
       if (quest == null) continue;
+      if (entry.value is! Map<String, dynamic>) continue;
       final progress = entry.value as Map<String, dynamic>;
       for (final pEntry in progress.entries) {
         final index = int.tryParse(pEntry.key);
-        if (index != null && index < quest.objectives.length) {
-          final raw = pEntry.value;
-          int? safeInt;
-          if (raw is int) {
-            safeInt = raw;
-          } else if (raw is num) {
-            safeInt = raw.toInt();
-          } else if (raw is String) {
-            safeInt = int.tryParse(raw);
-          }
-          quest.objectives[index].currentAmount = safeInt ?? 0;
+        if (index == null || index < 0 || index >= quest.objectives.length) {
+          continue;
         }
+        final raw = pEntry.value;
+        int? safeInt;
+        if (raw is int) {
+          safeInt = raw;
+        } else if (raw is num) {
+          safeInt = raw.toInt();
+        } else if (raw is String) {
+          safeInt = int.tryParse(raw);
+        }
+        quest.objectives[index].currentAmount = safeInt ?? 0;
       }
     }
   }
