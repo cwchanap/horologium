@@ -66,6 +66,12 @@ class QuestManager {
     List<Building> buildings,
     ResearchManager researchManager,
   ) {
+    // Auto-activate all available quests whose prerequisites are met so that
+    // progress is evaluated without requiring an explicit activateQuest() call.
+    for (final quest in getAvailableQuests()) {
+      activateQuest(quest.id);
+    }
+
     // Cache building counts for O(1) per-objective lookups
     final buildingCounts = <String, int>{};
     for (final b in buildings) {

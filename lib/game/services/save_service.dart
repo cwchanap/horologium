@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../achievements/achievement_manager.dart';
 import '../building/building.dart';
 import '../planet/index.dart';
+import '../quests/daily_quest_generator.dart';
 import '../quests/quest_manager.dart';
 import '../quests/quest_registry.dart';
 import '../research/research.dart';
@@ -355,6 +356,19 @@ class SaveService {
 
     // Load quest state
     final questManager = QuestManager(quests: QuestRegistry.starterQuests);
+    // Pre-populate today's and this week's rotating quests before restoring
+    // saved state so that loadFromJson can match saved daily_/weekly_ IDs.
+    final now = DateTime.now();
+    questManager.addRotatingQuests(
+      DailyQuestGenerator.generateDaily(
+        seed: DailyQuestGenerator.dailySeedForDate(now),
+      ),
+    );
+    questManager.addRotatingQuests(
+      DailyQuestGenerator.generateWeekly(
+        seed: DailyQuestGenerator.weeklySeedForDate(now),
+      ),
+    );
     final questJson = prefs.getString(_planetQuestsKey(planetId));
     if (questJson != null) {
       try {
