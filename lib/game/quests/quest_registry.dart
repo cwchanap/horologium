@@ -3,7 +3,7 @@ import 'quest.dart';
 import 'quest_objective.dart';
 
 class QuestRegistry {
-  static List<Quest> starterQuests = [
+  static List<Quest> get starterQuests => [
     Quest(
       id: 'quest_welcome',
       name: 'Welcome to Horologium',

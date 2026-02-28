@@ -64,7 +64,7 @@ void main() {
     });
 
     test('getAll returns all achievements', () {
-      expect(manager.getAll(), hasLength(6));
+      expect(manager.achievements, hasLength(6));
     });
 
     test('no achievements unlocked initially', () {

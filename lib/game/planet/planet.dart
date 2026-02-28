@@ -188,6 +188,9 @@ class Planet {
         name: 'Scholar',
         description: 'Complete all research',
         type: AchievementType.researchCompleted,
+        // Dynamic target: tracks the total number of ResearchType enum values.
+        // If ResearchType entries are added or removed, update migration logic
+        // in SaveService to preserve players' earned achievement state.
         targetAmount: ResearchType.values.length,
       ),
       Achievement(

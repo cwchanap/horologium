@@ -115,6 +115,16 @@ class QuestManager {
     }
 
     quest.status = QuestStatus.claimed;
+
+    // Notify any quests that became available because this quest is now claimed
+    for (final q in _quests.values) {
+      if (q.status == QuestStatus.available &&
+          q.prerequisiteQuestIds.contains(questId) &&
+          _prerequisitesMet(q)) {
+        onQuestAvailable?.call(q);
+      }
+    }
+
     return true;
   }
 
@@ -244,7 +254,16 @@ class QuestManager {
       for (final pEntry in progress.entries) {
         final index = int.tryParse(pEntry.key);
         if (index != null && index < quest.objectives.length) {
-          quest.objectives[index].currentAmount = pEntry.value as int;
+          final raw = pEntry.value;
+          int? safeInt;
+          if (raw is int) {
+            safeInt = raw;
+          } else if (raw is num) {
+            safeInt = raw.toInt();
+          } else if (raw is String) {
+            safeInt = int.tryParse(raw);
+          }
+          quest.objectives[index].currentAmount = safeInt ?? 0;
         }
       }
     }

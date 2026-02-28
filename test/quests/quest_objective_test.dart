@@ -87,7 +87,7 @@ void main() {
       expect(objective.progress, 1.0);
     });
 
-    test('progress is 0.0 when targetAmount is 0', () {
+    test('progress is 1.0 when targetAmount is 0', () {
       final objective = QuestObjective(
         type: QuestObjectiveType.buildBuilding,
         targetId: 'house',

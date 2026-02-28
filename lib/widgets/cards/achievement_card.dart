@@ -16,6 +16,7 @@ class _AchievementCardState extends State<AchievementCard> {
   @override
   Widget build(BuildContext context) {
     final ach = widget.achievement;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: () => setState(() => _expanded = !_expanded),
@@ -23,14 +24,25 @@ class _AchievementCardState extends State<AchievementCard> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.grey.withAlpha((255 * 0.1).round()),
+          color: isDark
+              ? Colors.grey.withAlpha((255 * 0.8).round())
+              : Colors.grey.withAlpha((255 * 0.1).round()),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: ach.isUnlocked
-                ? Colors.amber.withAlpha((255 * 0.5).round())
+                ? Colors.cyanAccent.withAlpha((255 * 0.5).round())
                 : Colors.grey.withAlpha((255 * 0.3).round()),
             width: 1,
           ),
+          boxShadow: ach.isUnlocked
+              ? [
+                  BoxShadow(
+                    color: Colors.cyanAccent.withValues(alpha: 0.25),
+                    spreadRadius: 1,
+                    blurRadius: 8,
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -39,7 +51,7 @@ class _AchievementCardState extends State<AchievementCard> {
               children: [
                 Icon(
                   ach.isUnlocked ? Icons.check_circle : Icons.lock,
-                  color: ach.isUnlocked ? Colors.amber : Colors.grey,
+                  color: ach.isUnlocked ? Colors.cyanAccent : Colors.grey,
                   size: 24,
                 ),
                 const SizedBox(width: 12),

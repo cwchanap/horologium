@@ -72,5 +72,31 @@ void main() {
         );
       }
     });
+
+    test('no circular prerequisite chains exist', () {
+      final questMap = {for (final q in QuestRegistry.starterQuests) q.id: q};
+
+      bool hasCircularDependency(String startId) {
+        final visited = <String>{};
+        final stack = <String>[startId];
+        while (stack.isNotEmpty) {
+          final current = stack.removeLast();
+          if (visited.contains(current)) return true;
+          visited.add(current);
+          final quest = questMap[current];
+          if (quest == null) continue;
+          stack.addAll(quest.prerequisiteQuestIds);
+        }
+        return false;
+      }
+
+      for (final quest in QuestRegistry.starterQuests) {
+        expect(
+          hasCircularDependency(quest.id),
+          isFalse,
+          reason: 'Quest ${quest.id} has a circular prerequisite chain',
+        );
+      }
+    });
   });
 }
