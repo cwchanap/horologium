@@ -142,6 +142,42 @@ void main() {
       expect(manager.getActiveQuests(), hasLength(1));
     });
 
+    group('checkProgress auto-activation', () {
+      test('activates available quests without explicit activateQuest call', () {
+        // No manual activateQuest call — checkProgress must auto-activate.
+        final buildings = [
+          _makeBuilding(BuildingType.house),
+          _makeBuilding(BuildingType.house),
+        ];
+        manager.checkProgress(Resources(), buildings, ResearchManager());
+
+        // test_build_house should be auto-activated and completed immediately.
+        expect(
+          manager.getCompletedQuests().any((q) => q.id == 'test_build_house'),
+          isTrue,
+        );
+      });
+
+      test('does not activate chained quest until prerequisite is claimed', () {
+        // Build enough houses to complete test_build_house, but do NOT claim it.
+        final buildings = [
+          _makeBuilding(BuildingType.house),
+          _makeBuilding(BuildingType.house),
+        ];
+        manager.checkProgress(Resources(), buildings, ResearchManager());
+
+        // test_chained should still be in available (prereq not yet claimed).
+        expect(
+          manager.getActiveQuests().any((q) => q.id == 'test_chained'),
+          isFalse,
+        );
+        expect(
+          manager.getAvailableQuests().any((q) => q.id == 'test_chained'),
+          isFalse,
+        );
+      });
+    });
+
     group('checkProgress with buildBuilding objective', () {
       test('updates building count objective', () {
         manager.activateQuest('test_build_house');
@@ -162,7 +198,16 @@ void main() {
         ];
         manager.checkProgress(Resources(), buildings, ResearchManager());
 
-        expect(manager.getActiveQuests(), isEmpty);
+        // test_build_house is completed; other eligible quests are auto-activated
+        // but remain active (their objectives are not met with the given state).
+        expect(
+          manager.getActiveQuests().any((q) => q.id == 'test_build_house'),
+          isFalse,
+        );
+        expect(
+          manager.getCompletedQuests().any((q) => q.id == 'test_build_house'),
+          isTrue,
+        );
         expect(manager.getCompletedQuests(), hasLength(1));
       });
     });
@@ -175,7 +220,9 @@ void main() {
         resources.resources[ResourceType.gold] = 75;
         manager.checkProgress(resources, [], ResearchManager());
 
-        final quest = manager.getActiveQuests().first;
+        final quest = manager.getActiveQuests().firstWhere(
+          (q) => q.id == 'test_accumulate',
+        );
         expect(quest.objectives[0].currentAmount, 75);
       });
 
@@ -207,7 +254,15 @@ void main() {
 
         manager.checkProgress(Resources(), [], ResearchManager());
 
-        expect(manager.getActiveQuests(), hasLength(1));
+        // test_research remains active; other quests are auto-activated too.
+        expect(
+          manager.getActiveQuests().any((q) => q.id == 'test_research'),
+          isTrue,
+        );
+        expect(
+          manager.getCompletedQuests().any((q) => q.id == 'test_research'),
+          isFalse,
+        );
       });
     });
 
@@ -339,6 +394,8 @@ void main() {
         final resources = Resources();
         resources.resources[ResourceType.gold] = 50;
         final buildings = [_makeBuilding(BuildingType.house)];
+        // checkProgress also auto-activates the remaining 3 available quests
+        // (test_research, test_population, test_happiness).
         manager.checkProgress(resources, buildings, ResearchManager());
 
         final json = manager.toJson();
@@ -354,7 +411,9 @@ void main() {
         );
         restored.loadFromJson(json);
 
-        expect(restored.getActiveQuests(), hasLength(2));
+        // All 5 non-chained quests are now active (auto-activated during checkProgress).
+        expect(restored.getActiveQuests(), hasLength(5));
+
         final buildQuest = restored.getActiveQuests().firstWhere(
           (q) => q.id == 'test_build_house',
         );

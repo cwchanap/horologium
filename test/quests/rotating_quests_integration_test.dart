@@ -87,5 +87,42 @@ void main() {
         reason: 'Claimed rotating quest should be preserved',
       );
     });
+    test('rotating quest state survives save-load when pre-populated', () {
+      // Simulate SaveService.loadPlanet: pre-populate rotating quests BEFORE
+      // calling loadFromJson so saved daily/weekly states are not dropped.
+      final seed = 42;
+      final daily = DailyQuestGenerator.generateDaily(seed: seed);
+
+      // --- Save side ---
+      final saveSideManager = QuestManager(quests: []);
+      saveSideManager.addRotatingQuests(daily);
+      final firstId = daily.first.id;
+      saveSideManager.activateQuest(firstId);
+      final q = saveSideManager.quests.firstWhere((q) => q.id == firstId);
+      q.status = QuestStatus.completed;
+
+      final savedJson = saveSideManager.toJson();
+
+      // --- Load side (mimics old broken behavior: no rotating quests before load) ---
+      final brokenManager = QuestManager(quests: []);
+      brokenManager.loadFromJson(savedJson);
+      expect(
+        brokenManager.getCompletedQuests().any((q) => q.id == firstId),
+        isFalse,
+        reason: 'Without pre-population the saved state is silently dropped',
+      );
+
+      // --- Load side (new correct behavior: add rotating quests BEFORE load) ---
+      final fixedManager = QuestManager(quests: []);
+      fixedManager.addRotatingQuests(
+        DailyQuestGenerator.generateDaily(seed: seed),
+      );
+      fixedManager.loadFromJson(savedJson);
+      expect(
+        fixedManager.getCompletedQuests().any((q) => q.id == firstId),
+        isTrue,
+        reason: 'With pre-population the completed rotating quest is restored',
+      );
+    });
   });
 }
