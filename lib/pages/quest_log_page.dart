@@ -61,7 +61,7 @@ class _QuestLogPageState extends State<QuestLogPage>
         controller: _tabController,
         children: [
           _buildActiveQuests(),
-          _buildCompletedQuests(),
+          _buildClaimedQuests(),
           _buildAchievements(),
         ],
       ),
@@ -139,7 +139,7 @@ class _QuestLogPageState extends State<QuestLogPage>
     );
   }
 
-  Widget _buildCompletedQuests() {
+  Widget _buildClaimedQuests() {
     final quests = widget.questManager.quests
         .where((q) => q.status == QuestStatus.claimed)
         .toList();

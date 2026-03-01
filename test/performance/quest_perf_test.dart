@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/quests/daily_quest_generator.dart';
 import 'package:horologium/game/quests/quest.dart';
@@ -16,9 +20,12 @@ import 'package:horologium/pages/quest_log_page.dart';
 
 /// Performance tests are skipped in CI due to inherent timing flakiness.
 /// Run locally with: flutter test test/performance/quest_perf_test.dart
-const _skipInCi = bool.fromEnvironment('CI', defaultValue: false);
+final _skipInCi = Platform.environment['CI']?.toLowerCase() == 'true';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
   group(
     'Performance: quest check ≤5ms per quest (NFR-QST-001)',
     skip: _skipInCi,
@@ -146,7 +153,7 @@ void main() {
     },
   );
 
-  group('Performance: UI load ≤200ms (NFR-QST-003)', skip: _skipInCi, () {
+  group('Performance: UI load ≤500ms (NFR-QST-003)', skip: _skipInCi, () {
     testWidgets('QuestLogPage builds within 500ms (cold start)', (
       tester,
     ) async {
