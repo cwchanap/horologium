@@ -73,14 +73,18 @@ class DailyQuestGenerator {
   };
 
   /// Generate a deterministic daily seed from a date (ignoring time-of-day).
+  /// Uses UTC to ensure cross-device consistency across time zones.
   static int dailySeedForDate(DateTime date) {
-    return date.year * 10000 + date.month * 100 + date.day;
+    final utc = date.toUtc();
+    return utc.year * 10000 + utc.month * 100 + utc.day;
   }
 
   /// Generate a deterministic weekly seed from a date (ISO week boundary).
+  /// Uses UTC to ensure cross-device consistency across time zones.
   static int weeklySeedForDate(DateTime date) {
-    // Normalize to midnight to prevent time-of-day from shifting week boundaries.
-    final normalizedDate = DateTime(date.year, date.month, date.day);
+    // Normalize to UTC midnight to prevent time-of-day/timezone from shifting week boundaries.
+    final utc = date.toUtc();
+    final normalizedDate = DateTime.utc(utc.year, utc.month, utc.day);
     // Normalize to the Monday of the ISO week.
     final monday = normalizedDate.subtract(
       Duration(days: (normalizedDate.weekday - 1)),
@@ -113,7 +117,6 @@ class DailyQuestGenerator {
     required bool isWeekly,
   }) {
     final rng = Random(seed);
-    final usedIds = <String>{};
     final quests = <Quest>[];
 
     for (int i = 0; i < count; i++) {
@@ -138,7 +141,6 @@ class DailyQuestGenerator {
 
       // IDs are unique by construction: prefix + seed + index.
       final questId = '${prefix}_${seed}_$i';
-      usedIds.add(questId);
 
       quests.add(
         Quest(

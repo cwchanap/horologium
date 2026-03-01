@@ -52,7 +52,7 @@ class _QuestLogPageState extends State<QuestLogPage>
           unselectedLabelColor: Colors.white54,
           tabs: const [
             Tab(text: 'Active'),
-            Tab(text: 'Completed'),
+            Tab(text: 'Claimed'),
             Tab(text: 'Achievements'),
           ],
         ),
@@ -147,7 +147,7 @@ class _QuestLogPageState extends State<QuestLogPage>
     if (quests.isEmpty) {
       return const Center(
         child: Text(
-          'No completed quests yet',
+          'No claimed quests yet',
           style: TextStyle(color: Colors.white54),
         ),
       );
