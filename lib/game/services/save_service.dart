@@ -2,8 +2,12 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../achievements/achievement_manager.dart';
 import '../building/building.dart';
 import '../planet/index.dart';
+import '../quests/daily_quest_generator.dart';
+import '../quests/quest_manager.dart';
+import '../quests/quest_registry.dart';
 import '../research/research.dart';
 import '../resources/resource_type.dart';
 import '../resources/resources.dart';
@@ -42,6 +46,9 @@ class SaveService {
       'planet.$planetId.buildingLimits';
   static String _planetBuildingsKey(String planetId) =>
       'planet.$planetId.buildings';
+  static String _planetQuestsKey(String planetId) => 'planet.$planetId.quests';
+  static String _planetAchievementsKey(String planetId) =>
+      'planet.$planetId.achievements';
 
   /// Load resources from legacy per-resource keys.
   /// Used as fallback when JSON parsing fails or when migrating from old format.
@@ -225,6 +232,14 @@ class SaveService {
         .map((b) => b.toLegacyString())
         .toList();
     await prefs.setStringList(_planetBuildingsKey(planetId), buildingStrings);
+
+    // Save quest state
+    final questJson = jsonEncode(planet.questManager.toJson());
+    await prefs.setString(_planetQuestsKey(planetId), questJson);
+
+    // Save achievement state
+    final achievementJson = jsonEncode(planet.achievementManager.toJson());
+    await prefs.setString(_planetAchievementsKey(planetId), achievementJson);
   }
 
   /// Load or create a planet from SharedPreferences
@@ -339,12 +354,59 @@ class SaveService {
         .cast<PlacedBuildingData>()
         .toList();
 
+    // Load quest state
+    final questManager = QuestManager(quests: QuestRegistry.starterQuests);
+    // Pre-populate today's and this week's rotating quests before restoring
+    // saved state so that loadFromJson can match saved daily_/weekly_ IDs.
+    final now = DateTime.now();
+    questManager.addRotatingQuests(
+      DailyQuestGenerator.generateDaily(
+        seed: DailyQuestGenerator.dailySeedForDate(now),
+      ),
+    );
+    questManager.addRotatingQuests(
+      DailyQuestGenerator.generateWeekly(
+        seed: DailyQuestGenerator.weeklySeedForDate(now),
+      ),
+    );
+    final questJson = prefs.getString(_planetQuestsKey(planetId));
+    if (questJson != null) {
+      try {
+        questManager.loadFromJson(
+          jsonDecode(questJson) as Map<String, dynamic>,
+        );
+      } catch (e, stackTrace) {
+        debugPrint(
+          'Failed to parse quests JSON for planet $planetId: $e\n$stackTrace',
+        );
+      }
+    }
+
+    // Load achievement state
+    final achievementManager = AchievementManager(
+      achievements: Planet.defaultAchievements(),
+    );
+    final achievementJson = prefs.getString(_planetAchievementsKey(planetId));
+    if (achievementJson != null) {
+      try {
+        achievementManager.loadFromJson(
+          jsonDecode(achievementJson) as Map<String, dynamic>,
+        );
+      } catch (e, stackTrace) {
+        debugPrint(
+          'Failed to parse achievements JSON for planet $planetId: $e\n$stackTrace',
+        );
+      }
+    }
+
     return Planet(
       id: planetId,
       name: name,
       resources: resources,
       researchManager: researchManager,
       buildingLimitManager: buildingLimitManager,
+      questManager: questManager,
+      achievementManager: achievementManager,
       buildings: buildings,
       buildingLimitsParseError: buildingLimitsParseError,
       buildingLimitsRawJson: buildingLimitsRawJson,

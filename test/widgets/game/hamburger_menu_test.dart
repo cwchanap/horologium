@@ -5,6 +5,12 @@ import 'package:horologium/game/resources/resources.dart';
 import 'package:horologium/game/research/research.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/grid.dart';
+import 'package:horologium/game/quests/quest_manager.dart';
+import 'package:horologium/game/quests/quest.dart';
+import 'package:horologium/game/quests/quest_objective.dart';
+import 'package:horologium/game/achievements/achievement_manager.dart';
+import 'package:horologium/game/achievements/achievement.dart';
+import 'package:horologium/game/resources/resource_type.dart';
 
 void main() {
   group('HamburgerMenu Widget Tests', () {
@@ -284,6 +290,65 @@ void main() {
       final positioned = tester.widget<Positioned>(find.byType(Positioned));
       expect(positioned.bottom, equals(80));
       expect(positioned.right, equals(20));
+    });
+
+    testWidgets('shows Quests menu item when quest managers provided', (
+      WidgetTester tester,
+    ) async {
+      final questManager = QuestManager(
+        quests: [
+          Quest(
+            id: 'q1',
+            name: 'Test Quest',
+            description: 'A test',
+            objectives: [
+              QuestObjective(
+                type: QuestObjectiveType.buildBuilding,
+                targetId: 'house',
+                targetAmount: 1,
+              ),
+            ],
+            reward: QuestReward(resources: {ResourceType.cash: 100}),
+            status: QuestStatus.active,
+          ),
+        ],
+      );
+      final achievementManager = AchievementManager(
+        achievements: [
+          Achievement(
+            id: 'a1',
+            name: 'First Steps',
+            description: 'Build first building',
+            type: AchievementType.buildingCount,
+            targetAmount: 1,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Stack(
+              children: [
+                HamburgerMenu(
+                  isVisible: true,
+                  onClose: () {},
+                  resources: testResources,
+                  researchManager: testResearchManager,
+                  buildingLimitManager: testBuildingLimitManager,
+                  grid: testGrid,
+                  onResourcesChanged: () {},
+                  questManager: questManager,
+                  achievementManager: achievementManager,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Quests'), findsOneWidget);
+      expect(find.byIcon(Icons.assignment), findsOneWidget);
     });
   });
 }

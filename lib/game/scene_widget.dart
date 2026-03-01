@@ -12,6 +12,7 @@ import '../widgets/game/building_options_dialog.dart';
 import '../widgets/game/production_overlay/production_overlay.dart';
 import '../widgets/game/resource_display.dart';
 import '../widgets/game/terrain_debug_sheet.dart';
+import '../widgets/game/quest_notification.dart';
 import 'audio_manager.dart';
 import 'building/building.dart';
 import 'main_game.dart';
@@ -19,6 +20,7 @@ import 'managers/building_placement_manager.dart';
 import 'managers/game_state_manager.dart';
 import 'managers/input_handler.dart';
 import 'planet/index.dart';
+import 'quests/quest.dart';
 import 'services/resource_service.dart';
 import 'services/planet_save_debouncer.dart';
 import 'services/save_service.dart';
@@ -47,6 +49,8 @@ class _MainGameWidgetState extends State<MainGameWidget>
   bool _uiOverlayOpen = false; // gates pointer events to GameWidget
   final AudioManager _audioManager = AudioManager();
   final PlanetSaveDebouncer _planetSaveDebouncer = PlanetSaveDebouncer();
+  String? _questNotificationName;
+  Timer? _questNotificationTimer;
 
   @override
   void initState() {
@@ -71,6 +75,22 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _game = MainGame(planet: widget.planet);
     _game.onPlanetChanged = _onPlanetChanged;
     _gameStateManager = GameStateManager(resources: widget.planet.resources);
+    _gameStateManager.questManager = widget.planet.questManager;
+    _gameStateManager.achievementManager = widget.planet.achievementManager;
+
+    // Wire quest completion notifications
+    widget.planet.questManager.onQuestCompleted = (quest) {
+      if (mounted) {
+        _questNotificationTimer?.cancel();
+        setState(() => _questNotificationName = quest.name);
+        _questNotificationTimer = Timer(const Duration(seconds: 4), () {
+          if (mounted) setState(() => _questNotificationName = null);
+        });
+      }
+    };
+
+    // Populate daily/weekly rotating quests
+    _gameStateManager.refreshRotatingQuests();
 
     _placementManager = BuildingPlacementManager(
       game: _game,
@@ -105,6 +125,9 @@ class _MainGameWidgetState extends State<MainGameWidget>
 
   @override
   void dispose() {
+    _questNotificationTimer?.cancel();
+    _questNotificationName = null;
+    widget.planet.questManager.onQuestCompleted = null;
     _gameStateManager.dispose();
     _planetSaveDebouncer.dispose();
     _audioManager.dispose();
@@ -115,6 +138,9 @@ class _MainGameWidgetState extends State<MainGameWidget>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _gameStateManager.refreshRotatingQuests();
+    }
     _audioManager.handleLifecycleChange(state);
   }
 
@@ -424,6 +450,9 @@ class _MainGameWidgetState extends State<MainGameWidget>
                 buildingLimitManager: _gameStateManager.buildingLimitManager,
                 grid: _game.grid,
                 onResourcesChanged: _onResourcesChanged,
+                questManager: _gameStateManager.questManager,
+                achievementManager: _gameStateManager.achievementManager,
+                onClaimQuestReward: _onClaimQuestReward,
                 musicEnabled: _audioManager.musicEnabled,
                 musicVolume: _audioManager.musicVolume,
                 onMusicEnabledChanged: (v) async {
@@ -468,10 +497,35 @@ class _MainGameWidgetState extends State<MainGameWidget>
                   });
                 },
               ),
+
+            // Quest completion notification
+            if (_questNotificationName != null)
+              Positioned(
+                top: 80,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: QuestNotification(
+                    questName: _questNotificationName!,
+                    onDismissed: () {
+                      _questNotificationTimer?.cancel();
+                      setState(() => _questNotificationName = null);
+                    },
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  void _onClaimQuestReward(Quest quest) {
+    final qm = _gameStateManager.questManager;
+    if (qm == null) return;
+    if (qm.claimReward(quest.id, widget.planet.resources)) {
+      _handleResourcesChanged(immediateSave: true);
+    }
   }
 
   void _openDebugSheet() {
