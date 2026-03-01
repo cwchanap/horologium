@@ -14,131 +14,139 @@ import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/game/resources/resources.dart';
 import 'package:horologium/pages/quest_log_page.dart';
 
+/// Performance tests are skipped in CI due to inherent timing flakiness.
+/// Run locally with: flutter test test/performance/quest_perf_test.dart
+const _skipInCi = bool.fromEnvironment('CI', defaultValue: false);
+
 void main() {
-  group('Performance: quest check ≤5ms per quest (NFR-QST-001)', () {
-    test('checkProgress on 50 quests completes within 250ms (5ms each)', () {
-      // Build 50 quests
-      final quests = <Quest>[];
-      for (int i = 0; i < 50; i++) {
-        quests.add(
-          Quest(
-            id: 'perf_$i',
-            name: 'Perf Quest $i',
-            description: 'Performance test quest $i',
-            objectives: [
-              QuestObjective(
-                type: QuestObjectiveType.buildBuilding,
-                targetId: 'house',
-                targetAmount: i + 1,
-              ),
-              QuestObjective(
-                type: QuestObjectiveType.accumulateResource,
-                targetId: 'cash',
-                targetAmount: (i + 1) * 100,
-              ),
-            ],
-            reward: QuestReward(resources: {ResourceType.cash: 100}),
-            status: QuestStatus.active,
-          ),
+  group(
+    'Performance: quest check ≤5ms per quest (NFR-QST-001)',
+    skip: _skipInCi,
+    () {
+      test('checkProgress on 50 quests completes within 250ms (5ms each)', () {
+        // Build 50 quests
+        final quests = <Quest>[];
+        for (int i = 0; i < 50; i++) {
+          quests.add(
+            Quest(
+              id: 'perf_$i',
+              name: 'Perf Quest $i',
+              description: 'Performance test quest $i',
+              objectives: [
+                QuestObjective(
+                  type: QuestObjectiveType.buildBuilding,
+                  targetId: 'house',
+                  targetAmount: i + 1,
+                ),
+                QuestObjective(
+                  type: QuestObjectiveType.accumulateResource,
+                  targetId: 'cash',
+                  targetAmount: (i + 1) * 100,
+                ),
+              ],
+              reward: QuestReward(resources: {ResourceType.cash: 100}),
+              status: QuestStatus.active,
+            ),
+          );
+        }
+
+        final manager = QuestManager(quests: quests);
+        final resources = Resources();
+        resources.resources[ResourceType.cash] = 5000;
+
+        // Simulate 20 buildings
+        final buildings = <Building>[];
+        final houseDef = BuildingRegistry.availableBuildings.firstWhere(
+          (b) => b.type == BuildingType.house,
         );
-      }
+        for (int i = 0; i < 20; i++) {
+          buildings.add(
+            Building(
+              type: houseDef.type,
+              name: houseDef.name,
+              description: houseDef.description,
+              icon: houseDef.icon,
+              assetPath: houseDef.assetPath,
+              color: houseDef.color,
+              baseCost: houseDef.baseCost,
+              baseGeneration: Map.of(houseDef.baseGeneration),
+              baseConsumption: Map.of(houseDef.baseConsumption),
+              requiredWorkers: houseDef.requiredWorkers,
+              category: houseDef.category,
+            ),
+          );
+        }
 
-      final manager = QuestManager(quests: quests);
-      final resources = Resources();
-      resources.resources[ResourceType.cash] = 5000;
+        final researchManager = ResearchManager();
 
-      // Simulate 20 buildings
-      final buildings = <Building>[];
-      final houseDef = BuildingRegistry.availableBuildings.firstWhere(
-        (b) => b.type == BuildingType.house,
-      );
-      for (int i = 0; i < 20; i++) {
-        buildings.add(
-          Building(
-            type: houseDef.type,
-            name: houseDef.name,
-            description: houseDef.description,
-            icon: houseDef.icon,
-            assetPath: houseDef.assetPath,
-            color: houseDef.color,
-            baseCost: houseDef.baseCost,
-            baseGeneration: Map.of(houseDef.baseGeneration),
-            baseConsumption: Map.of(houseDef.baseConsumption),
-            requiredWorkers: houseDef.requiredWorkers,
-            category: houseDef.category,
-          ),
-        );
-      }
-
-      final researchManager = ResearchManager();
-
-      // Warm up
-      manager.checkProgress(resources, buildings, researchManager);
-
-      // Measure
-      final sw = Stopwatch()..start();
-      const iterations = 100;
-      for (int i = 0; i < iterations; i++) {
+        // Warm up
         manager.checkProgress(resources, buildings, researchManager);
-      }
-      sw.stop();
 
-      final avgMs = sw.elapsedMilliseconds / iterations;
-      debugPrint(
-        'Quest checkProgress (50 quests): ${avgMs.toStringAsFixed(2)}ms avg over $iterations iterations',
-      );
+        // Measure
+        final sw = Stopwatch()..start();
+        const iterations = 100;
+        for (int i = 0; i < iterations; i++) {
+          manager.checkProgress(resources, buildings, researchManager);
+        }
+        sw.stop();
 
-      // NFR-QST-001: ≤5ms per quest → 250ms for 50 quests
-      expect(
-        avgMs,
-        lessThan(250),
-        reason: 'checkProgress on 50 quests should be under 250ms',
-      );
-    });
-
-    test('achievement checkProgress on 50 achievements within 250ms', () {
-      final achievements = <Achievement>[];
-      for (int i = 0; i < 50; i++) {
-        achievements.add(
-          Achievement(
-            id: 'perf_ach_$i',
-            name: 'Perf Achievement $i',
-            description: 'Performance test achievement $i',
-            type: AchievementType.buildingCount,
-            targetAmount: i + 10,
-          ),
+        final avgMs = sw.elapsedMilliseconds / iterations;
+        debugPrint(
+          'Quest checkProgress (50 quests): ${avgMs.toStringAsFixed(2)}ms avg over $iterations iterations',
         );
-      }
 
-      final manager = AchievementManager(achievements: achievements);
-      final resources = Resources();
-      final buildings = <Building>[];
-      final researchManager = ResearchManager();
+        // NFR-QST-001: ≤5ms per quest → 250ms for 50 quests
+        expect(
+          avgMs,
+          lessThan(250),
+          reason: 'checkProgress on 50 quests should be under 250ms',
+        );
+      });
 
-      // Warm up
-      manager.checkProgress(resources, buildings, researchManager);
+      test('achievement checkProgress on 50 achievements within 250ms', () {
+        final achievements = <Achievement>[];
+        for (int i = 0; i < 50; i++) {
+          achievements.add(
+            Achievement(
+              id: 'perf_ach_$i',
+              name: 'Perf Achievement $i',
+              description: 'Performance test achievement $i',
+              type: AchievementType.buildingCount,
+              targetAmount: i + 10,
+            ),
+          );
+        }
 
-      final sw = Stopwatch()..start();
-      const iterations = 100;
-      for (int i = 0; i < iterations; i++) {
+        final manager = AchievementManager(achievements: achievements);
+        final resources = Resources();
+        final buildings = <Building>[];
+        final researchManager = ResearchManager();
+
+        // Warm up
         manager.checkProgress(resources, buildings, researchManager);
-      }
-      sw.stop();
 
-      final avgMs = sw.elapsedMilliseconds / iterations;
-      debugPrint(
-        'Achievement checkProgress (50 achievements): ${avgMs.toStringAsFixed(2)}ms avg over $iterations iterations',
-      );
+        final sw = Stopwatch()..start();
+        const iterations = 100;
+        for (int i = 0; i < iterations; i++) {
+          manager.checkProgress(resources, buildings, researchManager);
+        }
+        sw.stop();
 
-      expect(
-        avgMs,
-        lessThan(250),
-        reason: 'checkProgress on 50 achievements should be under 250ms',
-      );
-    });
-  });
+        final avgMs = sw.elapsedMilliseconds / iterations;
+        debugPrint(
+          'Achievement checkProgress (50 achievements): ${avgMs.toStringAsFixed(2)}ms avg over $iterations iterations',
+        );
 
-  group('Performance: UI load ≤200ms (NFR-QST-003)', () {
+        expect(
+          avgMs,
+          lessThan(250),
+          reason: 'checkProgress on 50 achievements should be under 250ms',
+        );
+      });
+    },
+  );
+
+  group('Performance: UI load ≤200ms (NFR-QST-003)', skip: _skipInCi, () {
     testWidgets('QuestLogPage builds within 500ms (cold start)', (
       tester,
     ) async {

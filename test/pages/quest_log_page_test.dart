@@ -73,7 +73,7 @@ void main() {
       expect(find.text('Claimed Quest'), findsNothing);
     });
 
-    testWidgets('can switch to Completed tab', (tester) async {
+    testWidgets('can switch to Claimed tab', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: QuestLogPage(
@@ -83,7 +83,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('Completed'));
+      await tester.tap(find.text('Claimed'));
       await tester.pumpAndSettle();
 
       expect(find.text('Claimed Quest'), findsOneWidget);
