@@ -89,8 +89,25 @@ class AchievementManager {
       a.currentAmount = 0;
     }
 
-    final unlocked = (json['unlocked'] as List?)?.cast<String>() ?? [];
-    final progress = (json['progress'] as Map<String, dynamic>?) ?? {};
+    // Parse unlocked list defensively
+    final List<String> unlocked = [];
+    final rawUnlocked = json['unlocked'];
+    if (rawUnlocked is List) {
+      for (final item in rawUnlocked) {
+        if (item is String) {
+          unlocked.add(item);
+        } else if (item != null) {
+          unlocked.add(item.toString());
+        }
+      }
+    }
+
+    // Parse progress map defensively (already defensive, but using same pattern)
+    final Map<String, dynamic> progress = {};
+    final rawProgress = json['progress'];
+    if (rawProgress is Map<String, dynamic>) {
+      progress.addAll(rawProgress);
+    }
 
     for (final id in unlocked) {
       final a = _achievements[id];

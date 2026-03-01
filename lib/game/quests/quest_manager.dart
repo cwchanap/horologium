@@ -219,11 +219,49 @@ class QuestManager {
       }
     }
 
-    final active = (json['active'] as List?)?.cast<String>() ?? [];
-    final completed = (json['completed'] as List?)?.cast<String>() ?? [];
-    final claimed = (json['claimed'] as List?)?.cast<String>() ?? [];
-    final objectiveProgress =
-        (json['objectiveProgress'] as Map<String, dynamic>?) ?? {};
+    // Parse active, completed, claimed lists defensively
+    final List<String> active = [];
+    final rawActive = json['active'];
+    if (rawActive is List) {
+      for (final item in rawActive) {
+        if (item is String) {
+          active.add(item);
+        } else if (item != null) {
+          active.add(item.toString());
+        }
+      }
+    }
+
+    final List<String> completed = [];
+    final rawCompleted = json['completed'];
+    if (rawCompleted is List) {
+      for (final item in rawCompleted) {
+        if (item is String) {
+          completed.add(item);
+        } else if (item != null) {
+          completed.add(item.toString());
+        }
+      }
+    }
+
+    final List<String> claimed = [];
+    final rawClaimed = json['claimed'];
+    if (rawClaimed is List) {
+      for (final item in rawClaimed) {
+        if (item is String) {
+          claimed.add(item);
+        } else if (item != null) {
+          claimed.add(item.toString());
+        }
+      }
+    }
+
+    // Parse objective progress map defensively
+    final Map<String, dynamic> objectiveProgress = {};
+    final rawObjectiveProgress = json['objectiveProgress'];
+    if (rawObjectiveProgress is Map<String, dynamic>) {
+      objectiveProgress.addAll(rawObjectiveProgress);
+    }
 
     for (final id in claimed) {
       final quest = _quests[id];
