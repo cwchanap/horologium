@@ -20,6 +20,24 @@ class GameStateManager {
   int _lastDailySeed = 0;
   int _lastWeeklySeed = 0;
 
+  /// Initialize seeds from loaded quest data to prevent regeneration on first refresh.
+  void initializeSeedsFromQuests(QuestManager qm) {
+    final now = DateTime.now();
+    final currentDailySeed = DailyQuestGenerator.dailySeedForDate(now);
+    final currentWeeklySeed = DailyQuestGenerator.weeklySeedForDate(now);
+
+    // Check if quests for today already exist in the manager (loaded from save)
+    final hasDailyQuests = qm.quests.any(
+      (q) => q.id.startsWith('daily_${currentDailySeed}_'),
+    );
+    final hasWeeklyQuests = qm.quests.any(
+      (q) => q.id.startsWith('weekly_${currentWeeklySeed}_'),
+    );
+
+    if (hasDailyQuests) _lastDailySeed = currentDailySeed;
+    if (hasWeeklyQuests) _lastWeeklySeed = currentWeeklySeed;
+  }
+
   async.Timer? _resourceTimer;
 
   GameStateManager({required this.resources});

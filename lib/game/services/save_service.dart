@@ -359,22 +359,64 @@ class SaveService {
     // Pre-populate today's and this week's rotating quests before restoring
     // saved state so that loadFromJson can match saved daily_/weekly_ IDs.
     final now = DateTime.now();
+    final currentDailySeed = DailyQuestGenerator.dailySeedForDate(now);
+    final currentWeeklySeed = DailyQuestGenerator.weeklySeedForDate(now);
     questManager.addRotatingQuests(
-      DailyQuestGenerator.generateDaily(
-        seed: DailyQuestGenerator.dailySeedForDate(now),
-      ),
+      DailyQuestGenerator.generateDaily(seed: currentDailySeed),
     );
     questManager.addRotatingQuests(
-      DailyQuestGenerator.generateWeekly(
-        seed: DailyQuestGenerator.weeklySeedForDate(now),
-      ),
+      DailyQuestGenerator.generateWeekly(seed: currentWeeklySeed),
     );
+
+    // Restore rotating quest history from saved IDs before loadFromJson
     final questJson = prefs.getString(_planetQuestsKey(planetId));
     if (questJson != null) {
       try {
-        questManager.loadFromJson(
-          jsonDecode(questJson) as Map<String, dynamic>,
-        );
+        final savedQuestData = jsonDecode(questJson) as Map<String, dynamic>;
+
+        // Extract all saved quest IDs to reconstruct quests from older seeds
+        final allSavedIds = <String>[
+          ...(savedQuestData['active'] as List<dynamic>? ?? []).cast<String>(),
+          ...(savedQuestData['completed'] as List<dynamic>? ?? [])
+              .cast<String>(),
+          ...(savedQuestData['claimed'] as List<dynamic>? ?? []).cast<String>(),
+        ];
+
+        // Regenerate quests for rotating IDs from different seeds
+        final reconstructedDailySeeds = <int>{};
+        final reconstructedWeeklySeeds = <int>{};
+
+        for (final id in allSavedIds) {
+          if (id.startsWith('daily_')) {
+            final parts = id.split('_');
+            if (parts.length >= 2) {
+              final seed = int.tryParse(parts[1]);
+              if (seed != null &&
+                  seed != currentDailySeed &&
+                  !reconstructedDailySeeds.contains(seed)) {
+                questManager.addRotatingQuests(
+                  DailyQuestGenerator.generateDaily(seed: seed),
+                );
+                reconstructedDailySeeds.add(seed);
+              }
+            }
+          } else if (id.startsWith('weekly_')) {
+            final parts = id.split('_');
+            if (parts.length >= 2) {
+              final seed = int.tryParse(parts[1]);
+              if (seed != null &&
+                  seed != currentWeeklySeed &&
+                  !reconstructedWeeklySeeds.contains(seed)) {
+                questManager.addRotatingQuests(
+                  DailyQuestGenerator.generateWeekly(seed: seed),
+                );
+                reconstructedWeeklySeeds.add(seed);
+              }
+            }
+          }
+        }
+
+        questManager.loadFromJson(savedQuestData);
       } catch (e, stackTrace) {
         debugPrint(
           'Failed to parse quests JSON for planet $planetId: $e\n$stackTrace',
