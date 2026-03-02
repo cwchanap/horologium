@@ -78,6 +78,9 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _gameStateManager.questManager = widget.planet.questManager;
     _gameStateManager.achievementManager = widget.planet.achievementManager;
 
+    // Initialize seeds from loaded quests to prevent regeneration on first refresh
+    _gameStateManager.initializeSeedsFromQuests(widget.planet.questManager);
+
     // Wire quest completion notifications
     widget.planet.questManager.onQuestCompleted = (quest) {
       if (mounted) {
@@ -89,7 +92,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
       }
     };
 
-    // Populate daily/weekly rotating quests
+    // Populate daily/weekly rotating quests (only if seeds changed)
     _gameStateManager.refreshRotatingQuests();
 
     _placementManager = BuildingPlacementManager(
