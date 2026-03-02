@@ -62,12 +62,19 @@ class _QuestNotificationState extends State<QuestNotification>
         decoration: BoxDecoration(
           color: Colors.black.withAlpha((255 * 0.9).round()),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.amber, width: 1),
+          border: Border.all(color: Colors.cyanAccent, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.cyanAccent.withAlpha((255 * 0.3).round()),
+              blurRadius: 8,
+              spreadRadius: 2,
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.emoji_events, color: Colors.amber, size: 24),
+            const Icon(Icons.emoji_events, color: Colors.cyanAccent, size: 24),
             const SizedBox(width: 12),
             Column(
               mainAxisSize: MainAxisSize.min,
@@ -76,7 +83,7 @@ class _QuestNotificationState extends State<QuestNotification>
                 const Text(
                   'Quest Complete!',
                   style: TextStyle(
-                    color: Colors.amber,
+                    color: Colors.cyanAccent,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),

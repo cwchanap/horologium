@@ -50,14 +50,31 @@ class QuestObjective {
   };
 
   factory QuestObjective.fromJson(Map<String, dynamic> json) {
+    final targetIdValue = json['targetId'];
+    final targetAmountValue = json['targetAmount'];
+    final currentAmountValue = json['currentAmount'];
+
+    int parseAmount(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value < 0 ? 0 : value;
+      if (value is num) return value.toInt() < 0 ? 0 : value.toInt();
+      if (value is String) {
+        final parsed = int.tryParse(value);
+        return parsed == null || parsed < 0 ? 0 : parsed;
+      }
+      return 0;
+    }
+
     return QuestObjective(
       type: QuestObjectiveType.values.firstWhere(
         (t) => t.name == json['type'],
         orElse: () => QuestObjectiveType.buildBuilding,
       ),
-      targetId: json['targetId'] as String? ?? '',
-      targetAmount: (json['targetAmount'] as num?)?.toInt() ?? 0,
-      currentAmount: (json['currentAmount'] as num?)?.toInt() ?? 0,
+      targetId: targetIdValue is String
+          ? targetIdValue
+          : targetIdValue?.toString() ?? '',
+      targetAmount: parseAmount(targetAmountValue),
+      currentAmount: parseAmount(currentAmountValue),
     );
   }
 }

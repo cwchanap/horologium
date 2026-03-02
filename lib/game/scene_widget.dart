@@ -139,6 +139,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _questNotificationTimer?.cancel();
     _questNotificationName = null;
     widget.planet.questManager.onQuestCompleted = null;
+    widget.planet.achievementManager.onAchievementUnlocked = null;
     _gameStateManager.dispose();
     _planetSaveDebouncer.dispose();
     _audioManager.dispose();
