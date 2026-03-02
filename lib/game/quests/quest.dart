@@ -15,20 +15,41 @@ class QuestReward {
   };
 
   factory QuestReward.fromJson(Map<String, dynamic> json) {
-    final resourcesJson = json['resources'] as Map<String, dynamic>? ?? {};
     final resources = <ResourceType, double>{};
-    for (final entry in resourcesJson.entries) {
-      final type = ResourceType.values
-          .where((t) => t.name == entry.key)
-          .firstOrNull;
-      if (type != null) {
-        resources[type] = (entry.value as num).toDouble();
+    final resourcesValue = json['resources'];
+    if (resourcesValue is Map) {
+      for (final entry in resourcesValue.entries) {
+        final type = ResourceType.values
+            .where((t) => t.name == entry.key)
+            .firstOrNull;
+        if (type == null) continue;
+
+        final value = entry.value;
+        double parsedValue;
+        if (value is num) {
+          parsedValue = value.toDouble();
+        } else if (value is String) {
+          parsedValue = double.tryParse(value) ?? 0.0;
+        } else {
+          parsedValue = 0.0;
+        }
+        resources[type] = parsedValue;
       }
     }
-    return QuestReward(
-      resources: resources,
-      researchPoints: json['researchPoints'] as int? ?? 0,
-    );
+
+    final researchPointsValue = json['researchPoints'];
+    int researchPoints;
+    if (researchPointsValue is int) {
+      researchPoints = researchPointsValue;
+    } else if (researchPointsValue is num) {
+      researchPoints = researchPointsValue.toInt();
+    } else if (researchPointsValue is String) {
+      researchPoints = int.tryParse(researchPointsValue) ?? 0;
+    } else {
+      researchPoints = 0;
+    }
+
+    return QuestReward(resources: resources, researchPoints: researchPoints);
   }
 }
 
@@ -82,7 +103,10 @@ class Quest {
           ? QuestReward.fromJson(json['reward'] as Map<String, dynamic>)
           : const QuestReward(),
       prerequisiteQuestIds:
-          (json['prerequisiteQuestIds'] as List?)?.cast<String>() ?? [],
+          (json['prerequisiteQuestIds'] as List?)
+              ?.whereType<String>()
+              .toList() ??
+          [],
       status: QuestStatus.values.firstWhere(
         (s) => s.name == json['status'],
         orElse: () => QuestStatus.available,

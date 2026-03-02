@@ -7,8 +7,13 @@ import 'package:horologium/game/quests/quest_registry.dart';
 import 'package:horologium/game/research/research.dart';
 import 'package:horologium/game/research/research_type.dart';
 import 'package:horologium/game/resources/resources.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   group('GameStateManager rotating quests', () {
     test('refreshRotatingQuests adds daily and weekly quests', () {
       final gsm = GameStateManager(resources: Resources());
