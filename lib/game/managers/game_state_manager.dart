@@ -11,7 +11,7 @@ import '../services/resource_service.dart';
 
 class GameStateManager {
   final Resources resources;
-  final ResearchManager researchManager = ResearchManager();
+  ResearchManager researchManager = ResearchManager();
   final BuildingLimitManager buildingLimitManager = BuildingLimitManager();
   QuestManager? questManager;
   AchievementManager? achievementManager;

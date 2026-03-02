@@ -77,6 +77,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _gameStateManager = GameStateManager(resources: widget.planet.resources);
     _gameStateManager.questManager = widget.planet.questManager;
     _gameStateManager.achievementManager = widget.planet.achievementManager;
+    _gameStateManager.researchManager = widget.planet.researchManager;
 
     // Initialize seeds from loaded quests to prevent regeneration on first refresh
     _gameStateManager.initializeSeedsFromQuests(widget.planet.questManager);
@@ -89,6 +90,13 @@ class _MainGameWidgetState extends State<MainGameWidget>
         _questNotificationTimer = Timer(const Duration(seconds: 4), () {
           if (mounted) setState(() => _questNotificationName = null);
         });
+      }
+    };
+
+    // Wire achievement unlock notifications
+    widget.planet.achievementManager.onAchievementUnlocked = (achievement) {
+      if (mounted) {
+        debugPrint('Achievement unlocked: ${achievement.name}');
       }
     };
 
@@ -293,12 +301,10 @@ class _MainGameWidgetState extends State<MainGameWidget>
   }
 
   void _onPlanetChanged(Planet planet) {
-    // Update the global active planet
     ActivePlanet().updateActivePlanet(planet);
-
-    setState(() {
-      // Save the planet changes immediately
-      SaveService.savePlanet(planet);
+    setState(() {});
+    SaveService.savePlanet(planet).catchError((Object e, StackTrace s) {
+      debugPrint('Failed to save planet after planet change: $e\n$s');
     });
   }
 
