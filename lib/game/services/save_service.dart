@@ -419,7 +419,9 @@ class SaveService {
         questManager.loadFromJson(savedQuestData);
       } catch (e, stackTrace) {
         debugPrint(
-          'Failed to parse quests JSON for planet $planetId: $e\n$stackTrace',
+          'Failed to parse quests JSON for planet $planetId: $e\n'
+          'Raw JSON: $questJson\n'
+          '$stackTrace',
         );
       }
     }
@@ -436,7 +438,9 @@ class SaveService {
         );
       } catch (e, stackTrace) {
         debugPrint(
-          'Failed to parse achievements JSON for planet $planetId: $e\n$stackTrace',
+          'Failed to parse achievements JSON for planet $planetId: $e\n'
+          'Raw JSON: $achievementJson\n'
+          '$stackTrace',
         );
       }
     }

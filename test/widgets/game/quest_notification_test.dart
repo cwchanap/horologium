@@ -36,5 +36,27 @@ void main() {
 
       expect(dismissed, isTrue);
     });
+
+    testWidgets('does not crash when widget is disposed before timer fires', (
+      tester,
+    ) async {
+      // Show notification
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: QuestNotification(questName: 'Build Houses')),
+        ),
+      );
+
+      // Remove widget before the dismiss timer fires (simulates parent removing it)
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: SizedBox.shrink())),
+      );
+
+      // Advance past the dismiss timer — should not throw
+      expect(() async {
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+      }, returnsNormally);
+    });
   });
 }

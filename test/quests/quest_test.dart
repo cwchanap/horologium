@@ -18,6 +18,51 @@ void main() {
     });
   });
 
+  group('Quest.fromJson null safety', () {
+    test('does not throw when required string fields are null', () {
+      expect(
+        () => Quest.fromJson({
+          'id': null,
+          'name': null,
+          'description': null,
+          'objectives': null,
+          'reward': null,
+        }),
+        returnsNormally,
+      );
+    });
+
+    test('handles float targetAmount in objectives via fromJson', () {
+      final quest = Quest.fromJson({
+        'id': 'test',
+        'name': 'Test',
+        'description': 'Test',
+        'objectives': [
+          {
+            'type': 'buildBuilding',
+            'targetId': 'house',
+            'targetAmount': 5.0, // JSON double, not int
+          },
+        ],
+        'reward': {},
+      });
+      expect(quest.objectives.first.targetAmount, equals(5));
+    });
+
+    test('handles null targetId in objective fromJson', () {
+      final quest = Quest.fromJson({
+        'id': 'test',
+        'name': 'Test',
+        'description': 'Test',
+        'objectives': [
+          {'type': 'buildBuilding', 'targetId': null, 'targetAmount': 3},
+        ],
+        'reward': {},
+      });
+      expect(quest.objectives.first.targetId, equals(''));
+    });
+  });
+
   group('QuestReward', () {
     test('creates with resource rewards', () {
       final reward = QuestReward(

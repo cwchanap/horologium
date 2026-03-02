@@ -38,6 +38,7 @@ class _QuestNotificationState extends State<QuestNotification>
     _controller.forward();
 
     _dismissTimer = Timer(widget.duration, () {
+      if (!mounted) return;
       _controller.reverse().then((_) {
         widget.onDismissed?.call();
       });

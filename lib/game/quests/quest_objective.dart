@@ -55,9 +55,9 @@ class QuestObjective {
         (t) => t.name == json['type'],
         orElse: () => QuestObjectiveType.buildBuilding,
       ),
-      targetId: json['targetId'] as String,
-      targetAmount: json['targetAmount'] as int,
-      currentAmount: json['currentAmount'] as int? ?? 0,
+      targetId: json['targetId'] as String? ?? '',
+      targetAmount: (json['targetAmount'] as num?)?.toInt() ?? 0,
+      currentAmount: (json['currentAmount'] as num?)?.toInt() ?? 0,
     );
   }
 }

@@ -71,13 +71,16 @@ class Quest {
 
   factory Quest.fromJson(Map<String, dynamic> json) {
     return Quest(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      description: json['description'] as String,
-      objectives: (json['objectives'] as List)
-          .map((o) => QuestObjective.fromJson(o as Map<String, dynamic>))
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      objectives: (json['objectives'] as List? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(QuestObjective.fromJson)
           .toList(),
-      reward: QuestReward.fromJson(json['reward'] as Map<String, dynamic>),
+      reward: json['reward'] is Map<String, dynamic>
+          ? QuestReward.fromJson(json['reward'] as Map<String, dynamic>)
+          : const QuestReward(),
       prerequisiteQuestIds:
           (json['prerequisiteQuestIds'] as List?)?.cast<String>() ?? [],
       status: QuestStatus.values.firstWhere(
