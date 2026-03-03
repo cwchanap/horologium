@@ -119,5 +119,57 @@ void main() {
 
       expect(find.text('No active quests'), findsOneWidget);
     });
+
+    testWidgets('excludes prerequisite-locked quests from Active tab', (
+      tester,
+    ) async {
+      // Create a quest that is locked behind a prerequisite
+      final lockedQuest = Quest(
+        id: 'locked_quest',
+        name: 'Locked Quest',
+        description: 'Requires q1 to be claimed',
+        objectives: [
+          QuestObjective(
+            type: QuestObjectiveType.buildBuilding,
+            targetId: 'house',
+            targetAmount: 1,
+          ),
+        ],
+        reward: QuestReward(resources: {ResourceType.cash: 100}),
+        prerequisiteQuestIds: ['q1'],
+        status: QuestStatus.available,
+      );
+
+      // Create an available quest with no prerequisites
+      final availableQuest = Quest(
+        id: 'available_quest',
+        name: 'Available Quest',
+        description: 'No prerequisites',
+        objectives: [
+          QuestObjective(
+            type: QuestObjectiveType.buildBuilding,
+            targetId: 'house',
+            targetAmount: 1,
+          ),
+        ],
+        reward: QuestReward(resources: {ResourceType.cash: 50}),
+        status: QuestStatus.available,
+      );
+
+      final qm = QuestManager(quests: [availableQuest, lockedQuest]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: QuestLogPage(
+            questManager: qm,
+            achievementManager: achievementManager,
+          ),
+        ),
+      );
+
+      // Should show the available quest but not the locked quest
+      expect(find.text('Available Quest'), findsOneWidget);
+      expect(find.text('Locked Quest'), findsNothing);
+    });
   });
 }

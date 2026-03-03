@@ -191,9 +191,11 @@ class QuestManager {
           break;
       }
 
-      // Save objective progress for active and completed quests
+      // Save objective progress for active, completed, and claimed quests
+      // Claimed quests need progress saved to avoid showing "0 / target" after load
       if (quest.status == QuestStatus.active ||
-          quest.status == QuestStatus.completed) {
+          quest.status == QuestStatus.completed ||
+          quest.status == QuestStatus.claimed) {
         final progress = <String, int>{};
         for (int i = 0; i < quest.objectives.length; i++) {
           progress[i.toString()] = quest.objectives[i].currentAmount;
