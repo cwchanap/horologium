@@ -69,23 +69,27 @@ class _QuestLogPageState extends State<QuestLogPage>
   }
 
   Widget _buildActiveQuests() {
-    final allActive = widget.questManager.quests
-        .where(
-          (q) =>
-              q.status == QuestStatus.active ||
-              q.status == QuestStatus.completed ||
-              q.status == QuestStatus.available,
-        )
-        .toList();
+    // Use getAvailableQuests() to exclude prerequisite-locked quests
+    // Combine with active and completed quests for the full Active tab view
+    final available = widget.questManager.getAvailableQuests();
+    final active = widget.questManager.getActiveQuests();
+    final completed = widget.questManager.getCompletedQuests();
+
+    // Merge and deduplicate by quest ID
+    final allActive = <String, Quest>{};
+    for (final q in [...available, ...active, ...completed]) {
+      allActive[q.id] = q;
+    }
+    final questList = allActive.values.toList();
 
     // Separate into story, daily, weekly
-    final story = allActive
+    final story = questList
         .where((q) => !q.id.startsWith('daily_') && !q.id.startsWith('weekly_'))
         .toList();
-    final daily = allActive.where((q) => q.id.startsWith('daily_')).toList();
-    final weekly = allActive.where((q) => q.id.startsWith('weekly_')).toList();
+    final daily = questList.where((q) => q.id.startsWith('daily_')).toList();
+    final weekly = questList.where((q) => q.id.startsWith('weekly_')).toList();
 
-    if (allActive.isEmpty) {
+    if (questList.isEmpty) {
       return const Center(
         child: Text(
           'No active quests',

@@ -442,6 +442,42 @@ void main() {
 
         expect(manager.getActiveQuests(), isEmpty);
       });
+
+      test('preserves claimed quest objective progress after save/load', () {
+        // Set up a quest that gets completed and claimed with progress
+        manager.activateQuest('test_build_house');
+        final buildings = [
+          _makeBuilding(BuildingType.house),
+          _makeBuilding(BuildingType.house),
+        ];
+        final resources = Resources();
+        manager.checkProgress(resources, buildings, ResearchManager());
+        manager.claimReward('test_build_house', resources);
+
+        // Verify the quest is claimed with correct progress
+        final claimedQuests = manager.getClaimedQuests();
+        expect(claimedQuests, hasLength(1));
+        expect(claimedQuests.first.objectives[0].currentAmount, 2);
+
+        // Save and restore
+        final json = manager.toJson();
+        final restored = QuestManager(
+          quests: [
+            _buildQuest(),
+            _resourceQuest(),
+            _researchQuest(),
+            _populationQuest(),
+            _happinessQuest(),
+            _chainedQuest(),
+          ],
+        );
+        restored.loadFromJson(json);
+
+        // Verify claimed quest still has correct progress after restore
+        final restoredClaimed = restored.getClaimedQuests();
+        expect(restoredClaimed, hasLength(1));
+        expect(restoredClaimed.first.objectives[0].currentAmount, 2);
+      });
     });
   });
 }
