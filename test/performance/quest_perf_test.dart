@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,7 +21,7 @@ import 'package:horologium/pages/quest_log_page.dart';
 
 /// Performance tests are skipped in CI due to inherent timing flakiness.
 /// Run locally with: flutter test test/performance/quest_perf_test.dart
-final _skipInCi = Platform.environment['CI']?.toLowerCase() == 'true';
+final _skipInCi = kIsWeb || Platform.environment['CI']?.toLowerCase() == 'true';
 
 void main() {
   setUp(() {
