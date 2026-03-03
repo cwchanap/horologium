@@ -46,6 +46,21 @@ class _QuestNotificationState extends State<QuestNotification>
   }
 
   @override
+  void didUpdateWidget(covariant QuestNotification oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.questName != widget.questName) {
+      _dismissTimer?.cancel();
+      _controller.forward(from: 0);
+      _dismissTimer = Timer(widget.duration, () {
+        if (!mounted) return;
+        _controller.reverse().then((_) {
+          widget.onDismissed?.call();
+        });
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _dismissTimer?.cancel();
     _controller.dispose();
@@ -76,23 +91,27 @@ class _QuestNotificationState extends State<QuestNotification>
           children: [
             const Icon(Icons.emoji_events, color: Colors.cyanAccent, size: 24),
             const SizedBox(width: 12),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Quest Complete!',
-                  style: TextStyle(
-                    color: Colors.cyanAccent,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Quest Complete!',
+                    style: TextStyle(
+                      color: Colors.cyanAccent,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                Text(
-                  widget.questName,
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
+                  Text(
+                    widget.questName,
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ],
+              ),
             ),
           ],
         ),

@@ -113,7 +113,9 @@ void main() {
         gsm.questManager!.checkProgress(gsm.resources, [], gsm.researchManager);
 
         // Quest completes immediately since electricity is already researched
-        final completedQuest = gsm.questManager!.getCompletedQuests().first;
+        final completedQuests = gsm.questManager!.getCompletedQuests();
+        expect(completedQuests, isNotEmpty);
+        final completedQuest = completedQuests.first;
         expect(completedQuest.objectives.first.currentAmount, equals(1));
         expect(completedQuest.isComplete, isTrue);
       },
