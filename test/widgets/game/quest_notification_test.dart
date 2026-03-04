@@ -53,10 +53,8 @@ void main() {
       );
 
       // Advance past the dismiss timer — should not throw
-      expect(() async {
-        await tester.pump(const Duration(seconds: 4));
-        await tester.pumpAndSettle();
-      }, returnsNormally);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
     });
   });
 }
