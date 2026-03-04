@@ -49,7 +49,11 @@ class QuestManager {
   void removeRotatingQuests(String prefix, {bool preserveClaimed = false}) {
     _quests.removeWhere((id, quest) {
       if (!id.startsWith(prefix)) return false;
-      if (preserveClaimed && quest.status == QuestStatus.claimed) return false;
+      if (preserveClaimed &&
+          (quest.status == QuestStatus.claimed ||
+              quest.status == QuestStatus.completed)) {
+        return false;
+      }
       return true;
     });
   }

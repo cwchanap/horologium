@@ -134,9 +134,10 @@ class _QuestLogPageState extends State<QuestLogPage>
   Widget _buildQuestCard(Quest quest) {
     return QuestCard(
       quest: quest,
-      onClaim: quest.status == QuestStatus.completed
+      onClaim:
+          quest.status == QuestStatus.completed && widget.onClaimReward != null
           ? () {
-              widget.onClaimReward?.call(quest);
+              widget.onClaimReward!(quest);
               setState(() {});
             }
           : null,
