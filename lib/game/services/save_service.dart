@@ -49,6 +49,10 @@ class SaveService {
   static String _planetQuestsKey(String planetId) => 'planet.$planetId.quests';
   static String _planetAchievementsKey(String planetId) =>
       'planet.$planetId.achievements';
+  static String _planetDailySeedKey(String planetId) =>
+      'planet.$planetId.quests.dailySeed';
+  static String _planetWeeklySeedKey(String planetId) =>
+      'planet.$planetId.quests.weeklySeed';
 
   /// Load resources from legacy per-resource keys.
   /// Used as fallback when JSON parsing fails or when migrating from old format.
@@ -236,6 +240,17 @@ class SaveService {
     // Save quest state
     final questJson = jsonEncode(planet.questManager.toJson());
     await prefs.setString(_planetQuestsKey(planetId), questJson);
+
+    // Save quest seeds for proper refresh logic
+    final now = DateTime.now();
+    await prefs.setInt(
+      _planetDailySeedKey(planetId),
+      DailyQuestGenerator.dailySeedForDate(now),
+    );
+    await prefs.setInt(
+      _planetWeeklySeedKey(planetId),
+      DailyQuestGenerator.weeklySeedForDate(now),
+    );
 
     // Save achievement state
     final achievementJson = jsonEncode(planet.achievementManager.toJson());
@@ -445,6 +460,10 @@ class SaveService {
       }
     }
 
+    // Load quest seeds (default to 0 if not found, which will trigger refresh)
+    final lastDailySeed = prefs.getInt(_planetDailySeedKey(planetId)) ?? 0;
+    final lastWeeklySeed = prefs.getInt(_planetWeeklySeedKey(planetId)) ?? 0;
+
     return Planet(
       id: planetId,
       name: name,
@@ -456,6 +475,8 @@ class SaveService {
       buildings: buildings,
       buildingLimitsParseError: buildingLimitsParseError,
       buildingLimitsRawJson: buildingLimitsRawJson,
+      lastDailySeed: lastDailySeed,
+      lastWeeklySeed: lastWeeklySeed,
     );
   }
 
