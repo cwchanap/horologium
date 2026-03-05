@@ -241,13 +241,11 @@ class SaveService {
     final questJson = jsonEncode(planet.questManager.toJson());
     await prefs.setString(_planetQuestsKey(planetId), questJson);
 
-    // Save quest seeds from actual active quests (not wall-clock time)
-    // to prevent stale quests when app crosses day/week boundaries
-    final activeQuestIds = planet.questManager.getActiveQuests().map(
-      (q) => q.id,
-    );
-    final dailySeed = _extractSeedFromQuestIds(activeQuestIds, 'daily_');
-    final weeklySeed = _extractSeedFromQuestIds(activeQuestIds, 'weekly_');
+    // Save quest seeds — inspect ALL quests (active, completed, claimed)
+    // so that seeds are preserved even when all rotating quests have been completed.
+    final allQuestIds = planet.questManager.quests.map((q) => q.id);
+    final dailySeed = _extractSeedFromQuestIds(allQuestIds, 'daily_');
+    final weeklySeed = _extractSeedFromQuestIds(allQuestIds, 'weekly_');
     await prefs.setInt(
       _planetDailySeedKey(planetId),
       dailySeed ?? DailyQuestGenerator.dailySeedForDate(DateTime.now()),
