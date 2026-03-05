@@ -79,8 +79,11 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _gameStateManager.achievementManager = widget.planet.achievementManager;
     _gameStateManager.researchManager = widget.planet.researchManager;
 
-    // Initialize seeds from loaded quests to prevent regeneration on first refresh
-    _gameStateManager.initializeSeedsFromQuests(widget.planet.questManager);
+    // Initialize seeds from loaded save data to properly detect date changes
+    _gameStateManager.initializeSeedsFromLoadedData(
+      widget.planet.lastDailySeed,
+      widget.planet.lastWeeklySeed,
+    );
 
     // Wire quest completion notifications
     widget.planet.questManager.onQuestCompleted = (quest) {

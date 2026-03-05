@@ -25,6 +25,12 @@ class Planet {
   /// Raw JSON that failed to parse, preserved for manual recovery
   final String? buildingLimitsRawJson;
 
+  /// Last daily quest seed used to determine if daily quests should refresh
+  final int lastDailySeed;
+
+  /// Last weekly quest seed used to determine if weekly quests should refresh
+  final int lastWeeklySeed;
+
   Planet({
     required this.id,
     required this.name,
@@ -36,6 +42,8 @@ class Planet {
     List<PlacedBuildingData>? buildings,
     this.buildingLimitsParseError = false,
     this.buildingLimitsRawJson,
+    this.lastDailySeed = 0,
+    this.lastWeeklySeed = 0,
   }) : resources = resources ?? Resources(),
        researchManager = researchManager ?? ResearchManager(),
        buildingLimitManager = buildingLimitManager ?? BuildingLimitManager(),
@@ -116,6 +124,8 @@ class Planet {
     List<PlacedBuildingData>? buildings,
     bool? buildingLimitsParseError,
     String? buildingLimitsRawJson,
+    int? lastDailySeed,
+    int? lastWeeklySeed,
   }) {
     return Planet(
       id: id ?? this.id,
@@ -130,12 +140,14 @@ class Planet {
           buildingLimitsParseError ?? this.buildingLimitsParseError,
       buildingLimitsRawJson:
           buildingLimitsRawJson ?? this.buildingLimitsRawJson,
+      lastDailySeed: lastDailySeed ?? this.lastDailySeed,
+      lastWeeklySeed: lastWeeklySeed ?? this.lastWeeklySeed,
     );
   }
 
   @override
   String toString() {
-    return 'Planet(id: $id, name: $name, buildings: ${_buildings.length})';
+    return 'Planet(id: $id, name: $name, buildings: ${_buildings.length}, lastDailySeed: $lastDailySeed, lastWeeklySeed: $lastWeeklySeed)';
   }
 
   static List<Achievement> defaultAchievements() {
