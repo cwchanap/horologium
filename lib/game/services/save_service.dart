@@ -396,10 +396,12 @@ class SaveService {
 
         // Extract all saved quest IDs to reconstruct quests from older seeds
         final allSavedIds = <String>[
-          ...(savedQuestData['active'] as List<dynamic>? ?? []).cast<String>(),
+          ...(savedQuestData['active'] as List<dynamic>? ?? [])
+              .whereType<String>(),
           ...(savedQuestData['completed'] as List<dynamic>? ?? [])
-              .cast<String>(),
-          ...(savedQuestData['claimed'] as List<dynamic>? ?? []).cast<String>(),
+              .whereType<String>(),
+          ...(savedQuestData['claimed'] as List<dynamic>? ?? [])
+              .whereType<String>(),
         ];
 
         // Regenerate quests for rotating IDs from different seeds
