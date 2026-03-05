@@ -241,15 +241,20 @@ class SaveService {
     final questJson = jsonEncode(planet.questManager.toJson());
     await prefs.setString(_planetQuestsKey(planetId), questJson);
 
-    // Save quest seeds for proper refresh logic
-    final now = DateTime.now();
+    // Save quest seeds from actual active quests (not wall-clock time)
+    // to prevent stale quests when app crosses day/week boundaries
+    final activeQuestIds = planet.questManager.getActiveQuests().map(
+      (q) => q.id,
+    );
+    final dailySeed = _extractSeedFromQuestIds(activeQuestIds, 'daily_');
+    final weeklySeed = _extractSeedFromQuestIds(activeQuestIds, 'weekly_');
     await prefs.setInt(
       _planetDailySeedKey(planetId),
-      DailyQuestGenerator.dailySeedForDate(now),
+      dailySeed ?? DailyQuestGenerator.dailySeedForDate(DateTime.now()),
     );
     await prefs.setInt(
       _planetWeeklySeedKey(planetId),
-      DailyQuestGenerator.weeklySeedForDate(now),
+      weeklySeed ?? DailyQuestGenerator.weeklySeedForDate(DateTime.now()),
     );
 
     // Save achievement state
@@ -490,6 +495,23 @@ class SaveService {
   static Future<String?> loadActivePlanetId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keyActivePlanet);
+  }
+
+  /// Extract seed from quest IDs matching the given prefix.
+  /// Returns null if no matching quest found.
+  static int? _extractSeedFromQuestIds(
+    Iterable<String> questIds,
+    String prefix,
+  ) {
+    for (final id in questIds) {
+      if (id.startsWith(prefix)) {
+        final parts = id.split('_');
+        if (parts.length >= 2) {
+          return int.tryParse(parts[1]);
+        }
+      }
+    }
+    return null;
   }
 
   /// Migrate legacy save data to Earth planet format (one-time migration)
