@@ -39,14 +39,23 @@ class GameStateManager {
     VoidCallback onUpdate,
   ) {
     _resourceTimer = async.Timer.periodic(const Duration(seconds: 1), (timer) {
-      final buildings = getBuildingsCallback();
-      ResourceService.updateResources(resources, buildings);
+      try {
+        final buildings = getBuildingsCallback();
+        ResourceService.updateResources(resources, buildings);
 
-      // Check quest and achievement progress
-      questManager?.checkProgress(resources, buildings, researchManager);
-      achievementManager?.checkProgress(resources, buildings, researchManager);
+        // Check quest and achievement progress
+        questManager?.checkProgress(resources, buildings, researchManager);
+        achievementManager?.checkProgress(
+          resources,
+          buildings,
+          researchManager,
+        );
 
-      onUpdate();
+        onUpdate();
+      } catch (e, stackTrace) {
+        debugPrint('Resource generation tick failed: $e\n$stackTrace');
+        // Do not rethrow: re-throwing would cancel the Timer.periodic permanently.
+      }
     });
   }
 
