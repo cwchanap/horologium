@@ -22,6 +22,7 @@ class _QuestNotificationState extends State<QuestNotification>
   late AnimationController _controller;
   late Animation<Offset> _slideAnimation;
   Timer? _dismissTimer;
+  bool _disposed = false;
 
   @override
   void initState() {
@@ -40,7 +41,7 @@ class _QuestNotificationState extends State<QuestNotification>
     _dismissTimer = Timer(widget.duration, () {
       if (!mounted) return;
       _controller.reverse().then((_) {
-        widget.onDismissed?.call();
+        if (mounted && !_disposed) widget.onDismissed?.call();
       });
     });
   }
@@ -54,7 +55,7 @@ class _QuestNotificationState extends State<QuestNotification>
       _dismissTimer = Timer(widget.duration, () {
         if (!mounted) return;
         _controller.reverse().then((_) {
-          widget.onDismissed?.call();
+          if (mounted && !_disposed) widget.onDismissed?.call();
         });
       });
     }
@@ -62,6 +63,7 @@ class _QuestNotificationState extends State<QuestNotification>
 
   @override
   void dispose() {
+    _disposed = true;
     _dismissTimer?.cancel();
     _controller.dispose();
     super.dispose();
