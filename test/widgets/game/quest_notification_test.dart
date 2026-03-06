@@ -56,5 +56,43 @@ void main() {
       await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
     });
+
+    testWidgets(
+      'does not call onDismissed if widget removed during reverse animation',
+      (tester) async {
+        var callCount = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: QuestNotification(
+                questName: 'Test Quest',
+                duration: const Duration(milliseconds: 50),
+                onDismissed: () => callCount++,
+              ),
+            ),
+          ),
+        );
+
+        // Advance frame-by-frame past the 50ms timer so it fires and starts
+        // the 300ms reverse animation, but without completing that animation
+        // (a single pump(55ms) would run all frames synchronously and complete it).
+        for (int i = 0; i < 4; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        // ~64ms elapsed: timer has fired and reverse animation is in flight.
+
+        // Remove the widget from the tree before the 300ms reverse animation completes.
+        await tester.pumpWidget(
+          const MaterialApp(home: Scaffold(body: SizedBox())),
+        );
+
+        // Complete all pending animations/futures.
+        await tester.pumpAndSettle();
+
+        // onDismissed should NOT have been called because the widget was disposed
+        // before the reverse animation completed.
+        expect(callCount, equals(0));
+      },
+    );
   });
 }
