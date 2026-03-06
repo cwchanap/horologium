@@ -237,6 +237,33 @@ void main() {
 
         expect(manager.getUnlocked(), isEmpty);
       });
+
+      test(
+        'loadFromJson preserves currentAmount above targetAmount for over-achieved milestones',
+        () {
+          final manager = AchievementManager(
+            achievements: [
+              Achievement(
+                id: 'ach_builder_10',
+                name: 'Builder',
+                description: 'Place 10 buildings',
+                type: AchievementType.buildingCount,
+                targetAmount: 10,
+              ),
+            ],
+          );
+
+          manager.loadFromJson({
+            'unlocked': <String>[],
+            'progress': {'ach_builder_10': 15},
+          });
+
+          // currentAmount should be 15 (not clamped to 10)
+          expect(manager.achievements.first.currentAmount, equals(15));
+          // progress display is correctly capped at 1.0 by the getter
+          expect(manager.achievements.first.progress, equals(1.0));
+        },
+      );
     });
   });
 }

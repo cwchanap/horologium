@@ -120,7 +120,12 @@ class AchievementManager {
 
     for (final entry in progress.entries) {
       final a = _achievements[entry.key];
-      if (a == null) continue;
+      if (a == null) {
+        debugPrint(
+          'Warning: Unknown achievement ID "${entry.key}" in progress map, skipping.',
+        );
+        continue;
+      }
 
       // Parse progress value defensively
       int? value;
@@ -135,9 +140,8 @@ class AchievementManager {
       // Skip unknown or unparsable values
       if (value == null) continue;
 
-      // Clamp to valid range: >= 0 and <= targetAmount
-      final clamped = value.clamp(0, a.targetAmount);
-      a.currentAmount = clamped;
+      // Only clamp negative values; the progress getter already caps display at 1.0
+      a.currentAmount = value < 0 ? 0 : value;
     }
   }
 }
