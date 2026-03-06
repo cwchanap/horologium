@@ -387,6 +387,7 @@ class SaveService {
     );
 
     // Restore rotating quest history from saved IDs before loadFromJson
+    bool questLoadFailed = false;
     final questJson = prefs.getString(_planetQuestsKey(planetId));
     if (questJson != null) {
       try {
@@ -438,6 +439,7 @@ class SaveService {
 
         questManager.loadFromJson(savedQuestData);
       } catch (e, stackTrace) {
+        questLoadFailed = true;
         debugPrint(
           'Failed to parse quests JSON for planet $planetId: $e\n'
           'Raw JSON: $questJson\n'
@@ -447,6 +449,7 @@ class SaveService {
     }
 
     // Load achievement state
+    bool achievementLoadFailed = false;
     final achievementManager = AchievementManager(
       achievements: Planet.defaultAchievements(),
     );
@@ -457,6 +460,7 @@ class SaveService {
           jsonDecode(achievementJson) as Map<String, dynamic>,
         );
       } catch (e, stackTrace) {
+        achievementLoadFailed = true;
         debugPrint(
           'Failed to parse achievements JSON for planet $planetId: $e\n'
           'Raw JSON: $achievementJson\n'
@@ -480,6 +484,8 @@ class SaveService {
       buildings: buildings,
       buildingLimitsParseError: buildingLimitsParseError,
       buildingLimitsRawJson: buildingLimitsRawJson,
+      questLoadFailed: questLoadFailed,
+      achievementLoadFailed: achievementLoadFailed,
       lastDailySeed: lastDailySeed,
       lastWeeklySeed: lastWeeklySeed,
     );

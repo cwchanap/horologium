@@ -8,6 +8,41 @@ import 'package:horologium/game/planet/planet.dart';
 void main() {
   group('SaveService quest loading', () {
     test(
+      'loadOrCreatePlanet sets questLoadFailed when quest JSON is corrupt',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'planet.earth.resources_json': '{}',
+          'planet.earth.quests': '{invalid json',
+        });
+        final planet = await SaveService.loadOrCreatePlanet('earth');
+        expect(planet.questLoadFailed, isTrue);
+      },
+    );
+
+    test(
+      'loadOrCreatePlanet sets achievementLoadFailed when achievement JSON is corrupt',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'planet.earth.resources_json': '{}',
+          'planet.earth.achievements': '{invalid json',
+        });
+        final planet = await SaveService.loadOrCreatePlanet('earth');
+        expect(planet.achievementLoadFailed, isTrue);
+      },
+    );
+
+    test(
+      'loadOrCreatePlanet does not set questLoadFailed when quest JSON is valid or absent',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'planet.earth.resources_json': '{}',
+        });
+        final planet = await SaveService.loadOrCreatePlanet('earth');
+        expect(planet.questLoadFailed, isFalse);
+      },
+    );
+
+    test(
       'loadOrCreatePlanet handles non-string elements in quest list IDs gracefully',
       () async {
         // Simulate corrupted JSON where quest IDs are integers, not strings

@@ -170,6 +170,53 @@ class _MainGameWidgetState extends State<MainGameWidget>
       widget.planet.buildingLimitManager.toMap(),
     );
     setState(() {});
+
+    // Warn the user if any save data failed to parse
+    if (widget.planet.buildingLimitsParseError) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Your building limit data could not be loaded and has been reset.',
+              ),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+      });
+    }
+    if (widget.planet.questLoadFailed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Your quest progress could not be loaded and has been reset.',
+              ),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+      });
+    }
+    if (widget.planet.achievementLoadFailed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Your achievement progress could not be loaded and has been reset.',
+              ),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+      });
+    }
   }
 
   void _startResourceGeneration() {

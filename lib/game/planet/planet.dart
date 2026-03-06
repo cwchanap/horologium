@@ -25,6 +25,12 @@ class Planet {
   /// Raw JSON that failed to parse, preserved for manual recovery
   final String? buildingLimitsRawJson;
 
+  /// Indicates if quest JSON failed to parse during load
+  final bool questLoadFailed;
+
+  /// Indicates if achievement JSON failed to parse during load
+  final bool achievementLoadFailed;
+
   /// Last daily quest seed used to determine if daily quests should refresh
   final int lastDailySeed;
 
@@ -42,6 +48,8 @@ class Planet {
     List<PlacedBuildingData>? buildings,
     this.buildingLimitsParseError = false,
     this.buildingLimitsRawJson,
+    this.questLoadFailed = false,
+    this.achievementLoadFailed = false,
     this.lastDailySeed = 0,
     this.lastWeeklySeed = 0,
   }) : resources = resources ?? Resources(),
@@ -124,6 +132,8 @@ class Planet {
     List<PlacedBuildingData>? buildings,
     bool? buildingLimitsParseError,
     String? buildingLimitsRawJson,
+    bool? questLoadFailed,
+    bool? achievementLoadFailed,
     int? lastDailySeed,
     int? lastWeeklySeed,
   }) {
@@ -140,6 +150,9 @@ class Planet {
           buildingLimitsParseError ?? this.buildingLimitsParseError,
       buildingLimitsRawJson:
           buildingLimitsRawJson ?? this.buildingLimitsRawJson,
+      questLoadFailed: questLoadFailed ?? this.questLoadFailed,
+      achievementLoadFailed:
+          achievementLoadFailed ?? this.achievementLoadFailed,
       lastDailySeed: lastDailySeed ?? this.lastDailySeed,
       lastWeeklySeed: lastWeeklySeed ?? this.lastWeeklySeed,
     );
