@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:horologium/game/achievements/achievement_manager.dart';
 import 'package:horologium/game/services/save_service.dart';
 import 'package:horologium/game/quests/quest.dart';
 import 'package:horologium/game/quests/quest_manager.dart';
+import 'package:horologium/game/quests/quest_registry.dart';
 import 'package:horologium/game/planet/planet.dart';
 
 void main() {
@@ -92,6 +94,96 @@ void main() {
         // The saved daily seed must be 20260101, NOT today's date
         final savedSeed = prefs.getInt('planet.earth.quests.dailySeed');
         expect(savedSeed, equals(20260101));
+      },
+    );
+  });
+
+  group('SaveService round-trip', () {
+    test(
+      'savePlanet and loadOrCreatePlanet round-trips quest status correctly',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+
+        final questManager = QuestManager(quests: QuestRegistry.starterQuests);
+        final allQuests = questManager.quests;
+
+        // Need at least 3 quests to test all statuses
+        expect(allQuests.length, greaterThanOrEqualTo(3));
+
+        // Set 3 different statuses
+        final q0 = allQuests[0];
+        final q1 = allQuests[1];
+        final q2 = allQuests[2];
+
+        q0.status = QuestStatus.active;
+        if (q0.objectives.isNotEmpty) {
+          q0.objectives.first.currentAmount = 3;
+        }
+        q1.status = QuestStatus.completed;
+        q2.status = QuestStatus.claimed;
+
+        final planet = Planet(
+          id: 'roundtrip_test',
+          name: 'Test',
+          questManager: questManager,
+        );
+        await SaveService.savePlanet(planet);
+
+        final loaded = await SaveService.loadOrCreatePlanet(
+          'roundtrip_test',
+          name: 'Test',
+        );
+        final loadedQuests = loaded.questManager.quests;
+
+        final loadedQ0 = loadedQuests.firstWhere((q) => q.id == q0.id);
+        final loadedQ1 = loadedQuests.firstWhere((q) => q.id == q1.id);
+        final loadedQ2 = loadedQuests.firstWhere((q) => q.id == q2.id);
+
+        expect(loadedQ0.status, equals(QuestStatus.active));
+        expect(loadedQ1.status, equals(QuestStatus.completed));
+        expect(loadedQ2.status, equals(QuestStatus.claimed));
+
+        // Verify objective progress survived if q0 had objectives
+        if (q0.objectives.isNotEmpty) {
+          final loadedObj = loadedQ0.objectives.first;
+          expect(loadedObj.currentAmount, equals(3));
+        }
+      },
+    );
+
+    test(
+      'savePlanet and loadOrCreatePlanet round-trips achievement state correctly',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+
+        final achievements = Planet.defaultAchievements();
+        final firstId = achievements[0].id;
+        final secondId = achievements[1].id;
+
+        achievements[0].isUnlocked = true; // first achievement unlocked
+        achievements[1].currentAmount = 7; // second achievement at 7 progress
+
+        final achievementManager = AchievementManager(
+          achievements: achievements,
+        );
+        final planet = Planet(
+          id: 'ach_roundtrip_test',
+          name: 'Test',
+          achievementManager: achievementManager,
+        );
+        await SaveService.savePlanet(planet);
+
+        final loaded = await SaveService.loadOrCreatePlanet(
+          'ach_roundtrip_test',
+          name: 'Test',
+        );
+        final loadedAchs = loaded.achievementManager.achievements;
+
+        final loadedFirst = loadedAchs.firstWhere((a) => a.id == firstId);
+        final loadedSecond = loadedAchs.firstWhere((a) => a.id == secondId);
+
+        expect(loadedFirst.isUnlocked, isTrue);
+        expect(loadedSecond.currentAmount, equals(7));
       },
     );
   });
