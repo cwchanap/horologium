@@ -49,7 +49,8 @@ class _QuestNotificationState extends State<QuestNotification>
   @override
   void didUpdateWidget(covariant QuestNotification oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.questName != widget.questName) {
+    if (oldWidget.questName != widget.questName ||
+        oldWidget.duration != widget.duration) {
       _dismissTimer?.cancel();
       _controller.forward(from: 0);
       _dismissTimer = Timer(widget.duration, () {
