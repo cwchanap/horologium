@@ -68,6 +68,123 @@ void main() {
       final gsm = GameStateManager(resources: Resources());
       expect(gsm.refreshRotatingQuests(), isFalse);
     });
+
+    group('onSeedsChanged callback', () {
+      test('callback is invoked when quests are refreshed', () {
+        final gsm = GameStateManager(resources: Resources());
+        gsm.questManager = QuestManager(quests: []);
+
+        int? capturedDailySeed;
+        int? capturedWeeklySeed;
+
+        void onSeedsChanged(int dailySeed, int weeklySeed) {
+          capturedDailySeed = dailySeed;
+          capturedWeeklySeed = weeklySeed;
+        }
+
+        final date = DateTime.utc(2026, 2, 27);
+        final refreshed = gsm.refreshRotatingQuests(
+          now: date,
+          onSeedsChanged: onSeedsChanged,
+        );
+
+        expect(refreshed, isTrue);
+        expect(capturedDailySeed, isNotNull);
+        expect(capturedWeeklySeed, isNotNull);
+        // Verify the captured seeds match the expected values for the date
+        // Daily seed is YYYYMMDD format
+        expect(capturedDailySeed, equals(20260227));
+        // Weekly seed is YYYYMMDD of the Monday of that ISO week
+        // Feb 27, 2026 is a Friday, so Monday is Feb 23, 2026
+        expect(capturedWeeklySeed, equals(20260223));
+      });
+
+      test('callback is NOT invoked when quests are not refreshed', () {
+        final gsm = GameStateManager(resources: Resources());
+        gsm.questManager = QuestManager(quests: []);
+
+        final date = DateTime.utc(2026, 2, 27);
+
+        // First refresh - callback should be called
+        var callbackInvoked = false;
+        gsm.refreshRotatingQuests(
+          now: date,
+          onSeedsChanged: (dailySeed, weeklySeed) => callbackInvoked = true,
+        );
+        expect(callbackInvoked, isTrue);
+
+        // Second refresh with same day - callback should NOT be called
+        callbackInvoked = false;
+        gsm.refreshRotatingQuests(
+          now: DateTime.utc(2026, 2, 27, 18, 0),
+          onSeedsChanged: (dailySeed, weeklySeed) => callbackInvoked = true,
+        );
+        expect(callbackInvoked, isFalse);
+      });
+
+      test('callback is NOT invoked when quests are not refreshed', () {
+        final gsm = GameStateManager(resources: Resources());
+        gsm.questManager = QuestManager(quests: []);
+
+        final date = DateTime.utc(2026, 2, 27);
+
+        // First refresh - callback should be called
+        var callbackInvoked = false;
+        gsm.refreshRotatingQuests(
+          now: date,
+          onSeedsChanged: (daily, weekly) => callbackInvoked = true,
+        );
+        expect(callbackInvoked, isTrue);
+
+        // Second refresh with same day - callback should NOT be called
+        callbackInvoked = false;
+        gsm.refreshRotatingQuests(
+          now: DateTime.utc(2026, 2, 27, 18, 0),
+          onSeedsChanged: (daily, weekly) => callbackInvoked = true,
+        );
+        expect(callbackInvoked, isFalse);
+      });
+
+      test('callback is optional - works without it', () {
+        final gsm = GameStateManager(resources: Resources());
+        gsm.questManager = QuestManager(quests: []);
+
+        // Should not throw when callback is null
+        expect(
+          () => gsm.refreshRotatingQuests(now: DateTime.utc(2026, 2, 27)),
+          returnsNormally,
+        );
+      });
+
+      test('callback receives correct seeds for different dates', () {
+        final gsm = GameStateManager(resources: Resources());
+        gsm.questManager = QuestManager(quests: []);
+
+        List<Map<String, int>> capturedSeeds = [];
+
+        // First refresh
+        gsm.refreshRotatingQuests(
+          now: DateTime.utc(2026, 2, 27),
+          onSeedsChanged: (daily, weekly) {
+            capturedSeeds.add({'daily': daily, 'weekly': weekly});
+          },
+        );
+
+        // Second refresh on next day
+        gsm.refreshRotatingQuests(
+          now: DateTime.utc(2026, 2, 28),
+          onSeedsChanged: (daily, weekly) {
+            capturedSeeds.add({'daily': daily, 'weekly': weekly});
+          },
+        );
+
+        expect(capturedSeeds.length, equals(2));
+        expect(capturedSeeds[0]['daily'], equals(20260227));
+        expect(capturedSeeds[1]['daily'], equals(20260228));
+        // Weekly seed should be the same (same week)
+        expect(capturedSeeds[0]['weekly'], equals(capturedSeeds[1]['weekly']));
+      });
+    });
   });
 
   group('GameStateManager researchManager', () {

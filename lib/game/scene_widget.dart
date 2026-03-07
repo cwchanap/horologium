@@ -104,7 +104,15 @@ class _MainGameWidgetState extends State<MainGameWidget>
     };
 
     // Populate daily/weekly rotating quests (only if seeds changed)
-    _gameStateManager.refreshRotatingQuests();
+    // Provide callback to persist seeds immediately to prevent regeneration on re-entry
+    _gameStateManager.refreshRotatingQuests(
+      onSeedsChanged: (dailySeed, weeklySeed) {
+        SaveService.saveQuestSeeds(
+          widget.planet.id,
+          widget.planet.questManager,
+        );
+      },
+    );
 
     _placementManager = BuildingPlacementManager(
       game: _game,
@@ -154,7 +162,14 @@ class _MainGameWidgetState extends State<MainGameWidget>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      _gameStateManager.refreshRotatingQuests();
+      _gameStateManager.refreshRotatingQuests(
+        onSeedsChanged: (dailySeed, weeklySeed) {
+          SaveService.saveQuestSeeds(
+            widget.planet.id,
+            widget.planet.questManager,
+          );
+        },
+      );
     }
     _audioManager.handleLifecycleChange(state);
   }
