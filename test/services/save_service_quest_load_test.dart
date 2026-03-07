@@ -51,8 +51,8 @@ void main() {
         const corruptQuestJson =
             '{"active":[123,456],"completed":[],"claimed":[],"objectiveProgress":{}}';
         SharedPreferences.setMockInitialValues({
-          'planet_earth_resources_json': '{}',
-          'planet_earth_quests': corruptQuestJson,
+          'planet.earth.resources_json': '{}',
+          'planet.earth.quests': corruptQuestJson,
         });
         // Should not throw; should return a planet with default quest manager
         final planet = await SaveService.loadOrCreatePlanet('earth');

@@ -113,6 +113,18 @@ void main() {
         expect(manager.getUnlocked().any((a) => a.id == 'ach_rich'), isTrue);
       });
 
+      test('updates research completion achievement progress', () {
+        final researchManager = ResearchManager();
+        researchManager.completeResearch(ResearchType.electricity);
+
+        manager.checkProgress(Resources(), [], researchManager);
+
+        final achievement = manager.achievements.firstWhere(
+          (a) => a.id == 'ach_all_research',
+        );
+        expect(achievement.currentAmount, equals(1));
+      });
+
       test('unlocks happiness achievement', () {
         final resources = Resources();
         resources.happiness = 92;

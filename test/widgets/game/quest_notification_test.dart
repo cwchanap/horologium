@@ -37,6 +37,41 @@ void main() {
       expect(dismissed, isTrue);
     });
 
+    testWidgets('restarts dismiss timer when duration changes', (tester) async {
+      var dismissCount = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: QuestNotification(
+              questName: 'Build Houses',
+              duration: const Duration(seconds: 5),
+              onDismissed: () => dismissCount++,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump(const Duration(seconds: 1));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: QuestNotification(
+              questName: 'Build Houses',
+              duration: const Duration(milliseconds: 100),
+              onDismissed: () => dismissCount++,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pumpAndSettle();
+
+      expect(dismissCount, equals(1));
+    });
+
     testWidgets('does not crash when widget is disposed before timer fires', (
       tester,
     ) async {

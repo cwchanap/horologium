@@ -155,6 +155,7 @@ class QuestManager {
     switch (objective.type) {
       case QuestObjectiveType.buildBuilding:
         objective.currentAmount = buildingCounts[objective.targetId] ?? 0;
+        break;
       case QuestObjectiveType.accumulateResource:
         final type = ResourceType.values
             .where((r) => r.name == objective.targetId)
@@ -162,16 +163,21 @@ class QuestManager {
         if (type != null) {
           objective.currentAmount = (resources.resources[type] ?? 0).toInt();
         }
+        break;
       case QuestObjectiveType.completeResearch:
         objective.currentAmount =
             researchManager.isResearchedById(objective.targetId) ? 1 : 0;
+        break;
       case QuestObjectiveType.reachPopulation:
         objective.currentAmount = resources.population;
+        break;
       case QuestObjectiveType.achieveHappiness:
         objective.currentAmount = resources.happiness.toInt();
+        break;
       case QuestObjectiveType.upgradeBuilding:
         // Future: check max level of specific building type
         objective.currentAmount = 0;
+        break;
     }
   }
 
@@ -187,10 +193,13 @@ class QuestManager {
       switch (quest.status) {
         case QuestStatus.active:
           active.add(quest.id);
+          break;
         case QuestStatus.completed:
           completed.add(quest.id);
+          break;
         case QuestStatus.claimed:
           claimed.add(quest.id);
+          break;
         case QuestStatus.available:
           break;
       }
@@ -316,7 +325,10 @@ class QuestManager {
         } else if (raw is String) {
           safeInt = int.tryParse(raw);
         }
-        quest.objectives[index].currentAmount = safeInt ?? 0;
+        final restoredAmount = safeInt ?? 0;
+        quest.objectives[index].currentAmount = restoredAmount < 0
+            ? 0
+            : restoredAmount;
       }
     }
   }

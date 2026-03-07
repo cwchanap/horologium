@@ -11,7 +11,8 @@ import '../services/resource_service.dart';
 
 class GameStateManager {
   final Resources resources;
-  ResearchManager researchManager = ResearchManager();
+  ResearchManager researchManager =
+      ResearchManager(); // Mutable because loaded Planet state can replace it during initialization/restore.
   final BuildingLimitManager buildingLimitManager = BuildingLimitManager();
   QuestManager? questManager;
   AchievementManager? achievementManager;

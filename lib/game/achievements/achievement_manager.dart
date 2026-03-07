@@ -45,8 +45,10 @@ class AchievementManager {
     switch (achievement.type) {
       case AchievementType.buildingCount:
         achievement.currentAmount = buildings.length;
+        break;
       case AchievementType.populationReached:
         achievement.currentAmount = resources.population;
+        break;
       case AchievementType.resourceAccumulated:
         if (achievement.targetId != null) {
           final type = ResourceType.values
@@ -57,14 +59,17 @@ class AchievementManager {
                 .toInt();
           }
         }
+        break;
       case AchievementType.researchCompleted:
         int count = 0;
         for (final r in Research.availableResearch) {
           if (researchManager.isResearched(r.type)) count++;
         }
         achievement.currentAmount = count;
+        break;
       case AchievementType.happinessReached:
         achievement.currentAmount = resources.happiness.toInt();
+        break;
     }
   }
 

@@ -443,6 +443,21 @@ void main() {
         expect(manager.getActiveQuests(), isEmpty);
       });
 
+      test('loadFromJson clamps negative objective progress to zero', () {
+        manager.loadFromJson({
+          'active': ['test_build_house'],
+          'objectiveProgress': {
+            'test_build_house': {'0': -5},
+          },
+        });
+
+        final restoredQuest = manager.getActiveQuests().firstWhere(
+          (q) => q.id == 'test_build_house',
+        );
+
+        expect(restoredQuest.objectives.first.currentAmount, equals(0));
+      });
+
       test('preserves claimed quest objective progress after save/load', () {
         // Set up a quest that gets completed and claimed with progress
         manager.activateQuest('test_build_house');
