@@ -45,7 +45,8 @@ class QuestManager {
   }
 
   /// Remove rotating quests by ID prefix (e.g. 'daily_', 'weekly_').
-  /// Optionally preserve quests that have already been claimed.
+  /// When [preserveClaimed] is true, preserves quests that have been
+  /// completed or claimed (to protect player progress and unclaimed rewards).
   void removeRotatingQuests(String prefix, {bool preserveClaimed = false}) {
     _quests.removeWhere((id, quest) {
       if (!id.startsWith(prefix)) return false;
