@@ -503,21 +503,32 @@ class SaveService {
     return prefs.getString(_keyActivePlanet);
   }
 
-  /// Extract seed from quest IDs matching the given prefix.
+  /// Extract the latest (maximum) seed from quest IDs matching the given prefix.
   /// Returns null if no matching quest found.
+  ///
+  /// This ensures that when a planet has rotating quests from multiple seeds
+  /// (e.g., old claimed dailies from previous days plus current active dailies),
+  /// the latest seed is persisted to avoid unnecessary quest regeneration.
   static int? _extractSeedFromQuestIds(
     Iterable<String> questIds,
     String prefix,
   ) {
+    int? latestSeed;
     for (final id in questIds) {
       if (id.startsWith(prefix)) {
         final parts = id.split('_');
         if (parts.length >= 2) {
-          return int.tryParse(parts[1]);
+          final seed = int.tryParse(parts[1]);
+          if (seed != null) {
+            // Track the maximum (latest) seed
+            if (latestSeed == null || seed > latestSeed) {
+              latestSeed = seed;
+            }
+          }
         }
       }
     }
-    return null;
+    return latestSeed;
   }
 
   /// Migrate legacy save data to Earth planet format (one-time migration)
