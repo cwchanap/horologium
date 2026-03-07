@@ -531,6 +531,37 @@ class SaveService {
     return latestSeed;
   }
 
+  /// Save the current quest seeds for a planet to SharedPreferences.
+  ///
+  /// This should be called immediately after quest refresh to ensure seeds
+  /// are synchronized across session boundaries. Without this, re-entering the
+  /// game in the same session would use stale seeds from the Planet object,
+  /// causing unnecessary quest regeneration and loss of in-progress objectives.
+  ///
+  /// This method performs a lightweight save of just the seed values,
+  /// avoiding the overhead of a full planet save.
+  static Future<void> saveQuestSeeds(
+    String planetId,
+    QuestManager questManager,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Extract seeds from current quest IDs
+    final allQuestIds = questManager.quests.map((q) => q.id);
+    final dailySeed = _extractSeedFromQuestIds(allQuestIds, 'daily_');
+    final weeklySeed = _extractSeedFromQuestIds(allQuestIds, 'weekly_');
+
+    // Save seeds to persistent storage
+    await prefs.setInt(
+      _planetDailySeedKey(planetId),
+      dailySeed ?? DailyQuestGenerator.dailySeedForDate(DateTime.now()),
+    );
+    await prefs.setInt(
+      _planetWeeklySeedKey(planetId),
+      weeklySeed ?? DailyQuestGenerator.weeklySeedForDate(DateTime.now()),
+    );
+  }
+
   /// Migrate legacy save data to Earth planet format (one-time migration)
   static Future<Planet> _migrateLegacyToEarth() async {
     final prefs = await SharedPreferences.getInstance();

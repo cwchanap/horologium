@@ -67,7 +67,14 @@ class GameStateManager {
 
   /// Refresh daily and weekly rotating quests if the date-based seed has changed.
   /// Returns true if any quests were refreshed.
-  bool refreshRotatingQuests({DateTime? now}) {
+  ///
+  /// If [onSeedsChanged] is provided and quests were refreshed, it will be called
+  /// to persist the new seed values. This ensures seeds stay synchronized across
+  /// session boundaries, preventing unnecessary quest regeneration on re-entry.
+  bool refreshRotatingQuests({
+    DateTime? now,
+    void Function(int dailySeed, int weeklySeed)? onSeedsChanged,
+  }) {
     final qm = questManager;
     if (qm == null) return false;
 
@@ -91,6 +98,11 @@ class GameStateManager {
       );
       _lastWeeklySeed = weeklySeed;
       refreshed = true;
+    }
+
+    // Persist seeds if changed and callback provided
+    if (refreshed && onSeedsChanged != null) {
+      onSeedsChanged(dailySeed, weeklySeed);
     }
 
     return refreshed;
