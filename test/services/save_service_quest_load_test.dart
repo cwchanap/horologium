@@ -96,6 +96,111 @@ void main() {
         expect(savedSeed, equals(20260101));
       },
     );
+
+    test(
+      'savePlanet persists latest daily seed when old claimed and new active quests coexist',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+
+        // Build a quest manager with both old claimed quests and new active quests
+        final questManager = QuestManager(
+          quests: [
+            // Old claimed quest from Jan 1
+            Quest(
+              id: 'daily_20260101_0',
+              name: 'Old Quest',
+              description: 'Old quest from previous day',
+              objectives: [],
+              reward: const QuestReward(),
+            ),
+            // New active quest from Jan 5
+            Quest(
+              id: 'daily_20260105_1',
+              name: 'New Quest',
+              description: 'Current active quest',
+              objectives: [],
+              reward: const QuestReward(),
+            ),
+          ],
+        );
+        // Mark old quest as claimed, new quest as active
+        questManager.quests
+                .firstWhere((q) => q.id == 'daily_20260101_0')
+                .status =
+            QuestStatus.claimed;
+        questManager.quests
+                .firstWhere((q) => q.id == 'daily_20260105_1')
+                .status =
+            QuestStatus.active;
+
+        final planet = Planet(
+          id: 'earth',
+          name: 'Earth',
+          questManager: questManager,
+        );
+        await SaveService.savePlanet(planet);
+
+        // The saved daily seed must be the LATEST seed (20260105), not the first one (20260101)
+        final savedSeed = prefs.getInt('planet.earth.quests.dailySeed');
+        expect(
+          savedSeed,
+          equals(20260105),
+          reason: 'Should save latest seed, not first matching seed',
+        );
+      },
+    );
+
+    test(
+      'savePlanet persists latest weekly seed when old and new weekly quests coexist',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+
+        // Build a quest manager with both old and new weekly quests
+        final questManager = QuestManager(
+          quests: [
+            Quest(
+              id: 'weekly_202601_0',
+              name: 'Old Weekly',
+              description: 'Old weekly quest',
+              objectives: [],
+              reward: const QuestReward(),
+            ),
+            Quest(
+              id: 'weekly_202603_1',
+              name: 'New Weekly',
+              description: 'Current weekly quest',
+              objectives: [],
+              reward: const QuestReward(),
+            ),
+          ],
+        );
+        questManager.quests
+                .firstWhere((q) => q.id == 'weekly_202601_0')
+                .status =
+            QuestStatus.claimed;
+        questManager.quests
+                .firstWhere((q) => q.id == 'weekly_202603_1')
+                .status =
+            QuestStatus.active;
+
+        final planet = Planet(
+          id: 'earth',
+          name: 'Earth',
+          questManager: questManager,
+        );
+        await SaveService.savePlanet(planet);
+
+        // The saved weekly seed must be the LATEST seed (202603), not the first one (202601)
+        final savedSeed = prefs.getInt('planet.earth.quests.weeklySeed');
+        expect(
+          savedSeed,
+          equals(202603),
+          reason: 'Should save latest weekly seed, not first matching seed',
+        );
+      },
+    );
   });
 
   group('SaveService round-trip', () {
