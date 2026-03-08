@@ -2,12 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 class QuestNotification extends StatefulWidget {
+  final String questId;
   final String questName;
   final VoidCallback? onDismissed;
   final Duration duration;
 
   const QuestNotification({
     super.key,
+    required this.questId,
     required this.questName,
     this.onDismissed,
     this.duration = const Duration(seconds: 3),
@@ -49,7 +51,8 @@ class _QuestNotificationState extends State<QuestNotification>
   @override
   void didUpdateWidget(covariant QuestNotification oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.questName != widget.questName ||
+    if (oldWidget.questId != widget.questId ||
+        oldWidget.questName != widget.questName ||
         oldWidget.duration != widget.duration) {
       _dismissTimer?.cancel();
       _controller.forward(from: 0);

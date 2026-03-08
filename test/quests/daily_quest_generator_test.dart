@@ -1,7 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/quests/daily_quest_generator.dart';
 import 'package:horologium/game/quests/quest.dart';
 import 'package:horologium/game/quests/quest_objective.dart';
+import 'package:horologium/game/research/research.dart';
+import 'package:horologium/game/research/research_type.dart';
 
 void main() {
   group('DailyQuestGenerator', () {
@@ -16,9 +19,130 @@ void main() {
       }
     });
 
+    test('generates daily quests with research manager', () {
+      final researchManager = ResearchManager();
+      final quests = DailyQuestGenerator.generateDaily(
+        seed: 42,
+        researchManager: researchManager,
+      );
+      expect(quests, isNotEmpty);
+      expect(
+        quests.length,
+        lessThanOrEqualTo(DailyQuestGenerator.dailyQuestCount),
+      );
+      for (final q in quests) {
+        expect(q.id, startsWith('daily_'));
+        expect(q.status, equals(QuestStatus.available));
+        expect(q.objectives, isNotEmpty);
+      }
+    });
+
+    test('filters out research-gated buildings when no research completed', () {
+      final researchManager = ResearchManager();
+      // No research completed, so only non-gated buildings should appear
+      final quests = DailyQuestGenerator.generateDaily(
+        seed: 42,
+        researchManager: researchManager,
+      );
+
+      // Create a mapping manually for verification
+      final buildingTypeMap = {
+        'house': BuildingType.house,
+        'powerPlant': BuildingType.powerPlant,
+        'goldMine': BuildingType.goldMine,
+        'woodFactory': BuildingType.woodFactory,
+        'waterTreatment': BuildingType.waterTreatment,
+      };
+
+      for (final q in quests) {
+        for (final o in q.objectives) {
+          if (o.type == QuestObjectiveType.buildBuilding) {
+            // Verify target is not a research-gated building
+            final targetType = buildingTypeMap[o.targetId];
+            if (targetType != null) {
+              // powerPlant and goldMine are gated
+              expect(
+                targetType,
+                isNot(equals(BuildingType.powerPlant)),
+                reason:
+                    'Power Plant should not appear without electricity research',
+              );
+              expect(
+                targetType,
+                isNot(equals(BuildingType.goldMine)),
+                reason:
+                    'Gold Mine should not appear without gold mining research',
+              );
+            }
+          }
+        }
+      }
+    });
+
+    test('includes research-gated buildings when research completed', () {
+      final researchManager = ResearchManager();
+      // Complete electricity research
+      researchManager.completeResearch(ResearchType.electricity);
+      // Complete gold mining research
+      researchManager.completeResearch(ResearchType.goldMining);
+
+      // Generate many quests with different seeds to increase chance of gated buildings
+      final allQuests = <Quest>[];
+      for (int seed = 0; seed < 50; seed++) {
+        allQuests.addAll(
+          DailyQuestGenerator.generateDaily(
+            seed: seed,
+            researchManager: researchManager,
+          ),
+        );
+      }
+
+      // Power Plant and Gold Mine should now be available in the quest pool
+      // (though RNG determines if they actually appear in specific quests)
+      final hasPowerPlant = allQuests.any(
+        (q) => q.objectives.any(
+          (o) =>
+              o.type == QuestObjectiveType.buildBuilding &&
+              o.targetId == 'powerPlant',
+        ),
+      );
+      final hasGoldMine = allQuests.any(
+        (q) => q.objectives.any(
+          (o) =>
+              o.type == QuestObjectiveType.buildBuilding &&
+              o.targetId == 'goldMine',
+        ),
+      );
+
+      // At least one should appear across many seeds
+      expect(
+        hasPowerPlant || hasGoldMine,
+        isTrue,
+        reason:
+            'At least one gated building should appear in quest pool when researched (tested 50 seeds)',
+      );
+    });
+
     test('same seed produces same quests', () {
       final quests1 = DailyQuestGenerator.generateDaily(seed: 123);
       final quests2 = DailyQuestGenerator.generateDaily(seed: 123);
+      expect(quests1.length, equals(quests2.length));
+      for (int i = 0; i < quests1.length; i++) {
+        expect(quests1[i].id, equals(quests2[i].id));
+        expect(quests1[i].name, equals(quests2[i].name));
+      }
+    });
+
+    test('same seed with research manager produces same quests', () {
+      final researchManager = ResearchManager();
+      final quests1 = DailyQuestGenerator.generateDaily(
+        seed: 123,
+        researchManager: researchManager,
+      );
+      final quests2 = DailyQuestGenerator.generateDaily(
+        seed: 123,
+        researchManager: researchManager,
+      );
       expect(quests1.length, equals(quests2.length));
       for (int i = 0; i < quests1.length; i++) {
         expect(quests1[i].id, equals(quests2[i].id));

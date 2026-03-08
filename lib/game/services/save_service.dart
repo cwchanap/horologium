@@ -380,10 +380,16 @@ class SaveService {
     final currentDailySeed = DailyQuestGenerator.dailySeedForDate(now);
     final currentWeeklySeed = DailyQuestGenerator.weeklySeedForDate(now);
     questManager.addRotatingQuests(
-      DailyQuestGenerator.generateDaily(seed: currentDailySeed),
+      DailyQuestGenerator.generateDaily(
+        seed: currentDailySeed,
+        researchManager: researchManager,
+      ),
     );
     questManager.addRotatingQuests(
-      DailyQuestGenerator.generateWeekly(seed: currentWeeklySeed),
+      DailyQuestGenerator.generateWeekly(
+        seed: currentWeeklySeed,
+        researchManager: researchManager,
+      ),
     );
 
     // Restore rotating quest history from saved IDs before loadFromJson
@@ -416,7 +422,10 @@ class SaveService {
                   seed != currentDailySeed &&
                   !reconstructedDailySeeds.contains(seed)) {
                 questManager.addRotatingQuests(
-                  DailyQuestGenerator.generateDaily(seed: seed),
+                  DailyQuestGenerator.generateDaily(
+                    seed: seed,
+                    researchManager: researchManager,
+                  ),
                 );
                 reconstructedDailySeeds.add(seed);
               }
@@ -429,7 +438,10 @@ class SaveService {
                   seed != currentWeeklySeed &&
                   !reconstructedWeeklySeeds.contains(seed)) {
                 questManager.addRotatingQuests(
-                  DailyQuestGenerator.generateWeekly(seed: seed),
+                  DailyQuestGenerator.generateWeekly(
+                    seed: seed,
+                    researchManager: researchManager,
+                  ),
                 );
                 reconstructedWeeklySeeds.add(seed);
               }

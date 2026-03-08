@@ -1,6 +1,9 @@
 import 'dart:math';
 
+import '../building/building.dart';
+import '../research/research.dart';
 import '../resources/resource_type.dart';
+import '../services/building_service.dart';
 import 'quest.dart';
 import 'quest_objective.dart';
 
@@ -8,6 +11,16 @@ import 'quest_objective.dart';
 class DailyQuestGenerator {
   static const int dailyQuestCount = 3;
   static const int weeklyQuestCount = 2;
+
+  /// Mapping from target string IDs to BuildingType enum values
+  /// Used to filter building targets based on research state
+  static final Map<String, BuildingType> _buildingTypeMap = {
+    'house': BuildingType.house,
+    'powerPlant': BuildingType.powerPlant,
+    'goldMine': BuildingType.goldMine,
+    'woodFactory': BuildingType.woodFactory,
+    'waterTreatment': BuildingType.waterTreatment,
+  };
 
   /// Templates that the generator picks from.
   static const _templates = [
@@ -92,21 +105,29 @@ class DailyQuestGenerator {
     return monday.year * 10000 + monday.month * 100 + monday.day;
   }
 
-  static List<Quest> generateDaily({required int seed}) {
+  static List<Quest> generateDaily({
+    required int seed,
+    ResearchManager? researchManager,
+  }) {
     return _generate(
       seed: seed,
       count: dailyQuestCount,
       prefix: 'daily',
       isWeekly: false,
+      researchManager: researchManager,
     );
   }
 
-  static List<Quest> generateWeekly({required int seed}) {
+  static List<Quest> generateWeekly({
+    required int seed,
+    ResearchManager? researchManager,
+  }) {
     return _generate(
       seed: seed,
       count: weeklyQuestCount,
       prefix: 'weekly',
       isWeekly: true,
+      researchManager: researchManager,
     );
   }
 
@@ -115,15 +136,56 @@ class DailyQuestGenerator {
     required int count,
     required String prefix,
     required bool isWeekly,
+    ResearchManager? researchManager,
   }) {
     final rng = Random(seed);
     final quests = <Quest>[];
 
+    // Get available building types if researchManager is provided
+    Set<BuildingType>? availableBuildings;
+    if (researchManager != null) {
+      availableBuildings = BuildingService.getAvailableBuildings(
+        researchManager,
+      ).map((b) => b.type).toSet();
+    }
+
     for (int i = 0; i < count; i++) {
       final templateIndex = rng.nextInt(_templates.length);
       final template = _templates[templateIndex];
-      final targetIndex = rng.nextInt(template.targets.length);
-      final targetId = template.targets[targetIndex];
+
+      // Filter targets based on available buildings for building objectives
+      List<String> filteredTargets = template.targets;
+      if (template.objectiveType == QuestObjectiveType.buildBuilding &&
+          availableBuildings != null) {
+        filteredTargets = template.targets.where((targetId) {
+          final buildingType = _buildingTypeMap[targetId];
+          return buildingType == null ||
+              availableBuildings!.contains(buildingType);
+        }).toList();
+
+        // If all targets are filtered out, skip this quest or fall back to first available
+        if (filteredTargets.isEmpty) {
+          // Find at least one building that's available
+          final availableBuildingTargets = _buildingTypeMap.entries
+              .where((entry) => availableBuildings!.contains(entry.value))
+              .map((entry) => entry.key)
+              .toList();
+
+          if (availableBuildingTargets.isNotEmpty) {
+            filteredTargets = [
+              availableBuildingTargets[rng.nextInt(
+                availableBuildingTargets.length,
+              )],
+            ];
+          } else {
+            // If no buildings available at all, skip this quest
+            continue;
+          }
+        }
+      }
+
+      final targetIndex = rng.nextInt(filteredTargets.length);
+      final targetId = filteredTargets[targetIndex];
 
       final range = isWeekly ? template.weeklyRange : template.dailyRange;
       final targetAmount = range[0] + rng.nextInt(range[1] - range[0] + 1);
