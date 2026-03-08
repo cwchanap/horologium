@@ -30,6 +30,11 @@ class _QuestLogPageState extends State<QuestLogPage>
   void Function(Quest, QuestStatus, QuestStatus)? _questStatusCallback;
   void Function(Achievement)? _achievementUnlockedCallback;
 
+  // Store original callbacks to restore after disposal
+  void Function(Quest)? _originalOnQuestCompleted;
+  void Function(Quest)? _originalOnQuestAvailable;
+  void Function(Achievement)? _originalOnAchievementUnlocked;
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +54,12 @@ class _QuestLogPageState extends State<QuestLogPage>
   }
 
   void _setupListeners() {
+    // Save original callbacks before replacing them
+    _originalOnQuestCompleted = widget.questManager.onQuestCompleted;
+    _originalOnQuestAvailable = widget.questManager.onQuestAvailable;
+    _originalOnAchievementUnlocked =
+        widget.achievementManager.onAchievementUnlocked;
+
     // Listen for quest status changes (activation, completion, claiming)
     _questStatusCallback = (quest, oldStatus, newStatus) {
       if (mounted) setState(() {});
@@ -58,14 +69,20 @@ class _QuestLogPageState extends State<QuestLogPage>
     // Also listen for quest completion and availability notifications
     widget.questManager.onQuestCompleted = (quest) {
       if (mounted) setState(() {});
+      // Forward to original callback if it exists
+      _originalOnQuestCompleted?.call(quest);
     };
     widget.questManager.onQuestAvailable = (quest) {
       if (mounted) setState(() {});
+      // Forward to original callback if it exists
+      _originalOnQuestAvailable?.call(quest);
     };
 
     // Listen for achievement unlocks
     _achievementUnlockedCallback = (achievement) {
       if (mounted) setState(() {});
+      // Forward to original callback if it exists
+      _originalOnAchievementUnlocked?.call(achievement);
     };
     widget.achievementManager.onAchievementUnlocked =
         _achievementUnlockedCallback;
@@ -79,14 +96,13 @@ class _QuestLogPageState extends State<QuestLogPage>
     if (qm.onQuestStatusChanged == _questStatusCallback) {
       qm.onQuestStatusChanged = null;
     }
-    // Note: onQuestCompleted and onQuestAvailable are replaced, not appended,
-    // so we just set them to null to clear
-    qm.onQuestCompleted = null;
-    qm.onQuestAvailable = null;
 
-    if (am.onAchievementUnlocked == _achievementUnlockedCallback) {
-      am.onAchievementUnlocked = null;
-    }
+    // Restore original callbacks instead of setting to null
+    qm.onQuestCompleted = _originalOnQuestCompleted;
+    qm.onQuestAvailable = _originalOnQuestAvailable;
+
+    // Restore original achievement callback
+    am.onAchievementUnlocked = _originalOnAchievementUnlocked;
   }
 
   @override

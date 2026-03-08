@@ -102,6 +102,11 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _gameStateManager.achievementManager = widget.planet.achievementManager;
     _gameStateManager.researchManager = widget.planet.researchManager;
 
+    // Wire QuestManager to ResearchManager so quest research prerequisites work correctly
+    widget.planet.questManager.setResearchManager(
+      widget.planet.researchManager,
+    );
+
     // Initialize seeds from loaded save data to properly detect date changes
     _gameStateManager.initializeSeedsFromLoadedData(
       widget.planet.lastDailySeed,

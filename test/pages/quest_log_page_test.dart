@@ -335,6 +335,21 @@ void main() {
 
       final qm = QuestManager(quests: [quest1]);
 
+      // Set up original callbacks to simulate MainGameWidget's setup
+      bool originalQuestCompletedCalled = false;
+      Quest? originalQuest;
+      qm.onQuestCompleted = (quest) {
+        originalQuestCompletedCalled = true;
+        originalQuest = quest;
+      };
+
+      bool originalAchievementUnlockedCalled = false;
+      Achievement? originalAchievement;
+      achievementManager.onAchievementUnlocked = (achievement) {
+        originalAchievementUnlockedCalled = true;
+        originalAchievement = achievement;
+      };
+
       await tester.pumpWidget(
         MaterialApp(
           home: QuestLogPage(
@@ -353,9 +368,88 @@ void main() {
         const MaterialApp(home: Scaffold(body: Text('Empty'))),
       );
 
-      // Listeners should be cleared
+      // onQuestStatusChanged should be cleared (only this widget set it)
       expect(qm.onQuestStatusChanged, isNull);
-      expect(achievementManager.onAchievementUnlocked, isNull);
+
+      // Original callbacks should be restored
+      expect(qm.onQuestCompleted, isNotNull);
+      expect(achievementManager.onAchievementUnlocked, isNotNull);
+
+      // Verify the original callbacks still work
+      final testQuest = Quest(
+        id: 'test_complete',
+        name: 'Test Complete',
+        description: 'Test',
+        objectives: [
+          QuestObjective(
+            type: QuestObjectiveType.buildBuilding,
+            targetId: 'house',
+            targetAmount: 1,
+          ),
+        ],
+        reward: QuestReward(resources: {ResourceType.cash: 100}),
+        status: QuestStatus.completed,
+      );
+      qm.onQuestCompleted?.call(testQuest);
+      expect(originalQuestCompletedCalled, isTrue);
+      expect(originalQuest?.id, 'test_complete');
+
+      achievementManager.onAchievementUnlocked?.call(
+        achievementManager.achievements.first,
+      );
+      expect(originalAchievementUnlockedCalled, isTrue);
+      expect(originalAchievement?.id, 'a1');
+    });
+
+    testWidgets('forwards callbacks while page is open', (tester) async {
+      final quest1 = Quest(
+        id: 'q1',
+        name: 'Test Quest',
+        description: 'Test',
+        objectives: [
+          QuestObjective(
+            type: QuestObjectiveType.buildBuilding,
+            targetId: 'house',
+            targetAmount: 1,
+          ),
+        ],
+        reward: QuestReward(resources: {ResourceType.cash: 100}),
+        status: QuestStatus.completed,
+      );
+
+      final qm = QuestManager(quests: [quest1]);
+
+      // Set up original callbacks to simulate MainGameWidget's setup
+      bool originalQuestCompletedCalled = false;
+      Quest? originalQuest;
+      qm.onQuestCompleted = (quest) {
+        originalQuestCompletedCalled = true;
+        originalQuest = quest;
+      };
+
+      bool originalAchievementUnlockedCalled = false;
+      achievementManager.onAchievementUnlocked = (achievement) {
+        originalAchievementUnlockedCalled = true;
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: QuestLogPage(
+            questManager: qm,
+            achievementManager: achievementManager,
+          ),
+        ),
+      );
+
+      // Trigger callbacks while page is open - should forward to original
+      qm.onQuestCompleted?.call(quest1);
+      expect(originalQuestCompletedCalled, isTrue);
+      expect(originalQuest?.id, 'q1');
+
+      achievementManager.onAchievementUnlocked?.call(
+        achievementManager.achievements.first,
+      );
+      expect(originalAchievementUnlockedCalled, isTrue);
     });
   });
 }
