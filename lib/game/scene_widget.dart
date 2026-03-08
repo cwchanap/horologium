@@ -107,10 +107,19 @@ class _MainGameWidgetState extends State<MainGameWidget>
     // Provide callback to persist seeds immediately to prevent regeneration on re-entry
     _gameStateManager.refreshRotatingQuests(
       onSeedsChanged: (dailySeed, weeklySeed) {
+        // Persist seeds to SharedPreferences
         SaveService.saveQuestSeeds(
           widget.planet.id,
           widget.planet.questManager,
         );
+        // Also update in-memory planet seeds to prevent stale data on re-entry
+        final updatedPlanet = widget.planet.copyWith(
+          lastDailySeed: dailySeed,
+          lastWeeklySeed: weeklySeed,
+        );
+        ActivePlanet().updateActivePlanet(updatedPlanet);
+        // Save full planet to persist the refreshed quest data
+        SaveService.savePlanet(updatedPlanet);
       },
     );
 
@@ -168,6 +177,14 @@ class _MainGameWidgetState extends State<MainGameWidget>
             widget.planet.id,
             widget.planet.questManager,
           );
+          // Also update in-memory planet seeds to prevent stale data on re-entry
+          final updatedPlanet = widget.planet.copyWith(
+            lastDailySeed: dailySeed,
+            lastWeeklySeed: weeklySeed,
+          );
+          ActivePlanet().updateActivePlanet(updatedPlanet);
+          // Save full planet to persist the refreshed quest data
+          SaveService.savePlanet(updatedPlanet);
         },
       );
     }
