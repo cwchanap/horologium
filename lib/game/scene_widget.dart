@@ -78,17 +78,23 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _questRefreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (!mounted) return;
       _gameStateManager.refreshRotatingQuests(
-        onSeedsChanged: (dailySeed, weeklySeed) {
-          SaveService.saveQuestSeeds(
-            widget.planet.id,
-            widget.planet.questManager,
-          );
-          final updatedPlanet = widget.planet.copyWith(
-            lastDailySeed: dailySeed,
-            lastWeeklySeed: weeklySeed,
-          );
-          ActivePlanet().updateActivePlanet(updatedPlanet);
-          SaveService.savePlanet(updatedPlanet);
+        onSeedsChanged: (dailySeed, weeklySeed) async {
+          try {
+            await SaveService.saveQuestSeeds(
+              widget.planet.id,
+              widget.planet.questManager,
+            );
+            final updatedPlanet = widget.planet.copyWith(
+              lastDailySeed: dailySeed,
+              lastWeeklySeed: weeklySeed,
+            );
+            ActivePlanet().updateActivePlanet(updatedPlanet);
+            await SaveService.savePlanet(updatedPlanet);
+          } catch (e, stackTrace) {
+            debugPrint(
+              'Failed to persist quest seeds during periodic refresh: $e\n$stackTrace',
+            );
+          }
         },
       );
     });
@@ -142,20 +148,26 @@ class _MainGameWidgetState extends State<MainGameWidget>
     // Populate daily/weekly rotating quests (only if seeds changed)
     // Provide callback to persist seeds immediately to prevent regeneration on re-entry
     _gameStateManager.refreshRotatingQuests(
-      onSeedsChanged: (dailySeed, weeklySeed) {
-        // Persist seeds to SharedPreferences
-        SaveService.saveQuestSeeds(
-          widget.planet.id,
-          widget.planet.questManager,
-        );
-        // Also update in-memory planet seeds to prevent stale data on re-entry
-        final updatedPlanet = widget.planet.copyWith(
-          lastDailySeed: dailySeed,
-          lastWeeklySeed: weeklySeed,
-        );
-        ActivePlanet().updateActivePlanet(updatedPlanet);
-        // Save full planet to persist the refreshed quest data
-        SaveService.savePlanet(updatedPlanet);
+      onSeedsChanged: (dailySeed, weeklySeed) async {
+        try {
+          // Persist seeds to SharedPreferences
+          await SaveService.saveQuestSeeds(
+            widget.planet.id,
+            widget.planet.questManager,
+          );
+          // Also update in-memory planet seeds to prevent stale data on re-entry
+          final updatedPlanet = widget.planet.copyWith(
+            lastDailySeed: dailySeed,
+            lastWeeklySeed: weeklySeed,
+          );
+          ActivePlanet().updateActivePlanet(updatedPlanet);
+          // Save full planet to persist the refreshed quest data
+          await SaveService.savePlanet(updatedPlanet);
+        } catch (e, stackTrace) {
+          debugPrint(
+            'Failed to persist quest seeds during initialization: $e\n$stackTrace',
+          );
+        }
       },
     );
 
@@ -208,19 +220,25 @@ class _MainGameWidgetState extends State<MainGameWidget>
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _gameStateManager.refreshRotatingQuests(
-        onSeedsChanged: (dailySeed, weeklySeed) {
-          SaveService.saveQuestSeeds(
-            widget.planet.id,
-            widget.planet.questManager,
-          );
-          // Also update in-memory planet seeds to prevent stale data on re-entry
-          final updatedPlanet = widget.planet.copyWith(
-            lastDailySeed: dailySeed,
-            lastWeeklySeed: weeklySeed,
-          );
-          ActivePlanet().updateActivePlanet(updatedPlanet);
-          // Save full planet to persist the refreshed quest data
-          SaveService.savePlanet(updatedPlanet);
+        onSeedsChanged: (dailySeed, weeklySeed) async {
+          try {
+            await SaveService.saveQuestSeeds(
+              widget.planet.id,
+              widget.planet.questManager,
+            );
+            // Also update in-memory planet seeds to prevent stale data on re-entry
+            final updatedPlanet = widget.planet.copyWith(
+              lastDailySeed: dailySeed,
+              lastWeeklySeed: weeklySeed,
+            );
+            ActivePlanet().updateActivePlanet(updatedPlanet);
+            // Save full planet to persist the refreshed quest data
+            await SaveService.savePlanet(updatedPlanet);
+          } catch (e, stackTrace) {
+            debugPrint(
+              'Failed to persist quest seeds on app resume: $e\n$stackTrace',
+            );
+          }
         },
       );
     }
