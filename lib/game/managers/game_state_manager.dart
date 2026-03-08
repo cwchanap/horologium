@@ -86,7 +86,12 @@ class GameStateManager {
 
     if (dailySeed != _lastDailySeed) {
       qm.removeRotatingQuests('daily_', preserveClaimed: true);
-      qm.addRotatingQuests(DailyQuestGenerator.generateDaily(seed: dailySeed));
+      qm.addRotatingQuests(
+        DailyQuestGenerator.generateDaily(
+          seed: dailySeed,
+          researchManager: researchManager,
+        ),
+      );
       _lastDailySeed = dailySeed;
       refreshed = true;
     }
@@ -94,7 +99,10 @@ class GameStateManager {
     if (weeklySeed != _lastWeeklySeed) {
       qm.removeRotatingQuests('weekly_', preserveClaimed: true);
       qm.addRotatingQuests(
-        DailyQuestGenerator.generateWeekly(seed: weeklySeed),
+        DailyQuestGenerator.generateWeekly(
+          seed: weeklySeed,
+          researchManager: researchManager,
+        ),
       );
       _lastWeeklySeed = weeklySeed;
       refreshed = true;

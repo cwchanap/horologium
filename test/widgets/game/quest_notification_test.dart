@@ -7,7 +7,12 @@ void main() {
     testWidgets('shows quest completed message', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(body: QuestNotification(questName: 'Build Houses')),
+          home: Scaffold(
+            body: QuestNotification(
+              questId: 'quest_1',
+              questName: 'Build Houses',
+            ),
+          ),
         ),
       );
 
@@ -21,6 +26,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: QuestNotification(
+              questId: 'quest_1',
               questName: 'Build Houses',
               onDismissed: () => dismissed = true,
             ),
@@ -37,6 +43,48 @@ void main() {
       expect(dismissed, isTrue);
     });
 
+    testWidgets('restarts animation when questId changes', (tester) async {
+      var dismissCount = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: QuestNotification(
+              questId: 'quest_1',
+              questName: 'Build Houses',
+              duration: const Duration(seconds: 5),
+              onDismissed: () => dismissCount++,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump(const Duration(seconds: 1));
+
+      // Change questId with same name - should restart
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: QuestNotification(
+              questId: 'quest_2',
+              questName: 'Build Houses',
+              duration: const Duration(seconds: 5),
+              onDismissed: () => dismissCount++,
+            ),
+          ),
+        ),
+      );
+
+      // Should not dismiss yet since timer restarted
+      await tester.pump(const Duration(seconds: 2));
+      expect(dismissCount, equals(0));
+
+      // After 5 more seconds, it should dismiss
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(dismissCount, equals(1));
+    });
+
     testWidgets('restarts dismiss timer when duration changes', (tester) async {
       var dismissCount = 0;
 
@@ -44,6 +92,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: QuestNotification(
+              questId: 'quest_1',
               questName: 'Build Houses',
               duration: const Duration(seconds: 5),
               onDismissed: () => dismissCount++,
@@ -58,6 +107,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: QuestNotification(
+              questId: 'quest_1',
               questName: 'Build Houses',
               duration: const Duration(milliseconds: 100),
               onDismissed: () => dismissCount++,
@@ -78,7 +128,12 @@ void main() {
       // Show notification
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(body: QuestNotification(questName: 'Build Houses')),
+          home: Scaffold(
+            body: QuestNotification(
+              questId: 'quest_1',
+              questName: 'Build Houses',
+            ),
+          ),
         ),
       );
 
@@ -100,6 +155,7 @@ void main() {
           MaterialApp(
             home: Scaffold(
               body: QuestNotification(
+                questId: 'quest_1',
                 questName: 'Test Quest',
                 duration: const Duration(milliseconds: 50),
                 onDismissed: () => callCount++,

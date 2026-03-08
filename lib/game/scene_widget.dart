@@ -49,6 +49,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
   bool _uiOverlayOpen = false; // gates pointer events to GameWidget
   final AudioManager _audioManager = AudioManager();
   final PlanetSaveDebouncer _planetSaveDebouncer = PlanetSaveDebouncer();
+  String? _questNotificationId;
   String? _questNotificationName;
   Timer? _questNotificationTimer;
 
@@ -89,9 +90,17 @@ class _MainGameWidgetState extends State<MainGameWidget>
     widget.planet.questManager.onQuestCompleted = (quest) {
       if (mounted) {
         _questNotificationTimer?.cancel();
-        setState(() => _questNotificationName = quest.name);
+        setState(() {
+          _questNotificationId = quest.id;
+          _questNotificationName = quest.name;
+        });
         _questNotificationTimer = Timer(const Duration(seconds: 4), () {
-          if (mounted) setState(() => _questNotificationName = null);
+          if (mounted) {
+            setState(() {
+              _questNotificationId = null;
+              _questNotificationName = null;
+            });
+          }
         });
       }
     };
@@ -157,13 +166,11 @@ class _MainGameWidgetState extends State<MainGameWidget>
   @override
   void dispose() {
     _questNotificationTimer?.cancel();
+    _questNotificationId = null;
     _questNotificationName = null;
-    widget.planet.questManager.onQuestCompleted = null;
-    widget.planet.achievementManager.onAchievementUnlocked = null;
-    _gameStateManager.dispose();
-    _planetSaveDebouncer.dispose();
-    _audioManager.dispose();
     WidgetsBinding.instance.removeObserver(this);
+    _audioManager.dispose();
+    _planetSaveDebouncer.dispose();
     super.dispose();
   }
 
@@ -598,10 +605,14 @@ class _MainGameWidgetState extends State<MainGameWidget>
                 right: 0,
                 child: Center(
                   child: QuestNotification(
+                    questId: _questNotificationId!,
                     questName: _questNotificationName!,
                     onDismissed: () {
                       _questNotificationTimer?.cancel();
-                      setState(() => _questNotificationName = null);
+                      setState(() {
+                        _questNotificationId = null;
+                        _questNotificationName = null;
+                      });
                     },
                   ),
                 ),
