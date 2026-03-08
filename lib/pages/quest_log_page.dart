@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../game/achievements/achievement.dart';
+import '../game/achievements/achievement_manager.dart';
 import '../game/quests/quest.dart';
 import '../game/quests/quest_manager.dart';
-import '../game/achievements/achievement_manager.dart';
 import '../widgets/cards/quest_card.dart';
 import '../widgets/cards/achievement_card.dart';
 
@@ -25,14 +26,72 @@ class _QuestLogPageState extends State<QuestLogPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  // Callback references for cleanup
+  void Function(Quest, QuestStatus, QuestStatus)? _questStatusCallback;
+  void Function(Achievement)? _achievementUnlockedCallback;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _setupListeners();
+  }
+
+  @override
+  void didUpdateWidget(covariant QuestLogPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Re-setup listeners if the managers change
+    if (oldWidget.questManager != widget.questManager ||
+        oldWidget.achievementManager != widget.achievementManager) {
+      _removeListeners(oldWidget);
+      _setupListeners();
+    }
+  }
+
+  void _setupListeners() {
+    // Listen for quest status changes (activation, completion, claiming)
+    _questStatusCallback = (quest, oldStatus, newStatus) {
+      if (mounted) setState(() {});
+    };
+    widget.questManager.onQuestStatusChanged = _questStatusCallback;
+
+    // Also listen for quest completion and availability notifications
+    widget.questManager.onQuestCompleted = (quest) {
+      if (mounted) setState(() {});
+    };
+    widget.questManager.onQuestAvailable = (quest) {
+      if (mounted) setState(() {});
+    };
+
+    // Listen for achievement unlocks
+    _achievementUnlockedCallback = (achievement) {
+      if (mounted) setState(() {});
+    };
+    widget.achievementManager.onAchievementUnlocked =
+        _achievementUnlockedCallback;
+  }
+
+  void _removeListeners([QuestLogPage? oldWidget]) {
+    final qm = oldWidget?.questManager ?? widget.questManager;
+    final am = oldWidget?.achievementManager ?? widget.achievementManager;
+
+    // Remove our specific callbacks if they match
+    if (qm.onQuestStatusChanged == _questStatusCallback) {
+      qm.onQuestStatusChanged = null;
+    }
+    // Note: onQuestCompleted and onQuestAvailable are replaced, not appended,
+    // so we just set them to null to clear
+    qm.onQuestCompleted = null;
+    qm.onQuestAvailable = null;
+
+    if (am.onAchievementUnlocked == _achievementUnlockedCallback) {
+      am.onAchievementUnlocked = null;
+    }
   }
 
   @override
   void dispose() {
+    _removeListeners();
     _tabController.dispose();
     super.dispose();
   }

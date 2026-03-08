@@ -37,6 +37,8 @@ class QuestRegistry {
       reward: QuestReward(
         resources: {ResourceType.cash: 300, ResourceType.coal: 50},
       ),
+      // This quest is available from the start - completing the research
+      // objective is part of the quest, so no research requirement needed.
     ),
     Quest(
       id: 'quest_gold_rush',
@@ -55,6 +57,7 @@ class QuestRegistry {
         ),
       ],
       reward: QuestReward(resources: {ResourceType.cash: 500}),
+      requiredResearchIds: ['gold_mining'],
     ),
     Quest(
       id: 'quest_lumber_yard',
@@ -126,6 +129,7 @@ class QuestRegistry {
       reward: QuestReward(
         resources: {ResourceType.cash: 300, ResourceType.wheat: 50},
       ),
+      requiredResearchIds: ['grain_processing'],
     ),
     Quest(
       id: 'quest_water_works',
@@ -170,6 +174,7 @@ class QuestRegistry {
         ),
       ],
       reward: QuestReward(resources: {ResourceType.cash: 1000}),
+      requiredResearchIds: ['electricity', 'gold_mining'],
     ),
     Quest(
       id: 'quest_happy_town',

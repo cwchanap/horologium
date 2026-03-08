@@ -60,6 +60,7 @@ class Quest {
   final List<QuestObjective> objectives;
   final QuestReward reward;
   final List<String> prerequisiteQuestIds;
+  final List<String> requiredResearchIds;
   QuestStatus status;
 
   Quest({
@@ -69,6 +70,7 @@ class Quest {
     required this.objectives,
     required this.reward,
     this.prerequisiteQuestIds = const [],
+    this.requiredResearchIds = const [],
     this.status = QuestStatus.available,
   });
 
@@ -87,6 +89,7 @@ class Quest {
     'objectives': objectives.map((o) => o.toJson()).toList(),
     'reward': reward.toJson(),
     'prerequisiteQuestIds': prerequisiteQuestIds,
+    'requiredResearchIds': requiredResearchIds,
     'status': status.name,
   };
 
@@ -104,6 +107,11 @@ class Quest {
           : const QuestReward(),
       prerequisiteQuestIds:
           (json['prerequisiteQuestIds'] as List?)
+              ?.whereType<String>()
+              .toList() ??
+          [],
+      requiredResearchIds:
+          (json['requiredResearchIds'] as List?)
               ?.whereType<String>()
               .toList() ??
           [],

@@ -9,20 +9,30 @@ import 'quest_objective.dart';
 
 class QuestManager {
   final Map<String, Quest> _quests;
+  ResearchManager? _researchManager;
 
   void Function(Quest quest)? onQuestCompleted;
   void Function(Quest quest)? onQuestAvailable;
+  void Function(Quest quest, QuestStatus oldStatus, QuestStatus newStatus)?
+  onQuestStatusChanged;
 
-  QuestManager({required List<Quest> quests})
-    : _quests = {for (final q in quests) q.id: q};
+  QuestManager({required List<Quest> quests, ResearchManager? researchManager})
+    : _quests = {for (final q in quests) q.id: q},
+      _researchManager = researchManager;
+
+  void setResearchManager(ResearchManager researchManager) {
+    _researchManager = researchManager;
+  }
 
   List<Quest> get quests => _quests.values.toList();
 
   /// Quests whose prerequisites are all claimed and status is available.
+  /// Also filters out quests that require research the player hasn't completed yet.
   List<Quest> getAvailableQuests() {
     return _quests.values.where((q) {
       if (q.status != QuestStatus.available) return false;
-      return _prerequisitesMet(q);
+      if (!_prerequisitesMet(q)) return false;
+      return _researchPrerequisitesMet(q);
     }).toList();
   }
 
@@ -63,7 +73,15 @@ class QuestManager {
     final quest = _quests[questId];
     if (quest == null || quest.status != QuestStatus.available) return;
     if (!_prerequisitesMet(quest)) return;
-    quest.status = QuestStatus.active;
+    if (!_researchPrerequisitesMet(quest)) return;
+    _setQuestStatus(quest, QuestStatus.active);
+  }
+
+  void _setQuestStatus(Quest quest, QuestStatus newStatus) {
+    final oldStatus = quest.status;
+    if (oldStatus == newStatus) return;
+    quest.status = newStatus;
+    onQuestStatusChanged?.call(quest, oldStatus, newStatus);
   }
 
   void checkProgress(
@@ -98,7 +116,7 @@ class QuestManager {
       }
 
       if (!wasComplete && quest.isComplete) {
-        quest.status = QuestStatus.completed;
+        _setQuestStatus(quest, QuestStatus.completed);
         completedThisTick.add(quest);
       }
     }
@@ -125,7 +143,7 @@ class QuestManager {
           quest.reward.researchPoints;
     }
 
-    quest.status = QuestStatus.claimed;
+    _setQuestStatus(quest, QuestStatus.claimed);
 
     // Notify any quests that became available because this quest is now claimed
     for (final q in _quests.values) {
@@ -143,6 +161,19 @@ class QuestManager {
     for (final prereqId in quest.prerequisiteQuestIds) {
       final prereq = _quests[prereqId];
       if (prereq == null || prereq.status != QuestStatus.claimed) return false;
+    }
+    return true;
+  }
+
+  /// Checks if all required research for a quest has been completed.
+  /// Returns true if the quest has no research requirements or if all
+  /// required research is completed.
+  bool _researchPrerequisitesMet(Quest quest) {
+    if (_researchManager == null) return true;
+    for (final researchId in quest.requiredResearchIds) {
+      if (!_researchManager!.isResearchedById(researchId)) {
+        return false;
+      }
     }
     return true;
   }
@@ -306,7 +337,7 @@ class QuestManager {
         debugPrint('Warning: Unknown claimed quest ID "$id", skipping.');
         continue;
       }
-      quest.status = QuestStatus.claimed;
+      _setQuestStatus(quest, QuestStatus.claimed);
     }
 
     for (final id in completed) {
