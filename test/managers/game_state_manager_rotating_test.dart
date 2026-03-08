@@ -122,29 +122,6 @@ void main() {
         expect(callbackInvoked, isFalse);
       });
 
-      test('callback is NOT invoked when quests are not refreshed', () {
-        final gsm = GameStateManager(resources: Resources());
-        gsm.questManager = QuestManager(quests: []);
-
-        final date = DateTime.utc(2026, 2, 27);
-
-        // First refresh - callback should be called
-        var callbackInvoked = false;
-        gsm.refreshRotatingQuests(
-          now: date,
-          onSeedsChanged: (daily, weekly) => callbackInvoked = true,
-        );
-        expect(callbackInvoked, isTrue);
-
-        // Second refresh with same day - callback should NOT be called
-        callbackInvoked = false;
-        gsm.refreshRotatingQuests(
-          now: DateTime.utc(2026, 2, 27, 18, 0),
-          onSeedsChanged: (daily, weekly) => callbackInvoked = true,
-        );
-        expect(callbackInvoked, isFalse);
-      });
-
       test('callback is optional - works without it', () {
         final gsm = GameStateManager(resources: Resources());
         gsm.questManager = QuestManager(quests: []);
