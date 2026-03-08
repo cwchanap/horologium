@@ -31,6 +31,52 @@ class GameStateManager {
     _lastWeeklySeed = loadedWeeklySeed;
   }
 
+  /// Extracts seeds from existing rotating quest IDs and updates internal seeds.
+  /// This should be called after quest manager is set but before refreshRotatingQuests()
+  /// to properly handle migration from old saves where seeds were not persisted.
+  void recoverSeedsFromExistingQuests() {
+    final qm = questManager;
+    if (qm == null) return;
+
+    final allQuestIds = qm.quests.map((q) => q.id);
+
+    // Only recover if seed is 0 (old save or missing seed data)
+    if (_lastDailySeed == 0) {
+      final dailySeed = _extractSeedFromQuestIds(allQuestIds, 'daily_');
+      if (dailySeed != null) {
+        _lastDailySeed = dailySeed;
+      }
+    }
+
+    if (_lastWeeklySeed == 0) {
+      final weeklySeed = _extractSeedFromQuestIds(allQuestIds, 'weekly_');
+      if (weeklySeed != null) {
+        _lastWeeklySeed = weeklySeed;
+      }
+    }
+  }
+
+  /// Extract the seed from quest IDs matching the given prefix.
+  /// Returns null if no matching quest found.
+  int? _extractSeedFromQuestIds(Iterable<String> questIds, String prefix) {
+    int? latestSeed;
+    for (final id in questIds) {
+      if (id.startsWith(prefix)) {
+        final parts = id.split('_');
+        if (parts.length >= 2) {
+          final seed = int.tryParse(parts[1]);
+          if (seed != null) {
+            // Track the maximum (latest) seed
+            if (latestSeed == null || seed > latestSeed) {
+              latestSeed = seed;
+            }
+          }
+        }
+      }
+    }
+    return latestSeed;
+  }
+
   async.Timer? _resourceTimer;
 
   GameStateManager({required this.resources});

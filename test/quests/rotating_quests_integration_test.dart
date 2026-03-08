@@ -87,6 +87,45 @@ void main() {
         reason: 'Claimed rotating quest should be preserved',
       );
     });
+
+    test(
+      'addRotatingQuests skips quests that are already completed or claimed',
+      () {
+        final manager = QuestManager(quests: []);
+        final seed = 42;
+        final daily = DailyQuestGenerator.generateDaily(seed: seed);
+        manager.addRotatingQuests(daily);
+
+        final firstId = daily.first.id;
+        final originalQuest = manager.quests.firstWhere((q) => q.id == firstId);
+
+        // Complete and claim the first quest
+        manager.activateQuest(firstId);
+        originalQuest.status = QuestStatus.completed;
+
+        // Generate new quests with same seed (simulating refresh with same-day seed)
+        final newDaily = DailyQuestGenerator.generateDaily(seed: seed);
+
+        // Add new quests - should skip the completed one
+        manager.addRotatingQuests(newDaily);
+
+        // The completed quest should still be there with its status
+        final preservedQuest = manager.quests.firstWhere(
+          (q) => q.id == firstId,
+        );
+        expect(preservedQuest.status, equals(QuestStatus.completed));
+
+        // Claim it
+        preservedQuest.status = QuestStatus.claimed;
+
+        // Try to add again - should still skip
+        manager.addRotatingQuests(newDaily);
+        expect(
+          manager.quests.firstWhere((q) => q.id == firstId).status,
+          equals(QuestStatus.claimed),
+        );
+      },
+    );
     test('rotating quest definitions are saved and restored directly', () {
       // With rotatingQuestDefinitions, quest definitions are saved directly
       // and restored without needing pre-population or regeneration.

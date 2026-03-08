@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/managers/game_state_manager.dart';
+import 'package:horologium/game/quests/daily_quest_generator.dart';
 import 'package:horologium/game/quests/quest.dart';
 import 'package:horologium/game/quests/quest_manager.dart';
 import 'package:horologium/game/quests/quest_objective.dart';
@@ -162,6 +163,106 @@ void main() {
         expect(capturedSeeds[0]['weekly'], equals(capturedSeeds[1]['weekly']));
       });
     });
+  });
+
+  group('GameStateManager seed recovery', () {
+    test(
+      'recoverSeedsFromExistingQuests extracts seeds from rotating quest IDs',
+      () {
+        final gsm = GameStateManager(resources: Resources());
+        final questManager = QuestManager(quests: []);
+        gsm.questManager = questManager;
+
+        // Use Jan 15, 2024 (which is a Monday - same day for daily and weekly)
+        final testDate = DateTime.utc(2024, 1, 15);
+        final dailySeed = DailyQuestGenerator.dailySeedForDate(testDate);
+        final weeklySeed = DailyQuestGenerator.weeklySeedForDate(testDate);
+
+        final daily = DailyQuestGenerator.generateDaily(seed: dailySeed);
+        final weekly = DailyQuestGenerator.generateWeekly(seed: weeklySeed);
+        questManager.addRotatingQuests(daily);
+        questManager.addRotatingQuests(weekly);
+
+        // Initialize with seeds of 0 (simulating old save)
+        gsm.initializeSeedsFromLoadedData(0, 0);
+        expect(
+          gsm.refreshRotatingQuests(now: testDate),
+          isTrue,
+          reason: 'Should refresh with seed 0',
+        );
+
+        // Reset to simulate fresh load
+        final gsm2 = GameStateManager(resources: Resources());
+        final questManager2 = QuestManager(quests: []);
+        gsm2.questManager = questManager2;
+        questManager2.addRotatingQuests(daily);
+        questManager2.addRotatingQuests(weekly);
+
+        // Initialize with seeds of 0, but then recover
+        gsm2.initializeSeedsFromLoadedData(0, 0);
+        gsm2.recoverSeedsFromExistingQuests();
+
+        // Now refresh should not trigger (seeds match current date)
+        expect(
+          gsm2.refreshRotatingQuests(now: testDate),
+          isFalse,
+          reason: 'Should not refresh after recovering seeds from quests',
+        );
+      },
+    );
+
+    test('recoverSeedsFromExistingQuests does not overwrite non-zero seeds', () {
+      final gsm = GameStateManager(resources: Resources());
+      final questManager = QuestManager(quests: []);
+      gsm.questManager = questManager;
+
+      // Add quests with today's seed
+      final testDate = DateTime.utc(2024, 1, 15);
+      final dailySeed = DailyQuestGenerator.dailySeedForDate(testDate);
+      final daily = DailyQuestGenerator.generateDaily(seed: dailySeed);
+      questManager.addRotatingQuests(daily);
+
+      // Initialize with different non-zero seed
+      final existingSeed = 20240114; // Yesterday
+      gsm.initializeSeedsFromLoadedData(existingSeed, 0);
+
+      // Recover should not change the existing seed
+      gsm.recoverSeedsFromExistingQuests();
+
+      // Refresh should still happen because existing seed differs from today's
+      expect(
+        gsm.refreshRotatingQuests(now: testDate),
+        isTrue,
+        reason: 'Should refresh because existing seed differs from today',
+      );
+    });
+
+    test(
+      'recoverSeedsFromExistingQuests handles mixed seed recovery correctly',
+      () {
+        final gsm = GameStateManager(resources: Resources());
+        final questManager = QuestManager(quests: []);
+        gsm.questManager = questManager;
+
+        final testDate = DateTime.utc(2024, 1, 15);
+        final dailySeed = DailyQuestGenerator.dailySeedForDate(testDate);
+
+        // Add only daily quests (no weekly)
+        final daily = DailyQuestGenerator.generateDaily(seed: dailySeed);
+        questManager.addRotatingQuests(daily);
+
+        // Initialize with seeds of 0
+        gsm.initializeSeedsFromLoadedData(0, 0);
+        gsm.recoverSeedsFromExistingQuests();
+
+        // Daily seed should be recovered, weekly should stay 0
+        // So only daily should not refresh, weekly should refresh
+        final result = gsm.refreshRotatingQuests(now: testDate);
+        // We added daily quests with today's seed, so daily should NOT refresh
+        // But weekly (seed 0) != today's weekly seed, so it SHOULD refresh
+        expect(result, isTrue);
+      },
+    );
   });
 
   group('GameStateManager researchManager', () {

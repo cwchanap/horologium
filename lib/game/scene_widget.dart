@@ -119,6 +119,10 @@ class _MainGameWidgetState extends State<MainGameWidget>
       widget.planet.lastWeeklySeed,
     );
 
+    // Recover seeds from existing quests for migration from old saves
+    // where seeds were not persisted separately
+    _gameStateManager.recoverSeedsFromExistingQuests();
+
     // Wire quest completion notifications
     widget.planet.questManager.onQuestCompleted = (quest) {
       if (mounted) {
