@@ -655,6 +655,52 @@ void main() {
           isFalse,
         );
       });
+
+      test(
+        'setResearchManager properly filters existing quest availability',
+        () {
+          final goldRushQuest = Quest(
+            id: 'quest_gold_rush',
+            name: 'Gold Rush',
+            description: 'Build a gold mine',
+            objectives: [
+              QuestObjective(
+                type: QuestObjectiveType.buildBuilding,
+                targetId: 'goldMine',
+                targetAmount: 1,
+              ),
+            ],
+            reward: QuestReward(resources: {ResourceType.cash: 500}),
+            requiredResearchIds: ['gold_mining'],
+          );
+
+          // Create manager without research manager
+          final questManager = QuestManager(quests: [goldRushQuest]);
+
+          // Quest should be available because no research manager is set
+          expect(
+            questManager.getAvailableQuests().any(
+              (q) => q.id == 'quest_gold_rush',
+            ),
+            isTrue,
+          );
+
+          // Complete the required research first
+          final researchManager = ResearchManager();
+          researchManager.completeResearchById('gold_mining');
+
+          // Now set the research manager with completed research
+          questManager.setResearchManager(researchManager);
+
+          // Quest should still be available
+          expect(
+            questManager.getAvailableQuests().any(
+              (q) => q.id == 'quest_gold_rush',
+            ),
+            isTrue,
+          );
+        },
+      );
     });
 
     group('onQuestStatusChanged callback', () {
