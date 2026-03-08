@@ -189,6 +189,7 @@ class QuestManager {
     final completed = <String>[];
     final claimed = <String>[];
     final objectiveProgress = <String, Map<String, int>>{};
+    final rotatingQuestDefinitions = <String, Map<String, dynamic>>{};
 
     for (final quest in _quests.values) {
       switch (quest.status) {
@@ -216,6 +217,12 @@ class QuestManager {
         }
         objectiveProgress[quest.id] = progress;
       }
+
+      // Save full definition for rotating quests (daily_, weekly_)
+      // to prevent objective/reward mismatch after research changes
+      if (quest.id.startsWith('daily_') || quest.id.startsWith('weekly_')) {
+        rotatingQuestDefinitions[quest.id] = quest.toJson();
+      }
     }
 
     return {
@@ -223,10 +230,24 @@ class QuestManager {
       'completed': completed,
       'claimed': claimed,
       'objectiveProgress': objectiveProgress,
+      'rotatingQuestDefinitions': rotatingQuestDefinitions,
     };
   }
 
   void loadFromJson(Map<String, dynamic> json) {
+    // First, restore rotating quest definitions from saved data
+    // This ensures the correct objectives/rewards are used even if research state changed
+    final rawDefinitions = json['rotatingQuestDefinitions'];
+    if (rawDefinitions is Map<String, dynamic>) {
+      for (final entry in rawDefinitions.entries) {
+        final questId = entry.key;
+        if (entry.value is Map<String, dynamic>) {
+          final quest = Quest.fromJson(entry.value as Map<String, dynamic>);
+          _quests[questId] = quest;
+        }
+      }
+    }
+
     // Reset all quests to available
     for (final quest in _quests.values) {
       quest.status = QuestStatus.available;

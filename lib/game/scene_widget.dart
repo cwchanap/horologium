@@ -52,6 +52,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
   String? _questNotificationId;
   String? _questNotificationName;
   Timer? _questNotificationTimer;
+  Timer? _questRefreshTimer;
 
   @override
   void initState() {
@@ -69,7 +70,28 @@ class _MainGameWidgetState extends State<MainGameWidget>
           if (mounted) setState(() {});
         });
     _startResourceGeneration();
+    _startQuestRefreshTimer();
     _applyTerrainPrefsWhenReady();
+  }
+
+  void _startQuestRefreshTimer() {
+    _questRefreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      _gameStateManager.refreshRotatingQuests(
+        onSeedsChanged: (dailySeed, weeklySeed) {
+          SaveService.saveQuestSeeds(
+            widget.planet.id,
+            widget.planet.questManager,
+          );
+          final updatedPlanet = widget.planet.copyWith(
+            lastDailySeed: dailySeed,
+            lastWeeklySeed: weeklySeed,
+          );
+          ActivePlanet().updateActivePlanet(updatedPlanet);
+          SaveService.savePlanet(updatedPlanet);
+        },
+      );
+    });
   }
 
   void _initializeGame() {
@@ -165,6 +187,8 @@ class _MainGameWidgetState extends State<MainGameWidget>
 
   @override
   void dispose() {
+    _gameStateManager.dispose();
+    _questRefreshTimer?.cancel();
     _questNotificationTimer?.cancel();
     _questNotificationId = null;
     _questNotificationName = null;

@@ -392,58 +392,63 @@ class SaveService {
       ),
     );
 
-    // Restore rotating quest history from saved IDs before loadFromJson
+    // Restore quest state from saved data
+    // rotatingQuestDefinitions (saved via QuestManager.toJson) will override
+    // regenerated quests with exact saved definitions, preventing objective/reward
+    // mismatch when research state changes between sessions.
     bool questLoadFailed = false;
     final questJson = prefs.getString(_planetQuestsKey(planetId));
     if (questJson != null) {
       try {
         final savedQuestData = jsonDecode(questJson) as Map<String, dynamic>;
 
-        // Extract all saved quest IDs to reconstruct quests from older seeds
-        final allSavedIds = <String>[
-          ...(savedQuestData['active'] as List<dynamic>? ?? [])
-              .whereType<String>(),
-          ...(savedQuestData['completed'] as List<dynamic>? ?? [])
-              .whereType<String>(),
-          ...(savedQuestData['claimed'] as List<dynamic>? ?? [])
-              .whereType<String>(),
-        ];
+        // For old saves without rotatingQuestDefinitions, reconstruct quests from IDs
+        // using the seed embedded in the ID (e.g., "daily_20240115_0")
+        if (!savedQuestData.containsKey('rotatingQuestDefinitions')) {
+          final allSavedIds = <String>[
+            ...(savedQuestData['active'] as List<dynamic>? ?? [])
+                .whereType<String>(),
+            ...(savedQuestData['completed'] as List<dynamic>? ?? [])
+                .whereType<String>(),
+            ...(savedQuestData['claimed'] as List<dynamic>? ?? [])
+                .whereType<String>(),
+          ];
 
-        // Regenerate quests for rotating IDs from different seeds
-        final reconstructedDailySeeds = <int>{};
-        final reconstructedWeeklySeeds = <int>{};
+          final reconstructedDailySeeds = <int>{};
+          final reconstructedWeeklySeeds = <int>{};
 
-        for (final id in allSavedIds) {
-          if (id.startsWith('daily_')) {
-            final parts = id.split('_');
-            if (parts.length >= 2) {
-              final seed = int.tryParse(parts[1]);
-              if (seed != null &&
-                  seed != currentDailySeed &&
-                  !reconstructedDailySeeds.contains(seed)) {
-                questManager.addRotatingQuests(
-                  DailyQuestGenerator.generateDaily(
-                    seed: seed,
-                    researchManager: researchManager,
-                  ),
-                );
-                reconstructedDailySeeds.add(seed);
+          for (final id in allSavedIds) {
+            if (id.startsWith('daily_')) {
+              final parts = id.split('_');
+              if (parts.length >= 2) {
+                final seed = int.tryParse(parts[1]);
+                if (seed != null &&
+                    seed != currentDailySeed &&
+                    !reconstructedDailySeeds.contains(seed)) {
+                  questManager.addRotatingQuests(
+                    DailyQuestGenerator.generateDaily(
+                      seed: seed,
+                      researchManager: researchManager,
+                    ),
+                  );
+                  reconstructedDailySeeds.add(seed);
+                }
               }
-            }
-          } else if (id.startsWith('weekly_')) {
-            final parts = id.split('_');
-            if (parts.length >= 2) {
-              final seed = int.tryParse(parts[1]);
-              if (seed != null &&
-                  seed != currentWeeklySeed &&
-                  !reconstructedWeeklySeeds.contains(seed)) {
-                questManager.addRotatingQuests(
-                  DailyQuestGenerator.generateWeekly(
-                    seed: seed,
-                    researchManager: researchManager,
-                  ),
-                );
-                reconstructedWeeklySeeds.add(seed);
+            } else if (id.startsWith('weekly_')) {
+              final parts = id.split('_');
+              if (parts.length >= 2) {
+                final seed = int.tryParse(parts[1]);
+                if (seed != null &&
+                    seed != currentWeeklySeed &&
+                    !reconstructedWeeklySeeds.contains(seed)) {
+                  questManager.addRotatingQuests(
+                    DailyQuestGenerator.generateWeekly(
+                      seed: seed,
+                      researchManager: researchManager,
+                    ),
+                  );
+                  reconstructedWeeklySeeds.add(seed);
+                }
               }
             }
           }
