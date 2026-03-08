@@ -48,8 +48,17 @@ class QuestManager {
   bool get hasUnclaimedRewards => getCompletedQuests().isNotEmpty;
 
   /// Add procedurally-generated rotating quests.
+  /// Skips quests that already exist with completed or claimed status to preserve
+  /// player progress and prevent reward re-claiming.
   void addRotatingQuests(List<Quest> quests) {
     for (final q in quests) {
+      final existing = _quests[q.id];
+      // Skip if existing quest is completed or claimed to preserve progress
+      if (existing != null &&
+          (existing.status == QuestStatus.completed ||
+              existing.status == QuestStatus.claimed)) {
+        continue;
+      }
       _quests[q.id] = q;
     }
   }
