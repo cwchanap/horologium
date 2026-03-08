@@ -494,6 +494,240 @@ void main() {
         expect(restoredClaimed.first.objectives[0].currentAmount, 2);
       });
     });
+
+    group('research prerequisites', () {
+      test(
+        'quest requiring research is not available until research is completed',
+        () {
+          final goldRushQuest = Quest(
+            id: 'quest_gold_rush',
+            name: 'Gold Rush',
+            description: 'Build a gold mine',
+            objectives: [
+              QuestObjective(
+                type: QuestObjectiveType.buildBuilding,
+                targetId: 'goldMine',
+                targetAmount: 1,
+              ),
+            ],
+            reward: QuestReward(resources: {ResourceType.cash: 500}),
+            requiredResearchIds: ['gold_mining'],
+          );
+
+          final researchManager = ResearchManager();
+          final questManagerWithResearch = QuestManager(
+            quests: [goldRushQuest],
+            researchManager: researchManager,
+          );
+
+          // Without gold_mining research, quest should not be available
+          final availableBefore = questManagerWithResearch.getAvailableQuests();
+          expect(
+            availableBefore.any((q) => q.id == 'quest_gold_rush'),
+            isFalse,
+          );
+
+          // Complete the gold_mining research
+          researchManager.completeResearchById('gold_mining');
+
+          // Now the quest should be available
+          final availableAfter = questManagerWithResearch.getAvailableQuests();
+          expect(availableAfter.any((q) => q.id == 'quest_gold_rush'), isTrue);
+        },
+      );
+
+      test(
+        'quest requiring multiple research is not available until all research is completed',
+        () {
+          final complexQuest = Quest(
+            id: 'quest_complex',
+            name: 'Complex Quest',
+            description: 'Requires multiple research',
+            objectives: [
+              QuestObjective(
+                type: QuestObjectiveType.buildBuilding,
+                targetId: 'powerPlant',
+                targetAmount: 1,
+              ),
+            ],
+            reward: QuestReward(resources: {ResourceType.cash: 1000}),
+            requiredResearchIds: ['electricity', 'gold_mining'],
+          );
+
+          final researchManager = ResearchManager();
+          final questManagerWithResearch = QuestManager(
+            quests: [complexQuest],
+            researchManager: researchManager,
+          );
+
+          // Without any research, quest should not be available
+          expect(
+            questManagerWithResearch.getAvailableQuests().any(
+              (q) => q.id == 'quest_complex',
+            ),
+            isFalse,
+          );
+
+          // Complete only one research
+          researchManager.completeResearchById('electricity');
+          expect(
+            questManagerWithResearch.getAvailableQuests().any(
+              (q) => q.id == 'quest_complex',
+            ),
+            isFalse,
+          );
+
+          // Complete the second research
+          researchManager.completeResearchById('gold_mining');
+          expect(
+            questManagerWithResearch.getAvailableQuests().any(
+              (q) => q.id == 'quest_complex',
+            ),
+            isTrue,
+          );
+        },
+      );
+
+      test(
+        'quest without research requirements is available without research manager',
+        () {
+          final simpleQuest = Quest(
+            id: 'quest_simple',
+            name: 'Simple Quest',
+            description: 'No research needed',
+            objectives: [
+              QuestObjective(
+                type: QuestObjectiveType.buildBuilding,
+                targetId: 'house',
+                targetAmount: 1,
+              ),
+            ],
+            reward: QuestReward(resources: {ResourceType.cash: 100}),
+          );
+
+          // Create manager without research manager
+          final questManagerWithoutResearch = QuestManager(
+            quests: [simpleQuest],
+          );
+
+          // Quest should be available even without research manager
+          final available = questManagerWithoutResearch.getAvailableQuests();
+          expect(available.any((q) => q.id == 'quest_simple'), isTrue);
+        },
+      );
+
+      test('setResearchManager updates the research manager', () {
+        final goldRushQuest = Quest(
+          id: 'quest_gold_rush',
+          name: 'Gold Rush',
+          description: 'Build a gold mine',
+          objectives: [
+            QuestObjective(
+              type: QuestObjectiveType.buildBuilding,
+              targetId: 'goldMine',
+              targetAmount: 1,
+            ),
+          ],
+          reward: QuestReward(resources: {ResourceType.cash: 500}),
+          requiredResearchIds: ['gold_mining'],
+        );
+
+        // Create manager without research manager
+        final questManager = QuestManager(quests: [goldRushQuest]);
+
+        // Quest should be available because no research manager is set
+        expect(
+          questManager.getAvailableQuests().any(
+            (q) => q.id == 'quest_gold_rush',
+          ),
+          isTrue,
+        );
+
+        // Now set a research manager without the required research
+        final researchManager = ResearchManager();
+        questManager.setResearchManager(researchManager);
+
+        // Quest should no longer be available
+        expect(
+          questManager.getAvailableQuests().any(
+            (q) => q.id == 'quest_gold_rush',
+          ),
+          isFalse,
+        );
+      });
+    });
+
+    group('onQuestStatusChanged callback', () {
+      test('fires when quest is activated', () {
+        Quest? changedQuest;
+        QuestStatus? oldStatus;
+        QuestStatus? newStatus;
+
+        manager.onQuestStatusChanged = (quest, old, new_) {
+          changedQuest = quest;
+          oldStatus = old;
+          newStatus = new_;
+        };
+
+        manager.activateQuest('test_build_house');
+
+        expect(changedQuest, isNotNull);
+        expect(changedQuest!.id, 'test_build_house');
+        expect(oldStatus, QuestStatus.available);
+        expect(newStatus, QuestStatus.active);
+      });
+
+      test('fires when quest is completed', () {
+        manager.activateQuest('test_build_house');
+
+        Quest? changedQuest;
+        QuestStatus? oldStatus;
+        QuestStatus? newStatus;
+
+        manager.onQuestStatusChanged = (quest, old, new_) {
+          changedQuest = quest;
+          oldStatus = old;
+          newStatus = new_;
+        };
+
+        final buildings = [
+          _makeBuilding(BuildingType.house),
+          _makeBuilding(BuildingType.house),
+        ];
+        manager.checkProgress(Resources(), buildings, ResearchManager());
+
+        expect(changedQuest, isNotNull);
+        expect(changedQuest!.id, 'test_build_house');
+        expect(oldStatus, QuestStatus.active);
+        expect(newStatus, QuestStatus.completed);
+      });
+
+      test('fires when quest is claimed', () {
+        manager.activateQuest('test_build_house');
+        final buildings = [
+          _makeBuilding(BuildingType.house),
+          _makeBuilding(BuildingType.house),
+        ];
+        manager.checkProgress(Resources(), buildings, ResearchManager());
+
+        Quest? changedQuest;
+        QuestStatus? oldStatus;
+        QuestStatus? newStatus;
+
+        manager.onQuestStatusChanged = (quest, old, new_) {
+          changedQuest = quest;
+          oldStatus = old;
+          newStatus = new_;
+        };
+
+        manager.claimReward('test_build_house', Resources());
+
+        expect(changedQuest, isNotNull);
+        expect(changedQuest!.id, 'test_build_house');
+        expect(oldStatus, QuestStatus.completed);
+        expect(newStatus, QuestStatus.claimed);
+      });
+    });
   });
 }
 
