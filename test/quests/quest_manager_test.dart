@@ -774,6 +774,49 @@ void main() {
         expect(newStatus, QuestStatus.claimed);
       });
     });
+
+    group('onQuestsRefreshed callback', () {
+      test('addRotatingQuests fires onQuestsRefreshed', () {
+        int callCount = 0;
+        manager.onQuestsRefreshed = () => callCount++;
+
+        manager.addRotatingQuests([
+          Quest(
+            id: 'daily_20260101_0',
+            name: 'Daily',
+            description: 'Daily quest',
+            objectives: [],
+            reward: const QuestReward(),
+          ),
+        ]);
+
+        expect(callCount, 1);
+      });
+
+      test('removeRotatingQuests fires onQuestsRefreshed', () {
+        manager.addRotatingQuests([
+          Quest(
+            id: 'daily_20260101_0',
+            name: 'Daily',
+            description: 'Daily quest',
+            objectives: [],
+            reward: const QuestReward(),
+          ),
+        ]);
+
+        int callCount = 0;
+        manager.onQuestsRefreshed = () => callCount++;
+
+        manager.removeRotatingQuests('daily_');
+
+        expect(callCount, 1);
+      });
+
+      test('onQuestsRefreshed is null by default', () {
+        final qm = QuestManager(quests: []);
+        expect(qm.onQuestsRefreshed, isNull);
+      });
+    });
   });
 }
 
