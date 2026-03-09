@@ -101,8 +101,8 @@ void main() {
       },
     );
 
-    test('uses current date seeds when no rotating quests exist', () async {
-      // Create only a non-rotating quest
+    test('does not write seed keys when no rotating quests exist', () async {
+      // Create only a non-rotating quest (e.g. freshly-migrated legacy save)
       final staticQuest = Quest(
         id: 'build_house',
         name: 'Build House',
@@ -119,21 +119,14 @@ void main() {
 
       final questManager = QuestManager(quests: [staticQuest]);
 
-      // Save seeds - should use current date's seeds
       await SaveService.saveQuestSeeds('moon', questManager);
 
-      // Load seeds
       final prefs = await SharedPreferences.getInstance();
-      final dailySeed = prefs.getInt('planet.moon.quests.dailySeed');
-      final weeklySeed = prefs.getInt('planet.moon.quests.weeklySeed');
 
-      // Should match the current date's seeds
-      final today = DateTime.now().toUtc();
-      final expectedDailySeed =
-          today.year * 10000 + today.month * 100 + today.day;
-
-      expect(dailySeed, equals(expectedDailySeed));
-      expect(weeklySeed, isNotNull);
+      // Seeds must NOT be written; their absence lets refreshRotatingQuests()
+      // generate quests on the next load instead of skipping generation.
+      expect(prefs.containsKey('planet.moon.quests.dailySeed'), isFalse);
+      expect(prefs.containsKey('planet.moon.quests.weeklySeed'), isFalse);
     });
   });
 }

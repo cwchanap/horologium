@@ -201,6 +201,27 @@ void main() {
         );
       },
     );
+
+    test(
+      'savePlanet does not write seed keys when no rotating quests exist',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+
+        // A freshly-migrated planet only has starter (story) quests — no daily_ or weekly_ IDs.
+        final planet = Planet(
+          id: 'earth',
+          name: 'Earth',
+          questManager: QuestManager(quests: QuestRegistry.starterQuests),
+        );
+        await SaveService.savePlanet(planet);
+
+        // Seeds must NOT be written; their absence lets refreshRotatingQuests()
+        // generate quests on the next load instead of skipping generation.
+        expect(prefs.containsKey('planet.earth.quests.dailySeed'), isFalse);
+        expect(prefs.containsKey('planet.earth.quests.weeklySeed'), isFalse);
+      },
+    );
   });
 
   group('SaveService round-trip', () {

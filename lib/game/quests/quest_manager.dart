@@ -16,6 +16,11 @@ class QuestManager {
   void Function(Quest quest, QuestStatus oldStatus, QuestStatus newStatus)?
   onQuestStatusChanged;
 
+  /// Called when the set of quests changes structurally (i.e. rotating quests
+  /// are added or removed). Listeners such as [QuestLogPage] use this to
+  /// rebuild their list without waiting for a status-change event.
+  void Function()? onQuestsRefreshed;
+
   QuestManager({required List<Quest> quests, ResearchManager? researchManager})
     : _quests = {for (final q in quests) q.id: q},
       _researchManager = researchManager;
@@ -61,6 +66,7 @@ class QuestManager {
       }
       _quests[q.id] = q;
     }
+    onQuestsRefreshed?.call();
   }
 
   /// Remove rotating quests by ID prefix (e.g. 'daily_', 'weekly_').
@@ -76,6 +82,7 @@ class QuestManager {
       }
       return true;
     });
+    onQuestsRefreshed?.call();
   }
 
   void activateQuest(String questId) {

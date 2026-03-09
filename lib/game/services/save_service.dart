@@ -246,14 +246,16 @@ class SaveService {
     final allQuestIds = planet.questManager.quests.map((q) => q.id);
     final dailySeed = _extractSeedFromQuestIds(allQuestIds, 'daily_');
     final weeklySeed = _extractSeedFromQuestIds(allQuestIds, 'weekly_');
-    await prefs.setInt(
-      _planetDailySeedKey(planetId),
-      dailySeed ?? DailyQuestGenerator.dailySeedForDate(DateTime.now()),
-    );
-    await prefs.setInt(
-      _planetWeeklySeedKey(planetId),
-      weeklySeed ?? DailyQuestGenerator.weeklySeedForDate(DateTime.now()),
-    );
+    // Only persist seeds when rotating quests are present.
+    // Writing today's seed when no rotating quests exist would falsely
+    // tell the game that quests have already been generated, causing
+    // refreshRotatingQuests() to skip generation on the next load.
+    if (dailySeed != null) {
+      await prefs.setInt(_planetDailySeedKey(planetId), dailySeed);
+    }
+    if (weeklySeed != null) {
+      await prefs.setInt(_planetWeeklySeedKey(planetId), weeklySeed);
+    }
 
     // Save achievement state
     final achievementJson = jsonEncode(planet.achievementManager.toJson());
@@ -568,15 +570,14 @@ class SaveService {
     final dailySeed = _extractSeedFromQuestIds(allQuestIds, 'daily_');
     final weeklySeed = _extractSeedFromQuestIds(allQuestIds, 'weekly_');
 
-    // Save seeds to persistent storage
-    await prefs.setInt(
-      _planetDailySeedKey(planetId),
-      dailySeed ?? DailyQuestGenerator.dailySeedForDate(DateTime.now()),
-    );
-    await prefs.setInt(
-      _planetWeeklySeedKey(planetId),
-      weeklySeed ?? DailyQuestGenerator.weeklySeedForDate(DateTime.now()),
-    );
+    // Only write seeds when rotating quests are actually present (same guard
+    // as savePlanet) to avoid falsely blocking quest generation on next load.
+    if (dailySeed != null) {
+      await prefs.setInt(_planetDailySeedKey(planetId), dailySeed);
+    }
+    if (weeklySeed != null) {
+      await prefs.setInt(_planetWeeklySeedKey(planetId), weeklySeed);
+    }
   }
 
   /// Migrate legacy save data to Earth planet format (one-time migration)

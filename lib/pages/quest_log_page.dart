@@ -28,11 +28,13 @@ class _QuestLogPageState extends State<QuestLogPage>
 
   // Callback references for cleanup
   void Function(Quest, QuestStatus, QuestStatus)? _questStatusCallback;
+  void Function()? _questsRefreshedCallback;
   void Function(Achievement)? _achievementUnlockedCallback;
 
   // Store original callbacks to restore after disposal
   void Function(Quest)? _originalOnQuestCompleted;
   void Function(Quest)? _originalOnQuestAvailable;
+  void Function()? _originalOnQuestsRefreshed;
   void Function(Achievement)? _originalOnAchievementUnlocked;
 
   @override
@@ -57,6 +59,7 @@ class _QuestLogPageState extends State<QuestLogPage>
     // Save original callbacks before replacing them
     _originalOnQuestCompleted = widget.questManager.onQuestCompleted;
     _originalOnQuestAvailable = widget.questManager.onQuestAvailable;
+    _originalOnQuestsRefreshed = widget.questManager.onQuestsRefreshed;
     _originalOnAchievementUnlocked =
         widget.achievementManager.onAchievementUnlocked;
 
@@ -65,6 +68,13 @@ class _QuestLogPageState extends State<QuestLogPage>
       if (mounted) setState(() {});
     };
     widget.questManager.onQuestStatusChanged = _questStatusCallback;
+
+    // Rebuild when rotating quests are added or removed
+    _questsRefreshedCallback = () {
+      if (mounted) setState(() {});
+      _originalOnQuestsRefreshed?.call();
+    };
+    widget.questManager.onQuestsRefreshed = _questsRefreshedCallback;
 
     // Also listen for quest completion and availability notifications
     widget.questManager.onQuestCompleted = (quest) {
@@ -95,6 +105,9 @@ class _QuestLogPageState extends State<QuestLogPage>
     // Remove our specific callbacks if they match
     if (qm.onQuestStatusChanged == _questStatusCallback) {
       qm.onQuestStatusChanged = null;
+    }
+    if (qm.onQuestsRefreshed == _questsRefreshedCallback) {
+      qm.onQuestsRefreshed = _originalOnQuestsRefreshed;
     }
 
     // Restore original callbacks instead of setting to null
