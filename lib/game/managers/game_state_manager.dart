@@ -111,6 +111,15 @@ class GameStateManager {
     _resourceTimer = null;
   }
 
+  /// Check quest and achievement progress with the provided buildings list.
+  /// This should be called before saving when buildings, resources, or research
+  /// have changed outside the periodic tick (e.g., building placement, research
+  /// completion, reward claiming) to ensure progress is not lost on app close.
+  void checkProgress(List<Building> buildings) {
+    questManager?.checkProgress(resources, buildings, researchManager);
+    achievementManager?.checkProgress(resources, buildings, researchManager);
+  }
+
   /// Refresh daily and weekly rotating quests if the date-based seed has changed.
   /// Returns true if any quests were refreshed.
   ///
