@@ -431,6 +431,16 @@ class _MainGameWidgetState extends State<MainGameWidget>
         _gameStateManager.buildingLimitManager.toMap(),
       );
     });
+
+    // Check quest and achievement progress before saving to ensure immediate
+    // actions (building placement, research completion, reward claiming) trigger
+    // completions that are persisted. Without this, closing the app within the
+    // same second as the action could lose a just-completed quest/achievement.
+    final buildings = _game.hasLoaded
+        ? _game.grid.getAllBuildings()
+        : <Building>[];
+    _gameStateManager.checkProgress(buildings);
+
     _schedulePlanetSave(immediateSave: immediateSave);
   }
 
