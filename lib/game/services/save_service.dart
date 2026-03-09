@@ -447,39 +447,6 @@ class SaveService {
       }
     }
 
-    // Pre-populate today's and this week's rotating quests AFTER restoring saved state.
-    // This ensures old quest IDs are reconstructed first, allowing proper seed detection
-    // in recoverSeedsFromExistingQuests() and correct refreshRotatingQuests() behavior.
-    final now = DateTime.now();
-    final currentDailySeed = DailyQuestGenerator.dailySeedForDate(now);
-    final currentWeeklySeed = DailyQuestGenerator.weeklySeedForDate(now);
-
-    // Only add current rotating quests if they don't already exist (from loaded save)
-    final existingQuestIds = questManager.quests.map((q) => q.id).toSet();
-    final hasCurrentDaily = existingQuestIds.any(
-      (id) => id.startsWith('daily_$currentDailySeed'),
-    );
-    final hasCurrentWeekly = existingQuestIds.any(
-      (id) => id.startsWith('weekly_$currentWeeklySeed'),
-    );
-
-    if (!hasCurrentDaily) {
-      questManager.addRotatingQuests(
-        DailyQuestGenerator.generateDaily(
-          seed: currentDailySeed,
-          researchManager: researchManager,
-        ),
-      );
-    }
-    if (!hasCurrentWeekly) {
-      questManager.addRotatingQuests(
-        DailyQuestGenerator.generateWeekly(
-          seed: currentWeeklySeed,
-          researchManager: researchManager,
-        ),
-      );
-    }
-
     // Load achievement state
     bool achievementLoadFailed = false;
     final achievementManager = AchievementManager(
