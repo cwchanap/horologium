@@ -22,6 +22,27 @@ void main() {
     );
 
     test(
+      'loadOrCreatePlanet resets quest seeds when quest JSON is corrupt',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'planet.earth.resources_json': '{}',
+          'planet.earth.quests': '{invalid json',
+          'planet.earth.quests.dailySeed': 20260101,
+          'planet.earth.quests.weeklySeed': 202601,
+        });
+
+        final planet = await SaveService.loadOrCreatePlanet('earth');
+        final prefs = await SharedPreferences.getInstance();
+
+        expect(planet.questLoadFailed, isTrue);
+        expect(planet.lastDailySeed, 0);
+        expect(planet.lastWeeklySeed, 0);
+        expect(prefs.containsKey('planet.earth.quests.dailySeed'), isFalse);
+        expect(prefs.containsKey('planet.earth.quests.weeklySeed'), isFalse);
+      },
+    );
+
+    test(
       'loadOrCreatePlanet sets achievementLoadFailed when achievement JSON is corrupt',
       () async {
         SharedPreferences.setMockInitialValues({
@@ -218,6 +239,28 @@ void main() {
 
         // Seeds must NOT be written; their absence lets refreshRotatingQuests()
         // generate quests on the next load instead of skipping generation.
+        expect(prefs.containsKey('planet.earth.quests.dailySeed'), isFalse);
+        expect(prefs.containsKey('planet.earth.quests.weeklySeed'), isFalse);
+      },
+    );
+
+    test(
+      'savePlanet removes stale seed keys when no rotating quests exist',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'planet.earth.resources_json': '{}',
+          'planet.earth.quests.dailySeed': 20260101,
+          'planet.earth.quests.weeklySeed': 202601,
+        });
+        final prefs = await SharedPreferences.getInstance();
+
+        final planet = Planet(
+          id: 'earth',
+          name: 'Earth',
+          questManager: QuestManager(quests: QuestRegistry.starterQuests),
+        );
+        await SaveService.savePlanet(planet);
+
         expect(prefs.containsKey('planet.earth.quests.dailySeed'), isFalse);
         expect(prefs.containsKey('planet.earth.quests.weeklySeed'), isFalse);
       },

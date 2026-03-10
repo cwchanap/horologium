@@ -10,6 +10,7 @@ class AchievementManager {
   final Map<String, Achievement> _achievements;
 
   void Function(Achievement)? onAchievementUnlocked;
+  void Function(Achievement)? onAchievementProgressChanged;
 
   AchievementManager({required List<Achievement> achievements})
     : _achievements = {for (final a in achievements) a.id: a};
@@ -27,7 +28,11 @@ class AchievementManager {
     for (final achievement in _achievements.values) {
       if (achievement.isUnlocked) continue;
 
+      final before = achievement.currentAmount;
       _evaluateAchievement(achievement, resources, buildings, researchManager);
+      if (achievement.currentAmount != before) {
+        onAchievementProgressChanged?.call(achievement);
+      }
 
       if (achievement.currentAmount >= achievement.targetAmount) {
         achievement.isUnlocked = true;

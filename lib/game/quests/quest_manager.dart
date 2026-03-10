@@ -13,6 +13,7 @@ class QuestManager {
 
   void Function(Quest quest)? onQuestCompleted;
   void Function(Quest quest)? onQuestAvailable;
+  void Function(Quest quest)? onQuestProgressChanged;
   void Function(Quest quest, QuestStatus oldStatus, QuestStatus newStatus)?
   onQuestStatusChanged;
 
@@ -122,13 +123,22 @@ class QuestManager {
 
     for (final quest in getActiveQuests()) {
       bool wasComplete = quest.isComplete;
+      bool progressChanged = false;
       for (final objective in quest.objectives) {
+        final before = objective.currentAmount;
         _evaluateObjective(
           objective,
           resources,
           buildingCounts,
           researchManager,
         );
+        if (objective.currentAmount != before) {
+          progressChanged = true;
+        }
+      }
+
+      if (progressChanged) {
+        onQuestProgressChanged?.call(quest);
       }
 
       if (!wasComplete && quest.isComplete) {

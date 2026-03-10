@@ -190,6 +190,53 @@ void main() {
 
         expect(callCount, 1);
       });
+
+      test('fires onAchievementProgressChanged callback', () {
+        Achievement? changed;
+        int callCount = 0;
+        manager.onAchievementProgressChanged = (a) {
+          changed = a;
+          callCount++;
+        };
+
+        final buildings = [
+          Building(
+            type: BuildingType.house,
+            name: 'House',
+            description: 'A house',
+            icon: const IconData(0),
+            color: const Color(0xFF000000),
+            baseCost: 100,
+            category: BuildingCategory.residential,
+          ),
+        ];
+        manager.checkProgress(Resources(), buildings, ResearchManager());
+
+        expect(callCount, greaterThan(0));
+        expect(changed, isNotNull);
+      });
+
+      test('does not fire progress callback when progress is unchanged', () {
+        final localManager = AchievementManager(
+          achievements: [
+            Achievement(
+              id: 'ach_population_50',
+              name: 'Small Town',
+              description: 'Reach 50 population',
+              type: AchievementType.populationReached,
+              targetAmount: 50,
+            ),
+          ],
+        );
+        int callCount = 0;
+        localManager.onAchievementProgressChanged = (_) => callCount++;
+
+        final resources = Resources()..population = 20;
+        localManager.checkProgress(resources, [], ResearchManager());
+        localManager.checkProgress(resources, [], ResearchManager());
+
+        expect(callCount, 1);
+      });
     });
 
     group('serialization', () {

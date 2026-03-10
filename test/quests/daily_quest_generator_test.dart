@@ -203,10 +203,16 @@ void main() {
       expect(totalWeeklyAvg / trials, greaterThan(totalDailyAvg / trials));
     });
 
-    test('dailySeedForDate produces consistent seeds per day', () {
-      final date1 = DateTime(2026, 2, 27);
-      final date2 = DateTime(2026, 2, 27, 14, 30); // same day, different time
-      final date3 = DateTime(2026, 2, 28);
+    test('dailySeedForDate produces consistent seeds per UTC day', () {
+      final date1 = DateTime.utc(2026, 2, 27);
+      final date2 = DateTime.utc(
+        2026,
+        2,
+        27,
+        14,
+        30,
+      ); // same UTC day, different time
+      final date3 = DateTime.utc(2026, 2, 28);
 
       expect(
         DailyQuestGenerator.dailySeedForDate(date1),
@@ -218,11 +224,11 @@ void main() {
       );
     });
 
-    test('weeklySeedForDate produces consistent seeds per week', () {
-      // Monday and Sunday of the same week (ISO week: Mon-Sun)
-      final monday = DateTime(2026, 2, 23); // a Monday
-      final wednesday = DateTime(2026, 2, 25); // same week
-      final nextMonday = DateTime(2026, 3, 2); // next week
+    test('weeklySeedForDate produces consistent seeds per UTC week', () {
+      // Monday and Wednesday of the same ISO UTC week.
+      final monday = DateTime.utc(2026, 2, 23); // a Monday in UTC
+      final wednesday = DateTime.utc(2026, 2, 25); // same UTC week
+      final nextMonday = DateTime.utc(2026, 3, 2); // next UTC week
 
       expect(
         DailyQuestGenerator.weeklySeedForDate(monday),

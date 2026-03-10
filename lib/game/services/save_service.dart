@@ -250,11 +250,16 @@ class SaveService {
     // Writing today's seed when no rotating quests exist would falsely
     // tell the game that quests have already been generated, causing
     // refreshRotatingQuests() to skip generation on the next load.
+    // Clear stale seed keys when no rotating quests are present.
     if (dailySeed != null) {
       await prefs.setInt(_planetDailySeedKey(planetId), dailySeed);
+    } else {
+      await prefs.remove(_planetDailySeedKey(planetId));
     }
     if (weeklySeed != null) {
       await prefs.setInt(_planetWeeklySeedKey(planetId), weeklySeed);
+    } else {
+      await prefs.remove(_planetWeeklySeedKey(planetId));
     }
 
     // Save achievement state
@@ -468,9 +473,16 @@ class SaveService {
       }
     }
 
-    // Load quest seeds (default to 0 if not found, which will trigger refresh)
-    final lastDailySeed = prefs.getInt(_planetDailySeedKey(planetId)) ?? 0;
-    final lastWeeklySeed = prefs.getInt(_planetWeeklySeedKey(planetId)) ?? 0;
+    // Load quest seeds (default to 0 if not found, which will trigger refresh).
+    // If quest JSON failed to load, reset seeds so rotating quests regenerate.
+    int lastDailySeed = prefs.getInt(_planetDailySeedKey(planetId)) ?? 0;
+    int lastWeeklySeed = prefs.getInt(_planetWeeklySeedKey(planetId)) ?? 0;
+    if (questLoadFailed) {
+      lastDailySeed = 0;
+      lastWeeklySeed = 0;
+      await prefs.remove(_planetDailySeedKey(planetId));
+      await prefs.remove(_planetWeeklySeedKey(planetId));
+    }
 
     return Planet(
       id: planetId,
@@ -552,11 +564,16 @@ class SaveService {
 
     // Only write seeds when rotating quests are actually present (same guard
     // as savePlanet) to avoid falsely blocking quest generation on next load.
+    // Clear stale seed keys when rotating quests are absent.
     if (dailySeed != null) {
       await prefs.setInt(_planetDailySeedKey(planetId), dailySeed);
+    } else {
+      await prefs.remove(_planetDailySeedKey(planetId));
     }
     if (weeklySeed != null) {
       await prefs.setInt(_planetWeeklySeedKey(planetId), weeklySeed);
+    } else {
+      await prefs.remove(_planetWeeklySeedKey(planetId));
     }
   }
 
