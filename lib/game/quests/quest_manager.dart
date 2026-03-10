@@ -172,10 +172,9 @@ class QuestManager {
     _setQuestStatus(quest, QuestStatus.claimed);
 
     // Notify any quests that became available because this quest is now claimed
-    for (final q in _quests.values) {
-      if (q.status == QuestStatus.available &&
-          q.prerequisiteQuestIds.contains(questId) &&
-          _prerequisitesMet(q)) {
+    // Use getAvailableQuests() to enforce both prerequisite and research gating
+    for (final q in getAvailableQuests()) {
+      if (q.prerequisiteQuestIds.contains(questId)) {
         onQuestAvailable?.call(q);
       }
     }

@@ -196,8 +196,8 @@ void main() {
           }
         }
 
-        totalDailyAvg += dailySum / dailyCount;
-        totalWeeklyAvg += weeklySum / weeklyCount;
+        if (dailyCount > 0) totalDailyAvg += dailySum / dailyCount;
+        if (weeklyCount > 0) totalWeeklyAvg += weeklySum / weeklyCount;
       }
 
       expect(totalWeeklyAvg / trials, greaterThan(totalDailyAvg / trials));
