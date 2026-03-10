@@ -28,14 +28,18 @@ class _QuestLogPageState extends State<QuestLogPage>
 
   // Callback references for cleanup
   void Function(Quest, QuestStatus, QuestStatus)? _questStatusCallback;
+  void Function(Quest)? _questProgressCallback;
   void Function()? _questsRefreshedCallback;
   void Function(Achievement)? _achievementUnlockedCallback;
+  void Function(Achievement)? _achievementProgressCallback;
 
   // Store original callbacks to restore after disposal
   void Function(Quest)? _originalOnQuestCompleted;
   void Function(Quest)? _originalOnQuestAvailable;
+  void Function(Quest)? _originalOnQuestProgressChanged;
   void Function()? _originalOnQuestsRefreshed;
   void Function(Achievement)? _originalOnAchievementUnlocked;
+  void Function(Achievement)? _originalOnAchievementProgressChanged;
 
   @override
   void initState() {
@@ -59,15 +63,25 @@ class _QuestLogPageState extends State<QuestLogPage>
     // Save original callbacks before replacing them
     _originalOnQuestCompleted = widget.questManager.onQuestCompleted;
     _originalOnQuestAvailable = widget.questManager.onQuestAvailable;
+    _originalOnQuestProgressChanged =
+        widget.questManager.onQuestProgressChanged;
     _originalOnQuestsRefreshed = widget.questManager.onQuestsRefreshed;
     _originalOnAchievementUnlocked =
         widget.achievementManager.onAchievementUnlocked;
+    _originalOnAchievementProgressChanged =
+        widget.achievementManager.onAchievementProgressChanged;
 
     // Listen for quest status changes (activation, completion, claiming)
     _questStatusCallback = (quest, oldStatus, newStatus) {
       if (mounted) setState(() {});
     };
     widget.questManager.onQuestStatusChanged = _questStatusCallback;
+
+    _questProgressCallback = (quest) {
+      if (mounted) setState(() {});
+      _originalOnQuestProgressChanged?.call(quest);
+    };
+    widget.questManager.onQuestProgressChanged = _questProgressCallback;
 
     // Rebuild when rotating quests are added or removed
     _questsRefreshedCallback = () {
@@ -96,6 +110,13 @@ class _QuestLogPageState extends State<QuestLogPage>
     };
     widget.achievementManager.onAchievementUnlocked =
         _achievementUnlockedCallback;
+
+    _achievementProgressCallback = (achievement) {
+      if (mounted) setState(() {});
+      _originalOnAchievementProgressChanged?.call(achievement);
+    };
+    widget.achievementManager.onAchievementProgressChanged =
+        _achievementProgressCallback;
   }
 
   void _removeListeners([QuestLogPage? oldWidget]) {
@@ -105,6 +126,9 @@ class _QuestLogPageState extends State<QuestLogPage>
     // Remove our specific callbacks if they match
     if (qm.onQuestStatusChanged == _questStatusCallback) {
       qm.onQuestStatusChanged = null;
+    }
+    if (qm.onQuestProgressChanged == _questProgressCallback) {
+      qm.onQuestProgressChanged = _originalOnQuestProgressChanged;
     }
     if (qm.onQuestsRefreshed == _questsRefreshedCallback) {
       qm.onQuestsRefreshed = _originalOnQuestsRefreshed;
@@ -116,6 +140,9 @@ class _QuestLogPageState extends State<QuestLogPage>
 
     // Restore original achievement callback
     am.onAchievementUnlocked = _originalOnAchievementUnlocked;
+    if (am.onAchievementProgressChanged == _achievementProgressCallback) {
+      am.onAchievementProgressChanged = _originalOnAchievementProgressChanged;
+    }
   }
 
   @override

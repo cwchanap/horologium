@@ -385,6 +385,43 @@ void main() {
       });
     });
 
+    group('onQuestProgressChanged callback', () {
+      test('fires when objective progress changes', () {
+        final qm = QuestManager(quests: [_resourceQuest()]);
+        qm.activateQuest('test_accumulate');
+
+        Quest? changedQuest;
+        int callCount = 0;
+        qm.onQuestProgressChanged = (quest) {
+          changedQuest = quest;
+          callCount++;
+        };
+
+        final resources = Resources();
+        resources.resources[ResourceType.gold] = 75;
+        qm.checkProgress(resources, [], ResearchManager());
+
+        expect(callCount, 1);
+        expect(changedQuest, isNotNull);
+        expect(changedQuest!.id, 'test_accumulate');
+      });
+
+      test('does not fire when progress is unchanged', () {
+        final qm = QuestManager(quests: [_resourceQuest()]);
+        qm.activateQuest('test_accumulate');
+
+        int callCount = 0;
+        qm.onQuestProgressChanged = (_) => callCount++;
+
+        final resources = Resources();
+        resources.resources[ResourceType.gold] = 50;
+        qm.checkProgress(resources, [], ResearchManager());
+        qm.checkProgress(resources, [], ResearchManager());
+
+        expect(callCount, 1);
+      });
+    });
+
     group('serialization', () {
       test('toJson and loadFromJson round-trip', () {
         manager.activateQuest('test_build_house');

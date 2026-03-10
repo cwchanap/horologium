@@ -128,5 +128,33 @@ void main() {
       expect(prefs.containsKey('planet.moon.quests.dailySeed'), isFalse);
       expect(prefs.containsKey('planet.moon.quests.weeklySeed'), isFalse);
     });
+
+    test('removes stale seed keys when no rotating quests exist', () async {
+      SharedPreferences.setMockInitialValues({
+        'planet.moon.quests.dailySeed': 20260101,
+        'planet.moon.quests.weeklySeed': 202601,
+      });
+
+      final staticQuest = Quest(
+        id: 'build_house',
+        name: 'Build House',
+        description: 'Test',
+        objectives: [
+          QuestObjective(
+            type: QuestObjectiveType.buildBuilding,
+            targetId: 'house',
+            targetAmount: 1,
+          ),
+        ],
+        reward: const QuestReward(resources: {ResourceType.cash: 50.0}),
+      );
+
+      final questManager = QuestManager(quests: [staticQuest]);
+      await SaveService.saveQuestSeeds('moon', questManager);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey('planet.moon.quests.dailySeed'), isFalse);
+      expect(prefs.containsKey('planet.moon.quests.weeklySeed'), isFalse);
+    });
   });
 }
