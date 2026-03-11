@@ -23,13 +23,20 @@ class AchievementManager {
   void checkProgress(
     Resources resources,
     List<Building> buildings,
-    ResearchManager researchManager,
-  ) {
+    ResearchManager researchManager, [
+    int? totalBuildingsPlaced,
+  ]) {
     for (final achievement in _achievements.values) {
       if (achievement.isUnlocked) continue;
 
       final before = achievement.currentAmount;
-      _evaluateAchievement(achievement, resources, buildings, researchManager);
+      _evaluateAchievement(
+        achievement,
+        resources,
+        buildings,
+        researchManager,
+        totalBuildingsPlaced,
+      );
       if (achievement.currentAmount != before) {
         onAchievementProgressChanged?.call(achievement);
       }
@@ -45,11 +52,14 @@ class AchievementManager {
     Achievement achievement,
     Resources resources,
     List<Building> buildings,
-    ResearchManager researchManager,
-  ) {
+    ResearchManager researchManager, [
+    int? totalBuildingsPlaced,
+  ]) {
     switch (achievement.type) {
       case AchievementType.buildingCount:
-        achievement.currentAmount = buildings.length;
+        // Use cumulative count if provided, otherwise fall back to current building count
+        // Cumulative count tracks total placements (matches achievement text "Place X buildings")
+        achievement.currentAmount = totalBuildingsPlaced ?? buildings.length;
         break;
       case AchievementType.populationReached:
         achievement.currentAmount = resources.population;

@@ -83,19 +83,27 @@ class GameStateManager {
 
   void startResourceGeneration(
     List<Building> Function() getBuildingsCallback,
-    VoidCallback onUpdate,
-  ) {
+    VoidCallback onUpdate, [
+    Map<String, int>? cumulativeBuildingCounts,
+    int? totalBuildingsPlaced,
+  ]) {
     _resourceTimer = async.Timer.periodic(const Duration(seconds: 1), (timer) {
       try {
         final buildings = getBuildingsCallback();
         ResourceService.updateResources(resources, buildings);
 
         // Check quest and achievement progress
-        questManager?.checkProgress(resources, buildings, researchManager);
+        questManager?.checkProgress(
+          resources,
+          buildings,
+          researchManager,
+          cumulativeBuildingCounts,
+        );
         achievementManager?.checkProgress(
           resources,
           buildings,
           researchManager,
+          totalBuildingsPlaced,
         );
 
         onUpdate();
@@ -115,9 +123,23 @@ class GameStateManager {
   /// This should be called before saving when buildings, resources, or research
   /// have changed outside the periodic tick (e.g., building placement, research
   /// completion, reward claiming) to ensure progress is not lost on app close.
-  void checkProgress(List<Building> buildings) {
-    questManager?.checkProgress(resources, buildings, researchManager);
-    achievementManager?.checkProgress(resources, buildings, researchManager);
+  void checkProgress(
+    List<Building> buildings, [
+    Map<String, int>? cumulativeBuildingCounts,
+    int? totalBuildingsPlaced,
+  ]) {
+    questManager?.checkProgress(
+      resources,
+      buildings,
+      researchManager,
+      cumulativeBuildingCounts,
+    );
+    achievementManager?.checkProgress(
+      resources,
+      buildings,
+      researchManager,
+      totalBuildingsPlaced,
+    );
   }
 
   /// Refresh daily and weekly rotating quests if the date-based seed has changed.

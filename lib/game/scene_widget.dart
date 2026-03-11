@@ -312,9 +312,17 @@ class _MainGameWidgetState extends State<MainGameWidget>
   }
 
   void _startResourceGeneration() {
+    // Convert cumulative building counts from Map<BuildingType, int> to Map<String, int>
+    final cumulativeCounts = <String, int>{};
+    for (final entry in widget.planet.cumulativeBuildingCounts.entries) {
+      cumulativeCounts[entry.key.name] = entry.value;
+    }
+
     _gameStateManager.startResourceGeneration(
       () => _game.hasLoaded ? _game.grid.getAllBuildings() : <Building>[],
       _onResourcesChanged,
+      cumulativeCounts,
+      widget.planet.totalBuildingsPlaced,
     );
   }
 
@@ -441,7 +449,16 @@ class _MainGameWidgetState extends State<MainGameWidget>
     final buildings = _game.hasLoaded
         ? _game.grid.getAllBuildings()
         : <Building>[];
-    _gameStateManager.checkProgress(buildings);
+    // Convert cumulative building counts from Map<BuildingType, int> to Map<String, int>
+    final cumulativeCounts = <String, int>{};
+    for (final entry in widget.planet.cumulativeBuildingCounts.entries) {
+      cumulativeCounts[entry.key.name] = entry.value;
+    }
+    _gameStateManager.checkProgress(
+      buildings,
+      cumulativeCounts,
+      widget.planet.totalBuildingsPlaced,
+    );
 
     _schedulePlanetSave(immediateSave: immediateSave);
   }

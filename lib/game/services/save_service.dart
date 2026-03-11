@@ -53,6 +53,10 @@ class SaveService {
       'planet.$planetId.quests.dailySeed';
   static String _planetWeeklySeedKey(String planetId) =>
       'planet.$planetId.quests.weeklySeed';
+  static String _planetCumulativeBuildingCountsKey(String planetId) =>
+      'planet.$planetId.cumulativeBuildingCounts';
+  static String _planetTotalBuildingsPlacedKey(String planetId) =>
+      'planet.$planetId.totalBuildingsPlaced';
 
   /// Load resources from legacy per-resource keys.
   /// Used as fallback when JSON parsing fails or when migrating from old format.
@@ -265,6 +269,21 @@ class SaveService {
     // Save achievement state
     final achievementJson = jsonEncode(planet.achievementManager.toJson());
     await prefs.setString(_planetAchievementsKey(planetId), achievementJson);
+
+    // Save cumulative building counts
+    final cumulativeCountsJson = jsonEncode(
+      planet.cumulativeBuildingCounts.map((k, v) => MapEntry(k.name, v)),
+    );
+    await prefs.setString(
+      _planetCumulativeBuildingCountsKey(planetId),
+      cumulativeCountsJson,
+    );
+
+    // Save total buildings placed
+    await prefs.setInt(
+      _planetTotalBuildingsPlacedKey(planetId),
+      planet.totalBuildingsPlaced,
+    );
   }
 
   /// Load or create a planet from SharedPreferences
@@ -488,6 +507,37 @@ class SaveService {
       await prefs.remove(_planetWeeklySeedKey(planetId));
     }
 
+    // Load cumulative building counts
+    final Map<BuildingType, int> cumulativeBuildingCounts = {};
+    final cumulativeCountsJson = prefs.getString(
+      _planetCumulativeBuildingCountsKey(planetId),
+    );
+    if (cumulativeCountsJson != null) {
+      try {
+        final countsMap =
+            jsonDecode(cumulativeCountsJson) as Map<String, dynamic>;
+        for (final entry in countsMap.entries) {
+          final type = BuildingType.values
+              .where((t) => t.name == entry.key)
+              .firstOrNull;
+          if (type != null) {
+            cumulativeBuildingCounts[type] = (entry.value as num).toInt();
+          }
+        }
+      } catch (e, stackTrace) {
+        debugPrint(
+          'Failed to parse cumulative building counts JSON for planet $planetId: $e\n'
+          'Raw JSON: $cumulativeCountsJson\n'
+          '$stackTrace',
+        );
+        // Default to empty map (will be handled gracefully)
+      }
+    }
+
+    // Load total buildings placed
+    final totalBuildingsPlaced =
+        prefs.getInt(_planetTotalBuildingsPlacedKey(planetId)) ?? 0;
+
     return Planet(
       id: planetId,
       name: name,
@@ -503,6 +553,8 @@ class SaveService {
       achievementLoadFailed: achievementLoadFailed,
       lastDailySeed: lastDailySeed,
       lastWeeklySeed: lastWeeklySeed,
+      cumulativeBuildingCounts: cumulativeBuildingCounts,
+      totalBuildingsPlaced: totalBuildingsPlaced,
     );
   }
 
