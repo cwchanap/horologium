@@ -474,10 +474,14 @@ class SaveService {
     }
 
     // Load quest seeds (default to 0 if not found, which will trigger refresh).
-    // If quest JSON failed to load, reset seeds so rotating quests regenerate.
+    // If quest JSON was absent or failed to parse, reset seeds so that
+    // refreshRotatingQuests() does not skip regeneration on the next call
+    // (a crash between writing seeds and writing quest JSON would otherwise
+    // leave nonzero seeds with no quests, permanently blocking generation
+    // until the next natural rollover).
     int lastDailySeed = prefs.getInt(_planetDailySeedKey(planetId)) ?? 0;
     int lastWeeklySeed = prefs.getInt(_planetWeeklySeedKey(planetId)) ?? 0;
-    if (questLoadFailed) {
+    if (questLoadFailed || questJson == null) {
       lastDailySeed = 0;
       lastWeeklySeed = 0;
       await prefs.remove(_planetDailySeedKey(planetId));
