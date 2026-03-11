@@ -104,8 +104,9 @@ class QuestManager {
   void checkProgress(
     Resources resources,
     List<Building> buildings,
-    ResearchManager researchManager,
-  ) {
+    ResearchManager researchManager, [
+    Map<String, int>? cumulativeBuildingCounts,
+  ]) {
     // Auto-activate all available quests whose prerequisites are met so that
     // progress is evaluated without requiring an explicit activateQuest() call.
     for (final quest in getAvailableQuests()) {
@@ -119,6 +120,11 @@ class QuestManager {
       buildingCounts[key] = (buildingCounts[key] ?? 0) + 1;
     }
 
+    // Use cumulative counts if provided, otherwise fall back to current building counts
+    // Cumulative counts are used for buildBuilding objectives to track total placements
+    // instead of current grid size (matches quest text "Build X buildings")
+    final effectiveBuildingCounts = cumulativeBuildingCounts ?? buildingCounts;
+
     final completedThisTick = <Quest>[];
 
     for (final quest in getActiveQuests()) {
@@ -129,7 +135,7 @@ class QuestManager {
         _evaluateObjective(
           objective,
           resources,
-          buildingCounts,
+          effectiveBuildingCounts,
           researchManager,
         );
         if (objective.currentAmount != before) {

@@ -37,6 +37,12 @@ class Planet {
   /// Last weekly quest seed used to determine if weekly quests should refresh
   final int lastWeeklySeed;
 
+  /// Cumulative count of buildings placed per building type (never decreases)
+  final Map<BuildingType, int> cumulativeBuildingCounts;
+
+  /// Total number of buildings placed cumulatively (never decreases)
+  int totalBuildingsPlaced;
+
   Planet({
     required this.id,
     required this.name,
@@ -52,6 +58,8 @@ class Planet {
     this.achievementLoadFailed = false,
     this.lastDailySeed = 0,
     this.lastWeeklySeed = 0,
+    Map<BuildingType, int>? cumulativeBuildingCounts,
+    this.totalBuildingsPlaced = 0,
   }) : resources = resources ?? Resources(),
        researchManager = researchManager ?? ResearchManager(),
        buildingLimitManager = buildingLimitManager ?? BuildingLimitManager(),
@@ -60,7 +68,8 @@ class Planet {
        achievementManager =
            achievementManager ??
            AchievementManager(achievements: Planet.defaultAchievements()),
-       _buildings = buildings ?? [];
+       _buildings = buildings ?? [],
+       cumulativeBuildingCounts = cumulativeBuildingCounts ?? {};
 
   /// Get a copy of all buildings on this planet
   List<PlacedBuildingData> get buildings => List.unmodifiable(_buildings);
@@ -79,6 +88,14 @@ class Planet {
   /// Add a building to the planet
   void addBuilding(PlacedBuildingData building) {
     _buildings.add(building);
+
+    // Update cumulative building counts (never decreases)
+    cumulativeBuildingCounts.update(
+      building.type,
+      (value) => value + 1,
+      ifAbsent: () => 1,
+    );
+    totalBuildingsPlaced++;
   }
 
   /// Remove a building at specific coordinates
@@ -120,6 +137,16 @@ class Planet {
     return _buildings.where((b) => b.type == type).length;
   }
 
+  /// Get cumulative count of buildings placed for a specific type
+  int getCumulativeBuildingCount(BuildingType type) {
+    return cumulativeBuildingCounts[type] ?? 0;
+  }
+
+  /// Get total cumulative buildings placed (all types)
+  int getTotalBuildingsPlaced() {
+    return totalBuildingsPlaced;
+  }
+
   /// Create a copy of this planet with modified values
   Planet copyWith({
     String? id,
@@ -136,6 +163,8 @@ class Planet {
     bool? achievementLoadFailed,
     int? lastDailySeed,
     int? lastWeeklySeed,
+    Map<BuildingType, int>? cumulativeBuildingCounts,
+    int? totalBuildingsPlaced,
   }) {
     return Planet(
       id: id ?? this.id,
@@ -155,12 +184,15 @@ class Planet {
           achievementLoadFailed ?? this.achievementLoadFailed,
       lastDailySeed: lastDailySeed ?? this.lastDailySeed,
       lastWeeklySeed: lastWeeklySeed ?? this.lastWeeklySeed,
+      cumulativeBuildingCounts:
+          cumulativeBuildingCounts ?? Map.from(this.cumulativeBuildingCounts),
+      totalBuildingsPlaced: totalBuildingsPlaced ?? this.totalBuildingsPlaced,
     );
   }
 
   @override
   String toString() {
-    return 'Planet(id: $id, name: $name, buildings: ${_buildings.length}, lastDailySeed: $lastDailySeed, lastWeeklySeed: $lastWeeklySeed)';
+    return 'Planet(id: $id, name: $name, buildings: ${_buildings.length}, totalBuildingsPlaced: $totalBuildingsPlaced, lastDailySeed: $lastDailySeed, lastWeeklySeed: $lastWeeklySeed)';
   }
 
   static List<Achievement> defaultAchievements() {
