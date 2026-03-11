@@ -69,7 +69,38 @@ class Planet {
            achievementManager ??
            AchievementManager(achievements: Planet.defaultAchievements()),
        _buildings = buildings ?? [],
-       cumulativeBuildingCounts = cumulativeBuildingCounts ?? {};
+       cumulativeBuildingCounts = _initializeCumulativeBuildingCounts(
+         buildings,
+         cumulativeBuildingCounts,
+       ) {
+    if (totalBuildingsPlaced == 0 && _buildings.isNotEmpty) {
+      totalBuildingsPlaced = _buildings.length;
+    }
+  }
+
+  static Map<BuildingType, int> _initializeCumulativeBuildingCounts(
+    List<PlacedBuildingData>? buildings,
+    Map<BuildingType, int>? cumulativeBuildingCounts,
+  ) {
+    if (cumulativeBuildingCounts != null &&
+        cumulativeBuildingCounts.isNotEmpty) {
+      return cumulativeBuildingCounts;
+    }
+
+    if (buildings == null || buildings.isEmpty) {
+      return cumulativeBuildingCounts ?? {};
+    }
+
+    final derivedCounts = <BuildingType, int>{};
+    for (final building in buildings) {
+      derivedCounts.update(
+        building.type,
+        (value) => value + 1,
+        ifAbsent: () => 1,
+      );
+    }
+    return derivedCounts;
+  }
 
   /// Get a copy of all buildings on this planet
   List<PlacedBuildingData> get buildings => List.unmodifiable(_buildings);

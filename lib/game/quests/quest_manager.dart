@@ -120,11 +120,6 @@ class QuestManager {
       buildingCounts[key] = (buildingCounts[key] ?? 0) + 1;
     }
 
-    // Use cumulative counts if provided, otherwise fall back to current building counts
-    // Cumulative counts are used for buildBuilding objectives to track total placements
-    // instead of current grid size (matches quest text "Build X buildings")
-    final effectiveBuildingCounts = cumulativeBuildingCounts ?? buildingCounts;
-
     final completedThisTick = <Quest>[];
 
     for (final quest in getActiveQuests()) {
@@ -135,7 +130,8 @@ class QuestManager {
         _evaluateObjective(
           objective,
           resources,
-          effectiveBuildingCounts,
+          buildingCounts,
+          cumulativeBuildingCounts,
           researchManager,
         );
         if (objective.currentAmount != before) {
@@ -213,11 +209,24 @@ class QuestManager {
     QuestObjective objective,
     Resources resources,
     Map<String, int> buildingCounts,
+    Map<String, int>? cumulativeBuildingCounts,
     ResearchManager researchManager,
   ) {
     switch (objective.type) {
       case QuestObjectiveType.buildBuilding:
-        objective.currentAmount = buildingCounts[objective.targetId] ?? 0;
+        final lifetimeCount = cumulativeBuildingCounts?[objective.targetId];
+        if (lifetimeCount != null) {
+          if (objective.startingAmount == null) {
+            final baseline = lifetimeCount - objective.currentAmount;
+            objective.startingAmount = baseline < 0
+                ? 0
+                : (baseline > lifetimeCount ? lifetimeCount : baseline);
+          }
+          objective.currentAmount =
+              lifetimeCount - (objective.startingAmount ?? lifetimeCount);
+        } else {
+          objective.currentAmount = buildingCounts[objective.targetId] ?? 0;
+        }
         break;
       case QuestObjectiveType.accumulateResource:
         final type = ResourceType.values
