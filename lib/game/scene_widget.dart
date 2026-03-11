@@ -80,11 +80,12 @@ class _MainGameWidgetState extends State<MainGameWidget>
       _gameStateManager.refreshRotatingQuests(
         onSeedsChanged: (dailySeed, weeklySeed) async {
           try {
+            final livePlanet = ActivePlanet().value;
             await SaveService.saveQuestSeeds(
-              widget.planet.id,
-              widget.planet.questManager,
+              livePlanet.id,
+              livePlanet.questManager,
             );
-            final updatedPlanet = widget.planet.copyWith(
+            final updatedPlanet = livePlanet.copyWith(
               lastDailySeed: dailySeed,
               lastWeeklySeed: weeklySeed,
             );
