@@ -84,26 +84,27 @@ class GameStateManager {
   void startResourceGeneration(
     List<Building> Function() getBuildingsCallback,
     VoidCallback onUpdate, [
-    Map<String, int>? cumulativeBuildingCounts,
-    int? totalBuildingsPlaced,
+    Map<String, int>? Function()? getCumulativeBuildingCounts,
+    int? Function()? getTotalBuildingsPlaced,
   ]) {
     _resourceTimer = async.Timer.periodic(const Duration(seconds: 1), (timer) {
       try {
         final buildings = getBuildingsCallback();
         ResourceService.updateResources(resources, buildings);
 
-        // Check quest and achievement progress
+        // Check quest and achievement progress using live snapshots so that
+        // building placements after startup are reflected on every tick.
         questManager?.checkProgress(
           resources,
           buildings,
           researchManager,
-          cumulativeBuildingCounts,
+          getCumulativeBuildingCounts?.call(),
         );
         achievementManager?.checkProgress(
           resources,
           buildings,
           researchManager,
-          totalBuildingsPlaced,
+          getTotalBuildingsPlaced?.call(),
         );
 
         onUpdate();

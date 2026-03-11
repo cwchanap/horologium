@@ -532,11 +532,21 @@ class SaveService {
         );
         // Default to empty map (will be handled gracefully)
       }
+    } else {
+      // Legacy save: cumulative stats were never recorded. Bootstrap from the
+      // current buildings list so existing players aren't penalised by starting
+      // all build-count quests and achievements from zero.
+      for (final building in buildings) {
+        cumulativeBuildingCounts[building.type] =
+            (cumulativeBuildingCounts[building.type] ?? 0) + 1;
+      }
     }
 
-    // Load total buildings placed
+    // Load total buildings placed. Fall back to the current building count for
+    // legacy saves that predate this key.
     final totalBuildingsPlaced =
-        prefs.getInt(_planetTotalBuildingsPlacedKey(planetId)) ?? 0;
+        prefs.getInt(_planetTotalBuildingsPlacedKey(planetId)) ??
+        buildings.length;
 
     return Planet(
       id: planetId,
