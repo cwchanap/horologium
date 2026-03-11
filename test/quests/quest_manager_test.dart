@@ -210,6 +210,63 @@ void main() {
         );
         expect(manager.getCompletedQuests(), hasLength(1));
       });
+
+      test(
+        'tracks build progress from buildings placed after the quest becomes active',
+        () {
+          final quest = Quest(
+            id: 'quest_build_power_plant',
+            name: 'Power Up',
+            description: 'Build 1 power plant',
+            objectives: [
+              QuestObjective(
+                type: QuestObjectiveType.buildBuilding,
+                targetId: 'powerPlant',
+                targetAmount: 1,
+              ),
+            ],
+            reward: QuestReward(resources: {ResourceType.cash: 100}),
+            requiredResearchIds: ['electricity'],
+          );
+          final researchManager = ResearchManager();
+          final questManager = QuestManager(
+            quests: [quest],
+            researchManager: researchManager,
+          );
+
+          questManager.checkProgress(Resources(), const [], researchManager, {
+            'powerPlant': 3,
+          });
+
+          expect(questManager.getActiveQuests(), isEmpty);
+          expect(questManager.getCompletedQuests(), isEmpty);
+
+          researchManager.completeResearchById('electricity');
+          questManager.checkProgress(Resources(), const [], researchManager, {
+            'powerPlant': 3,
+          });
+
+          final activeQuest = questManager.getActiveQuests().single;
+          expect(activeQuest.id, 'quest_build_power_plant');
+          expect(activeQuest.objectives.single.currentAmount, 0);
+          expect(questManager.getCompletedQuests(), isEmpty);
+
+          final currentBuildings = [_makeBuilding(BuildingType.powerPlant)];
+          questManager.checkProgress(
+            Resources(),
+            currentBuildings,
+            researchManager,
+            {'powerPlant': 4},
+          );
+
+          expect(
+            questManager.getCompletedQuests().any(
+              (q) => q.id == 'quest_build_power_plant',
+            ),
+            isTrue,
+          );
+        },
+      );
     });
 
     group('checkProgress with accumulateResource objective', () {

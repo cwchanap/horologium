@@ -12,12 +12,14 @@ class QuestObjective {
   final String targetId;
   final int targetAmount;
   int currentAmount;
+  int? startingAmount;
 
   QuestObjective({
     required this.type,
     required this.targetId,
     required this.targetAmount,
     this.currentAmount = 0,
+    this.startingAmount,
   });
 
   bool get isComplete => currentAmount >= targetAmount;
@@ -47,12 +49,14 @@ class QuestObjective {
     'targetId': targetId,
     'targetAmount': targetAmount,
     'currentAmount': currentAmount,
+    if (startingAmount != null) 'startingAmount': startingAmount,
   };
 
   factory QuestObjective.fromJson(Map<String, dynamic> json) {
     final targetIdValue = json['targetId'];
     final targetAmountValue = json['targetAmount'];
     final currentAmountValue = json['currentAmount'];
+    final startingAmountValue = json['startingAmount'];
 
     int parseAmount(dynamic value) {
       if (value == null) return 0;
@@ -75,6 +79,9 @@ class QuestObjective {
           : targetIdValue?.toString() ?? '',
       targetAmount: parseAmount(targetAmountValue),
       currentAmount: parseAmount(currentAmountValue),
+      startingAmount: startingAmountValue == null
+          ? null
+          : parseAmount(startingAmountValue),
     );
   }
 }
