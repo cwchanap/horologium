@@ -544,7 +544,12 @@ class SaveService {
           'Raw JSON: $cumulativeCountsJson\n'
           '$stackTrace',
         );
-        // Default to empty map (will be handled gracefully)
+        // Malformed blob — bootstrap from the current buildings list so
+        // per-type lifetime progress is preserved as a safe lower bound.
+        for (final building in buildings) {
+          cumulativeBuildingCounts[building.type] =
+              (cumulativeBuildingCounts[building.type] ?? 0) + 1;
+        }
       }
     } else {
       // Legacy save: cumulative stats were never recorded. Bootstrap from the
