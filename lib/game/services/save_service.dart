@@ -640,7 +640,12 @@ class SaveService {
       return questSeed;
     }
 
-    return savedSeed == 0 ? questSeed : savedSeed;
+    // questSeed >= savedSeed: quest JSON is at least as new as prefs, so
+    // prefer it. Without this, a stale non-zero savedSeed would be returned
+    // and refreshRotatingQuests() would see a seed mismatch, wipe active
+    // quests, and lose in-progress objective state.
+    await prefs.setInt(key, questSeed);
+    return questSeed;
   }
 
   /// Save the current quest seeds for a planet to SharedPreferences.
