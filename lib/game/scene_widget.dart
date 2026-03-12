@@ -80,10 +80,6 @@ class _MainGameWidgetState extends State<MainGameWidget>
       _gameStateManager.refreshRotatingQuests(
         onSeedsChanged: (dailySeed, weeklySeed) async {
           try {
-            await SaveService.saveQuestSeeds(
-              widget.planet.id,
-              widget.planet.questManager,
-            );
             await SaveService.savePlanet(widget.planet);
           } catch (e, stackTrace) {
             debugPrint(
@@ -149,12 +145,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _gameStateManager.refreshRotatingQuests(
       onSeedsChanged: (dailySeed, weeklySeed) async {
         try {
-          // Persist seeds to SharedPreferences
-          await SaveService.saveQuestSeeds(
-            widget.planet.id,
-            widget.planet.questManager,
-          );
-          // Save full planet to persist the refreshed quest data
+          // Save full planet so quest JSON and derived seed keys stay in sync.
           await SaveService.savePlanet(widget.planet);
         } catch (e, stackTrace) {
           debugPrint(
@@ -217,11 +208,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
       _gameStateManager.refreshRotatingQuests(
         onSeedsChanged: (dailySeed, weeklySeed) async {
           try {
-            await SaveService.saveQuestSeeds(
-              widget.planet.id,
-              widget.planet.questManager,
-            );
-            // Save full planet to persist the refreshed quest data
+            // Save full planet so quest JSON and derived seed keys stay in sync.
             await SaveService.savePlanet(widget.planet);
           } catch (e, stackTrace) {
             debugPrint(

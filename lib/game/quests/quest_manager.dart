@@ -160,15 +160,15 @@ class QuestManager {
 
     // Distribute resource rewards
     for (final entry in quest.reward.resources.entries) {
-      final current = resources.resources[entry.key] ?? 0;
+      final current = resources.resources[entry.key] ?? 0.0;
       resources.resources[entry.key] = current + entry.value;
     }
 
     // Distribute research points
     if (quest.reward.researchPoints > 0) {
       resources.resources[ResourceType.research] =
-          (resources.resources[ResourceType.research] ?? 0) +
-          quest.reward.researchPoints;
+          (resources.resources[ResourceType.research] ?? 0.0) +
+          quest.reward.researchPoints.toDouble();
     }
 
     _setQuestStatus(quest, QuestStatus.claimed);
@@ -260,6 +260,7 @@ class QuestManager {
     final completed = <String>[];
     final claimed = <String>[];
     final objectiveProgress = <String, Map<String, int>>{};
+    final objectiveStartingAmounts = <String, Map<String, int>>{};
     final rotatingQuestDefinitions = <String, Map<String, dynamic>>{};
 
     for (final quest in _quests.values) {
@@ -283,10 +284,18 @@ class QuestManager {
           quest.status == QuestStatus.completed ||
           quest.status == QuestStatus.claimed) {
         final progress = <String, int>{};
+        final startingAmounts = <String, int>{};
         for (int i = 0; i < quest.objectives.length; i++) {
           progress[i.toString()] = quest.objectives[i].currentAmount;
+          final startingAmount = quest.objectives[i].startingAmount;
+          if (startingAmount != null) {
+            startingAmounts[i.toString()] = startingAmount;
+          }
         }
         objectiveProgress[quest.id] = progress;
+        if (startingAmounts.isNotEmpty) {
+          objectiveStartingAmounts[quest.id] = startingAmounts;
+        }
       }
 
       // Save full definition for rotating quests (daily_, weekly_)
@@ -301,6 +310,7 @@ class QuestManager {
       'completed': completed,
       'claimed': claimed,
       'objectiveProgress': objectiveProgress,
+      'objectiveStartingAmounts': objectiveStartingAmounts,
       'rotatingQuestDefinitions': rotatingQuestDefinitions,
     };
   }
@@ -371,6 +381,12 @@ class QuestManager {
       objectiveProgress.addAll(rawObjectiveProgress);
     }
 
+    final Map<String, dynamic> objectiveStartingAmounts = {};
+    final rawObjectiveStartingAmounts = json['objectiveStartingAmounts'];
+    if (rawObjectiveStartingAmounts is Map<String, dynamic>) {
+      objectiveStartingAmounts.addAll(rawObjectiveStartingAmounts);
+    }
+
     for (final id in claimed) {
       final quest = _quests[id];
       if (quest == null) {
@@ -422,6 +438,30 @@ class QuestManager {
         quest.objectives[index].currentAmount = restoredAmount < 0
             ? 0
             : restoredAmount;
+      }
+    }
+
+    for (final entry in objectiveStartingAmounts.entries) {
+      final quest = _quests[entry.key];
+      if (quest == null) continue;
+      if (entry.value is! Map<String, dynamic>) continue;
+      final startingAmounts = entry.value as Map<String, dynamic>;
+      for (final pEntry in startingAmounts.entries) {
+        final index = int.tryParse(pEntry.key);
+        if (index == null || index < 0 || index >= quest.objectives.length) {
+          continue;
+        }
+        final raw = pEntry.value;
+        int? safeInt;
+        if (raw is int) {
+          safeInt = raw;
+        } else if (raw is num) {
+          safeInt = raw.toInt();
+        } else if (raw is String) {
+          safeInt = int.tryParse(raw);
+        }
+        if (safeInt == null) continue;
+        quest.objectives[index].startingAmount = safeInt < 0 ? 0 : safeInt;
       }
     }
   }
