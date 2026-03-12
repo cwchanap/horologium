@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:horologium/game/achievements/achievement_manager.dart';
@@ -78,6 +80,36 @@ void main() {
         // Should not throw; should return a planet with default quest manager
         final planet = await SaveService.loadOrCreatePlanet('earth');
         expect(planet.questManager, isNotNull);
+      },
+    );
+
+    test(
+      'loadOrCreatePlanet resets stale rotating seeds that are newer than quest JSON',
+      () async {
+        final staleQuestJson = QuestManager(
+          quests: [
+            Quest(
+              id: 'daily_20260101_0',
+              name: 'Old Daily',
+              description: 'Old quest definition',
+              objectives: [],
+              reward: const QuestReward(),
+            ),
+          ],
+        )..quests.first.status = QuestStatus.active;
+
+        SharedPreferences.setMockInitialValues({
+          'planet.earth.resources_json': '{}',
+          'planet.earth.quests': jsonEncode(staleQuestJson.toJson()),
+          'planet.earth.quests.dailySeed': 20260102,
+        });
+
+        final planet = await SaveService.loadOrCreatePlanet('earth');
+        final prefs = await SharedPreferences.getInstance();
+
+        expect(planet.questLoadFailed, isFalse);
+        expect(planet.lastDailySeed, equals(20260101));
+        expect(prefs.getInt('planet.earth.quests.dailySeed'), equals(20260101));
       },
     );
 

@@ -379,6 +379,22 @@ void main() {
         expect(manager.getClaimedQuests(), hasLength(1));
       });
 
+      test('stores research rewards as doubles', () {
+        manager.activateQuest('test_research');
+
+        final researchManager = ResearchManager();
+        researchManager.completeResearch(ResearchType.electricity);
+
+        final resources = Resources();
+        manager.checkProgress(resources, [], researchManager);
+
+        final claimed = manager.claimReward('test_research', resources);
+
+        expect(claimed, isTrue);
+        expect(resources.resources[ResourceType.research], equals(10.0));
+        expect(resources.resources[ResourceType.research], isA<double>());
+      });
+
       test('returns false for non-completed quest', () {
         manager.activateQuest('test_build_house');
 
@@ -587,6 +603,68 @@ void main() {
         expect(restoredClaimed, hasLength(1));
         expect(restoredClaimed.first.objectives[0].currentAmount, 2);
       });
+
+      test(
+        'preserves startingAmount for non-rotating build quests after save/load',
+        () {
+          final quest = Quest(
+            id: 'story_build_power_plant',
+            name: 'Power Up',
+            description: 'Build 2 new power plants',
+            objectives: [
+              QuestObjective(
+                type: QuestObjectiveType.buildBuilding,
+                targetId: 'powerPlant',
+                targetAmount: 2,
+              ),
+            ],
+            reward: const QuestReward(resources: {ResourceType.cash: 100.0}),
+          );
+
+          final original = QuestManager(quests: [quest]);
+          original.activateQuest('story_build_power_plant');
+          original.checkProgress(Resources(), const [], ResearchManager(), {
+            'powerPlant': 3,
+          });
+          original.checkProgress(Resources(), const [], ResearchManager(), {
+            'powerPlant': 4,
+          });
+
+          final saved = original.toJson();
+          final restored = QuestManager(
+            quests: [
+              Quest(
+                id: 'story_build_power_plant',
+                name: 'Power Up',
+                description: 'Build 2 new power plants',
+                objectives: [
+                  QuestObjective(
+                    type: QuestObjectiveType.buildBuilding,
+                    targetId: 'powerPlant',
+                    targetAmount: 2,
+                  ),
+                ],
+                reward: const QuestReward(
+                  resources: {ResourceType.cash: 100.0},
+                ),
+              ),
+            ],
+          );
+          restored.loadFromJson(saved);
+
+          final restoredQuest = restored.getActiveQuests().single;
+          final restoredObjective = restoredQuest.objectives.single;
+          expect(restoredObjective.currentAmount, equals(1));
+          expect(restoredObjective.startingAmount, equals(3));
+
+          restored.checkProgress(Resources(), const [], ResearchManager(), {
+            'powerPlant': 5,
+          });
+
+          expect(restored.getCompletedQuests(), hasLength(1));
+          expect(restored.getCompletedQuests().single.id, quest.id);
+        },
+      );
     });
 
     group('research prerequisites', () {

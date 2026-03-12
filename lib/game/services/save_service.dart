@@ -494,10 +494,7 @@ class SaveService {
 
     // Load quest seeds (default to 0 if not found, which will trigger refresh).
     // If quest JSON was absent or failed to parse, reset seeds so that
-    // refreshRotatingQuests() does not skip regeneration on the next call
-    // (a crash between writing seeds and writing quest JSON would otherwise
-    // leave nonzero seeds with no quests, permanently blocking generation
-    // until the next natural rollover).
+    // refreshRotatingQuests() does not skip regeneration on the next call.
     int lastDailySeed = prefs.getInt(_planetDailySeedKey(planetId)) ?? 0;
     int lastWeeklySeed = prefs.getInt(_planetWeeklySeedKey(planetId)) ?? 0;
     if (questLoadFailed || questJson == null) {
@@ -505,6 +502,23 @@ class SaveService {
       lastWeeklySeed = 0;
       await prefs.remove(_planetDailySeedKey(planetId));
       await prefs.remove(_planetWeeklySeedKey(planetId));
+    } else {
+      final questIds = questManager.quests.map((q) => q.id);
+      final questDailySeed = _extractSeedFromQuestIds(questIds, 'daily_');
+      final questWeeklySeed = _extractSeedFromQuestIds(questIds, 'weekly_');
+
+      lastDailySeed = await _reconcileQuestSeed(
+        prefs: prefs,
+        key: _planetDailySeedKey(planetId),
+        savedSeed: lastDailySeed,
+        questSeed: questDailySeed,
+      );
+      lastWeeklySeed = await _reconcileQuestSeed(
+        prefs: prefs,
+        key: _planetWeeklySeedKey(planetId),
+        savedSeed: lastWeeklySeed,
+        questSeed: questWeeklySeed,
+      );
     }
 
     // Load cumulative building counts
@@ -606,6 +620,27 @@ class SaveService {
       }
     }
     return latestSeed;
+  }
+
+  static Future<int> _reconcileQuestSeed({
+    required SharedPreferences prefs,
+    required String key,
+    required int savedSeed,
+    required int? questSeed,
+  }) async {
+    if (questSeed == null) {
+      if (savedSeed != 0) {
+        await prefs.remove(key);
+      }
+      return 0;
+    }
+
+    if (savedSeed > questSeed) {
+      await prefs.setInt(key, questSeed);
+      return questSeed;
+    }
+
+    return savedSeed == 0 ? questSeed : savedSeed;
   }
 
   /// Save the current quest seeds for a planet to SharedPreferences.
