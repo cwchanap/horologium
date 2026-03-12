@@ -451,5 +451,62 @@ void main() {
       );
       expect(originalAchievementUnlockedCalled, isTrue);
     });
+
+    testWidgets('forwards and restores original quest status callback', (
+      tester,
+    ) async {
+      final quest = Quest(
+        id: 'q1',
+        name: 'Status Quest',
+        description: 'Tests quest status forwarding',
+        objectives: [
+          QuestObjective(
+            type: QuestObjectiveType.buildBuilding,
+            targetId: 'house',
+            targetAmount: 1,
+          ),
+        ],
+        reward: QuestReward(resources: {ResourceType.cash: 100}),
+      );
+      final qm = QuestManager(quests: [quest]);
+
+      Quest? forwardedQuest;
+      QuestStatus? forwardedOldStatus;
+      QuestStatus? forwardedNewStatus;
+
+      void originalStatusCallback(
+        Quest quest,
+        QuestStatus oldStatus,
+        QuestStatus newStatus,
+      ) {
+        forwardedQuest = quest;
+        forwardedOldStatus = oldStatus;
+        forwardedNewStatus = newStatus;
+      }
+
+      qm.onQuestStatusChanged = originalStatusCallback;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: QuestLogPage(
+            questManager: qm,
+            achievementManager: achievementManager,
+          ),
+        ),
+      );
+
+      qm.activateQuest('q1');
+      await tester.pump();
+
+      expect(forwardedQuest?.id, equals('q1'));
+      expect(forwardedOldStatus, equals(QuestStatus.available));
+      expect(forwardedNewStatus, equals(QuestStatus.active));
+
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: Text('Empty'))),
+      );
+
+      expect(qm.onQuestStatusChanged, same(originalStatusCallback));
+    });
   });
 }

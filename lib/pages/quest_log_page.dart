@@ -30,10 +30,13 @@ class _QuestLogPageState extends State<QuestLogPage>
   void Function(Quest, QuestStatus, QuestStatus)? _questStatusCallback;
   void Function(Quest)? _questProgressCallback;
   void Function()? _questsRefreshedCallback;
+  void Function(Quest)? _questCompletedCallback;
+  void Function(Quest)? _questAvailableCallback;
   void Function(Achievement)? _achievementUnlockedCallback;
   void Function(Achievement)? _achievementProgressCallback;
 
   // Store original callbacks to restore after disposal
+  void Function(Quest, QuestStatus, QuestStatus)? _originalOnQuestStatusChanged;
   void Function(Quest)? _originalOnQuestCompleted;
   void Function(Quest)? _originalOnQuestAvailable;
   void Function(Quest)? _originalOnQuestProgressChanged;
@@ -61,6 +64,7 @@ class _QuestLogPageState extends State<QuestLogPage>
 
   void _setupListeners() {
     // Save original callbacks before replacing them
+    _originalOnQuestStatusChanged = widget.questManager.onQuestStatusChanged;
     _originalOnQuestCompleted = widget.questManager.onQuestCompleted;
     _originalOnQuestAvailable = widget.questManager.onQuestAvailable;
     _originalOnQuestProgressChanged =
@@ -74,6 +78,7 @@ class _QuestLogPageState extends State<QuestLogPage>
     // Listen for quest status changes (activation, completion, claiming)
     _questStatusCallback = (quest, oldStatus, newStatus) {
       if (mounted) setState(() {});
+      _originalOnQuestStatusChanged?.call(quest, oldStatus, newStatus);
     };
     widget.questManager.onQuestStatusChanged = _questStatusCallback;
 
@@ -91,21 +96,21 @@ class _QuestLogPageState extends State<QuestLogPage>
     widget.questManager.onQuestsRefreshed = _questsRefreshedCallback;
 
     // Also listen for quest completion and availability notifications
-    widget.questManager.onQuestCompleted = (quest) {
+    _questCompletedCallback = (quest) {
       if (mounted) setState(() {});
-      // Forward to original callback if it exists
       _originalOnQuestCompleted?.call(quest);
     };
-    widget.questManager.onQuestAvailable = (quest) {
+    widget.questManager.onQuestCompleted = _questCompletedCallback;
+
+    _questAvailableCallback = (quest) {
       if (mounted) setState(() {});
-      // Forward to original callback if it exists
       _originalOnQuestAvailable?.call(quest);
     };
+    widget.questManager.onQuestAvailable = _questAvailableCallback;
 
     // Listen for achievement unlocks
     _achievementUnlockedCallback = (achievement) {
       if (mounted) setState(() {});
-      // Forward to original callback if it exists
       _originalOnAchievementUnlocked?.call(achievement);
     };
     widget.achievementManager.onAchievementUnlocked =
@@ -125,7 +130,7 @@ class _QuestLogPageState extends State<QuestLogPage>
 
     // Remove our specific callbacks if they match
     if (qm.onQuestStatusChanged == _questStatusCallback) {
-      qm.onQuestStatusChanged = null;
+      qm.onQuestStatusChanged = _originalOnQuestStatusChanged;
     }
     if (qm.onQuestProgressChanged == _questProgressCallback) {
       qm.onQuestProgressChanged = _originalOnQuestProgressChanged;
@@ -133,13 +138,17 @@ class _QuestLogPageState extends State<QuestLogPage>
     if (qm.onQuestsRefreshed == _questsRefreshedCallback) {
       qm.onQuestsRefreshed = _originalOnQuestsRefreshed;
     }
-
-    // Restore original callbacks instead of setting to null
-    qm.onQuestCompleted = _originalOnQuestCompleted;
-    qm.onQuestAvailable = _originalOnQuestAvailable;
+    if (qm.onQuestCompleted == _questCompletedCallback) {
+      qm.onQuestCompleted = _originalOnQuestCompleted;
+    }
+    if (qm.onQuestAvailable == _questAvailableCallback) {
+      qm.onQuestAvailable = _originalOnQuestAvailable;
+    }
 
     // Restore original achievement callback
-    am.onAchievementUnlocked = _originalOnAchievementUnlocked;
+    if (am.onAchievementUnlocked == _achievementUnlockedCallback) {
+      am.onAchievementUnlocked = _originalOnAchievementUnlocked;
+    }
     if (am.onAchievementProgressChanged == _achievementProgressCallback) {
       am.onAchievementProgressChanged = _originalOnAchievementProgressChanged;
     }

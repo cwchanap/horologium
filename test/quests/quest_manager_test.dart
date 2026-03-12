@@ -665,6 +665,68 @@ void main() {
           expect(restored.getCompletedQuests().single.id, quest.id);
         },
       );
+
+      test(
+        'clears startingAmount when load resets a rotating quest to available',
+        () {
+          final questId = 'daily_20260101_0';
+          final original = QuestManager(
+            quests: [
+              Quest(
+                id: questId,
+                name: 'Build Power Plants',
+                description: 'Build a new power plant',
+                objectives: [
+                  QuestObjective(
+                    type: QuestObjectiveType.buildBuilding,
+                    targetId: 'powerPlant',
+                    targetAmount: 1,
+                  ),
+                ],
+                reward: const QuestReward(
+                  resources: {ResourceType.cash: 100.0},
+                ),
+              ),
+            ],
+          );
+
+          original.activateQuest(questId);
+          original.checkProgress(Resources(), const [], ResearchManager(), {
+            'powerPlant': 3,
+          });
+
+          final saved = original.toJson();
+          saved['active'] = <String>[];
+          saved['completed'] = <String>[];
+          saved['claimed'] = <String>[];
+          saved['objectiveProgress'] = <String, dynamic>{};
+          saved['objectiveStartingAmounts'] = <String, dynamic>{};
+
+          final restored = QuestManager(quests: []);
+          restored.loadFromJson(saved);
+
+          final restoredQuest = restored.quests.singleWhere(
+            (q) => q.id == questId,
+          );
+          expect(restoredQuest.status, equals(QuestStatus.available));
+          expect(restoredQuest.objectives.single.currentAmount, equals(0));
+          expect(restoredQuest.objectives.single.startingAmount, isNull);
+
+          restored.activateQuest(questId);
+          restored.checkProgress(Resources(), const [], ResearchManager(), {
+            'powerPlant': 3,
+          });
+
+          expect(
+            restored.quests
+                .singleWhere((q) => q.id == questId)
+                .objectives
+                .single
+                .currentAmount,
+            equals(0),
+          );
+        },
+      );
     });
 
     group('research prerequisites', () {
