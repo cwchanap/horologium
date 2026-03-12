@@ -334,6 +334,7 @@ class QuestManager {
       quest.status = QuestStatus.available;
       for (final obj in quest.objectives) {
         obj.currentAmount = 0;
+        obj.startingAmount = null;
       }
     }
 
