@@ -16,7 +16,7 @@ void main() {
       () async {
         SharedPreferences.setMockInitialValues({
           'planet.earth.resources_json': '{}',
-          'planet.earth.quests': '{invalid json',
+          'planet_earth_quests': '{invalid json',
         });
         final planet = await SaveService.loadOrCreatePlanet('earth');
         expect(planet.questLoadFailed, isTrue);
@@ -28,9 +28,9 @@ void main() {
       () async {
         SharedPreferences.setMockInitialValues({
           'planet.earth.resources_json': '{}',
-          'planet.earth.quests': '{invalid json',
-          'planet.earth.quests.dailySeed': 20260101,
-          'planet.earth.quests.weeklySeed': 202601,
+          'planet_earth_quests': '{invalid json',
+          'planet_earth_quests_dailySeed': 20260101,
+          'planet_earth_quests_weeklySeed': 202601,
         });
 
         final planet = await SaveService.loadOrCreatePlanet('earth');
@@ -39,8 +39,8 @@ void main() {
         expect(planet.questLoadFailed, isTrue);
         expect(planet.lastDailySeed, 0);
         expect(planet.lastWeeklySeed, 0);
-        expect(prefs.containsKey('planet.earth.quests.dailySeed'), isFalse);
-        expect(prefs.containsKey('planet.earth.quests.weeklySeed'), isFalse);
+        expect(prefs.containsKey('planet_earth_quests_dailySeed'), isFalse);
+        expect(prefs.containsKey('planet_earth_quests_weeklySeed'), isFalse);
       },
     );
 
@@ -49,7 +49,7 @@ void main() {
       () async {
         SharedPreferences.setMockInitialValues({
           'planet.earth.resources_json': '{}',
-          'planet.earth.achievements': '{invalid json',
+          'planet_earth_achievements': '{invalid json',
         });
         final planet = await SaveService.loadOrCreatePlanet('earth');
         expect(planet.achievementLoadFailed, isTrue);
@@ -75,7 +75,7 @@ void main() {
             '{"active":[123,456],"completed":[],"claimed":[],"objectiveProgress":{}}';
         SharedPreferences.setMockInitialValues({
           'planet.earth.resources_json': '{}',
-          'planet.earth.quests': corruptQuestJson,
+          'planet_earth_quests': corruptQuestJson,
         });
         // Should not throw; should return a planet with default quest manager
         final planet = await SaveService.loadOrCreatePlanet('earth');
@@ -100,8 +100,8 @@ void main() {
 
         SharedPreferences.setMockInitialValues({
           'planet.earth.resources_json': '{}',
-          'planet.earth.quests': jsonEncode(staleQuestJson.toJson()),
-          'planet.earth.quests.dailySeed': 20260102,
+          'planet_earth_quests': jsonEncode(staleQuestJson.toJson()),
+          'planet_earth_quests_dailySeed': 20260102,
         });
 
         final planet = await SaveService.loadOrCreatePlanet('earth');
@@ -109,7 +109,7 @@ void main() {
 
         expect(planet.questLoadFailed, isFalse);
         expect(planet.lastDailySeed, equals(20260101));
-        expect(prefs.getInt('planet.earth.quests.dailySeed'), equals(20260101));
+        expect(prefs.getInt('planet_earth_quests_dailySeed'), equals(20260101));
       },
     );
 
@@ -145,7 +145,7 @@ void main() {
         await SaveService.savePlanet(planet);
 
         // The saved daily seed must be 20260101, NOT today's date
-        final savedSeed = prefs.getInt('planet.earth.quests.dailySeed');
+        final savedSeed = prefs.getInt('planet_earth_quests_dailySeed');
         expect(savedSeed, equals(20260101));
       },
     );
@@ -195,7 +195,7 @@ void main() {
         await SaveService.savePlanet(planet);
 
         // The saved daily seed must be the LATEST seed (20260105), not the first one (20260101)
-        final savedSeed = prefs.getInt('planet.earth.quests.dailySeed');
+        final savedSeed = prefs.getInt('planet_earth_quests_dailySeed');
         expect(
           savedSeed,
           equals(20260105),
@@ -246,7 +246,7 @@ void main() {
         await SaveService.savePlanet(planet);
 
         // The saved weekly seed must be the LATEST seed (202603), not the first one (202601)
-        final savedSeed = prefs.getInt('planet.earth.quests.weeklySeed');
+        final savedSeed = prefs.getInt('planet_earth_quests_weeklySeed');
         expect(
           savedSeed,
           equals(202603),
@@ -271,8 +271,8 @@ void main() {
 
         // Seeds must NOT be written; their absence lets refreshRotatingQuests()
         // generate quests on the next load instead of skipping generation.
-        expect(prefs.containsKey('planet.earth.quests.dailySeed'), isFalse);
-        expect(prefs.containsKey('planet.earth.quests.weeklySeed'), isFalse);
+        expect(prefs.containsKey('planet_earth_quests_dailySeed'), isFalse);
+        expect(prefs.containsKey('planet_earth_quests_weeklySeed'), isFalse);
       },
     );
 
@@ -293,8 +293,34 @@ void main() {
         );
         await SaveService.savePlanet(planet);
 
+        expect(prefs.containsKey('planet_earth_quests_dailySeed'), isFalse);
+        expect(prefs.containsKey('planet_earth_quests_weeklySeed'), isFalse);
         expect(prefs.containsKey('planet.earth.quests.dailySeed'), isFalse);
         expect(prefs.containsKey('planet.earth.quests.weeklySeed'), isFalse);
+      },
+    );
+
+    test(
+      'loadOrCreatePlanet reads legacy quest and achievement keys',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'planet.earth.resources_json': '{}',
+          'planet.earth.quests': jsonEncode(
+            QuestManager(quests: QuestRegistry.starterQuests).toJson(),
+          ),
+          'planet.earth.achievements': jsonEncode(
+            AchievementManager(
+              achievements: Planet.defaultAchievements(),
+            ).toJson(),
+          ),
+        });
+
+        final planet = await SaveService.loadOrCreatePlanet('earth');
+
+        expect(planet.questLoadFailed, isFalse);
+        expect(planet.achievementLoadFailed, isFalse);
+        expect(planet.questManager.quests, isNotEmpty);
+        expect(planet.achievementManager.achievements, isNotEmpty);
       },
     );
   });

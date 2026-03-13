@@ -17,7 +17,7 @@ void main() {
           throwCount++;
           if (throwCount <= 2) throw Exception('simulated error');
           return [];
-        }, () => updateCount++);
+        }, ([bool _ = false]) => updateCount++);
 
         // Wait for 3+ ticks (3 seconds + a bit)
         await Future<void>.delayed(const Duration(milliseconds: 3200));

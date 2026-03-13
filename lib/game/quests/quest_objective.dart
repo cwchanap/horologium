@@ -40,7 +40,7 @@ class QuestObjective {
       case QuestObjectiveType.achieveHappiness:
         return 'Achieve happiness $targetAmount';
       case QuestObjectiveType.upgradeBuilding:
-        return 'Upgrade $targetId to level $targetAmount';
+        return 'Upgrade $targetId $targetAmount times';
     }
   }
 

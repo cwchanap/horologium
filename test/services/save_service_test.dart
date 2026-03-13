@@ -49,8 +49,8 @@ void main() {
 
       // Load seeds directly from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      final dailySeed = prefs.getInt('planet.earth.quests.dailySeed');
-      final weeklySeed = prefs.getInt('planet.earth.quests.weeklySeed');
+      final dailySeed = prefs.getInt('planet_earth_quests_dailySeed');
+      final weeklySeed = prefs.getInt('planet_earth_quests_weeklySeed');
 
       expect(dailySeed, equals(20260227));
       expect(weeklySeed, equals(20260223));
@@ -95,7 +95,7 @@ void main() {
 
         // Load seeds
         final prefs = await SharedPreferences.getInstance();
-        final dailySeed = prefs.getInt('planet.mars.quests.dailySeed');
+        final dailySeed = prefs.getInt('planet_mars_quests_dailySeed');
 
         expect(dailySeed, equals(20260227)); // Should be the newer seed
       },
@@ -125,8 +125,8 @@ void main() {
 
       // Seeds must NOT be written; their absence lets refreshRotatingQuests()
       // generate quests on the next load instead of skipping generation.
-      expect(prefs.containsKey('planet.moon.quests.dailySeed'), isFalse);
-      expect(prefs.containsKey('planet.moon.quests.weeklySeed'), isFalse);
+      expect(prefs.containsKey('planet_moon_quests_dailySeed'), isFalse);
+      expect(prefs.containsKey('planet_moon_quests_weeklySeed'), isFalse);
     });
 
     test('removes stale seed keys when no rotating quests exist', () async {
@@ -153,6 +153,8 @@ void main() {
       await SaveService.saveQuestSeeds('moon', questManager);
 
       final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey('planet_moon_quests_dailySeed'), isFalse);
+      expect(prefs.containsKey('planet_moon_quests_weeklySeed'), isFalse);
       expect(prefs.containsKey('planet.moon.quests.dailySeed'), isFalse);
       expect(prefs.containsKey('planet.moon.quests.weeklySeed'), isFalse);
     });

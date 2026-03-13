@@ -115,9 +115,15 @@ class QuestManager {
 
     // Cache building counts for O(1) per-objective lookups
     final buildingCounts = <String, int>{};
+    final buildingUpgradeCounts = <String, int>{};
     for (final b in buildings) {
       final key = b.type.name;
       buildingCounts[key] = (buildingCounts[key] ?? 0) + 1;
+      final upgradeCount = b.level > 1 ? b.level - 1 : 0;
+      if (upgradeCount > 0) {
+        buildingUpgradeCounts[key] =
+            (buildingUpgradeCounts[key] ?? 0) + upgradeCount;
+      }
     }
 
     final completedThisTick = <Quest>[];
@@ -131,6 +137,7 @@ class QuestManager {
           objective,
           resources,
           buildingCounts,
+          buildingUpgradeCounts,
           cumulativeBuildingCounts,
           researchManager,
         );
@@ -209,6 +216,7 @@ class QuestManager {
     QuestObjective objective,
     Resources resources,
     Map<String, int> buildingCounts,
+    Map<String, int> buildingUpgradeCounts,
     Map<String, int>? cumulativeBuildingCounts,
     ResearchManager researchManager,
   ) {
@@ -247,8 +255,16 @@ class QuestManager {
         objective.currentAmount = resources.happiness.toInt();
         break;
       case QuestObjectiveType.upgradeBuilding:
-        // Future: check max level of specific building type
-        objective.currentAmount = 0;
+        final upgradeCount = buildingUpgradeCounts[objective.targetId] ?? 0;
+        if (objective.startingAmount == null) {
+          final baseline = upgradeCount - objective.currentAmount;
+          objective.startingAmount = baseline < 0
+              ? 0
+              : (baseline > upgradeCount ? upgradeCount : baseline);
+        }
+        final progress =
+            upgradeCount - (objective.startingAmount ?? upgradeCount);
+        objective.currentAmount = progress < 0 ? 0 : progress;
         break;
     }
   }

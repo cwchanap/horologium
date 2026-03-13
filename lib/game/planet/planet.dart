@@ -178,7 +178,15 @@ class Planet {
     return totalBuildingsPlaced;
   }
 
-  /// Create a copy of this planet with modified values
+  /// Create a copy of this planet with modified values.
+  ///
+  /// Manager instances are shared by reference unless replacements are passed
+  /// in. That means `questManager`, `achievementManager`, `researchManager`,
+  /// and `buildingLimitManager` keep the same callback/state lifecycles across
+  /// both `Planet` instances, so callers that need independent listeners after
+  /// `_onPlanetChanged` updates or during `dispose()` should clone or detach
+  /// those managers first. `QuestLogPage` shows the defensive pattern by only
+  /// restoring listeners when the callback still matches its own wrapper.
   Planet copyWith({
     String? id,
     String? name,

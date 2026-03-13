@@ -78,6 +78,20 @@ Quest _happinessQuest() => Quest(
   reward: QuestReward(resources: {ResourceType.cash: 500}),
 );
 
+Quest _upgradeQuest() => Quest(
+  id: 'test_upgrade_house',
+  name: 'Upgrade Houses',
+  description: 'Upgrade houses twice',
+  objectives: [
+    QuestObjective(
+      type: QuestObjectiveType.upgradeBuilding,
+      targetId: 'house',
+      targetAmount: 2,
+    ),
+  ],
+  reward: QuestReward(resources: {ResourceType.cash: 400}),
+);
+
 Quest _chainedQuest() => Quest(
   id: 'test_chained',
   name: 'Chained Quest',
@@ -344,6 +358,33 @@ void main() {
         manager.checkProgress(resources, [], ResearchManager());
 
         expect(manager.getCompletedQuests(), hasLength(1));
+      });
+    });
+
+    group('checkProgress with upgradeBuilding objective', () {
+      test('tracks upgrades made after the quest becomes active', () {
+        final questManager = QuestManager(quests: [_upgradeQuest()]);
+        final house = _makeBuilding(BuildingType.house)..upgrade();
+        final researchManager = ResearchManager();
+
+        questManager.checkProgress(Resources(), [house], researchManager);
+
+        final activeQuest = questManager.getActiveQuests().single;
+        expect(activeQuest.objectives.single.currentAmount, 0);
+
+        house.upgrade();
+        questManager.checkProgress(Resources(), [house], researchManager);
+        expect(
+          questManager.getActiveQuests().single.objectives.single.currentAmount,
+          1,
+        );
+
+        house.upgrade();
+        questManager.checkProgress(Resources(), [house], researchManager);
+
+        final completedQuest = questManager.getCompletedQuests().single;
+        expect(completedQuest.id, 'test_upgrade_house');
+        expect(completedQuest.objectives.single.currentAmount, 2);
       });
     });
 
