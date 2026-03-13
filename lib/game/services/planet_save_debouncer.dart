@@ -11,6 +11,15 @@ class PlanetSaveDebouncer {
   final DateTime Function() _now;
   Timer? _timer;
   DateTime? _lastSaveAt;
+  Future<void> _saveChain = Future<void>.value();
+
+  void _enqueueSave(Future<void> Function() saveCallback) {
+    final scheduledSave = _saveChain.then((_) => saveCallback());
+    _saveChain = scheduledSave.catchError(
+      (Object error, StackTrace stackTrace) {},
+    );
+    unawaited(scheduledSave);
+  }
 
   void schedule(
     Future<void> Function() saveCallback, {
@@ -20,7 +29,7 @@ class PlanetSaveDebouncer {
       _timer?.cancel();
       _timer = null;
       _lastSaveAt = _now();
-      unawaited(saveCallback());
+      _enqueueSave(saveCallback);
       return;
     }
 
@@ -28,15 +37,16 @@ class PlanetSaveDebouncer {
     final lastSaveAt = _lastSaveAt;
     if (lastSaveAt == null || now.difference(lastSaveAt) >= _interval) {
       _lastSaveAt = now;
-      unawaited(saveCallback());
+      _enqueueSave(saveCallback);
       return;
     }
 
     final delay = _interval - now.difference(lastSaveAt);
     _timer?.cancel();
     _timer = Timer(delay, () {
+      _timer = null;
       _lastSaveAt = _now();
-      unawaited(saveCallback());
+      _enqueueSave(saveCallback);
     });
   }
 

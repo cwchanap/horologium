@@ -5,6 +5,7 @@ import '../achievements/achievement_manager.dart';
 import '../building/building.dart';
 import '../quests/daily_quest_generator.dart';
 import '../quests/quest_manager.dart';
+import '../quests/quest_seed_parser.dart';
 import '../research/research.dart';
 import '../resources/resources.dart';
 import '../services/resource_service.dart';
@@ -42,39 +43,18 @@ class GameStateManager {
 
     // Only recover if seed is 0 (old save or missing seed data)
     if (_lastDailySeed == 0) {
-      final dailySeed = _extractSeedFromQuestIds(allQuestIds, 'daily_');
+      final dailySeed = parseLatestSeedFromQuestIds(allQuestIds, 'daily_');
       if (dailySeed != null) {
         _lastDailySeed = dailySeed;
       }
     }
 
     if (_lastWeeklySeed == 0) {
-      final weeklySeed = _extractSeedFromQuestIds(allQuestIds, 'weekly_');
+      final weeklySeed = parseLatestSeedFromQuestIds(allQuestIds, 'weekly_');
       if (weeklySeed != null) {
         _lastWeeklySeed = weeklySeed;
       }
     }
-  }
-
-  /// Extract the seed from quest IDs matching the given prefix.
-  /// Returns null if no matching quest found.
-  int? _extractSeedFromQuestIds(Iterable<String> questIds, String prefix) {
-    int? latestSeed;
-    for (final id in questIds) {
-      if (id.startsWith(prefix)) {
-        final parts = id.split('_');
-        if (parts.length >= 2) {
-          final seed = int.tryParse(parts[1]);
-          if (seed != null) {
-            // Track the maximum (latest) seed
-            if (latestSeed == null || seed > latestSeed) {
-              latestSeed = seed;
-            }
-          }
-        }
-      }
-    }
-    return latestSeed;
   }
 
   async.Timer? _resourceTimer;
@@ -83,10 +63,16 @@ class GameStateManager {
 
   void startResourceGeneration(
     List<Building> Function() getBuildingsCallback,
-    VoidCallback onUpdate, [
+    void Function([bool isTimerTick]) onUpdate, [
     Map<String, int>? Function()? getCumulativeBuildingCounts,
     int? Function()? getTotalBuildingsPlaced,
   ]) {
+    if (_resourceTimer?.isActive ?? false) {
+      return;
+    }
+    _resourceTimer?.cancel();
+    _resourceTimer = null;
+
     _resourceTimer = async.Timer.periodic(const Duration(seconds: 1), (timer) {
       try {
         final buildings = getBuildingsCallback();
@@ -107,7 +93,7 @@ class GameStateManager {
           getTotalBuildingsPlaced?.call(),
         );
 
-        onUpdate();
+        onUpdate(true);
       } catch (e, stackTrace) {
         debugPrint('Resource generation tick failed: $e\n$stackTrace');
         // Do not rethrow: re-throwing would cancel the Timer.periodic permanently.

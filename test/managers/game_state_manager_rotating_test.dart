@@ -316,4 +316,34 @@ void main() {
       },
     );
   });
+
+  group('GameStateManager resource generation', () {
+    test(
+      'startResourceGeneration is idempotent and marks timer ticks',
+      () async {
+        final gsm = GameStateManager(resources: Resources());
+        int updateCalls = 0;
+        final timerFlags = <bool>[];
+
+        void onUpdate([bool isTimerTick = false]) {
+          updateCalls++;
+          timerFlags.add(isTimerTick);
+        }
+
+        gsm.startResourceGeneration(() => const [], onUpdate);
+        gsm.startResourceGeneration(() => const [], onUpdate);
+
+        await Future<void>.delayed(const Duration(milliseconds: 1100));
+
+        expect(updateCalls, 1);
+        expect(timerFlags, equals([true]));
+
+        gsm.stopResourceGeneration();
+        await Future<void>.delayed(const Duration(milliseconds: 1200));
+
+        expect(updateCalls, 1);
+      },
+      timeout: const Timeout(Duration(seconds: 5)),
+    );
+  });
 }

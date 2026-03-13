@@ -262,7 +262,6 @@ class _QuestLogPageState extends State<QuestLogPage>
           quest.status == QuestStatus.completed && widget.onClaimReward != null
           ? () {
               widget.onClaimReward!(quest);
-              setState(() {});
             }
           : null,
     );

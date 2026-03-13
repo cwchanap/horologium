@@ -78,14 +78,8 @@ class _MainGameWidgetState extends State<MainGameWidget>
     _questRefreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (!mounted) return;
       _gameStateManager.refreshRotatingQuests(
-        onSeedsChanged: (dailySeed, weeklySeed) async {
-          try {
-            await SaveService.savePlanet(widget.planet);
-          } catch (e, stackTrace) {
-            debugPrint(
-              'Failed to persist quest seeds during periodic refresh: $e\n$stackTrace',
-            );
-          }
+        onSeedsChanged: (dailySeed, weeklySeed) {
+          _schedulePlanetSave(immediateSave: true);
         },
       );
     });
@@ -143,15 +137,9 @@ class _MainGameWidgetState extends State<MainGameWidget>
     // Populate daily/weekly rotating quests (only if seeds changed)
     // Provide callback to persist seeds immediately to prevent regeneration on re-entry
     _gameStateManager.refreshRotatingQuests(
-      onSeedsChanged: (dailySeed, weeklySeed) async {
-        try {
-          // Save full planet so quest JSON and derived seed keys stay in sync.
-          await SaveService.savePlanet(widget.planet);
-        } catch (e, stackTrace) {
-          debugPrint(
-            'Failed to persist quest seeds during initialization: $e\n$stackTrace',
-          );
-        }
+      onSeedsChanged: (dailySeed, weeklySeed) {
+        // Save full planet so quest JSON and derived seed keys stay in sync.
+        _schedulePlanetSave(immediateSave: true);
       },
     );
 
@@ -206,15 +194,9 @@ class _MainGameWidgetState extends State<MainGameWidget>
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _gameStateManager.refreshRotatingQuests(
-        onSeedsChanged: (dailySeed, weeklySeed) async {
-          try {
-            // Save full planet so quest JSON and derived seed keys stay in sync.
-            await SaveService.savePlanet(widget.planet);
-          } catch (e, stackTrace) {
-            debugPrint(
-              'Failed to persist quest seeds on app resume: $e\n$stackTrace',
-            );
-          }
+        onSeedsChanged: (dailySeed, weeklySeed) {
+          // Save full planet so quest JSON and derived seed keys stay in sync.
+          _schedulePlanetSave(immediateSave: true);
         },
       );
     }
@@ -396,11 +378,14 @@ class _MainGameWidgetState extends State<MainGameWidget>
     }
   }
 
-  void _onResourcesChanged() {
-    _handleResourcesChanged();
+  void _onResourcesChanged([bool isTimerTick = false]) {
+    _handleResourcesChanged(fromTimerTick: isTimerTick);
   }
 
-  void _handleResourcesChanged({bool immediateSave = false}) {
+  void _handleResourcesChanged({
+    bool immediateSave = false,
+    bool fromTimerTick = false,
+  }) {
     setState(() {
       // Sync worker assignments from grid to planet before saving
       _syncPlanetFromGrid();
@@ -414,30 +399,30 @@ class _MainGameWidgetState extends State<MainGameWidget>
       );
     });
 
-    // Check quest and achievement progress before saving to ensure immediate
-    // actions (building placement, research completion, reward claiming) trigger
-    // completions that are persisted. Without this, closing the app within the
-    // same second as the action could lose a just-completed quest/achievement.
-    final buildings = _game.hasLoaded
-        ? _game.grid.getAllBuildings()
-        : <Building>[];
-    // Convert cumulative building counts from Map<BuildingType, int> to Map<String, int>
-    final cumulativeCounts = <String, int>{};
-    for (final entry in widget.planet.cumulativeBuildingCounts.entries) {
-      cumulativeCounts[entry.key.name] = entry.value;
+    if (!fromTimerTick) {
+      // Timer ticks already perform quest and achievement checks inside
+      // GameStateManager.startResourceGeneration(), so only manual actions need
+      // the extra full-state scan before saving.
+      final buildings = _game.hasLoaded
+          ? _game.grid.getAllBuildings()
+          : <Building>[];
+      final cumulativeCounts = <String, int>{};
+      for (final entry in widget.planet.cumulativeBuildingCounts.entries) {
+        cumulativeCounts[entry.key.name] = entry.value;
+      }
+      _gameStateManager.checkProgress(
+        buildings,
+        cumulativeCounts,
+        widget.planet.totalBuildingsPlaced,
+      );
     }
-    _gameStateManager.checkProgress(
-      buildings,
-      cumulativeCounts,
-      widget.planet.totalBuildingsPlaced,
-    );
 
     _schedulePlanetSave(immediateSave: immediateSave);
   }
 
-  void _schedulePlanetSave({bool immediateSave = false}) {
+  void _schedulePlanetSave({Planet? planet, bool immediateSave = false}) {
     _planetSaveDebouncer.schedule(
-      () => SaveService.savePlanet(widget.planet),
+      () => SaveService.savePlanet(planet ?? widget.planet),
       immediate: immediateSave,
     );
   }
@@ -445,9 +430,6 @@ class _MainGameWidgetState extends State<MainGameWidget>
   void _onPlanetChanged(Planet planet) {
     ActivePlanet().updateActivePlanet(planet);
     setState(() {});
-    SaveService.savePlanet(planet).catchError((Object e, StackTrace s) {
-      debugPrint('Failed to save planet after planet change: $e\n$s');
-    });
   }
 
   void _handleGridCellTapped(int x, int y) {

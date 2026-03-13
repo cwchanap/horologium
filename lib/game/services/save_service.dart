@@ -8,6 +8,7 @@ import '../planet/index.dart';
 import '../quests/daily_quest_generator.dart';
 import '../quests/quest_manager.dart';
 import '../quests/quest_registry.dart';
+import '../quests/quest_seed_parser.dart';
 import '../research/research.dart';
 import '../resources/resource_type.dart';
 import '../resources/resources.dart';
@@ -46,17 +47,95 @@ class SaveService {
       'planet.$planetId.buildingLimits';
   static String _planetBuildingsKey(String planetId) =>
       'planet.$planetId.buildings';
-  static String _planetQuestsKey(String planetId) => 'planet.$planetId.quests';
+  static String _planetQuestsKey(String planetId) =>
+      'planet_${planetId}_quests';
+  static String _legacyPlanetQuestsKey(String planetId) =>
+      'planet.$planetId.quests';
   static String _planetAchievementsKey(String planetId) =>
+      'planet_${planetId}_achievements';
+  static String _legacyPlanetAchievementsKey(String planetId) =>
       'planet.$planetId.achievements';
   static String _planetDailySeedKey(String planetId) =>
+      'planet_${planetId}_quests_dailySeed';
+  static String _legacyPlanetDailySeedKey(String planetId) =>
       'planet.$planetId.quests.dailySeed';
   static String _planetWeeklySeedKey(String planetId) =>
+      'planet_${planetId}_quests_weeklySeed';
+  static String _legacyPlanetWeeklySeedKey(String planetId) =>
       'planet.$planetId.quests.weeklySeed';
   static String _planetCumulativeBuildingCountsKey(String planetId) =>
+      'planet_${planetId}_cumulativeBuildingCounts';
+  static String _legacyPlanetCumulativeBuildingCountsKey(String planetId) =>
       'planet.$planetId.cumulativeBuildingCounts';
   static String _planetTotalBuildingsPlacedKey(String planetId) =>
+      'planet_${planetId}_totalBuildingsPlaced';
+  static String _legacyPlanetTotalBuildingsPlacedKey(String planetId) =>
       'planet.$planetId.totalBuildingsPlaced';
+
+  static String? _readString(
+    SharedPreferences prefs,
+    String key, {
+    String? legacyKey,
+  }) {
+    final currentValue = prefs.getString(key);
+    if (currentValue != null) {
+      return currentValue;
+    }
+    if (legacyKey == null) {
+      return null;
+    }
+    return prefs.getString(legacyKey);
+  }
+
+  static int? _readInt(
+    SharedPreferences prefs,
+    String key, {
+    String? legacyKey,
+  }) {
+    final currentValue = prefs.getInt(key);
+    if (currentValue != null) {
+      return currentValue;
+    }
+    if (legacyKey == null) {
+      return null;
+    }
+    return prefs.getInt(legacyKey);
+  }
+
+  static Future<void> _writeString(
+    SharedPreferences prefs,
+    String key,
+    String value, {
+    String? legacyKey,
+  }) async {
+    await prefs.setString(key, value);
+    if (legacyKey != null) {
+      await prefs.remove(legacyKey);
+    }
+  }
+
+  static Future<void> _writeInt(
+    SharedPreferences prefs,
+    String key,
+    int value, {
+    String? legacyKey,
+  }) async {
+    await prefs.setInt(key, value);
+    if (legacyKey != null) {
+      await prefs.remove(legacyKey);
+    }
+  }
+
+  static Future<void> _removeKey(
+    SharedPreferences prefs,
+    String key, {
+    String? legacyKey,
+  }) async {
+    await prefs.remove(key);
+    if (legacyKey != null) {
+      await prefs.remove(legacyKey);
+    }
+  }
 
   /// Load resources from legacy per-resource keys.
   /// Used as fallback when JSON parsing fails or when migrating from old format.
@@ -243,46 +322,78 @@ class SaveService {
 
     // Save quest state
     final questJson = jsonEncode(planet.questManager.toJson());
-    await prefs.setString(_planetQuestsKey(planetId), questJson);
+    await _writeString(
+      prefs,
+      _planetQuestsKey(planetId),
+      questJson,
+      legacyKey: _legacyPlanetQuestsKey(planetId),
+    );
 
     // Save quest seeds — inspect ALL quests (active, completed, claimed)
     // so that seeds are preserved even when all rotating quests have been completed.
     final allQuestIds = planet.questManager.quests.map((q) => q.id);
-    final dailySeed = _extractSeedFromQuestIds(allQuestIds, 'daily_');
-    final weeklySeed = _extractSeedFromQuestIds(allQuestIds, 'weekly_');
+    final dailySeed = parseLatestSeedFromQuestIds(allQuestIds, 'daily_');
+    final weeklySeed = parseLatestSeedFromQuestIds(allQuestIds, 'weekly_');
     // Only persist seeds when rotating quests are present.
     // Writing today's seed when no rotating quests exist would falsely
     // tell the game that quests have already been generated, causing
     // refreshRotatingQuests() to skip generation on the next load.
     // Clear stale seed keys when no rotating quests are present.
     if (dailySeed != null) {
-      await prefs.setInt(_planetDailySeedKey(planetId), dailySeed);
+      await _writeInt(
+        prefs,
+        _planetDailySeedKey(planetId),
+        dailySeed,
+        legacyKey: _legacyPlanetDailySeedKey(planetId),
+      );
     } else {
-      await prefs.remove(_planetDailySeedKey(planetId));
+      await _removeKey(
+        prefs,
+        _planetDailySeedKey(planetId),
+        legacyKey: _legacyPlanetDailySeedKey(planetId),
+      );
     }
     if (weeklySeed != null) {
-      await prefs.setInt(_planetWeeklySeedKey(planetId), weeklySeed);
+      await _writeInt(
+        prefs,
+        _planetWeeklySeedKey(planetId),
+        weeklySeed,
+        legacyKey: _legacyPlanetWeeklySeedKey(planetId),
+      );
     } else {
-      await prefs.remove(_planetWeeklySeedKey(planetId));
+      await _removeKey(
+        prefs,
+        _planetWeeklySeedKey(planetId),
+        legacyKey: _legacyPlanetWeeklySeedKey(planetId),
+      );
     }
 
     // Save achievement state
     final achievementJson = jsonEncode(planet.achievementManager.toJson());
-    await prefs.setString(_planetAchievementsKey(planetId), achievementJson);
+    await _writeString(
+      prefs,
+      _planetAchievementsKey(planetId),
+      achievementJson,
+      legacyKey: _legacyPlanetAchievementsKey(planetId),
+    );
 
     // Save cumulative building counts
     final cumulativeCountsJson = jsonEncode(
       planet.cumulativeBuildingCounts.map((k, v) => MapEntry(k.name, v)),
     );
-    await prefs.setString(
+    await _writeString(
+      prefs,
       _planetCumulativeBuildingCountsKey(planetId),
       cumulativeCountsJson,
+      legacyKey: _legacyPlanetCumulativeBuildingCountsKey(planetId),
     );
 
     // Save total buildings placed
-    await prefs.setInt(
+    await _writeInt(
+      prefs,
       _planetTotalBuildingsPlacedKey(planetId),
       planet.totalBuildingsPlaced,
+      legacyKey: _legacyPlanetTotalBuildingsPlacedKey(planetId),
     );
   }
 
@@ -407,7 +518,11 @@ class SaveService {
     // Only pre-populate current rotating quests AFTER loading saved state to avoid
     // seed conflicts that would cause refreshRotatingQuests() to skip generation.
     bool questLoadFailed = false;
-    final questJson = prefs.getString(_planetQuestsKey(planetId));
+    final questJson = _readString(
+      prefs,
+      _planetQuestsKey(planetId),
+      legacyKey: _legacyPlanetQuestsKey(planetId),
+    );
     if (questJson != null) {
       try {
         final savedQuestData = jsonDecode(questJson) as Map<String, dynamic>;
@@ -476,7 +591,11 @@ class SaveService {
     final achievementManager = AchievementManager(
       achievements: Planet.defaultAchievements(),
     );
-    final achievementJson = prefs.getString(_planetAchievementsKey(planetId));
+    final achievementJson = _readString(
+      prefs,
+      _planetAchievementsKey(planetId),
+      legacyKey: _legacyPlanetAchievementsKey(planetId),
+    );
     if (achievementJson != null) {
       try {
         achievementManager.loadFromJson(
@@ -495,27 +614,49 @@ class SaveService {
     // Load quest seeds (default to 0 if not found, which will trigger refresh).
     // If quest JSON was absent or failed to parse, reset seeds so that
     // refreshRotatingQuests() does not skip regeneration on the next call.
-    int lastDailySeed = prefs.getInt(_planetDailySeedKey(planetId)) ?? 0;
-    int lastWeeklySeed = prefs.getInt(_planetWeeklySeedKey(planetId)) ?? 0;
+    int lastDailySeed =
+        _readInt(
+          prefs,
+          _planetDailySeedKey(planetId),
+          legacyKey: _legacyPlanetDailySeedKey(planetId),
+        ) ??
+        0;
+    int lastWeeklySeed =
+        _readInt(
+          prefs,
+          _planetWeeklySeedKey(planetId),
+          legacyKey: _legacyPlanetWeeklySeedKey(planetId),
+        ) ??
+        0;
     if (questLoadFailed || questJson == null) {
       lastDailySeed = 0;
       lastWeeklySeed = 0;
-      await prefs.remove(_planetDailySeedKey(planetId));
-      await prefs.remove(_planetWeeklySeedKey(planetId));
+      await _removeKey(
+        prefs,
+        _planetDailySeedKey(planetId),
+        legacyKey: _legacyPlanetDailySeedKey(planetId),
+      );
+      await _removeKey(
+        prefs,
+        _planetWeeklySeedKey(planetId),
+        legacyKey: _legacyPlanetWeeklySeedKey(planetId),
+      );
     } else {
       final questIds = questManager.quests.map((q) => q.id);
-      final questDailySeed = _extractSeedFromQuestIds(questIds, 'daily_');
-      final questWeeklySeed = _extractSeedFromQuestIds(questIds, 'weekly_');
+      final questDailySeed = parseLatestSeedFromQuestIds(questIds, 'daily_');
+      final questWeeklySeed = parseLatestSeedFromQuestIds(questIds, 'weekly_');
 
       lastDailySeed = await _reconcileQuestSeed(
         prefs: prefs,
         key: _planetDailySeedKey(planetId),
+        legacyKey: _legacyPlanetDailySeedKey(planetId),
         savedSeed: lastDailySeed,
         questSeed: questDailySeed,
       );
       lastWeeklySeed = await _reconcileQuestSeed(
         prefs: prefs,
         key: _planetWeeklySeedKey(planetId),
+        legacyKey: _legacyPlanetWeeklySeedKey(planetId),
         savedSeed: lastWeeklySeed,
         questSeed: questWeeklySeed,
       );
@@ -523,8 +664,10 @@ class SaveService {
 
     // Load cumulative building counts
     final Map<BuildingType, int> cumulativeBuildingCounts = {};
-    final cumulativeCountsJson = prefs.getString(
+    final cumulativeCountsJson = _readString(
+      prefs,
       _planetCumulativeBuildingCountsKey(planetId),
+      legacyKey: _legacyPlanetCumulativeBuildingCountsKey(planetId),
     );
     if (cumulativeCountsJson != null) {
       try {
@@ -564,7 +707,11 @@ class SaveService {
     // Load total buildings placed. Fall back to the current building count for
     // legacy saves that predate this key.
     final totalBuildingsPlaced =
-        prefs.getInt(_planetTotalBuildingsPlacedKey(planetId)) ??
+        _readInt(
+          prefs,
+          _planetTotalBuildingsPlacedKey(planetId),
+          legacyKey: _legacyPlanetTotalBuildingsPlacedKey(planetId),
+        ) ??
         buildings.length;
 
     return Planet(
@@ -599,49 +746,22 @@ class SaveService {
     return prefs.getString(_keyActivePlanet);
   }
 
-  /// Extract the latest (maximum) seed from quest IDs matching the given prefix.
-  /// Returns null if no matching quest found.
-  ///
-  /// This ensures that when a planet has rotating quests from multiple seeds
-  /// (e.g., old claimed dailies from previous days plus current active dailies),
-  /// the latest seed is persisted to avoid unnecessary quest regeneration.
-  static int? _extractSeedFromQuestIds(
-    Iterable<String> questIds,
-    String prefix,
-  ) {
-    int? latestSeed;
-    for (final id in questIds) {
-      if (id.startsWith(prefix)) {
-        final parts = id.split('_');
-        if (parts.length >= 2) {
-          final seed = int.tryParse(parts[1]);
-          if (seed != null) {
-            // Track the maximum (latest) seed
-            if (latestSeed == null || seed > latestSeed) {
-              latestSeed = seed;
-            }
-          }
-        }
-      }
-    }
-    return latestSeed;
-  }
-
   static Future<int> _reconcileQuestSeed({
     required SharedPreferences prefs,
     required String key,
+    required String legacyKey,
     required int savedSeed,
     required int? questSeed,
   }) async {
     if (questSeed == null) {
       if (savedSeed != 0) {
-        await prefs.remove(key);
+        await _removeKey(prefs, key, legacyKey: legacyKey);
       }
       return 0;
     }
 
     if (savedSeed > questSeed) {
-      await prefs.setInt(key, questSeed);
+      await _writeInt(prefs, key, questSeed, legacyKey: legacyKey);
       return questSeed;
     }
 
@@ -649,7 +769,7 @@ class SaveService {
     // prefer it. Without this, a stale non-zero savedSeed would be returned
     // and refreshRotatingQuests() would see a seed mismatch, wipe active
     // quests, and lose in-progress objective state.
-    await prefs.setInt(key, questSeed);
+    await _writeInt(prefs, key, questSeed, legacyKey: legacyKey);
     return questSeed;
   }
 
@@ -670,21 +790,39 @@ class SaveService {
 
     // Extract seeds from current quest IDs
     final allQuestIds = questManager.quests.map((q) => q.id);
-    final dailySeed = _extractSeedFromQuestIds(allQuestIds, 'daily_');
-    final weeklySeed = _extractSeedFromQuestIds(allQuestIds, 'weekly_');
+    final dailySeed = parseLatestSeedFromQuestIds(allQuestIds, 'daily_');
+    final weeklySeed = parseLatestSeedFromQuestIds(allQuestIds, 'weekly_');
 
     // Only write seeds when rotating quests are actually present (same guard
     // as savePlanet) to avoid falsely blocking quest generation on next load.
     // Clear stale seed keys when rotating quests are absent.
     if (dailySeed != null) {
-      await prefs.setInt(_planetDailySeedKey(planetId), dailySeed);
+      await _writeInt(
+        prefs,
+        _planetDailySeedKey(planetId),
+        dailySeed,
+        legacyKey: _legacyPlanetDailySeedKey(planetId),
+      );
     } else {
-      await prefs.remove(_planetDailySeedKey(planetId));
+      await _removeKey(
+        prefs,
+        _planetDailySeedKey(planetId),
+        legacyKey: _legacyPlanetDailySeedKey(planetId),
+      );
     }
     if (weeklySeed != null) {
-      await prefs.setInt(_planetWeeklySeedKey(planetId), weeklySeed);
+      await _writeInt(
+        prefs,
+        _planetWeeklySeedKey(planetId),
+        weeklySeed,
+        legacyKey: _legacyPlanetWeeklySeedKey(planetId),
+      );
     } else {
-      await prefs.remove(_planetWeeklySeedKey(planetId));
+      await _removeKey(
+        prefs,
+        _planetWeeklySeedKey(planetId),
+        legacyKey: _legacyPlanetWeeklySeedKey(planetId),
+      );
     }
   }
 
