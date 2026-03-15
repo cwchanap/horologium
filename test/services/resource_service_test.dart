@@ -34,46 +34,31 @@ void main() {
   group('ResourceService.canAffordBuilding', () {
     test('returns true when cash equals building cost', () {
       final resources = Resources()..resources[ResourceType.cash] = 100;
-      final building = createBuilding(
-        type: BuildingType.coalMine,
-        cost: 100,
-      );
+      final building = createBuilding(type: BuildingType.coalMine, cost: 100);
       expect(ResourceService.canAffordBuilding(resources, building), isTrue);
     });
 
     test('returns true when cash exceeds building cost', () {
       final resources = Resources()..resources[ResourceType.cash] = 500;
-      final building = createBuilding(
-        type: BuildingType.coalMine,
-        cost: 100,
-      );
+      final building = createBuilding(type: BuildingType.coalMine, cost: 100);
       expect(ResourceService.canAffordBuilding(resources, building), isTrue);
     });
 
     test('returns false when cash is less than building cost', () {
       final resources = Resources()..resources[ResourceType.cash] = 50;
-      final building = createBuilding(
-        type: BuildingType.coalMine,
-        cost: 100,
-      );
+      final building = createBuilding(type: BuildingType.coalMine, cost: 100);
       expect(ResourceService.canAffordBuilding(resources, building), isFalse);
     });
 
     test('returns false when cash is zero and building has a cost', () {
       final resources = Resources()..resources[ResourceType.cash] = 0;
-      final building = createBuilding(
-        type: BuildingType.coalMine,
-        cost: 1,
-      );
+      final building = createBuilding(type: BuildingType.coalMine, cost: 1);
       expect(ResourceService.canAffordBuilding(resources, building), isFalse);
     });
 
     test('returns true for a free building (cost 0) with zero cash', () {
       final resources = Resources()..resources[ResourceType.cash] = 0;
-      final building = createBuilding(
-        type: BuildingType.house,
-        cost: 0,
-      );
+      final building = createBuilding(type: BuildingType.house, cost: 0);
       expect(ResourceService.canAffordBuilding(resources, building), isTrue);
     });
   });
@@ -101,17 +86,19 @@ void main() {
       expect(resources.cash, equals(50));
     });
 
-    test('auto-assigns a worker when building requires one and workers exist',
-        () {
-      final resources = Resources()..resources[ResourceType.cash] = 1000;
-      final building = createBuilding(
-        type: BuildingType.coalMine,
-        cost: 100,
-        requiredWorkers: 1,
-      );
-      ResourceService.purchaseBuilding(resources, building);
-      expect(building.assignedWorkers, equals(1));
-    });
+    test(
+      'auto-assigns a worker when building requires one and workers exist',
+      () {
+        final resources = Resources()..resources[ResourceType.cash] = 1000;
+        final building = createBuilding(
+          type: BuildingType.coalMine,
+          cost: 100,
+          requiredWorkers: 1,
+        );
+        ResourceService.purchaseBuilding(resources, building);
+        expect(building.assignedWorkers, equals(1));
+      },
+    );
 
     test('does not assign workers when requiredWorkers is 0', () {
       final resources = Resources()..resources[ResourceType.cash] = 1000;

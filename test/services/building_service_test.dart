@@ -12,17 +12,21 @@ void main() {
       researchManager = ResearchManager();
     });
 
-    test('returns non-research-gated buildings regardless of research state',
-        () {
-      // With no research completed, only buildings that are NOT behind
-      // research gates should be available.
-      final available = BuildingService.getAvailableBuildings(researchManager);
+    test(
+      'returns non-research-gated buildings regardless of research state',
+      () {
+        // With no research completed, only buildings that are NOT behind
+        // research gates should be available.
+        final available = BuildingService.getAvailableBuildings(
+          researchManager,
+        );
 
-      // Research-gated types should not appear
-      final types = available.map((b) => b.type).toSet();
-      expect(types, isNot(contains(BuildingType.powerPlant)));
-      expect(types, isNot(contains(BuildingType.goldMine)));
-    });
+        // Research-gated types should not appear
+        final types = available.map((b) => b.type).toSet();
+        expect(types, isNot(contains(BuildingType.powerPlant)));
+        expect(types, isNot(contains(BuildingType.goldMine)));
+      },
+    );
 
     test('includes power plant after electricity research', () {
       researchManager.completeResearch(ResearchType.electricity);
@@ -89,15 +93,20 @@ void main() {
       );
     });
 
-    test('returns list that is a subset of BuildingRegistry.availableBuildings',
-        () {
-      final available = BuildingService.getAvailableBuildings(researchManager);
-      final allTypes =
-          BuildingRegistry.availableBuildings.map((b) => b.type).toSet();
-      for (final building in available) {
-        expect(allTypes, contains(building.type));
-      }
-    });
+    test(
+      'returns list that is a subset of BuildingRegistry.availableBuildings',
+      () {
+        final available = BuildingService.getAvailableBuildings(
+          researchManager,
+        );
+        final allTypes = BuildingRegistry.availableBuildings
+            .map((b) => b.type)
+            .toSet();
+        for (final building in available) {
+          expect(allTypes, contains(building.type));
+        }
+      },
+    );
   });
 
   group('BuildingService research gating invariant', () {
@@ -108,14 +117,14 @@ void main() {
         if (research.unlocksBuildings.isEmpty) continue;
 
         final managerWithout = ResearchManager();
-        final withoutResearch =
-            BuildingService.getAvailableBuildings(managerWithout);
+        final withoutResearch = BuildingService.getAvailableBuildings(
+          managerWithout,
+        );
         final withoutTypes = withoutResearch.map((b) => b.type).toSet();
 
         final managerWith = ResearchManager();
         managerWith.completeResearch(research.type);
-        final withResearch =
-            BuildingService.getAvailableBuildings(managerWith);
+        final withResearch = BuildingService.getAvailableBuildings(managerWith);
         final withTypes = withResearch.map((b) => b.type).toSet();
 
         for (final buildingType in research.unlocksBuildings) {
@@ -136,4 +145,3 @@ void main() {
     });
   });
 }
-
