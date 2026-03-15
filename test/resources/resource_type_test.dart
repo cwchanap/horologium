@@ -220,10 +220,7 @@ void main() {
       });
 
       test('refinement uses bakery_dining icon', () {
-        expect(
-          ResourceCategory.refinement.icon,
-          equals(Icons.bakery_dining),
-        );
+        expect(ResourceCategory.refinement.icon, equals(Icons.bakery_dining));
       });
     });
   });

@@ -91,10 +91,7 @@ void main() {
       final advanced = Research.availableResearch.firstWhere(
         (r) => r.type == ResearchType.advancedConstruction,
       );
-      expect(
-        advanced.prerequisites,
-        contains(ResearchType.expansionPlanning),
-      );
+      expect(advanced.prerequisites, contains(ResearchType.expansionPlanning));
     });
 
     test('modernHousing requires electricity as prerequisite', () {
@@ -106,8 +103,9 @@ void main() {
     });
 
     test('all types are represented in availableResearch', () {
-      final researchedTypes =
-          Research.availableResearch.map((r) => r.type).toSet();
+      final researchedTypes = Research.availableResearch
+          .map((r) => r.type)
+          .toSet();
       for (final type in ResearchType.values) {
         expect(
           researchedTypes,
