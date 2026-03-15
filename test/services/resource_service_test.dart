@@ -143,13 +143,15 @@ void main() {
         cost: 100,
         requiredWorkers: 2,
       );
-      // Manually assign 2 workers
-      building.assignWorker();
-      building.assignWorker();
+      final initialAvailableWorkers = resources.availableWorkers;
+      resources.assignWorkerTo(building);
+      resources.assignWorkerTo(building);
       expect(building.assignedWorkers, equals(2));
+      expect(resources.availableWorkers, equals(initialAvailableWorkers - 2));
 
       ResourceService.refundBuilding(resources, building);
       expect(building.assignedWorkers, equals(0));
+      expect(resources.availableWorkers, equals(initialAvailableWorkers));
     });
 
     test('refund works even when building has no workers', () {

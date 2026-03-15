@@ -58,6 +58,7 @@ void main() {
     });
 
     test('includes advanced grain buildings after advanced grain research', () {
+      researchManager.completeResearch(ResearchType.grainProcessing);
       researchManager.completeResearch(ResearchType.advancedGrainProcessing);
       final available = BuildingService.getAvailableBuildings(researchManager);
       final types = available.map((b) => b.type).toSet();
@@ -66,6 +67,7 @@ void main() {
     });
 
     test('includes bakery after food processing research', () {
+      researchManager.completeResearch(ResearchType.grainProcessing);
       researchManager.completeResearch(ResearchType.foodProcessing);
       final available = BuildingService.getAvailableBuildings(researchManager);
       final types = available.map((b) => b.type).toSet();
