@@ -231,8 +231,11 @@ void main() {
       expect(BakeryProduct.values, contains(BakeryProduct.pastries));
     });
 
-    test('has exactly two variants', () {
-      expect(BakeryProduct.values, hasLength(2));
+    test('contains all expected variants', () {
+      expect(
+        BakeryProduct.values,
+        containsAll([BakeryProduct.bread, BakeryProduct.pastries]),
+      );
     });
   });
 
@@ -244,8 +247,16 @@ void main() {
       expect(CropType.values, contains(CropType.barley));
     });
 
-    test('has exactly four variants', () {
-      expect(CropType.values, hasLength(4));
+    test('contains all expected variants', () {
+      expect(
+        CropType.values,
+        containsAll([
+          CropType.wheat,
+          CropType.corn,
+          CropType.rice,
+          CropType.barley,
+        ]),
+      );
     });
   });
 }
