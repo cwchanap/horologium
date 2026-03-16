@@ -5,7 +5,10 @@ import 'package:horologium/game/resources/resource_category.dart';
 void main() {
   group('ResourceCategory.displayName', () {
     test('rawMaterials returns "Raw Materials"', () {
-      expect(ResourceCategory.rawMaterials.displayName, equals('Raw Materials'));
+      expect(
+        ResourceCategory.rawMaterials.displayName,
+        equals('Raw Materials'),
+      );
     });
 
     test('foodResources returns "Food Resources"', () {
