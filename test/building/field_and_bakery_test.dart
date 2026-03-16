@@ -19,7 +19,10 @@ Field _makeField({CropType cropType = CropType.wheat, int level = 1}) {
   );
 }
 
-Bakery _makeBakery({BakeryProduct productType = BakeryProduct.bread, int level = 1}) {
+Bakery _makeBakery({
+  BakeryProduct productType = BakeryProduct.bread,
+  int level = 1,
+}) {
   return Bakery(
     type: BuildingType.bakery,
     name: 'Bakery',
