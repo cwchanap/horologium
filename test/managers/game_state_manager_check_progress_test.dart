@@ -192,27 +192,29 @@ void main() {
   });
 
   group('GameStateManager.dispose', () {
-    test('stops resource generation timer on dispose', () async {
-      SharedPreferences.setMockInitialValues({});
-      int tickCount = 0;
-      final gsm = GameStateManager(resources: Resources());
+    test(
+      'stops resource generation timer on dispose',
+      () async {
+        int tickCount = 0;
+        final gsm = GameStateManager(resources: Resources());
 
-      gsm.startResourceGeneration(
-        () => [],
-        ([bool _ = false]) => tickCount++,
-      );
+        gsm.startResourceGeneration(
+          () => [],
+          ([bool _ = false]) => tickCount++,
+        );
 
-      await Future<void>.delayed(const Duration(milliseconds: 1100));
-      expect(tickCount, greaterThan(0));
+        await Future<void>.delayed(const Duration(milliseconds: 1100));
+        expect(tickCount, greaterThan(0));
 
-      final countBeforeDispose = tickCount;
-      gsm.dispose();
+        final countBeforeDispose = tickCount;
+        gsm.dispose();
 
-      await Future<void>.delayed(const Duration(milliseconds: 1200));
-      // No additional ticks after dispose
-      expect(tickCount, equals(countBeforeDispose));
-    },
-    timeout: const Timeout(Duration(seconds: 5)));
+        await Future<void>.delayed(const Duration(milliseconds: 1200));
+        // No additional ticks after dispose
+        expect(tickCount, equals(countBeforeDispose));
+      },
+      timeout: const Timeout(Duration(seconds: 5)),
+    );
 
     test('dispose is safe to call when timer was never started', () {
       final gsm = GameStateManager(resources: Resources());
@@ -238,7 +240,6 @@ void main() {
 
       // First refresh to record seeds
       gsm.refreshRotatingQuests(now: date);
-      final countAfterFirst = gsm.questManager!.quests.length;
 
       // Simulate app restart: create new manager with loaded seeds
       final gsm2 = GameStateManager(resources: Resources());

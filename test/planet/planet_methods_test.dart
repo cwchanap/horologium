@@ -269,7 +269,11 @@ void main() {
 
   group('Planet.copyWith', () {
     test('creates planet with updated name', () {
-      final planet = Planet(id: 'mars', name: 'Mars', questManager: QuestManager(quests: []));
+      final planet = Planet(
+        id: 'mars',
+        name: 'Mars',
+        questManager: QuestManager(quests: []),
+      );
       final copy = planet.copyWith(name: 'Mars II');
       expect(copy.name, equals('Mars II'));
       expect(copy.id, equals('mars'));
