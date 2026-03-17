@@ -96,8 +96,7 @@ void main() {
       expect(unlocked.first.id, equals('ach_wealthy'));
     });
 
-    test('both questManager and achievementManager are checked in same call',
-        () {
+    test('both questManager and achievementManager are checked in same call', () {
       final resources = Resources();
       resources.cash = 10000;
 
@@ -293,8 +292,7 @@ void main() {
       expect(completed, isNotEmpty);
     });
 
-    test('checkProgress with default researchManager does not unlock research quest',
-        () {
+    test('checkProgress with default researchManager does not unlock research quest', () {
       final quest = Quest(
         id: 'research_quest',
         name: 'Researcher',

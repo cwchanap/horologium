@@ -24,8 +24,7 @@ void main() {
         expect(limit, equals(6));
       });
 
-      test('returns correct limits for different building types independently',
-          () {
+      test('returns correct limits for different building types independently', () {
         manager.increaseBuildingLimit(BuildingType.house, 3);
 
         final houseLimit = manager.getBuildingLimit(BuildingType.house);
@@ -162,9 +161,7 @@ void main() {
       }
     });
 
-    test(
-        'custom baseBuildingLimit is respected when building has non-default value',
-        () {
+    test('custom baseBuildingLimit is respected when building has non-default value', () {
       // Create a fresh manager and check a building with custom base limit
       final manager = BuildingLimitManager();
       final customBuilding = Building(
