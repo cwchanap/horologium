@@ -42,12 +42,15 @@ void main() {
       expect(planet.getCumulativeBuildingCount(BuildingType.house), equals(2));
     });
 
-    test('cumulative count does not decrease when building is later removed', () {
-      final planet = _emptyPlanet();
-      planet.addBuilding(_house());
-      planet.removeBuildingAt(0, 0);
-      expect(planet.getCumulativeBuildingCount(BuildingType.house), equals(1));
-    });
+    test(
+      'cumulative count does not decrease when building is later removed',
+      () {
+        final planet = _emptyPlanet();
+        planet.addBuilding(_house());
+        planet.removeBuildingAt(0, 0);
+        expect(planet.getCumulativeBuildingCount(BuildingType.house), equals(1));
+      },
+    );
 
     test('tracks multiple building types independently', () {
       final planet = _emptyPlanet();
@@ -103,11 +106,14 @@ void main() {
       expect(planet.getBuildingAt(0, 0), isNull);
     });
 
-    test('returns null when planet has buildings but none at given coordinates', () {
-      final planet = _emptyPlanet();
-      planet.addBuilding(_house(x: 1, y: 1));
-      expect(planet.getBuildingAt(5, 5), isNull);
-    });
+    test(
+      'returns null when planet has buildings but none at given coordinates',
+      () {
+        final planet = _emptyPlanet();
+        planet.addBuilding(_house(x: 1, y: 1));
+        expect(planet.getBuildingAt(5, 5), isNull);
+      },
+    );
   });
 
   group('Planet.isPositionOccupied', () {
@@ -412,14 +418,17 @@ void main() {
       expect(planet.achievementLoadFailed, isFalse);
     });
 
-    test('achievementManager is set from defaultAchievements when not provided', () {
-      final planet = Planet(
-        id: 'p',
-        name: 'P',
-        questManager: QuestManager(quests: []),
-      );
-      expect(planet.achievementManager, isNotNull);
-      expect(planet.achievementManager.achievements, isNotEmpty);
-    });
+    test(
+      'achievementManager is set from defaultAchievements when not provided',
+      () {
+        final planet = Planet(
+          id: 'p',
+          name: 'P',
+          questManager: QuestManager(quests: []),
+        );
+        expect(planet.achievementManager, isNotNull);
+        expect(planet.achievementManager.achievements, isNotEmpty);
+      },
+    );
   });
 }

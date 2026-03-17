@@ -96,42 +96,45 @@ void main() {
       expect(unlocked.first.id, equals('ach_wealthy'));
     });
 
-    test('both questManager and achievementManager are checked in same call', () {
-      final resources = Resources();
-      resources.cash = 10000;
+    test(
+      'both questManager and achievementManager are checked in same call',
+      () {
+        final resources = Resources();
+        resources.cash = 10000;
 
-      final quest = Quest(
-        id: 'cash_quest',
-        name: 'Cash Quest',
-        description: 'Get 1000 cash',
-        objectives: [
-          QuestObjective(
-            type: QuestObjectiveType.accumulateResource,
-            targetId: 'cash',
-            targetAmount: 1000,
-          ),
-        ],
-        reward: const QuestReward(),
-      );
+        final quest = Quest(
+          id: 'cash_quest',
+          name: 'Cash Quest',
+          description: 'Get 1000 cash',
+          objectives: [
+            QuestObjective(
+              type: QuestObjectiveType.accumulateResource,
+              targetId: 'cash',
+              targetAmount: 1000,
+            ),
+          ],
+          reward: const QuestReward(),
+        );
 
-      final achievement = Achievement(
-        id: 'ach_cash',
-        name: 'Rich',
-        description: 'Get 5000 cash',
-        type: AchievementType.resourceAccumulated,
-        targetAmount: 5000,
-        targetId: 'cash',
-      );
+        final achievement = Achievement(
+          id: 'ach_cash',
+          name: 'Rich',
+          description: 'Get 5000 cash',
+          type: AchievementType.resourceAccumulated,
+          targetAmount: 5000,
+          targetId: 'cash',
+        );
 
-      final gsm = GameStateManager(resources: resources);
-      gsm.questManager = QuestManager(quests: [quest]);
-      gsm.achievementManager = AchievementManager(achievements: [achievement]);
+        final gsm = GameStateManager(resources: resources);
+        gsm.questManager = QuestManager(quests: [quest]);
+        gsm.achievementManager = AchievementManager(achievements: [achievement]);
 
-      gsm.checkProgress([]);
+        gsm.checkProgress([]);
 
-      expect(gsm.questManager!.getCompletedQuests(), isNotEmpty);
-      expect(gsm.achievementManager!.getUnlocked(), isNotEmpty);
-    });
+        expect(gsm.questManager!.getCompletedQuests(), isNotEmpty);
+        expect(gsm.achievementManager!.getUnlocked(), isNotEmpty);
+      },
+    );
 
     test('passes cumulative building counts to questManager', () {
       final resources = Resources();
@@ -292,28 +295,31 @@ void main() {
       expect(completed, isNotEmpty);
     });
 
-    test('checkProgress with default researchManager does not unlock research quest', () {
-      final quest = Quest(
-        id: 'research_quest',
-        name: 'Researcher',
-        description: 'Complete electricity research',
-        objectives: [
-          QuestObjective(
-            type: QuestObjectiveType.completeResearch,
-            targetId: 'electricity',
-            targetAmount: 1,
-          ),
-        ],
-        reward: const QuestReward(),
-      );
+    test(
+      'checkProgress with default researchManager does not unlock research quest',
+      () {
+        final quest = Quest(
+          id: 'research_quest',
+          name: 'Researcher',
+          description: 'Complete electricity research',
+          objectives: [
+            QuestObjective(
+              type: QuestObjectiveType.completeResearch,
+              targetId: 'electricity',
+              targetAmount: 1,
+            ),
+          ],
+          reward: const QuestReward(),
+        );
 
-      final gsm = GameStateManager(resources: Resources());
-      // researchManager starts with no completions
-      gsm.questManager = QuestManager(quests: [quest]);
+        final gsm = GameStateManager(resources: Resources());
+        // researchManager starts with no completions
+        gsm.questManager = QuestManager(quests: [quest]);
 
-      gsm.checkProgress([]);
+        gsm.checkProgress([]);
 
-      expect(gsm.questManager!.getCompletedQuests(), isEmpty);
-    });
+        expect(gsm.questManager!.getCompletedQuests(), isEmpty);
+      },
+    );
   });
 }
