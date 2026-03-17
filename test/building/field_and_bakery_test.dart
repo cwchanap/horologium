@@ -139,7 +139,8 @@ void main() {
       });
 
       test('pastries generation at level 3', () {
-        final bakery = _makeBakery(productType: BakeryProduct.pastries, level: 3);
+        final bakery =
+            _makeBakery(productType: BakeryProduct.pastries, level: 3);
         expect(bakery.generation[ResourceType.pastries], equals(3.0));
         expect(bakery.consumption[ResourceType.flour], equals(9.0));
       });

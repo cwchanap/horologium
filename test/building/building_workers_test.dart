@@ -43,12 +43,15 @@ void main() {
         expect(building.hasWorkers, isFalse);
       });
 
-      test('returns true when fully assigned with multiple required workers', () {
-        final building = _makeBuilding(requiredWorkers: 2);
-        building.assignWorker();
-        building.assignWorker();
-        expect(building.hasWorkers, isTrue);
-      });
+      test(
+        'returns true when fully assigned with multiple required workers',
+        () {
+          final building = _makeBuilding(requiredWorkers: 2);
+          building.assignWorker();
+          building.assignWorker();
+          expect(building.hasWorkers, isTrue);
+        },
+      );
     });
 
     group('canAssignWorker', () {

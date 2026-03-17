@@ -24,17 +24,20 @@ void main() {
         expect(limit, equals(6));
       });
 
-      test('returns correct limits for different building types independently', () {
-        manager.increaseBuildingLimit(BuildingType.house, 3);
+      test(
+        'returns correct limits for different building types independently',
+        () {
+          manager.increaseBuildingLimit(BuildingType.house, 3);
 
-        final houseLimit = manager.getBuildingLimit(BuildingType.house);
-        final powerPlantLimit =
-            manager.getBuildingLimit(BuildingType.powerPlant);
+          final houseLimit = manager.getBuildingLimit(BuildingType.house);
+          final powerPlantLimit =
+              manager.getBuildingLimit(BuildingType.powerPlant);
 
-        expect(houseLimit, equals(7));
-        // powerPlant base limit is 4, unchanged
-        expect(powerPlantLimit, equals(4));
-      });
+          expect(houseLimit, equals(7));
+          // powerPlant base limit is 4, unchanged
+          expect(powerPlantLimit, equals(4));
+        },
+      );
     });
 
     group('increaseBuildingLimit', () {
@@ -161,29 +164,32 @@ void main() {
       }
     });
 
-    test('custom baseBuildingLimit is respected when building has non-default value', () {
-      // Create a fresh manager and check a building with custom base limit
-      final manager = BuildingLimitManager();
-      final customBuilding = Building(
-        type: BuildingType.researchLab,
-        name: 'Research Lab',
-        description: 'Test',
-        icon: Icons.science,
-        color: Colors.blue,
-        baseCost: 200,
-        baseBuildingLimit: 2,
-        requiredWorkers: 1,
-        category: BuildingCategory.services,
-      );
-      // The registry entry for researchLab should match its declared baseBuildingLimit
-      final registryBuilding = BuildingRegistry.availableBuildings
-          .firstWhere((b) => b.type == BuildingType.researchLab);
-      expect(
-        manager.getBuildingLimit(BuildingType.researchLab),
-        equals(registryBuilding.baseBuildingLimit),
-      );
-      // Confirm the customBuilding we built has limit 2 (not testing manager, just the object)
-      expect(customBuilding.baseBuildingLimit, equals(2));
-    });
+    test(
+      'custom baseBuildingLimit is respected when building has non-default value',
+      () {
+        // Create a fresh manager and check a building with custom base limit
+        final manager = BuildingLimitManager();
+        final customBuilding = Building(
+          type: BuildingType.researchLab,
+          name: 'Research Lab',
+          description: 'Test',
+          icon: Icons.science,
+          color: Colors.blue,
+          baseCost: 200,
+          baseBuildingLimit: 2,
+          requiredWorkers: 1,
+          category: BuildingCategory.services,
+        );
+        // The registry entry for researchLab should match its declared baseBuildingLimit
+        final registryBuilding = BuildingRegistry.availableBuildings
+            .firstWhere((b) => b.type == BuildingType.researchLab);
+        expect(
+          manager.getBuildingLimit(BuildingType.researchLab),
+          equals(registryBuilding.baseBuildingLimit),
+        );
+        // Confirm the customBuilding we built has limit 2 (not testing manager, just the object)
+        expect(customBuilding.baseBuildingLimit, equals(2));
+      },
+    );
   });
 }
