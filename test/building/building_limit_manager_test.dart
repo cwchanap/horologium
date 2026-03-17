@@ -30,8 +30,9 @@ void main() {
           manager.increaseBuildingLimit(BuildingType.house, 3);
 
           final houseLimit = manager.getBuildingLimit(BuildingType.house);
-          final powerPlantLimit =
-              manager.getBuildingLimit(BuildingType.powerPlant);
+          final powerPlantLimit = manager.getBuildingLimit(
+            BuildingType.powerPlant,
+          );
 
           expect(houseLimit, equals(7));
           // powerPlant base limit is 4, unchanged
@@ -54,10 +55,7 @@ void main() {
       test('does not affect other building types', () {
         manager.increaseBuildingLimit(BuildingType.coalMine, 5);
 
-        expect(
-          manager.getBuildingLimit(BuildingType.woodFactory),
-          equals(4),
-        );
+        expect(manager.getBuildingLimit(BuildingType.woodFactory), equals(4));
         expect(manager.getBuildingLimit(BuildingType.coalMine), equals(9));
       });
     });
@@ -181,8 +179,9 @@ void main() {
           category: BuildingCategory.services,
         );
         // The registry entry for researchLab should match its declared baseBuildingLimit
-        final registryBuilding = BuildingRegistry.availableBuildings
-            .firstWhere((b) => b.type == BuildingType.researchLab);
+        final registryBuilding = BuildingRegistry.availableBuildings.firstWhere(
+          (b) => b.type == BuildingType.researchLab,
+        );
         expect(
           manager.getBuildingLimit(BuildingType.researchLab),
           equals(registryBuilding.baseBuildingLimit),
