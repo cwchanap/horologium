@@ -21,8 +21,7 @@ Building _makeBuilding({int requiredWorkers = 1}) {
 void main() {
   group('Building worker assignment', () {
     group('hasWorkers', () {
-      test('returns false when no workers assigned and requiredWorkers > 0',
-          () {
+      test('returns false when no workers assigned and requiredWorkers > 0', () {
         final building = _makeBuilding(requiredWorkers: 1);
         expect(building.hasWorkers, isFalse);
       });
@@ -44,8 +43,7 @@ void main() {
         expect(building.hasWorkers, isFalse);
       });
 
-      test('returns true when fully assigned with multiple required workers',
-          () {
+      test('returns true when fully assigned with multiple required workers', () {
         final building = _makeBuilding(requiredWorkers: 2);
         building.assignWorker();
         building.assignWorker();
