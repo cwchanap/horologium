@@ -33,14 +33,14 @@ void main() {
   });
 
   group('GameStateManager.checkProgress', () {
-    test('does not throw when questManager and achievementManager are null', () {
-      final gsm = GameStateManager(resources: Resources());
+    test(
+      'does not throw when questManager and achievementManager are null',
+      () {
+        final gsm = GameStateManager(resources: Resources());
 
-      expect(
-        () => gsm.checkProgress([_makeHouse()]),
-        returnsNormally,
-      );
-    });
+        expect(() => gsm.checkProgress([_makeHouse()]), returnsNormally);
+      },
+    );
 
     test('delegates to questManager when set', () {
       final resources = Resources();
@@ -127,7 +127,9 @@ void main() {
 
         final gsm = GameStateManager(resources: resources);
         gsm.questManager = QuestManager(quests: [quest]);
-        gsm.achievementManager = AchievementManager(achievements: [achievement]);
+        gsm.achievementManager = AchievementManager(
+          achievements: [achievement],
+        );
 
         gsm.checkProgress([]);
 
@@ -181,8 +183,7 @@ void main() {
       );
 
       final gsm = GameStateManager(resources: resources);
-      gsm.achievementManager =
-          AchievementManager(achievements: [achievement]);
+      gsm.achievementManager = AchievementManager(achievements: [achievement]);
 
       // Pass totalBuildingsPlaced = 1
       gsm.checkProgress([], null, 1);

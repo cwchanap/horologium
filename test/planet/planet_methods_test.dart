@@ -10,16 +10,14 @@ PlacedBuildingData _house({String id = 'h1', int x = 0, int y = 0}) {
 }
 
 PlacedBuildingData _powerPlant({String id = 'p1', int x = 4, int y = 0}) {
-  return PlacedBuildingData(
-    id: id,
-    x: x,
-    y: y,
-    type: BuildingType.powerPlant,
-  );
+  return PlacedBuildingData(id: id, x: x, y: y, type: BuildingType.powerPlant);
 }
 
-Planet _emptyPlanet() =>
-    Planet(id: 'test', name: 'Test', questManager: QuestManager(quests: []));
+Planet _emptyPlanet() => Planet(
+  id: 'test',
+  name: 'Test',
+  questManager: QuestManager(quests: []),
+);
 
 void main() {
   group('Planet.addBuilding', () {
@@ -48,7 +46,10 @@ void main() {
         final planet = _emptyPlanet();
         planet.addBuilding(_house());
         planet.removeBuildingAt(0, 0);
-        expect(planet.getCumulativeBuildingCount(BuildingType.house), equals(1));
+        expect(
+          planet.getCumulativeBuildingCount(BuildingType.house),
+          equals(1),
+        );
       },
     );
 
@@ -56,10 +57,7 @@ void main() {
       final planet = _emptyPlanet();
       planet.addBuilding(_house());
       planet.addBuilding(_powerPlant());
-      expect(
-        planet.getCumulativeBuildingCount(BuildingType.house),
-        equals(1),
-      );
+      expect(planet.getCumulativeBuildingCount(BuildingType.house), equals(1));
       expect(
         planet.getCumulativeBuildingCount(BuildingType.powerPlant),
         equals(1),
@@ -195,10 +193,7 @@ void main() {
       final planet = _emptyPlanet();
       planet.addBuilding(_house());
       planet.removeBuildingAt(0, 0);
-      expect(
-        planet.getCumulativeBuildingCount(BuildingType.house),
-        equals(1),
-      );
+      expect(planet.getCumulativeBuildingCount(BuildingType.house), equals(1));
     });
   });
 
@@ -329,22 +324,16 @@ void main() {
   });
 
   group('Planet constructor cumulative count initialization', () {
-    test(
-      'uses provided cumulativeBuildingCounts when non-empty',
-      () {
-        final counts = {BuildingType.house: 10};
-        final planet = Planet(
-          id: 'p',
-          name: 'P',
-          cumulativeBuildingCounts: counts,
-          questManager: QuestManager(quests: []),
-        );
-        expect(
-          planet.getCumulativeBuildingCount(BuildingType.house),
-          equals(10),
-        );
-      },
-    );
+    test('uses provided cumulativeBuildingCounts when non-empty', () {
+      final counts = {BuildingType.house: 10};
+      final planet = Planet(
+        id: 'p',
+        name: 'P',
+        cumulativeBuildingCounts: counts,
+        questManager: QuestManager(quests: []),
+      );
+      expect(planet.getCumulativeBuildingCount(BuildingType.house), equals(10));
+    });
 
     test(
       'derives counts from buildings when cumulativeBuildingCounts not provided',
@@ -395,10 +384,7 @@ void main() {
     test('buildings getter returns unmodifiable list', () {
       final planet = _emptyPlanet();
       planet.addBuilding(_house());
-      expect(
-        () => planet.buildings.add(_powerPlant()),
-        throwsUnsupportedError,
-      );
+      expect(() => planet.buildings.add(_powerPlant()), throwsUnsupportedError);
     });
   });
 
