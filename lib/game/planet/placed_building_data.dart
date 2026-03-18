@@ -50,8 +50,7 @@ class PlacedBuildingData {
     // assume it's the ID in new format. Otherwise, it's the old format.
     final firstPart = parts[0];
     final isInteger = int.tryParse(firstPart) != null;
-    final looksLikeId =
-        !isInteger && (firstPart.contains('-') || firstPart.length > 8);
+    final looksLikeId = !isInteger;
 
     String id;
     int xIndex, yIndex, typeIndex;
