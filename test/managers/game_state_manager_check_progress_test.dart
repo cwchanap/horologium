@@ -1,3 +1,4 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/achievements/achievement.dart';
@@ -195,9 +196,8 @@ void main() {
   });
 
   group('GameStateManager.dispose', () {
-    test(
-      'stops resource generation timer on dispose',
-      () async {
+    test('stops resource generation timer on dispose', () {
+      fakeAsync((async) {
         int tickCount = 0;
         final gsm = GameStateManager(resources: Resources());
 
@@ -206,18 +206,17 @@ void main() {
           ([bool _ = false]) => tickCount++,
         );
 
-        await Future<void>.delayed(const Duration(milliseconds: 1100));
+        async.elapse(const Duration(seconds: 1));
         expect(tickCount, greaterThan(0));
 
         final countBeforeDispose = tickCount;
         gsm.dispose();
 
-        await Future<void>.delayed(const Duration(milliseconds: 1200));
         // No additional ticks after dispose
+        async.elapse(const Duration(seconds: 2));
         expect(tickCount, equals(countBeforeDispose));
-      },
-      timeout: const Timeout(Duration(seconds: 5)),
-    );
+      });
+    });
 
     test('dispose is safe to call when timer was never started', () {
       final gsm = GameStateManager(resources: Resources());

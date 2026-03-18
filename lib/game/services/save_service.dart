@@ -442,7 +442,10 @@ class SaveService {
           }
         }
       } catch (e) {
-        // Log parse errors with context to aid debugging
+        // Log parse errors with context to aid debugging.
+        // Stack trace is intentionally omitted: tests exercise this path
+        // deliberately (corrupted JSON), and a full stack trace would produce
+        // alarming noise in CI output with no additional diagnostic value.
         final rawJson = prefs.getString(_planetResourcesJsonKey(planetId));
         debugPrint('Failed to parse resources JSON for planet $planetId: $e');
         debugPrint('Raw JSON: $rawJson');

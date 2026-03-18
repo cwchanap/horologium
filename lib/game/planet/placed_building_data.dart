@@ -46,8 +46,9 @@ class PlacedBuildingData {
     final parts = data.split(',');
     if (parts.isEmpty) return null;
 
-    // Detect format: if first part is not a pure integer and contains a dash or is long,
-    // assume it's the ID in new format. Otherwise, it's the old format.
+    // Detect format: x/y coordinates are always integers, so any non-integer
+    // first part must be an ID (new format). Pure integers indicate the old
+    // format where the string starts directly with the x coordinate.
     final firstPart = parts[0];
     final isInteger = int.tryParse(firstPart) != null;
     final looksLikeId = !isInteger;
