@@ -441,11 +441,10 @@ class SaveService {
             );
           }
         }
-      } catch (e, stackTrace) {
+      } catch (e) {
         // Log parse errors with context to aid debugging
         final rawJson = prefs.getString(_planetResourcesJsonKey(planetId));
         debugPrint('Failed to parse resources JSON for planet $planetId: $e');
-        debugPrint('Stack trace: $stackTrace');
         debugPrint('Raw JSON: $rawJson');
 
         // Attempt to load from old per-resource keys as fallback
