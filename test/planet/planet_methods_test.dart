@@ -289,11 +289,17 @@ void main() {
       expect(copy.lastDailySeed, equals(20260315));
     });
 
-    test('copies buildings list', () {
+    test('copies buildings list independently from original', () {
       final planet = _emptyPlanet();
       planet.addBuilding(_house());
       final copy = planet.copyWith();
+
+      // Mutate the original after copying
+      planet.addBuilding(_house());
+
+      // Copy is unaffected; original grew
       expect(copy.buildings.length, equals(1));
+      expect(planet.buildings.length, equals(2));
     });
 
     test('can override specific boolean flags', () {
