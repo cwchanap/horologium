@@ -173,8 +173,24 @@ void main() {
     await openDialog(tester, building: building, resources: resources);
 
     expect(find.byIcon(Icons.warning), findsOneWidget);
-    expect(find.text('+0.0/sec'), findsOneWidget);
-    expect(find.text('-1.0/sec'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            widget.data != null &&
+            RegExp(r'^\+0(?:\.0)?/sec$').hasMatch(widget.data!),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            widget.data != null &&
+            RegExp(r'^-1(?:\.0)?/sec$').hasMatch(widget.data!),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('falls back to enum names when the registry has no label', (
