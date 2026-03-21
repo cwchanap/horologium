@@ -294,7 +294,7 @@ void main() {
         onBuildingUpgraded: () => upgrades++,
       );
 
-      await tester.tap(find.text('Upgrade (200)'));
+      await tester.tap(find.text('Upgrade (${building.upgradeCost})'));
       await tester.pumpAndSettle();
 
       expect(building.level, equals(2));
@@ -319,7 +319,7 @@ void main() {
         onBuildingUpgraded: () => upgrades++,
       );
 
-      await tester.tap(find.text('Upgrade (200)'));
+      await tester.tap(find.text('Upgrade (${building.upgradeCost})'));
       await tester.pump();
 
       expect(building.level, equals(1));
