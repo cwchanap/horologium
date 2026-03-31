@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../building/building.dart';
-import '../main_game.dart';
 import '../resources/resources.dart';
 import '../services/resource_service.dart';
+import 'game_manager_context.dart';
 
 class BuildingPlacementManager {
-  final MainGame game;
+  final GameManagerContext game;
   final Resources resources;
   final BuildingLimitManager buildingLimitManager;
   final VoidCallback onResourcesChanged;

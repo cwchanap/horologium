@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 
 import 'building/building.dart';
 import 'grid.dart';
+import 'managers/game_manager_context.dart';
 import 'planet/index.dart';
 import 'terrain/index.dart';
 
@@ -18,7 +19,8 @@ class MainGame extends FlameGame
         flame_events.TapCallbacks,
         flame_events.PointerMoveCallbacks,
         ScrollDetector,
-        ScaleDetector {
+        ScaleDetector
+    implements GameManagerContext {
   Grid? _grid;
   ParallaxTerrainComponent? _terrain;
   Planet? _planet;
@@ -37,6 +39,7 @@ class MainGame extends FlameGame
   late double _scaleStartZoom;
   double? _fitZoom; // Computed zoom that fits the whole terrain in the viewport
 
+  @override
   Building? buildingToPlace;
   final PlacementPreview placementPreview = PlacementPreview()
     ..priority = 30; // Ensure preview renders above grid
@@ -45,6 +48,7 @@ class MainGame extends FlameGame
 
   MainGame({Planet? planet}) : _planet = planet;
 
+  @override
   Grid get grid => _grid!;
   ParallaxTerrainComponent? get terrain => _terrain;
   bool get hasLoaded => _grid != null && _terrain != null;
@@ -343,6 +347,7 @@ class MainGame extends FlameGame
     }
   }
 
+  @override
   void hidePlacementPreview() {
     if (world.contains(placementPreview)) {
       world.remove(placementPreview);
