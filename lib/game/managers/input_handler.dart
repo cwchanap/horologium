@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../building/building.dart';
 import '../building/menu.dart';
-import '../main_game.dart';
 import '../resources/resources.dart';
 import 'building_placement_manager.dart';
+import 'game_manager_context.dart';
 
 class InputHandler {
-  final MainGame game;
+  final GameManagerContext game;
   final Resources resources;
   final BuildingPlacementManager placementManager;
   final Function(int, int) onEmptyGridTapped;
