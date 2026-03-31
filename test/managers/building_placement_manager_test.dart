@@ -109,19 +109,18 @@ void main() {
     ) async {
       final context = await pumpPlacementHarness(tester);
       final building = createBuilding();
+      final limit = buildingLimitManager.getBuildingLimit(BuildingType.house);
       game.buildingToPlace = building;
-      game.grid
-        ..placeBuilding(0, 0, createBuilding())
-        ..placeBuilding(2, 0, createBuilding())
-        ..placeBuilding(4, 0, createBuilding())
-        ..placeBuilding(6, 0, createBuilding());
+      for (var i = 0; i < limit; i++) {
+        game.grid.placeBuilding(i * 2, 0, createBuilding());
+      }
 
-      final placed = manager.handleBuildingPlacement(8, 0, context);
+      final placed = manager.handleBuildingPlacement(limit * 2, 0, context);
       await tester.pump();
 
       expect(placed, isFalse);
       expect(
-        find.text('Building limit reached! Maximum 4 Houses allowed.'),
+        find.text('Building limit reached! Maximum $limit Houses allowed.'),
         findsOneWidget,
       );
       expect(game.buildingToPlace, same(building));
