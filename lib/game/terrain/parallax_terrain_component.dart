@@ -95,6 +95,20 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
     _baseTerrain.addAll(generatedTerrain);
   }
 
+  @visibleForTesting
+  void replaceTerrainDataForTest(Map<String, TerrainCell> terrain) {
+    _baseTerrain
+      ..clear()
+      ..addAll(terrain);
+  }
+
+  @visibleForTesting
+  void replaceLayersForTest(Map<TerrainDepth, ParallaxTerrainLayer> layers) {
+    _parallaxLayers
+      ..clear()
+      ..addAll(layers);
+  }
+
   Future<void> _createParallaxLayers() async {
     _parallaxLayers.clear();
     removeAll(children);
