@@ -4,8 +4,13 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'background_music_player.dart';
+
 class AudioManager {
-  AudioPlayer? _bgm;
+  AudioManager({BackgroundMusicPlayer? backgroundMusicPlayer})
+    : _bgm = backgroundMusicPlayer;
+
+  BackgroundMusicPlayer? _bgm;
   bool _bgmStarted = false;
   bool _bgmInitializing = false;
   bool _musicEnabled = true;
@@ -37,12 +42,14 @@ class AudioManager {
     }
   }
 
+  BackgroundMusicPlayer get _backgroundMusicPlayer =>
+      _bgm ??= AudioPlayerBackgroundMusicPlayer();
+
   Future<bool> _initAudio() async {
     try {
-      _bgm ??= AudioPlayer();
-      await _bgm!.setReleaseMode(ReleaseMode.loop);
-      await _bgm!.setVolume(_musicVolume);
-      await _bgm!.play(AssetSource('audio/background.mp3'));
+      await _backgroundMusicPlayer.setReleaseMode(ReleaseMode.loop);
+      await _backgroundMusicPlayer.setVolume(_musicVolume);
+      await _backgroundMusicPlayer.playAsset('audio/background.mp3');
       debugPrint('BGM started (volume=$_musicVolume).');
       return true;
     } catch (e) {
@@ -72,14 +79,14 @@ class AudioManager {
       await maybeStartBgm();
     } else if (_bgmStarted && !value) {
       try {
-        _bgm?.pause();
+        await _bgm?.pause();
         debugPrint('BGM paused by user.');
       } catch (e) {
         debugPrint('Failed to pause BGM: $e');
       }
     } else if (_bgmStarted && value) {
       try {
-        _bgm?.resume();
+        await _bgm?.resume();
         debugPrint('BGM resumed by user.');
       } catch (e) {
         debugPrint('Failed to resume BGM: $e');
@@ -92,7 +99,7 @@ class AudioManager {
     unawaited(_savePrefs());
     if (_bgmStarted) {
       try {
-        _bgm?.setVolume(_musicVolume);
+        unawaited(_bgm?.setVolume(_musicVolume));
         debugPrint('BGM volume changed to $_musicVolume.');
       } catch (e) {
         debugPrint('Failed to change BGM volume: $e');
@@ -106,17 +113,17 @@ class AudioManager {
       switch (state) {
         case AppLifecycleState.paused:
         case AppLifecycleState.inactive:
-          _bgm?.pause();
+          unawaited(_bgm?.pause());
           debugPrint('BGM paused due to lifecycle.');
           break;
         case AppLifecycleState.resumed:
           if (_musicEnabled) {
-            _bgm?.resume();
+            unawaited(_bgm?.resume());
             debugPrint('BGM resumed due to lifecycle.');
           }
           break;
         case AppLifecycleState.detached:
-          _bgm?.stop();
+          unawaited(_bgm?.stop());
           debugPrint('BGM stopped due to lifecycle detach.');
           break;
         default:
@@ -131,9 +138,9 @@ class AudioManager {
     if (_bgm != null) {
       try {
         if (_bgmStarted) {
-          _bgm?.stop();
+          unawaited(_bgm?.stop());
         }
-        _bgm?.dispose();
+        unawaited(_bgm?.dispose());
       } catch (e) {
         debugPrint('BGM dispose error: $e');
       }
