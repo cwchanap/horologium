@@ -59,6 +59,26 @@ class TerrainComponent extends PositionComponent with HasGameReference {
     _terrainData.addAll(generator.generateTerrain());
   }
 
+  @visibleForTesting
+  void prepareForTest() {
+    _cellSize = Vector2(cellWidth, cellHeight);
+    size = Vector2(gridSize * cellWidth, gridSize * cellHeight);
+  }
+
+  @visibleForTesting
+  void replaceTerrainDataForTest(Map<String, TerrainCell> terrain) {
+    _terrainData
+      ..clear()
+      ..addAll(terrain);
+  }
+
+  @visibleForTesting
+  void replaceLayersForTest(Map<String, TerrainLayer> layers) {
+    _terrainLayers
+      ..clear()
+      ..addAll(layers);
+  }
+
   Future<void> _createTerrainLayers() async {
     _terrainLayers.clear();
     removeAll(children);
