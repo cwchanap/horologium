@@ -138,7 +138,7 @@ class Grid extends PositionComponent with HasGameReference {
         _buildings.remove(key);
       }
     }
-    onBuildingRemoved?.call(x, y);
+    onBuildingRemoved?.call(placedBuilding.x, placedBuilding.y);
   }
 
   int countBuildingsOfType(BuildingType type) {
