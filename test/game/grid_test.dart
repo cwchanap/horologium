@@ -41,6 +41,31 @@ void main() {
       expect(grid.getAllBuildings(), [same(building)]);
     });
 
+    test('countBuildingsOfType counts unique placed buildings by type', () {
+      final grid = Grid();
+      final houseOne = _createTestBuilding(
+        type: BuildingType.house,
+        name: 'House One',
+      );
+      final houseTwo = _createTestBuilding(
+        type: BuildingType.house,
+        name: 'House Two',
+      );
+      final powerPlant = _createTestBuilding(
+        type: BuildingType.powerPlant,
+        name: 'Power Plant',
+      );
+
+      grid
+        ..placeBuilding(1, 1, houseOne, notifyCallbacks: false)
+        ..placeBuilding(5, 5, houseTwo, notifyCallbacks: false)
+        ..placeBuilding(9, 9, powerPlant, notifyCallbacks: false);
+
+      expect(grid.countBuildingsOfType(BuildingType.house), 2);
+      expect(grid.countBuildingsOfType(BuildingType.powerPlant), 1);
+      expect(grid.countBuildingsOfType(BuildingType.coalMine), 0);
+    });
+
     test(
       'removeBuilding clears every occupied cell and invokes the callback once',
       () {
@@ -66,10 +91,13 @@ void main() {
   });
 }
 
-Building _createTestBuilding() {
+Building _createTestBuilding({
+  BuildingType type = BuildingType.house,
+  String name = 'Test House',
+}) {
   return Building(
-    type: BuildingType.house,
-    name: 'Test House',
+    type: type,
+    name: name,
     description: 'Test building used for grid bookkeeping tests.',
     icon: Icons.home,
     color: Colors.green,
