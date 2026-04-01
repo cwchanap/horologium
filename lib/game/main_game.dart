@@ -156,6 +156,23 @@ class MainGame extends FlameGame
 
   Planet? get planet => _planet;
 
+  @visibleForTesting
+  void setGridForTest(Grid grid) {
+    _grid = grid;
+    _grid!.terrainComponent = _terrain;
+  }
+
+  @visibleForTesting
+  void setTerrainForTest(ParallaxTerrainComponent? terrain) {
+    _terrain = terrain;
+    _grid?.terrainComponent = terrain;
+  }
+
+  @visibleForTesting
+  void setFitZoomForTest(double? fitZoom) {
+    _fitZoom = fitZoom;
+  }
+
   // Grid callbacks for planet updates
   void _onBuildingPlaced(int x, int y, Building building) {
     if (_planet == null) return;
@@ -203,59 +220,19 @@ class MainGame extends FlameGame
   @override
   void onTapUp(flame_events.TapUpEvent event) {
     onUserInteracted?.call();
-    if (_grid == null) return;
-
-    final worldPosition = camera.globalToLocal(event.canvasPosition);
-    // Update preview on tap as well, so it appears even if the cursor hasn't moved
-    if (buildingToPlace != null) {
-      showPlacementPreview(buildingToPlace!, worldPosition);
-    }
-    final localPosition = _grid!.toLocal(worldPosition);
-    final gridPosition = _grid!.getGridPosition(localPosition);
-
-    if (gridPosition != null) {
-      onGridCellTapped?.call(gridPosition.x.toInt(), gridPosition.y.toInt());
-    } else {
-      // Clicked outside grid - cancel building placement if active
-      if (buildingToPlace != null) {
-        onGridCellTapped?.call(
-          -1,
-          -1,
-        ); // Special coordinates to indicate cancel
-      }
-    }
+    handleTapAtWorldPosition(camera.globalToLocal(event.canvasPosition));
   }
 
   @override
   void onLongTapDown(flame_events.TapDownEvent event) {
     onUserInteracted?.call();
-    if (_grid == null) return;
-
-    final worldPosition = camera.globalToLocal(event.canvasPosition);
-    final localPosition = _grid!.toLocal(worldPosition);
-    final gridPosition = _grid!.getGridPosition(localPosition);
-
-    if (gridPosition != null) {
-      onGridCellLongTapped?.call(
-        gridPosition.x.toInt(),
-        gridPosition.y.toInt(),
-      );
-    }
+    handleLongTapAtWorldPosition(camera.globalToLocal(event.canvasPosition));
   }
 
   void onSecondaryTapUp(flame_events.TapUpEvent event) {
-    if (_grid == null) return;
-
-    final worldPosition = camera.globalToLocal(event.canvasPosition);
-    final localPosition = _grid!.toLocal(worldPosition);
-    final gridPosition = _grid!.getGridPosition(localPosition);
-
-    if (gridPosition != null) {
-      onGridCellSecondaryTapped?.call(
-        gridPosition.x.toInt(),
-        gridPosition.y.toInt(),
-      );
-    }
+    handleSecondaryTapAtWorldPosition(
+      camera.globalToLocal(event.canvasPosition),
+    );
   }
 
   void clampZoom() {
@@ -300,6 +277,54 @@ class MainGame extends FlameGame
       final delta = (info.delta.global..negate()) / zoom;
       camera.moveBy(delta);
       _clampCameraToTerrain();
+    }
+  }
+
+  Vector2? _getGridPositionForWorldPosition(Vector2 worldPosition) {
+    if (_grid == null) {
+      return null;
+    }
+
+    final localPosition = _grid!.toLocal(worldPosition);
+    return _grid!.getGridPosition(localPosition);
+  }
+
+  @visibleForTesting
+  void handleTapAtWorldPosition(Vector2 worldPosition) {
+    if (_grid == null) return;
+
+    if (buildingToPlace != null) {
+      showPlacementPreview(buildingToPlace!, worldPosition);
+    }
+
+    final gridPosition = _getGridPositionForWorldPosition(worldPosition);
+
+    if (gridPosition != null) {
+      onGridCellTapped?.call(gridPosition.x.toInt(), gridPosition.y.toInt());
+    } else if (buildingToPlace != null) {
+      onGridCellTapped?.call(-1, -1);
+    }
+  }
+
+  @visibleForTesting
+  void handleLongTapAtWorldPosition(Vector2 worldPosition) {
+    final gridPosition = _getGridPositionForWorldPosition(worldPosition);
+    if (gridPosition != null) {
+      onGridCellLongTapped?.call(
+        gridPosition.x.toInt(),
+        gridPosition.y.toInt(),
+      );
+    }
+  }
+
+  @visibleForTesting
+  void handleSecondaryTapAtWorldPosition(Vector2 worldPosition) {
+    final gridPosition = _getGridPositionForWorldPosition(worldPosition);
+    if (gridPosition != null) {
+      onGridCellSecondaryTapped?.call(
+        gridPosition.x.toInt(),
+        gridPosition.y.toInt(),
+      );
     }
   }
 
