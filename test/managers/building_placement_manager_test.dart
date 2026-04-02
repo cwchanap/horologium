@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/building/category.dart';
-import 'package:horologium/game/grid.dart';
 import 'package:horologium/game/managers/building_placement_manager.dart';
-import 'package:horologium/game/managers/game_manager_context.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/game/resources/resources.dart';
+
+import 'test_game_manager_context.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -179,21 +179,4 @@ void main() {
       expect(game.hidePlacementPreviewCallCount, equals(1));
     });
   });
-}
-
-class TestGameManagerContext implements GameManagerContext {
-  @override
-  // Safe in these tests because placement manager paths only exercise Grid's
-  // internal occupancy methods and never require a mounted Flame game.
-  final Grid grid = Grid();
-
-  @override
-  Building? buildingToPlace;
-
-  int hidePlacementPreviewCallCount = 0;
-
-  @override
-  void hidePlacementPreview() {
-    hidePlacementPreviewCallCount++;
-  }
 }

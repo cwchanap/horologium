@@ -184,7 +184,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
     widget.planet.questManager.onQuestCompleted = null;
     widget.planet.achievementManager.onAchievementUnlocked = null;
     WidgetsBinding.instance.removeObserver(this);
-    _audioManager.dispose();
+    unawaited(_audioManager.dispose());
     _planetSaveDebouncer.dispose();
     super.dispose();
   }

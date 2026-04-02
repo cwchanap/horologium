@@ -18,7 +18,7 @@ fi
 
 # Run analyzer for the whole project to prevent committing broken code
 echo "Running flutter analyze..."
-if ! flutter analyze; then
+if ! flutter analyze --no-pub; then
   echo "\nError: flutter analyze reported issues. Fix them and re-commit."
   exit 1
 fi
