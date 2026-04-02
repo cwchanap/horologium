@@ -160,12 +160,21 @@ Grid _configuredGrid({int gridSize = 50}) {
 }
 
 Building _createBuilding(BuildingType type) {
-  return PlacedBuildingData(
+  final building = PlacedBuildingData(
     id: '${type.name}-test',
     x: 0,
     y: 0,
     type: type,
-  ).createBuilding()!;
+  ).createBuilding();
+
+  if (building == null) {
+    throw StateError(
+      'PlacedBuildingData.createBuilding returned null for '
+      'BuildingType.${type.name} in _createBuilding; expected a Building.',
+    );
+  }
+
+  return building;
 }
 
 Vector2 _worldPositionForCell(Grid grid, int x, int y) {

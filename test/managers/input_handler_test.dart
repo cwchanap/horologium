@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/building/category.dart';
-import 'package:horologium/game/grid.dart';
 import 'package:horologium/game/managers/building_placement_manager.dart';
-import 'package:horologium/game/managers/game_manager_context.dart';
 import 'package:horologium/game/managers/input_handler.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/game/resources/resources.dart';
+
+import 'test_game_manager_context.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -138,19 +138,4 @@ void main() {
       expect(longTapArgs![2], same(building));
     });
   });
-}
-
-class TestGameManagerContext implements GameManagerContext {
-  @override
-  final Grid grid = Grid();
-
-  @override
-  Building? buildingToPlace;
-
-  int hidePlacementPreviewCallCount = 0;
-
-  @override
-  void hidePlacementPreview() {
-    hidePlacementPreviewCallCount++;
-  }
 }

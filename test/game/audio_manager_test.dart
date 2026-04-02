@@ -8,9 +8,21 @@ import 'package:horologium/game/background_music_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
-  FakeBackgroundMusicPlayer({this.playCompleter});
+  FakeBackgroundMusicPlayer({
+    this.playCompleter,
+    this.stopCompleter,
+    this.setVolumeError,
+    this.pauseError,
+    this.resumeError,
+    this.stopError,
+  });
 
-  final Completer<void>? playCompleter;
+  Completer<void>? playCompleter;
+  Completer<void>? stopCompleter;
+  Object? setVolumeError;
+  Object? pauseError;
+  Object? resumeError;
+  Object? stopError;
   ReleaseMode? releaseMode;
   final List<double> volumeCalls = <double>[];
   final List<String> playedAssets = <String>[];
@@ -27,6 +39,9 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
   @override
   Future<void> pause() async {
     pauseCalls++;
+    if (pauseError != null) {
+      throw pauseError!;
+    }
   }
 
   @override
@@ -40,6 +55,9 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
   @override
   Future<void> resume() async {
     resumeCalls++;
+    if (resumeError != null) {
+      throw resumeError!;
+    }
   }
 
   @override
@@ -50,11 +68,20 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
   @override
   Future<void> setVolume(double volume) async {
     volumeCalls.add(volume);
+    if (setVolumeError != null) {
+      throw setVolumeError!;
+    }
   }
 
   @override
   Future<void> stop() async {
     stopCalls++;
+    if (stopError != null) {
+      throw stopError!;
+    }
+    if (stopCompleter != null) {
+      await stopCompleter!.future;
+    }
   }
 }
 
@@ -122,6 +149,26 @@ void main() {
       expect(manager.bgmStarted, isTrue);
     });
 
+    test(
+      'does not mark bgm started when music is disabled mid-start',
+      () async {
+        final playCompleter = Completer<void>();
+        final player = FakeBackgroundMusicPlayer(playCompleter: playCompleter);
+        final manager = AudioManager(backgroundMusicPlayer: player);
+
+        final firstStart = manager.maybeStartBgm();
+        await Future<void>.delayed(Duration.zero);
+        await manager.setMusicEnabled(false);
+        playCompleter.complete();
+        await firstStart;
+
+        expect(manager.musicEnabled, isFalse);
+        expect(manager.bgmStarted, isFalse);
+        expect(player.playedAssets, <String>['audio/background.mp3']);
+        expect(player.stopCalls, 1);
+      },
+    );
+
     test('skips once bgm has already started', () async {
       final player = FakeBackgroundMusicPlayer();
       final manager = AudioManager(backgroundMusicPlayer: player);
@@ -185,6 +232,19 @@ void main() {
         expect(prefs.getDouble('audio.musicVolume'), 1.0);
       },
     );
+
+    test('setMusicVolume handles async player errors', () async {
+      final player = FakeBackgroundMusicPlayer();
+      final manager = AudioManager(backgroundMusicPlayer: player);
+      await manager.maybeStartBgm();
+      player.setVolumeError = StateError('setVolume failed');
+
+      manager.setMusicVolume(0.25);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(manager.musicVolume, 0.25);
+      expect(player.volumeCalls.last, 0.25);
+    });
   });
 
   group('AudioManager lifecycle and disposal', () {
@@ -217,14 +277,60 @@ void main() {
       },
     );
 
+    test(
+      'handleLifecycleChange catches async player command failures',
+      () async {
+        final player = FakeBackgroundMusicPlayer();
+        final manager = AudioManager(backgroundMusicPlayer: player);
+        await manager.maybeStartBgm();
+        player.pauseError = StateError('pause failed');
+        player.resumeError = StateError('resume failed');
+        player.stopError = StateError('stop failed');
+
+        manager.handleLifecycleChange(AppLifecycleState.paused);
+        manager.handleLifecycleChange(AppLifecycleState.resumed);
+        manager.handleLifecycleChange(AppLifecycleState.detached);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(player.pauseCalls, 1);
+        expect(player.resumeCalls, 1);
+        expect(player.stopCalls, 1);
+      },
+    );
+
     test('dispose stops started bgm and disposes the player', () async {
       final player = FakeBackgroundMusicPlayer();
       final manager = AudioManager(backgroundMusicPlayer: player);
       await manager.maybeStartBgm();
 
-      manager.dispose();
+      await Future<void>.sync(() => manager.dispose());
 
       expect(player.stopCalls, 1);
+      expect(player.disposeCalls, 1);
+    });
+
+    test('dispose waits for stop before disposing the player', () async {
+      final player = FakeBackgroundMusicPlayer();
+      final manager = AudioManager(backgroundMusicPlayer: player);
+      await manager.maybeStartBgm();
+      player.stopCompleter = Completer<void>();
+
+      var disposeCompleted = false;
+      final disposeFuture = Future<void>.sync(() => manager.dispose()).then((
+        _,
+      ) {
+        disposeCompleted = true;
+      });
+
+      await Future<void>.delayed(Duration.zero);
+
+      expect(player.stopCalls, 1);
+      expect(player.disposeCalls, 0);
+      expect(disposeCompleted, isFalse);
+
+      player.stopCompleter!.complete();
+      await disposeFuture;
+
       expect(player.disposeCalls, 1);
     });
   });

@@ -64,8 +64,14 @@ class AudioManager {
 
     try {
       final success = await _initAudio();
-      if (success) {
+      if (success && _musicEnabled) {
         _bgmStarted = true;
+      } else if (success) {
+        try {
+          await _bgm?.stop();
+        } catch (e) {
+          debugPrint('Failed to stop BGM after disable during init: $e');
+        }
       }
     } finally {
       _bgmInitializing = false;
@@ -98,53 +104,91 @@ class AudioManager {
     _musicVolume = value.clamp(0.0, 1.0);
     unawaited(_savePrefs());
     if (_bgmStarted) {
-      try {
-        unawaited(_bgm?.setVolume(_musicVolume));
-        debugPrint('BGM volume changed to $_musicVolume.');
-      } catch (e) {
-        debugPrint('Failed to change BGM volume: $e');
+      final volumeFuture = _bgm?.setVolume(_musicVolume);
+      if (volumeFuture != null) {
+        unawaited(
+          volumeFuture
+              .then((_) {
+                debugPrint('BGM volume changed to $_musicVolume.');
+              })
+              .catchError((Object e) {
+                debugPrint('Failed to change BGM volume: $e');
+              }),
+        );
       }
     }
   }
 
   void handleLifecycleChange(AppLifecycleState state) {
-    try {
-      if (!_bgmStarted) return;
-      switch (state) {
-        case AppLifecycleState.paused:
-        case AppLifecycleState.inactive:
-          unawaited(_bgm?.pause());
-          debugPrint('BGM paused due to lifecycle.');
-          break;
-        case AppLifecycleState.resumed:
-          if (_musicEnabled) {
-            unawaited(_bgm?.resume());
-            debugPrint('BGM resumed due to lifecycle.');
+    if (!_bgmStarted) return;
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        final pauseFuture = _bgm?.pause();
+        if (pauseFuture != null) {
+          unawaited(
+            pauseFuture
+                .then((_) {
+                  debugPrint('BGM paused due to lifecycle.');
+                })
+                .catchError((Object e) {
+                  debugPrint('Failed to pause BGM due to lifecycle: $e');
+                }),
+          );
+        }
+        break;
+      case AppLifecycleState.resumed:
+        if (_musicEnabled) {
+          final resumeFuture = _bgm?.resume();
+          if (resumeFuture != null) {
+            unawaited(
+              resumeFuture
+                  .then((_) {
+                    debugPrint('BGM resumed due to lifecycle.');
+                  })
+                  .catchError((Object e) {
+                    debugPrint('Failed to resume BGM due to lifecycle: $e');
+                  }),
+            );
           }
-          break;
-        case AppLifecycleState.detached:
-          unawaited(_bgm?.stop());
-          debugPrint('BGM stopped due to lifecycle detach.');
-          break;
-        default:
-          break;
-      }
-    } catch (e) {
-      debugPrint('BGM lifecycle handling error: $e');
+        }
+        break;
+      case AppLifecycleState.detached:
+        final stopFuture = _bgm?.stop();
+        if (stopFuture != null) {
+          unawaited(
+            stopFuture
+                .then((_) {
+                  debugPrint('BGM stopped due to lifecycle detach.');
+                })
+                .catchError((Object e) {
+                  debugPrint('Failed to stop BGM due to lifecycle detach: $e');
+                }),
+          );
+        }
+        break;
+      default:
+        break;
     }
   }
 
-  void dispose() {
-    if (_bgm != null) {
-      try {
-        if (_bgmStarted) {
-          unawaited(_bgm?.stop());
-        }
-        unawaited(_bgm?.dispose());
-      } catch (e) {
-        debugPrint('BGM dispose error: $e');
+  Future<void> dispose() async {
+    final bgm = _bgm;
+    final started = _bgmStarted;
+
+    try {
+      if (bgm != null && started) {
+        await bgm.stop();
       }
+      if (bgm != null) {
+        await bgm.dispose();
+      }
+    } catch (e) {
+      debugPrint('BGM dispose error: $e');
+    } finally {
       _bgm = null;
+      _bgmStarted = false;
+      _bgmInitializing = false;
     }
   }
 }
