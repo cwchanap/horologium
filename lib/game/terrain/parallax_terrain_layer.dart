@@ -1,5 +1,6 @@
 import 'package:flame/components.dart';
 import 'package:flame/extensions.dart';
+import 'package:flutter/foundation.dart'; // ignore: unnecessary_import
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -236,13 +237,13 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
 
     if (sprite != null) {
       // Position feature deterministically per cell + feature
-      final featureSize = _getFeatureSize(feature);
+      final featureSize = getFeatureSize(feature);
       final rawPosition = _isLargeFeature(feature)
-          ? _getLargeFeaturePosition(cellRect, feature, featureSize)
-          : _getFeaturePosition(cellRect, feature);
+          ? getLargeFeaturePosition(cellRect, feature, featureSize)
+          : getFeaturePosition(cellRect, feature);
 
       // Adjust by feature-specific anchor offset (e.g., tree trunk baseline)
-      final anchorOffset = _getFeatureAnchorOffset(feature, featureSize);
+      final anchorOffset = getFeatureAnchorOffset(feature, featureSize);
       final baseX = rawPosition.x + anchorOffset.x;
       final baseY = rawPosition.y + anchorOffset.y;
 
@@ -270,7 +271,8 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     }
   }
 
-  Vector2 _getFeaturePosition(Rect cellRect, FeatureType feature) {
+  @visibleForTesting
+  Vector2 getFeaturePosition(Rect cellRect, FeatureType feature) {
     // Deterministic per-cell offset using cell coordinates + feature
     // This yields variety across the grid while staying reproducible.
     final cellX = (cellRect.left / cellWidth).round();
@@ -291,7 +293,8 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     return Vector2(x, y);
   }
 
-  Vector2 _getLargeFeaturePosition(
+  @visibleForTesting
+  Vector2 getLargeFeaturePosition(
     Rect cellRect,
     FeatureType feature,
     Vector2 featureSize,
@@ -316,7 +319,8 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     return Vector2(baseX + xOffset, baseY + yOffset);
   }
 
-  Vector2 _getFeatureAnchorOffset(FeatureType feature, Vector2 featureSize) {
+  @visibleForTesting
+  Vector2 getFeatureAnchorOffset(FeatureType feature, Vector2 featureSize) {
     switch (feature) {
       case FeatureType.treeOakLarge:
       case FeatureType.treePineLarge:
@@ -327,7 +331,8 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     }
   }
 
-  Vector2 _getFeatureSize(FeatureType feature) {
+  @visibleForTesting
+  Vector2 getFeatureSize(FeatureType feature) {
     // Return appropriate size based on feature type and depth
     switch (feature) {
       case FeatureType.treeOakLarge:
