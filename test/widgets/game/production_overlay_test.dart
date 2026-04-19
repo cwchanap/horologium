@@ -10,6 +10,7 @@ import 'package:horologium/widgets/game/production_overlay/cluster_node.dart';
 import 'package:horologium/widgets/game/production_overlay/empty_state.dart';
 import 'package:horologium/widgets/game/production_overlay/node_detail_panel.dart';
 import 'package:horologium/widgets/game/production_overlay/production_overlay.dart';
+import 'package:horologium/widgets/game/production_overlay/resource_filter.dart';
 import 'package:horologium/widgets/game/production_overlay/resource_flow_edge.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -213,6 +214,88 @@ void main() {
       // Find the SizedBox used as canvas inside the InteractiveViewer.
       final interactiveViewer = find.byType(InteractiveViewer);
       expect(interactiveViewer, findsOneWidget);
+    });
+
+    testWidgets('ResourceFilterWidget is rendered when buildings exist', (
+      tester,
+    ) async {
+      final buildings = [
+        _createTestBuilding(
+          type: BuildingType.coalMine,
+          generation: {ResourceType.coal: 1.0},
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => buildings,
+            getResources: () => Resources(),
+            onClose: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(ResourceFilterWidget), findsOneWidget);
+    });
+
+    testWidgets('onBuildingsChanged callback is called when buildings change', (
+      tester,
+    ) async {
+      var buildingsChanged = 0;
+      final building = _createTestBuilding(
+        type: BuildingType.coalMine,
+        generation: {ResourceType.coal: 1.0},
+      );
+      // Mutable reference so getBuildings closure can return updated list
+      var currentBuildings = [building];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => currentBuildings,
+            getResources: () => Resources(),
+            onClose: () {},
+            onBuildingsChanged: () => buildingsChanged++,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Change the building's worker count to change the signature
+      building.assignedWorkers = 1;
+
+      // Wait for the auto-refresh timer (1 second) to detect the change
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(buildingsChanged, greaterThan(0));
+    });
+
+    testWidgets('resource filter dropdown shows All Resources hint', (
+      tester,
+    ) async {
+      final buildings = [
+        _createTestBuilding(
+          type: BuildingType.coalMine,
+          generation: {ResourceType.coal: 1.0},
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => buildings,
+            getResources: () => Resources(),
+            onClose: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('All Resources'), findsOneWidget);
     });
   });
 
