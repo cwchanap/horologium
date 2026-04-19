@@ -173,6 +173,13 @@ class MainGame extends FlameGame
     _fitZoom = fitZoom;
   }
 
+  @visibleForTesting
+  void simulateBuildingPlaced(int x, int y, Building building) =>
+      _onBuildingPlaced(x, y, building);
+
+  @visibleForTesting
+  void simulateBuildingRemoved(int x, int y) => _onBuildingRemoved(x, y);
+
   // Grid callbacks for planet updates
   void _onBuildingPlaced(int x, int y, Building building) {
     if (_planet == null) return;

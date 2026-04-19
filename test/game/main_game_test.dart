@@ -1,9 +1,12 @@
 import 'package:flame/components.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/building/building.dart';
+import 'package:horologium/game/building/category.dart';
 import 'package:horologium/game/grid.dart';
 import 'package:horologium/game/main_game.dart';
 import 'package:horologium/game/planet/index.dart';
+import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/game/terrain/parallax_terrain_component.dart';
 import 'package:horologium/game/terrain/terrain_biome.dart';
 
@@ -149,6 +152,100 @@ void main() {
         ]);
       },
     );
+  });
+
+  group('MainGame._onBuildingPlaced', () {
+    test('adds PlacedBuildingData to planet and fires onPlanetChanged', () {
+      final planet = Planet(id: 'p1', name: 'P1');
+      final game = MainGame(planet: planet);
+      final events = <Planet>[];
+      game.onPlanetChanged = events.add;
+
+      final building = _createBuilding(BuildingType.house);
+      game.simulateBuildingPlaced(3, 4, building);
+
+      expect(planet.buildings, hasLength(1));
+      expect(planet.buildings.first.x, 3);
+      expect(planet.buildings.first.y, 4);
+      expect(planet.buildings.first.type, BuildingType.house);
+      expect(planet.buildings.first.variant, isNull);
+      expect(events, hasLength(1));
+    });
+
+    test('captures Field crop variant', () {
+      final planet = Planet(id: 'p2', name: 'P2');
+      final game = MainGame(planet: planet);
+
+      final field = Field(
+        type: BuildingType.field,
+        name: 'Field',
+        description: 'Test',
+        icon: Icons.grass,
+        color: Colors.green,
+        baseCost: 50,
+        category: BuildingCategory.foodResources,
+        cropType: CropType.corn,
+      );
+      game.simulateBuildingPlaced(1, 1, field);
+
+      expect(planet.buildings.first.variant, 'corn');
+    });
+
+    test('captures Bakery product variant', () {
+      final planet = Planet(id: 'p3', name: 'P3');
+      final game = MainGame(planet: planet);
+
+      final bakery = Bakery(
+        type: BuildingType.bakery,
+        name: 'Bakery',
+        description: 'Test',
+        icon: Icons.bakery_dining,
+        color: Colors.orange,
+        baseCost: 150,
+        category: BuildingCategory.refinement,
+        productType: BakeryProduct.pastries,
+      );
+      game.simulateBuildingPlaced(2, 2, bakery);
+
+      expect(planet.buildings.first.variant, 'pastries');
+    });
+
+    test('does nothing when planet is null', () {
+      final game = MainGame();
+      game.simulateBuildingPlaced(0, 0, _createBuilding(BuildingType.house));
+      // No error thrown; nothing to assert beyond survival
+    });
+  });
+
+  group('MainGame._onBuildingRemoved', () {
+    test('removes building from planet and fires onPlanetChanged', () {
+      final planet = Planet(
+        id: 'p4',
+        name: 'P4',
+        buildings: [
+          const PlacedBuildingData(
+            id: 'h1',
+            x: 5,
+            y: 5,
+            type: BuildingType.house,
+          ),
+        ],
+      );
+      final game = MainGame(planet: planet);
+      final events = <Planet>[];
+      game.onPlanetChanged = events.add;
+
+      game.simulateBuildingRemoved(5, 5);
+
+      expect(planet.buildings, isEmpty);
+      expect(events, hasLength(1));
+    });
+
+    test('does nothing when planet is null', () {
+      final game = MainGame();
+      game.simulateBuildingRemoved(0, 0);
+      // No error thrown
+    });
   });
 }
 
