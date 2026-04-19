@@ -30,7 +30,7 @@ class TerrainLayer extends PositionComponent with HasGameReference {
 
   Future<void> _loadSprites() async {
     // Load base terrain sprite
-    final baseAssetPath = _getBaseAssetPath(terrainType);
+    final baseAssetPath = getBaseAssetPath(terrainType);
     if (baseAssetPath != null) {
       final image = await game.images.load(baseAssetPath);
       _baseSprite = Sprite(image);
@@ -39,7 +39,7 @@ class TerrainLayer extends PositionComponent with HasGameReference {
     // Load feature sprites
     _featureSprites.clear();
     for (final feature in features) {
-      final featureAssetPath = _getFeatureAssetPath(feature);
+      final featureAssetPath = getFeatureAssetPath(feature);
       if (featureAssetPath != null) {
         if (!_spriteCache.containsKey(featureAssetPath)) {
           final image = await game.images.load(featureAssetPath);
@@ -50,7 +50,8 @@ class TerrainLayer extends PositionComponent with HasGameReference {
     }
   }
 
-  String? _getBaseAssetPath(TerrainType type) {
+  @visibleForTesting
+  String? getBaseAssetPath(TerrainType type) {
     switch (type) {
       case TerrainType.grass:
         return TerrainAssets.grassBase;
@@ -68,7 +69,8 @@ class TerrainLayer extends PositionComponent with HasGameReference {
     }
   }
 
-  String? _getFeatureAssetPath(FeatureType feature) {
+  @visibleForTesting
+  String? getFeatureAssetPath(FeatureType feature) {
     switch (feature) {
       case FeatureType.treeOakSmall:
         return TerrainAssets.treeOakSmall;
@@ -111,7 +113,7 @@ class TerrainLayer extends PositionComponent with HasGameReference {
     } else {
       // Fallback to colored rectangle if no sprite
       final fallbackPaint = Paint()
-        ..color = _getFallbackColor(terrainType).withValues(alpha: opacity);
+        ..color = getFallbackColor(terrainType).withValues(alpha: opacity);
       canvas.drawRect(Rect.fromLTWH(0, 0, size.x, size.y), fallbackPaint);
     }
 
@@ -130,7 +132,8 @@ class TerrainLayer extends PositionComponent with HasGameReference {
     }
   }
 
-  Color _getFallbackColor(TerrainType type) {
+  @visibleForTesting
+  Color getFallbackColor(TerrainType type) {
     switch (type) {
       case TerrainType.grass:
         return const Color(0xFF4CAF50);
@@ -176,12 +179,13 @@ class TerrainLayer extends PositionComponent with HasGameReference {
     TerrainType newType,
     List<FeatureType> newFeatures,
   ) async {
-    if (terrainType != newType || !_listsEqual(features, newFeatures)) {
+    if (terrainType != newType || !listsEqual(features, newFeatures)) {
       await _loadSprites();
     }
   }
 
-  bool _listsEqual(List<FeatureType> a, List<FeatureType> b) {
+  @visibleForTesting
+  bool listsEqual(List<FeatureType> a, List<FeatureType> b) {
     if (a.length != b.length) return false;
     for (int i = 0; i < a.length; i++) {
       if (a[i] != b[i]) return false;
