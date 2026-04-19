@@ -1,4 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:horologium/game/building/building.dart';
+import 'package:horologium/game/planet/placed_building_data.dart';
+import 'package:horologium/game/planet/planet.dart';
 import 'package:horologium/game/quests/quest.dart';
 import 'package:horologium/game/quests/quest_manager.dart';
 import 'package:horologium/game/quests/quest_objective.dart';
@@ -158,5 +161,103 @@ void main() {
       expect(prefs.containsKey('planet.moon.quests.dailySeed'), isFalse);
       expect(prefs.containsKey('planet.moon.quests.weeklySeed'), isFalse);
     });
+  });
+
+  group('SaveService planet building variant round-trips', () {
+    test('saves and reloads a Field building with corn crop variant', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+
+      const planetId = 'variant-field';
+      // Format: id,x,y,type,level,workers,variant
+      const buildingStr = 'field-abc,3,4,field,1,1,corn';
+
+      // Set resources JSON key so loadOrCreatePlanet enters the loading branch.
+      await prefs.setString('planet.$planetId.resources_json', '{}');
+      await prefs.setStringList('planet.$planetId.buildings', [buildingStr]);
+
+      final planet = await SaveService.loadOrCreatePlanet(
+        planetId,
+        name: 'Field Planet',
+      );
+
+      expect(planet.buildings, hasLength(1));
+      expect(planet.buildings.first.type, BuildingType.field);
+      expect(planet.buildings.first.variant, 'corn');
+    });
+
+    test(
+      'saves and reloads a Bakery building with pastries product variant',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+
+        const planetId = 'variant-bakery';
+        const buildingStr = 'bakery-xyz,1,2,bakery,1,2,pastries';
+
+        // Set resources JSON key so loadOrCreatePlanet enters the loading branch.
+        await prefs.setString('planet.$planetId.resources_json', '{}');
+        await prefs.setStringList('planet.$planetId.buildings', [buildingStr]);
+
+        final planet = await SaveService.loadOrCreatePlanet(
+          planetId,
+          name: 'Bakery Planet',
+        );
+
+        expect(planet.buildings, hasLength(1));
+        expect(planet.buildings.first.type, BuildingType.bakery);
+        expect(planet.buildings.first.variant, 'pastries');
+      },
+    );
+
+    test('building with no variant field loads with null variant', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+
+      const planetId = 'no-variant';
+      // Old format: id,x,y,type,level,workers (no variant field)
+      const buildingStr = 'house-123,5,5,house,1,0';
+
+      // Set resources JSON key so loadOrCreatePlanet enters the loading branch.
+      await prefs.setString('planet.$planetId.resources_json', '{}');
+      await prefs.setStringList('planet.$planetId.buildings', [buildingStr]);
+
+      final planet = await SaveService.loadOrCreatePlanet(
+        planetId,
+        name: 'No Variant Planet',
+      );
+
+      expect(planet.buildings, hasLength(1));
+      expect(planet.buildings.first.variant, isNull);
+    });
+
+    test(
+      'savePlanet persists Field variant and loadOrCreatePlanet restores it',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+
+        const planetId = 'roundtrip-field';
+        final fieldData = PlacedBuildingData(
+          id: 'f1',
+          x: 2,
+          y: 3,
+          type: BuildingType.field,
+          variant: 'barley',
+        );
+        final planet = Planet(
+          id: planetId,
+          name: 'Round Trip',
+          buildings: [fieldData],
+        );
+
+        await SaveService.savePlanet(planet);
+        final loaded = await SaveService.loadOrCreatePlanet(
+          planetId,
+          name: 'Round Trip',
+        );
+
+        expect(loaded.buildings.first.variant, 'barley');
+      },
+    );
   });
 }
