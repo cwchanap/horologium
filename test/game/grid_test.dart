@@ -89,6 +89,41 @@ void main() {
       },
     );
   });
+
+  group('Grid.getSpriteForBuilding', () {
+    test('returns null for a building with assetPath when cache is empty', () {
+      final grid = Grid();
+      final building = Building(
+        type: BuildingType.house,
+        name: 'Sprite Building',
+        description: 'Has an asset path',
+        icon: Icons.home,
+        color: Colors.blue,
+        baseCost: 100,
+        assetPath: 'assets/images/building/house.png',
+        category: BuildingCategory.residential,
+      );
+
+      // Cache is empty (onLoad not called), so result is null
+      // but the assetPath-present branch is executed
+      expect(grid.getSpriteForBuilding(building), isNull);
+    });
+
+    test('returns null for a building with no assetPath', () {
+      final grid = Grid();
+      final building = Building(
+        type: BuildingType.powerPlant,
+        name: 'No Asset',
+        description: 'No asset path',
+        icon: Icons.bolt,
+        color: Colors.yellow,
+        baseCost: 200,
+        category: BuildingCategory.services,
+      );
+
+      expect(grid.getSpriteForBuilding(building), isNull);
+    });
+  });
 }
 
 Building _createTestBuilding({
