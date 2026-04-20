@@ -256,6 +256,7 @@ void main() {
           name: 'Round Trip',
         );
 
+        expect(loaded.buildings, hasLength(1));
         expect(loaded.buildings.first.variant, 'barley');
       },
     );

@@ -212,8 +212,12 @@ void main() {
 
     test('does nothing when planet is null', () {
       final game = MainGame();
+      var planetChangedCalled = false;
+      game.onPlanetChanged = (_) {
+        planetChangedCalled = true;
+      };
       game.simulateBuildingPlaced(0, 0, _createBuilding(BuildingType.house));
-      // No error thrown; nothing to assert beyond survival
+      expect(planetChangedCalled, isFalse);
     });
   });
 
@@ -243,8 +247,12 @@ void main() {
 
     test('does nothing when planet is null', () {
       final game = MainGame();
+      var planetChangedCalled = false;
+      game.onPlanetChanged = (_) {
+        planetChangedCalled = true;
+      };
       game.simulateBuildingRemoved(0, 0);
-      // No error thrown
+      expect(planetChangedCalled, isFalse);
     });
   });
 }

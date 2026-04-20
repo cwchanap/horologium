@@ -181,13 +181,14 @@ class TerrainLayer extends PositionComponent with HasGameReference {
     TerrainType newType,
     List<FeatureType> newFeatures,
   ) async {
-    if (terrainType != newType || !listsEqual(features, newFeatures)) {
+    if (terrainType != newType ||
+        !TerrainLayer.listsEqual(features, newFeatures)) {
       await _loadSprites();
     }
   }
 
   @visibleForTesting
-  bool listsEqual(List<FeatureType> a, List<FeatureType> b) {
+  static bool listsEqual(List<FeatureType> a, List<FeatureType> b) {
     if (a.length != b.length) return false;
     for (int i = 0; i < a.length; i++) {
       if (a[i] != b[i]) return false;

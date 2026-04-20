@@ -181,6 +181,9 @@ void main() {
       );
       await _pumpUntilFound(tester, find.byType(ResourceDisplay));
 
+      // Verify the callback is wired up by the widget
+      expect(achievementManager.onAchievementUnlocked, isNotNull);
+
       // Fire the callback — should not throw
       final achievement = achievementManager.achievements.first;
       achievementManager.onAchievementUnlocked?.call(achievement);
@@ -193,11 +196,36 @@ void main() {
     ) async {
       addTearDown(() => _disposeMainGameWidget(tester));
 
+      final questManager = QuestManager(
+        quests: [
+          Quest(
+            id: 'lifecycle-quest',
+            name: 'Lifecycle Quest',
+            description: 'For coverage',
+            objectives: [
+              QuestObjective(
+                type: QuestObjectiveType.buildBuilding,
+                targetId: 'house',
+                targetAmount: 1,
+              ),
+            ],
+            reward: const QuestReward(resources: {ResourceType.cash: 50}),
+          ),
+        ],
+      );
+
       await _pumpMainGameWidget(
         tester,
-        planet: Planet(id: 'lifecycle', name: 'Lifecycle'),
+        planet: Planet(
+          id: 'lifecycle',
+          name: 'Lifecycle',
+          questManager: questManager,
+        ),
       );
       await _pumpUntilFound(tester, find.byType(ResourceDisplay));
+
+      // Verify quest callback is wired
+      expect(questManager.onQuestCompleted, isNotNull);
 
       // Simulate a resume lifecycle event via the binding observer
       final binding = WidgetsBinding.instance;
