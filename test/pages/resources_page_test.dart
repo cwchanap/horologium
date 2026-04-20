@@ -39,10 +39,8 @@ void main() {
     testWidgets('default selected tab is Raw Materials', (tester) async {
       await pumpPage(tester);
 
-      await tester.tap(find.text('Raw Materials'));
-      await tester.pump();
-
-      expect(find.text('Resources Overview'), findsOneWidget);
+      // Raw Materials is the default — Gold should be visible immediately
+      expect(find.text('Gold'), findsOneWidget);
     });
 
     testWidgets('tapping a category tab switches the display', (tester) async {
@@ -51,7 +49,8 @@ void main() {
       await tester.tap(find.text('Food Resources'));
       await tester.pump();
 
-      expect(find.text('Resources Overview'), findsOneWidget);
+      // Food Resources tab should show Wheat instead of Gold
+      expect(find.text('Wheat'), findsOneWidget);
     });
 
     testWidgets('tapping all category tabs does not throw', (tester) async {
@@ -62,7 +61,8 @@ void main() {
         await tester.pump();
       }
 
-      expect(find.text('Resources Overview'), findsOneWidget);
+      // Final tab (Refinement) should show Bread
+      expect(find.text('Bread'), findsOneWidget);
     });
 
     testWidgets('back button pops the route', (tester) async {
@@ -99,26 +99,27 @@ void main() {
     testWidgets('shows production rates when a building generates resources', (
       tester,
     ) async {
-      final house = Building(
-        type: BuildingType.house,
-        name: 'House',
-        description: 'Shelter',
-        icon: Icons.home,
-        color: Colors.green,
-        baseCost: 50,
-        category: BuildingCategory.residential,
-        baseGeneration: {ResourceType.cash: 0.5},
+      final mine = Building(
+        type: BuildingType.coalMine,
+        name: 'Coal Mine',
+        description: 'Produces coal',
+        icon: Icons.fireplace,
+        color: Colors.grey,
+        baseCost: 90,
+        baseGeneration: {ResourceType.coal: 1.0},
+        requiredWorkers: 1,
+        category: BuildingCategory.rawMaterials,
       );
-      grid.placeBuilding(0, 0, house, notifyCallbacks: false);
+      mine.assignedWorkers = 1;
+      grid.placeBuilding(0, 0, mine, notifyCallbacks: false);
 
-      resources.resources[ResourceType.cash] = 500;
+      resources.resources[ResourceType.coal] = 50;
 
       await pumpPage(tester);
 
-      await tester.tap(find.text('Raw Materials'));
-      await tester.pump();
-
-      expect(find.text('Resources Overview'), findsOneWidget);
+      // Coal is in the Raw Materials category — verify the rate is shown
+      expect(find.text('Coal'), findsOneWidget);
+      expect(find.text('1.0/s'), findsWidgets);
     });
   });
 }

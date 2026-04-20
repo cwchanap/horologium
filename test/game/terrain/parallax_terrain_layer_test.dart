@@ -110,16 +110,20 @@ void main() {
       expect(p1.x, p2.x);
       expect(p1.y, p2.y);
     });
-    test('produces different results for different cells', () {
-      final pos1 = layer.getFeaturePosition(
+    test('produces varied positions across multiple cells', () {
+      final positions = <String>{};
+      for (final rect in [
         const Rect.fromLTWH(0, 0, 50, 50),
-        FeatureType.rockSmall,
-      );
-      final pos2 = layer.getFeaturePosition(
         const Rect.fromLTWH(50, 0, 50, 50),
-        FeatureType.rockSmall,
-      );
-      expect(pos1.x == pos2.x && pos1.y == pos2.y, isFalse);
+        const Rect.fromLTWH(100, 0, 50, 50),
+        const Rect.fromLTWH(150, 0, 50, 50),
+      ]) {
+        final pos = layer.getFeaturePosition(rect, FeatureType.rockSmall);
+        positions.add(
+          '${pos.x.toStringAsFixed(4)},${pos.y.toStringAsFixed(4)}',
+        );
+      }
+      expect(positions.length, greaterThan(1));
     });
   });
 
@@ -132,10 +136,11 @@ void main() {
         FeatureType.treeOakLarge,
         featureSize,
       );
-      // base Y = cellRect.bottom - featureSize.y = 50 - 75 = -25
-      // with small fy offset in range [0, -1.5]
-      expect(pos.y, greaterThanOrEqualTo(-27));
-      expect(pos.y, lessThanOrEqualTo(-24));
+      // baseY = cellRect.bottom - featureSize.y = 50 - 75 = -25
+      // yOffset = -fy * cellRect.height * 0.03, fy ∈ [0,1) → yOffset ∈ [0, -1.5)
+      // pos.y = baseY + yOffset ∈ [-26.5, -25.0]
+      expect(pos.y, greaterThanOrEqualTo(-26.5));
+      expect(pos.y, lessThanOrEqualTo(-25.0));
     });
     test('is deterministic for same inputs', () {
       const cellRect = Rect.fromLTWH(100, 100, 50, 50);

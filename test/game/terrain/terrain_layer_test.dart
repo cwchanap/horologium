@@ -125,7 +125,7 @@ void main() {
   group('TerrainLayer.listsEqual', () {
     test('returns true for two identical single-element lists', () {
       expect(
-        layer.listsEqual(
+        TerrainLayer.listsEqual(
           [FeatureType.treeOakSmall],
           [FeatureType.treeOakSmall],
         ),
@@ -134,7 +134,7 @@ void main() {
     });
     test('returns false when elements differ', () {
       expect(
-        layer.listsEqual(
+        TerrainLayer.listsEqual(
           [FeatureType.treeOakSmall],
           [FeatureType.treeOakLarge],
         ),
@@ -142,14 +142,14 @@ void main() {
       );
     });
     test('returns false when lengths differ', () {
-      expect(layer.listsEqual([FeatureType.treeOakSmall], []), isFalse);
+      expect(TerrainLayer.listsEqual([FeatureType.treeOakSmall], []), isFalse);
     });
     test('returns true for two empty lists', () {
-      expect(layer.listsEqual([], []), isTrue);
+      expect(TerrainLayer.listsEqual([], []), isTrue);
     });
     test('returns true for identical multi-element lists', () {
       expect(
-        layer.listsEqual(
+        TerrainLayer.listsEqual(
           [FeatureType.treeOakSmall, FeatureType.rockSmall],
           [FeatureType.treeOakSmall, FeatureType.rockSmall],
         ),
@@ -158,7 +158,7 @@ void main() {
     });
     test('returns false when only order differs', () {
       expect(
-        layer.listsEqual(
+        TerrainLayer.listsEqual(
           [FeatureType.treeOakSmall, FeatureType.rockSmall],
           [FeatureType.rockSmall, FeatureType.treeOakSmall],
         ),

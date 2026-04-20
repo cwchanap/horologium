@@ -264,6 +264,9 @@ void main() {
       );
       await tester.pump();
 
+      // Baseline: no changes detected yet
+      expect(buildingsChanged, 0);
+
       // Change the building's worker count to change the signature
       building.assignedWorkers = 1;
 
