@@ -300,6 +300,138 @@ void main() {
 
       expect(find.text('All Resources'), findsOneWidget);
     });
+
+    testWidgets(
+      'tapping a node opens details and tapping background clears it',
+      (tester) async {
+        final mine = _createTestBuilding(
+          type: BuildingType.coalMine,
+          generation: {ResourceType.coal: 1.0},
+        )..assignedWorkers = 1;
+        final plant = _createTestBuilding(
+          type: BuildingType.powerPlant,
+          generation: {ResourceType.electricity: 1.0},
+          consumption: {ResourceType.coal: 1.0},
+        )..assignedWorkers = 1;
+
+        tester.view.physicalSize = const Size(320, 640);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ProductionOverlay(
+              getBuildings: () => [mine, plant],
+              getResources: () => Resources(),
+              onClose: () {},
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.byType(ListTile), findsNWidgets(2));
+
+        await tester.tap(find.byType(ListTile).first);
+        await tester.pump();
+
+        expect(find.byType(NodeDetailPanel), findsAtLeastNWidgets(1));
+
+        await tester.tap(find.byIcon(Icons.close).last);
+        await tester.pump();
+
+        expect(find.byType(NodeDetailPanel), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'double tap highlights a chain and changing filter rebuilds graph',
+      (tester) async {
+        final mine = _createTestBuilding(
+          type: BuildingType.coalMine,
+          generation: {ResourceType.coal: 1.0},
+        )..assignedWorkers = 1;
+        final plant = _createTestBuilding(
+          type: BuildingType.powerPlant,
+          generation: {ResourceType.electricity: 1.0},
+          consumption: {ResourceType.coal: 1.0},
+        )..assignedWorkers = 1;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ProductionOverlay(
+              getBuildings: () => [mine, plant],
+              getResources: () => Resources(),
+              onClose: () {},
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        final firstNode = find.byType(BuildingNodeWidget).first;
+        await tester.tap(firstNode);
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tap(firstNode);
+        await tester.pump();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(find.byType(NodeDetailPanel), findsAtLeastNWidgets(1));
+
+        await tester.tap(find.byType(DropdownButton<ResourceType?>));
+        await tester.pump();
+        await tester.tap(find.text('Electricity').last);
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.byType(NodeDetailPanel), findsNothing);
+        expect(find.byType(BuildingNodeWidget), findsOneWidget);
+
+        await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+        await tester.pump();
+      },
+    );
+
+    testWidgets(
+      'narrow screen uses list view and selecting an item opens details',
+      (tester) async {
+        final mine = _createTestBuilding(
+          type: BuildingType.coalMine,
+          generation: {ResourceType.coal: 1.0},
+        )..assignedWorkers = 1;
+        final plant = _createTestBuilding(
+          type: BuildingType.powerPlant,
+          generation: {ResourceType.electricity: 1.0},
+          consumption: {ResourceType.coal: 1.0},
+        )..assignedWorkers = 1;
+
+        tester.view.physicalSize = const Size(320, 640);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ProductionOverlay(
+              getBuildings: () => [mine, plant],
+              getResources: () => Resources(),
+              onClose: () {},
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.byType(ListTile), findsNWidgets(2));
+
+        await tester.tap(find.byType(ListTile).first);
+        await tester.pump();
+
+        expect(find.byType(NodeDetailPanel), findsOneWidget);
+      },
+    );
   });
 
   group('BuildingNodeWidget', () {

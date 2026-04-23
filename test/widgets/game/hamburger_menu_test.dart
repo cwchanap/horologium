@@ -350,5 +350,112 @@ void main() {
       expect(find.text('Quests'), findsOneWidget);
       expect(find.byIcon(Icons.assignment), findsOneWidget);
     });
+
+    testWidgets('completed quests show a reward badge and open the quest log', (
+      tester,
+    ) async {
+      final questManager = QuestManager(
+        quests: [
+          Quest(
+            id: 'claimable',
+            name: 'Claimable Quest',
+            description: 'Ready to claim',
+            objectives: [
+              QuestObjective(
+                type: QuestObjectiveType.buildBuilding,
+                targetId: 'house',
+                targetAmount: 1,
+              ),
+            ],
+            reward: QuestReward(resources: {ResourceType.cash: 50}),
+            status: QuestStatus.completed,
+          ),
+        ],
+      );
+      final achievementManager = AchievementManager(
+        achievements: [
+          Achievement(
+            id: 'a2',
+            name: 'Badge',
+            description: 'Badge',
+            type: AchievementType.buildingCount,
+            targetAmount: 1,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Stack(
+              children: [
+                HamburgerMenu(
+                  isVisible: true,
+                  onClose: () => menuClosed = true,
+                  resources: testResources,
+                  researchManager: testResearchManager,
+                  buildingLimitManager: testBuildingLimitManager,
+                  grid: testGrid,
+                  onResourcesChanged: () {},
+                  questManager: questManager,
+                  achievementManager: achievementManager,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Container &&
+              widget.decoration is BoxDecoration &&
+              (widget.decoration as BoxDecoration).shape == BoxShape.circle,
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Quests'));
+      await tester.pumpAndSettle();
+
+      expect(menuClosed, isTrue);
+      expect(find.text('Quest Log'), findsOneWidget);
+    });
+
+    testWidgets('planet selection opens a dialog that can be dismissed', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Stack(
+              children: [
+                HamburgerMenu(
+                  isVisible: true,
+                  onClose: () => menuClosed = true,
+                  resources: testResources,
+                  researchManager: testResearchManager,
+                  buildingLimitManager: testBuildingLimitManager,
+                  grid: testGrid,
+                  onResourcesChanged: () {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Planet Selection'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Dialog), findsOneWidget);
+      expect(find.text('Planet Selection'), findsWidgets);
+
+      await tester.tap(find.byIcon(Icons.close).last);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Dialog), findsNothing);
+    });
   });
 }
