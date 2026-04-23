@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -86,6 +88,62 @@ void main() {
 
         expect(grid.getAllBuildings(), isEmpty);
         expect(removedCoordinates, ['3,4']);
+      },
+    );
+
+    test('render draws grid lines and debug overlays without throwing', () {
+      final grid = Grid(gridSize: 2)
+        ..size = Vector2(cellWidth * 2, cellHeight * 2)
+        ..showDebug = true;
+      final canvas = Canvas(PictureRecorder());
+
+      expect(() => grid.render(canvas), returnsNormally);
+    });
+
+    test(
+      'render draws asset and fallback building branches with level badges',
+      () {
+        final grid = Grid(gridSize: 8)
+          ..size = Vector2(cellWidth * 8, cellHeight * 8)
+          ..showDebug = true;
+
+        final assetBuilding = Building(
+          type: BuildingType.house,
+          name: 'Asset House',
+          description: 'Asset-backed render branch',
+          icon: Icons.home,
+          assetPath: 'assets/images/building/house.png',
+          color: Colors.blue,
+          baseCost: 100,
+          category: BuildingCategory.residential,
+          level: 2,
+        );
+        final levelThree = _createTestBuilding(
+          type: BuildingType.powerPlant,
+          name: 'Level Three',
+        )..level = 3;
+        final levelFour = _createTestBuilding(
+          type: BuildingType.coalMine,
+          name: 'Level Four',
+        )..level = 4;
+        final levelFive = _createTestBuilding(
+          type: BuildingType.woodFactory,
+          name: 'Level Five',
+        )..level = 5;
+        final levelSix = _createTestBuilding(
+          type: BuildingType.quarry,
+          name: 'Level Six',
+        )..level = 6;
+
+        grid
+          ..placeBuilding(0, 0, assetBuilding, notifyCallbacks: false)
+          ..placeBuilding(2, 0, levelThree, notifyCallbacks: false)
+          ..placeBuilding(4, 0, levelFour, notifyCallbacks: false)
+          ..placeBuilding(0, 2, levelFive, notifyCallbacks: false)
+          ..placeBuilding(2, 2, levelSix, notifyCallbacks: false);
+        final canvas = Canvas(PictureRecorder());
+
+        expect(() => grid.render(canvas), returnsNormally);
       },
     );
   });
