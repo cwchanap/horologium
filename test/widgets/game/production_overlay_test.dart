@@ -301,54 +301,53 @@ void main() {
       expect(find.text('All Resources'), findsOneWidget);
     });
 
-    testWidgets(
-      'tapping a node opens details and tapping background clears it',
-      (tester) async {
-        final mine = _createTestBuilding(
-          type: BuildingType.coalMine,
-          generation: {ResourceType.coal: 1.0},
-        )..assignedWorkers = 1;
-        final plant = _createTestBuilding(
-          type: BuildingType.powerPlant,
-          generation: {ResourceType.electricity: 1.0},
-          consumption: {ResourceType.coal: 1.0},
-        )..assignedWorkers = 1;
+    testWidgets('tapping a node opens details and close button clears it', (
+      tester,
+    ) async {
+      final mine = _createTestBuilding(
+        type: BuildingType.coalMine,
+        generation: {ResourceType.coal: 1.0},
+      )..assignedWorkers = 1;
+      final plant = _createTestBuilding(
+        type: BuildingType.powerPlant,
+        generation: {ResourceType.electricity: 1.0},
+        consumption: {ResourceType.coal: 1.0},
+      )..assignedWorkers = 1;
 
-        tester.view.physicalSize = const Size(320, 640);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-        await tester.pumpWidget(
-          MaterialApp(
-            home: ProductionOverlay(
-              getBuildings: () => [mine, plant],
-              getResources: () => Resources(),
-              onClose: () {},
-            ),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => [mine, plant],
+            getResources: () => Resources(),
+            onClose: () {},
           ),
-        );
-        await tester.pump();
-        await tester.pump();
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
 
-        expect(find.byType(ListTile), findsNWidgets(2));
+      expect(find.byType(ListTile), findsNWidgets(2));
 
-        await tester.tap(find.byType(ListTile).first);
-        await tester.pump();
+      await tester.tap(find.byType(ListTile).first);
+      await tester.pump();
 
-        expect(find.byType(NodeDetailPanel), findsAtLeastNWidgets(1));
+      expect(find.byType(NodeDetailPanel), findsAtLeastNWidgets(1));
 
-        final detailPanelCloseButton = find.descendant(
-          of: find.byType(NodeDetailPanel),
-          matching: find.byIcon(Icons.close),
-        );
-        expect(detailPanelCloseButton, findsOneWidget);
-        await tester.tap(detailPanelCloseButton);
-        await tester.pump();
+      final detailPanelCloseButton = find.descendant(
+        of: find.byType(NodeDetailPanel),
+        matching: find.byIcon(Icons.close),
+      );
+      expect(detailPanelCloseButton, findsOneWidget);
+      await tester.tap(detailPanelCloseButton);
+      await tester.pump();
 
-        expect(find.byType(NodeDetailPanel), findsNothing);
-      },
-    );
+      expect(find.byType(NodeDetailPanel), findsNothing);
+    });
 
     testWidgets(
       'double tap highlights a chain and changing filter rebuilds graph',
