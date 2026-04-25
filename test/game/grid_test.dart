@@ -101,7 +101,7 @@ void main() {
     });
 
     test(
-      'render draws asset and fallback building branches with level badges',
+      'render covers asset-path and fallback building branches with level badges',
       () {
         final grid = Grid(gridSize: 8)
           ..size = Vector2(cellWidth * 8, cellHeight * 8)

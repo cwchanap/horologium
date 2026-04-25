@@ -444,9 +444,10 @@ void main() {
       await tester.pump();
       await _pumpUntilFound(tester, find.text('Developer Tools'));
 
-      await tester.tapAt(const Offset(760, 110));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      final bottomSheet = find.byType(BottomSheet);
+      expect(bottomSheet, findsOneWidget);
+      Navigator.of(tester.element(bottomSheet)).pop();
+      await _pumpUntilAbsent(tester, find.text('Developer Tools'));
 
       expect(find.text('Developer Tools'), findsNothing);
     });
@@ -466,10 +467,24 @@ void main() {
       await tester.pump();
       await _pumpUntilFound(tester, find.byType(HamburgerMenu));
 
-      await tester.drag(find.byType(Slider), const Offset(-80, 0));
-      await tester.pump();
+      final hamburgerMenu = find.byType(HamburgerMenu);
+      final slider = find.descendant(
+        of: hamburgerMenu,
+        matching: find.byType(Slider),
+      );
+      final switchTile = find.descendant(
+        of: hamburgerMenu,
+        matching: find.byType(SwitchListTile),
+      );
 
-      final switchTile = find.byType(SwitchListTile);
+      expect(slider, findsOneWidget);
+      expect(switchTile, findsOneWidget);
+
+      final initialSliderValue = tester.widget<Slider>(slider).value;
+      await tester.drag(slider, const Offset(-80, 0));
+      await tester.pump();
+      expect(tester.widget<Slider>(slider).value, lessThan(initialSliderValue));
+
       await tester.tap(switchTile);
       await tester.pump();
 
@@ -505,4 +520,20 @@ Future<void> _pumpUntilFound(
   }
 
   expect(finder, findsOneWidget);
+}
+
+Future<void> _pumpUntilAbsent(
+  WidgetTester tester,
+  Finder finder, {
+  int maxPumps = 80,
+  Duration step = const Duration(milliseconds: 100),
+}) async {
+  for (var attempt = 0; attempt < maxPumps; attempt++) {
+    if (finder.evaluate().isEmpty) {
+      return;
+    }
+    await tester.pump(step);
+  }
+
+  expect(finder, findsNothing);
 }

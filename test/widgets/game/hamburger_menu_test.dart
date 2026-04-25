@@ -11,6 +11,7 @@ import 'package:horologium/game/quests/quest_objective.dart';
 import 'package:horologium/game/achievements/achievement_manager.dart';
 import 'package:horologium/game/achievements/achievement.dart';
 import 'package:horologium/game/resources/resource_type.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('HamburgerMenu Widget Tests', () {
@@ -21,6 +22,7 @@ void main() {
     bool menuClosed = false;
 
     setUp(() {
+      SharedPreferences.setMockInitialValues({});
       testResources = Resources();
       testResearchManager = ResearchManager();
       testBuildingLimitManager = BuildingLimitManager();
@@ -406,12 +408,16 @@ void main() {
         ),
       );
 
+      final questTile = find.widgetWithText(ListTile, 'Quests');
       expect(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is Container &&
-              widget.decoration is BoxDecoration &&
-              (widget.decoration as BoxDecoration).shape == BoxShape.circle,
+        find.descendant(
+          of: questTile,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Container &&
+                widget.decoration is BoxDecoration &&
+                (widget.decoration as BoxDecoration).shape == BoxShape.circle,
+          ),
         ),
         findsOneWidget,
       );
@@ -452,7 +458,12 @@ void main() {
       expect(find.byType(Dialog), findsOneWidget);
       expect(find.text('Planet Selection'), findsWidgets);
 
-      await tester.tap(find.byIcon(Icons.close).last);
+      final dialogCloseButton = find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byIcon(Icons.close),
+      );
+      expect(dialogCloseButton, findsOneWidget);
+      await tester.tap(dialogCloseButton);
       await tester.pumpAndSettle();
 
       expect(find.byType(Dialog), findsNothing);
