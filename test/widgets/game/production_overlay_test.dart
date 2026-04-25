@@ -338,7 +338,12 @@ void main() {
 
         expect(find.byType(NodeDetailPanel), findsAtLeastNWidgets(1));
 
-        await tester.tap(find.byIcon(Icons.close).last);
+        final detailPanelCloseButton = find.descendant(
+          of: find.byType(NodeDetailPanel),
+          matching: find.byIcon(Icons.close),
+        );
+        expect(detailPanelCloseButton, findsOneWidget);
+        await tester.tap(detailPanelCloseButton);
         await tester.pump();
 
         expect(find.byType(NodeDetailPanel), findsNothing);

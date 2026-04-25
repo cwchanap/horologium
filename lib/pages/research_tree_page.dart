@@ -114,6 +114,7 @@ class _ResearchTreePageState extends State<ResearchTreePage> {
         .toList();
 
     return Container(
+      key: ValueKey('research-card-${research.id}'),
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(

@@ -5,6 +5,7 @@ import 'package:horologium/game/research/research.dart';
 import 'package:horologium/game/research/research_type.dart';
 import 'package:horologium/game/resources/resources.dart';
 import 'package:horologium/pages/research_tree_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('ResearchTreePage', () {
@@ -14,6 +15,7 @@ void main() {
     late int resourcesChangedCalls;
 
     setUp(() {
+      SharedPreferences.setMockInitialValues({});
       researchManager = ResearchManager();
       resources = Resources();
       buildingLimitManager = BuildingLimitManager();
@@ -35,15 +37,10 @@ void main() {
     }
 
     Finder researchCard(String title) {
-      return find
-          .ancestor(
-            of: find.text(title),
-            matching: find.byWidgetPredicate(
-              (widget) =>
-                  widget is Container && widget.decoration is BoxDecoration,
-            ),
-          )
-          .first;
+      final research = Research.availableResearch.firstWhere(
+        (r) => r.name == title,
+      );
+      return find.byKey(ValueKey('research-card-${research.id}'));
     }
 
     testWidgets('shows locked prerequisites for advanced construction', (
@@ -90,13 +87,13 @@ void main() {
 
       await pumpResearchTreePage(tester);
 
+      final electricityCard = researchCard('Electricity');
+
       expect(
-        find.descendant(
-          of: researchCard('Electricity'),
-          matching: find.text('Completed'),
-        ),
+        find.descendant(of: electricityCard, matching: find.text('Completed')),
         findsOneWidget,
       );
+      expect(find.text('Completed'), findsOneWidget);
     });
 
     testWidgets(
@@ -116,7 +113,7 @@ void main() {
         await tester.ensureVisible(button);
         await tester.pumpAndSettle();
 
-        await tester.tap(button, warnIfMissed: false);
+        await tester.tap(button);
         await tester.pumpAndSettle();
 
         expect(
