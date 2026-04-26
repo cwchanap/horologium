@@ -23,10 +23,10 @@ _game.onPlanetChanged = _onPlanetChanged;
 
 ### Manager Pattern
 Game logic is organized into specialized managers in `lib/game/managers/`:
-- `GameStateManager`: Coordinates building limits and research state
+- `GameStateManager`: Coordinates building limits, research state, and game tick logic
 - `BuildingPlacementManager`: Handles building placement validation and execution
 - `InputHandler`: Processes grid interactions and user input
-- `PersistenceManager`: Manages save/load operations
+- `GameManagerContext`: Abstract interface passed to managers for shared grid/placement state
 
 ### State Persistence
 All game state persists via SharedPreferences using specific key patterns:
@@ -34,6 +34,7 @@ All game state persists via SharedPreferences using specific key patterns:
 - Buildings: StringList `'buildings'` with format `'x,y,BuildingName'`
 - Research: StringList `'completed_research'` with research IDs
 - Planet data: Nested keys like `'planet_<id>_buildings'`
+- Save writes are debounced via `PlanetSaveDebouncer` to avoid excessive I/O
 
 ### Resource System
 Resources use a Map-based system with string keys matching ResourceType enum names:
@@ -52,6 +53,17 @@ Update cycle runs every second:
 2. Consume required resources
 3. Generate output resources (only if building has workers assigned)
 
+### Quest & Achievement Systems
+- `QuestManager` (`lib/game/quests/`): Tracks quest state, prerequisites, and progress. Fires callbacks (`onQuestCompleted`, `onQuestsRefreshed`) consumed by Flutter UI.
+- `DailyQuestGenerator` + `QuestSeedParser`: Generates rotating daily quests from a seed.
+- `AchievementManager` (`lib/game/achievements/`): Checks progress against `Resources`, `Building` list, and `ResearchManager` each tick.
+
+### Production Chain System
+`lib/game/production/` provides read-only analysis of resource flows:
+- `ProductionGraph`: Builds a directed graph of resource producers/consumers
+- `FlowAnalyzer`: Calculates net rates and bottlenecks
+- `ChainHighlighter`: Maps buildings to their chain role for UI highlighting
+
 ## Key File Locations
 
 ### Core Game Files
@@ -68,15 +80,23 @@ Update cycle runs every second:
 - `lib/game/research/research.dart` - Research system with unlock trees
 - `lib/game/planet/planet.dart` - Planet data model with multi-planet support
 - `lib/game/services/save_service.dart` - SaveService for planet persistence
+- `lib/game/services/planet_save_debouncer.dart` - Debounced save writes
 - `lib/game/services/resource_service.dart` - ResourceService for resource calculations
 - `lib/game/services/building_service.dart` - BuildingService for building operations
 - `lib/game/terrain/` - Procedural terrain generation with biomes and parallax
+
+### Pages
+- `lib/pages/quest_log_page.dart` - Quest log UI
+- `lib/pages/research_tree_page.dart` - Research tree UI
+- `lib/pages/resources_page.dart` - Resource detail page
+- `lib/pages/trade_page.dart` - Trade/market UI
 
 ### UI Components
 - `lib/widgets/game/building_selection_panel.dart` - Building menu with BuildingCard widgets
 - `lib/widgets/game/resource_display.dart` - Resource overlay showing amounts and rates
 - `lib/widgets/game/game_controls.dart` - Camera zoom and delete mode controls
 - `lib/widgets/game/hamburger_menu.dart` - Settings and audio preferences
+- `lib/widgets/planet_switcher.dart` - Planet switching UI
 
 ### Assets
 - `lib/constants/assets_path.dart` - Assets helper with sprite path constants
@@ -84,9 +104,8 @@ Update cycle runs every second:
 - `assets/images/terrain/` - Terrain and parallax layer assets
 - `assets/audio/` - Music and sound effects
 
-## Common Development Workflows
+## Commands
 
-### Running and Testing
 ```bash
 # Install dependencies
 flutter pub get
@@ -111,10 +130,9 @@ dart format --output=none --set-exit-if-changed .
 
 # Build release APK
 flutter build apk
-
-# Build iOS
-flutter build ios
 ```
+
+## Common Development Workflows
 
 ### Adding New Buildings
 1. Add enum value to `BuildingType` in `lib/game/building/building.dart`
@@ -135,38 +153,22 @@ flutter build ios
      category: BuildingCategory.production,
    )
    ```
-4. Add sprite constant to `lib/constants/assets_path.dart`:
-   ```dart
-   static const String myBuilding = 'assets/images/building/my_building.png';
-   ```
+4. Add sprite constant to `lib/constants/assets_path.dart`
 5. Place sprite at `assets/images/building/my_building.png`
 6. Optionally gate behind research in `Research.availableResearch`
-7. Test placement, worker assignment, and resource flow
 
 ### Adding New Resources
 1. Add to `ResourceType` enum in `lib/game/resources/resource_type.dart`
 2. Add to `ResourceCategory` enum if it's a new category
 3. Initialize in `Resources.resources` map with default value
-4. Add sprite constant to `Assets` class (optional)
-5. Update UI in `resource_display.dart` if needed for display
-6. Update relevant building generation/consumption maps
-7. Add persistence handling in `SaveService` if needed
-8. Add tests in `test/resources/resources_test.dart`
+4. Update UI in `resource_display.dart` if needed for display
+5. Update relevant building generation/consumption maps
+6. Add persistence handling in `SaveService` if needed
+7. Add tests in `test/resources/resources_test.dart`
 
 ### Adding New Research
-1. Create `Research` instance in `Research.availableResearch` list:
-   ```dart
-   Research(
-     id: 'advanced_tech',
-     name: 'Advanced Technology',
-     description: 'Unlocks advanced buildings',
-     cost: 500,
-     unlocksBuildings: [BuildingType.researchLab],
-     prerequisites: ['basic_tech'],
-   )
-   ```
+1. Create `Research` instance in `Research.availableResearch` list with `id`, `name`, `cost`, `unlocksBuildings`, and `prerequisites`
 2. Reference research ID in building unlock conditions
-3. Test research tree progression and building unlock behavior
 
 ### Writing Tests
 Use `SharedPreferences.setMockInitialValues()` in test setUp:
@@ -181,10 +183,10 @@ setUp(() {
 });
 ```
 
-Test files should mirror lib structure and use `*_test.dart` naming.
+Test files mirror lib structure and use `*_test.dart` naming.
 
 ### Adding Terrain Features
-1. Add sprite assets to appropriate `assets/images/terrain/` subdirectory
+1. Add sprite assets to `assets/images/terrain/` subdirectory
 2. Update `TerrainAssets` class with asset paths
 3. Configure in `TerrainGenerator` for procedural placement
 4. Adjust `TerrainBiome` if adding biome-specific features
@@ -199,21 +201,18 @@ if (resources.canAssignWorkerTo(building)) {
   resources.assignWorkerTo(building);
   building.assignWorker();
 }
-
 // Buildings only produce when they have required workers
-if (building.hasWorkers) {
-  // Generate resources
-}
+if (building.hasWorkers) { /* generate resources */ }
 ```
 
 ### Building Placement Flow
-```dart
-// 1. Check grid availability (no overlap)
-// 2. Validate sufficient resources
-// 3. Check building limits (research-gated)
-// 4. Place building on grid
-// 5. Deduct resources
-// 6. Save to SharedPreferences
+```
+1. Check grid availability (no overlap)
+2. Validate sufficient resources
+3. Check building limits (research-gated)
+4. Place building on grid
+5. Deduct resources
+6. Save to SharedPreferences
 ```
 
 ### Camera Controls
@@ -238,38 +237,33 @@ if (building.hasWorkers) {
 ## Project-Specific Notes
 
 ### Multi-Planet System
-The game supports multiple planets. Active planet is tracked via `ActivePlanet.instance.currentPlanet`. Each planet has independent:
-- Resources
-- Buildings
-- Research progress
-- Grid state
-
-Save/load operations are planet-scoped using planet ID in SharedPreferences keys.
+Active planet tracked via `ActivePlanet.instance.currentPlanet`. Each planet has independent resources, buildings, research, and grid state. Save/load is planet-scoped using planet ID in SharedPreferences keys.
 
 ### Audio System
-Background music controlled via `AudioPlayer` with web-safe autoplay handling (starts on first user interaction). Preferences stored in SharedPreferences.
+Background music controlled via `AudioManager` with web-safe autoplay handling (starts on first user interaction). Preferences stored in SharedPreferences.
 
 ### Terrain System
 Procedural terrain generation with biome support. Parallax layers create depth. See `docs/` for detailed terrain implementation guides.
 
 ### Coding Style
-- Follow Flutter defaults: 2-space indentation, trailing commas for multi-line literals, and `lowerCamelCase` for members
-- Keep Flame components in dedicated files named `<Feature>Component` to ease discovery
-- Run `dart format --output=none --set-exit-if-changed .` before committing; CI enforces these rules
-- Centralize constants in the relevant manager or `Assets` class rather than scattering magic values
+- Follow Flutter defaults: 2-space indentation, trailing commas for multi-line literals, `lowerCamelCase` for members
+- Keep Flame components in dedicated files named `<Feature>Component`
+- Centralize constants in the relevant manager or `Assets` class
 
 ### Commit Guidelines
-- Adopt Conventional Commits (`feat:`, `fix:`, `chore:`, `ci:`) as in the git history
-- Keep commits focused: gameplay change, UI tweak, and tooling updates should land separately
-- Pull requests need a concise summary, testing notes (`flutter test`, manual device checks), and any relevant screenshots or screen recordings
-- Link issues or TODO references, and call out migrations that require data wipes or saved-game resets
+- Conventional Commits: `feat:`, `fix:`, `chore:`, `ci:`
+- Keep commits focused — gameplay, UI tweaks, and tooling should land separately
+- Call out migrations that require data wipes or saved-game resets
+
+### Local Agent Commands
+Custom slash commands live in `.claude/commands/`. The repo also has `.opencode/command` as a symlink to `.claude/commands` for tooling compatibility. To recreate the symlink from repo root: `ln -s ../.claude/commands .opencode/command`
 
 ## CI/CD
 
 GitHub Actions runs on push/PR to main:
-- `flutter analyze --fatal-infos` - must pass with no warnings
-- `dart format --output=none --set-exit-if-changed .` - enforces formatting
-- `flutter test --coverage` - runs all tests
+- `flutter analyze --fatal-infos`
+- `dart format --output=none --set-exit-if-changed .`
+- `flutter test --coverage`
 - Builds debug APK and web artifacts
 
 ## Utility Scripts
@@ -281,6 +275,3 @@ GitHub Actions runs on push/PR to main:
 ## Active Technologies
 - **Language/Framework**: Dart 3.x (null safety), Flutter 3.x, Flame (latest stable)
 - **Persistence**: In-memory state with SharedPreferences for game saves
-
-## Recent Changes
-- 001-production-chain-visualization: Added production chain visualization overlay
