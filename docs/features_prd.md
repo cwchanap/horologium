@@ -9,8 +9,8 @@
 **Implementation Status:**
 - ✅ Population Growth & Happiness System (Completed)
 - ✅ Building Upgrades and Visual Progression (Completed)
-- ⏳ Quests and Achievement System (Not Started)
-- ⏳ Production Chain Visualization (Not Started)
+- ✅ Quests and Achievement System (Completed)
+- ✅ Production Chain Visualization (Completed)
 - ⏳ Stellar Map - Inter-Planetary Trade Routes (Not Started)
 - ⏳ Decorative Buildings and Landscaping (Not Started)
 - ⏳ Natural Disasters and Events System (Not Started)
@@ -633,14 +633,83 @@ void checkQuestProgress(Resources resources, List<Building> buildings) {
 
 #### 3.3.6 Acceptance Criteria
 
-- [ ] At least 10 starter quests defined and functional
-- [ ] Quest progress updates in real-time during gameplay
-- [ ] Completed quests award resources correctly
-- [ ] Quest log displays active, completed, and available quests
-- [ ] Quest state persists across app restarts
-- [ ] Achievement grid shows locked/unlocked states
-- [ ] Quest chains unlock correctly after prerequisites met
-- [ ] Quest notifications appear without blocking gameplay
+- [x] At least 10 starter quests defined and functional
+- [x] Quest progress updates in real-time during gameplay
+- [x] Completed quests award resources correctly
+- [x] Quest log displays active, completed, and available quests
+- [x] Quest state persists across app restarts
+- [x] Achievement grid shows locked/unlocked states
+- [x] Quest chains unlock correctly after prerequisites met
+- [x] Quest notifications appear without blocking gameplay
+
+#### 3.3.7 Implementation Summary
+
+**Status:** ✅ **COMPLETED** (April 2026)
+
+**What Was Implemented:**
+
+1. **Quest Data Models** (`lib/game/quests/`)
+   - `Quest` with `id`, `name`, `description`, `objectives`, `reward`, `prerequisiteQuestIds`, `requiredResearchIds`, `status`
+   - `QuestObjective` with types: `buildBuilding`, `accumulateResource`, `completeResearch`, `reachPopulation`, `achieveHappiness`, `upgradeBuilding`
+   - `QuestReward` with `Map<ResourceType, double> resources` and `researchPoints`
+   - Full JSON serialization/deserialization for persistence
+
+2. **Quest Manager** (`lib/game/quests/quest_manager.dart`)
+   - Tracks available, active, completed, and claimed quest states
+   - Auto-activates quests when prerequisites are met
+   - Research prerequisites via `requiredResearchIds`
+   - Quest chains via `prerequisiteQuestIds` (only unlocks after claiming)
+   - Callbacks: `onQuestCompleted`, `onQuestAvailable`, `onQuestProgressChanged`, `onQuestsRefreshed`
+
+3. **Quest Registry** (`lib/game/quests/quest_registry.dart`)
+   - 10 handcrafted starter quests covering building, resources, population, happiness, and research objectives
+   - Includes quest chains (e.g., `quest_happy_town` prerequisite: `quest_welcome`)
+
+4. **Daily/Weekly Quest Generation** (`lib/game/quests/daily_quest_generator.dart`, `quest_seed_parser.dart`)
+   - Procedural rotating quests from a deterministic date seed
+   - 3 daily quests + 2 weekly quests generated each refresh
+   - Templates cover: build buildings, gather resources, reach population, achieve happiness
+   - Only generates quests for buildings the player has unlocked via research
+
+5. **Achievement System** (`lib/game/achievements/`)
+   - `Achievement` with 5 types: `buildingCount`, `populationReached`, `resourceAccumulated`, `researchCompleted`, `happinessReached`
+   - `AchievementManager` checks progress every tick against resources/buildings/research
+   - Callbacks: `onAchievementUnlocked`, `onAchievementProgressChanged`
+
+6. **UI** (`lib/pages/quest_log_page.dart`, `lib/widgets/cards/`)
+   - `QuestLogPage` with 3 tabs: Active Quests, Completed, Achievements
+   - `QuestCard` showing progress bars and reward previews
+   - `AchievementCard` grid with locked/unlocked states
+   - `QuestNotification` widget for completion banners
+   - Hamburger menu shows reward badge when unclaimed quests exist
+
+7. **Persistence** (`lib/game/services/save_service.dart`)
+   - Quest status (active/completed/claimed) persisted per planet
+   - Objective progress and `startingAmount` offsets saved
+   - Rotating quest definitions saved to survive research-state changes across sessions
+
+**Key Decisions:**
+- **Auto-activation:** Quests auto-activate without requiring player action, so progress is always tracked
+- **`startingAmount` offsets:** Build/upgrade objectives use a baseline so only progress made *after* quest activation counts
+- **Research gating:** Both research prerequisites (to prevent quest appearing) and quest-chain prerequisites supported
+- **Rotating quests preserved on save:** Full quest definition saved so objective targets/rewards don't change mid-quest
+
+**Test Coverage:**
+- 12 quest test files (unit, integration, widget, performance)
+- 3 achievement test files
+- All 862 tests passing
+
+**Files Created:**
+- `lib/game/quests/quest.dart`, `quest_objective.dart`, `quest_manager.dart`, `quest_registry.dart`, `daily_quest_generator.dart`, `quest_seed_parser.dart`
+- `lib/game/achievements/achievement.dart`, `achievement_manager.dart`
+- `lib/pages/quest_log_page.dart`
+- `lib/widgets/cards/quest_card.dart`, `achievement_card.dart`
+- `lib/widgets/game/quest_notification.dart`
+
+**Not Implemented (Out of Scope):**
+- Cosmetic building skin rewards (deferred)
+- Achievement leaderboards (requires backend)
+- Planet-specific quest biomes (deferred)
 
 ---
 
@@ -761,13 +830,68 @@ class ChainAnalyzer {
 
 #### 3.4.6 Acceptance Criteria
 
-- [ ] Production graph displays all active buildings
-- [ ] Resource flow direction is clear (producer -> consumer)
-- [ ] Deficit resources highlighted in red
-- [ ] Tapping a node shows building details
-- [ ] Graph updates in real-time as buildings are added/removed
-- [ ] Visualization performs at 30fps on mid-range devices
-- [ ] Chain filter correctly isolates single resource chains
+- [x] Production graph displays all active buildings
+- [x] Resource flow direction is clear (producer -> consumer)
+- [x] Deficit resources highlighted in red
+- [x] Tapping a node shows building details
+- [x] Graph updates in real-time as buildings are added/removed
+- [x] Visualization performs at 30fps on mid-range devices
+- [x] Chain filter correctly isolates single resource chains
+
+#### 3.4.7 Implementation Summary
+
+**Status:** ✅ **COMPLETED** (April 2026)
+
+**What Was Implemented:**
+
+1. **Production Graph Data Model** (`lib/game/production/production_graph.dart`)
+   - `ProductionGraph` — snapshot container with `nodes`, `edges`, `bottlenecks`
+   - `BuildingNode` — represents a placed building with `inputs`/`outputs` (ResourcePorts), `status`, `hasWorkers`, `isSelected`, `isHighlighted`
+   - `ResourceFlowEdge` — directed edge from producer to consumer with `ratePerSecond`, `FlowStatus`, `isIncomplete` flag
+   - `BottleneckInsight` — detected bottleneck with `severity`, `description`, `recommendation`, `impactedNodeIds`
+   - `NodeCluster` — groups nodes by `BuildingCategory` for >50-building view
+   - Factory `ProductionGraph.fromBuildings()` builds the full graph from placed buildings
+   - Incomplete edges emitted when a consumer has no producer, or a producer has no consumer
+
+2. **Flow Analyzer** (`lib/game/production/flow_analyzer.dart`)
+   - Calculates net production/consumption rates per resource
+   - Assigns `FlowStatus` (surplus/balanced/deficit) to nodes and edges
+   - Generates `BottleneckInsight` entries for deficit resources
+
+3. **Chain Highlighter** (`lib/game/production/chain_highlighter.dart`)
+   - Traces all upstream/downstream nodes connected to a selected building
+   - Returns `ChainHighlight` with highlighted node/edge IDs for UI rendering
+
+4. **Production Overlay UI** (`lib/widgets/game/production_overlay/`)
+   - `ProductionOverlay` — full-screen overlay with pan/zoom support
+   - `BuildingNodeWidget` — tappable node with color-coded status ring
+   - `ClusterNodeWidget` — collapsed category cluster for dense grids
+   - `ResourceFlowEdgeWidget` — animated arrow with flow rate label
+   - `NodeDetailPanel` — slide-up panel with building stats on selection
+   - `ResourceFilter` — chip bar to isolate a single resource's chain
+   - `ProductionTheme` — centralized color/style constants (cyan = surplus, red = deficit, yellow = balanced)
+   - `EmptyState` — displayed when no buildings placed
+   - Auto-refresh timer re-builds graph when building list changes
+
+**Key Decisions:**
+- **Clustering at 50+ nodes:** Category-level clusters prevent an unreadable hairball on large colonies
+- **Incomplete edges:** Explicitly rendered as dashed lines to make missing producers/consumers visible
+- **Rate splitting:** When multiple producers supply one resource, demand is split evenly across all of them
+- **Read-only visualization:** Graph is always rebuilt from live building state; no separate graph state to keep in sync
+
+**Test Coverage:**
+- `test/game/production/production_graph_test.dart` — graph construction and edge cases
+- `test/widgets/game/production_overlay_test.dart` — overlay widget rendering
+
+**Files Created:**
+- `lib/game/production/production_graph.dart`, `flow_analyzer.dart`, `chain_highlighter.dart`
+- `lib/widgets/game/production_overlay/production_overlay.dart`, `building_node.dart`, `cluster_node.dart`, `resource_flow_edge.dart`, `node_detail_panel.dart`, `resource_filter.dart`, `production_theme.dart`, `empty_state.dart`
+
+**Not Implemented (Out of Scope):**
+- Animated resource particles on edges (deferred)
+- "What-if" simulation mode (deferred)
+- Historical production data graphs (deferred)
+- Export production report (deferred)
 
 ---
 
