@@ -53,5 +53,8 @@ coverage/
 specs/
 .worktrees/
 
+# Generated web files
+web/flutter_bootstrap.js
+
 # Claude AI local settings
 .claude/settings.local.json
