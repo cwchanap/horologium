@@ -1,5 +1,66 @@
+import 'terrain_biome.dart';
+
 class TerrainAssets {
   TerrainAssets._();
+
+  /// Resolves a [FeatureType] to its asset path, or null if unavailable.
+  static String? getFeatureAssetPath(FeatureType feature) {
+    switch (feature) {
+      case FeatureType.treeOakSmall:
+        return treeOakSmall;
+      case FeatureType.treeOakLarge:
+        return treeOakLarge;
+      case FeatureType.treePineSmall:
+        return treePineSmall;
+      case FeatureType.treePineLarge:
+        return treePineLarge;
+      case FeatureType.bushGreen:
+        return bushGreen;
+      case FeatureType.bushFlowering:
+        return bushFlowering;
+      case FeatureType.rockSmall:
+        return rockSmall;
+      case FeatureType.rockMedium:
+        return rockMedium;
+      case FeatureType.rockLarge:
+        return rockLarge;
+      case FeatureType.riverHorizontal:
+        return riverHorizontal;
+      case FeatureType.riverVertical:
+        return riverVertical;
+      case FeatureType.riverCornerTL:
+        return riverCornerTL;
+      case FeatureType.riverCornerTR:
+        return riverCornerTR;
+      case FeatureType.riverCornerBL:
+        return riverCornerBL;
+      case FeatureType.riverCornerBR:
+        return riverCornerBR;
+      case FeatureType.lakeSmall:
+        return lakeSmall;
+      case FeatureType.lakeLarge:
+        return lakeLarge;
+    }
+  }
+
+  /// Resolves a [TerrainType] to its base asset path, or null if unavailable.
+  static String? getBaseAssetPath(TerrainType type) {
+    switch (type) {
+      case TerrainType.grass:
+        return grassBase;
+      case TerrainType.dirt:
+        return dirtBase;
+      case TerrainType.sand:
+        return sandBase;
+      case TerrainType.rock:
+        return rockBase;
+      case TerrainType.snow:
+        return snowBase;
+      case TerrainType.water:
+        // water_base.png not available - will use fallback color
+        return null;
+    }
+  }
 
   // Base terrain textures (64x64) - Available assets only
   static const String grassBase = 'terrain/base/grass_base.png';

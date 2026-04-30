@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 import shutil
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 from PIL import Image
@@ -24,9 +26,14 @@ def latest_generated_png() -> Path:
 
 
 def remove_background(source: Path, temp_output: Path) -> None:
+    if not REMOVE_CHROMA.is_file():
+        raise FileNotFoundError(
+            f"remove_chroma_key.py not found at {REMOVE_CHROMA}. "
+            "Ensure the codex skills imagegen scripts are installed."
+        )
     subprocess.run(
         [
-            "python3",
+            sys.executable,
             str(REMOVE_CHROMA),
             "--input",
             str(source),
@@ -80,12 +87,14 @@ def main() -> None:
     source = Path(args.source) if args.source else latest_generated_png()
     destination = Path(args.dest)
 
-    temp_source = Path("/tmp") / f"{destination.stem}_source.png"
-    temp_alpha = Path("/tmp") / f"{destination.stem}_alpha.png"
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        temp_source = tmp_path / f"{destination.stem}_source.png"
+        temp_alpha = tmp_path / f"{destination.stem}_alpha.png"
 
-    shutil.copy2(source, temp_source)
-    remove_background(temp_source, temp_alpha)
-    fit_asset(temp_alpha, destination, args.width, args.height)
+        shutil.copy2(source, temp_source)
+        remove_background(temp_source, temp_alpha)
+        fit_asset(temp_alpha, destination, args.width, args.height)
 
     print(destination)
 

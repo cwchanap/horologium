@@ -48,50 +48,95 @@ void main() {
         TerrainAssets.treeOakLarge,
       );
     });
-    test('returns null for treePineSmall', () {
-      expect(layer.getFeatureAssetPath(FeatureType.treePineSmall), isNull);
+    test('returns treePineSmall path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.treePineSmall),
+        TerrainAssets.treePineSmall,
+      );
     });
-    test('returns null for treePineLarge', () {
-      expect(layer.getFeatureAssetPath(FeatureType.treePineLarge), isNull);
+    test('returns treePineLarge path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.treePineLarge),
+        TerrainAssets.treePineLarge,
+      );
     });
-    test('returns null for bushGreen', () {
-      expect(layer.getFeatureAssetPath(FeatureType.bushGreen), isNull);
+    test('returns bushGreen path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.bushGreen),
+        TerrainAssets.bushGreen,
+      );
     });
-    test('returns null for bushFlowering', () {
-      expect(layer.getFeatureAssetPath(FeatureType.bushFlowering), isNull);
+    test('returns bushFlowering path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.bushFlowering),
+        TerrainAssets.bushFlowering,
+      );
     });
-    test('returns null for rockSmall', () {
-      expect(layer.getFeatureAssetPath(FeatureType.rockSmall), isNull);
+    test('returns rockSmall path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.rockSmall),
+        TerrainAssets.rockSmall,
+      );
     });
-    test('returns null for rockMedium', () {
-      expect(layer.getFeatureAssetPath(FeatureType.rockMedium), isNull);
+    test('returns rockMedium path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.rockMedium),
+        TerrainAssets.rockMedium,
+      );
     });
-    test('returns null for rockLarge', () {
-      expect(layer.getFeatureAssetPath(FeatureType.rockLarge), isNull);
+    test('returns rockLarge path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.rockLarge),
+        TerrainAssets.rockLarge,
+      );
     });
-    test('returns null for riverHorizontal', () {
-      expect(layer.getFeatureAssetPath(FeatureType.riverHorizontal), isNull);
+    test('returns riverHorizontal path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.riverHorizontal),
+        TerrainAssets.riverHorizontal,
+      );
     });
-    test('returns null for riverVertical', () {
-      expect(layer.getFeatureAssetPath(FeatureType.riverVertical), isNull);
+    test('returns riverVertical path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.riverVertical),
+        TerrainAssets.riverVertical,
+      );
     });
-    test('returns null for riverCornerTL', () {
-      expect(layer.getFeatureAssetPath(FeatureType.riverCornerTL), isNull);
+    test('returns riverCornerTL path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.riverCornerTL),
+        TerrainAssets.riverCornerTL,
+      );
     });
-    test('returns null for riverCornerTR', () {
-      expect(layer.getFeatureAssetPath(FeatureType.riverCornerTR), isNull);
+    test('returns riverCornerTR path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.riverCornerTR),
+        TerrainAssets.riverCornerTR,
+      );
     });
-    test('returns null for riverCornerBL', () {
-      expect(layer.getFeatureAssetPath(FeatureType.riverCornerBL), isNull);
+    test('returns riverCornerBL path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.riverCornerBL),
+        TerrainAssets.riverCornerBL,
+      );
     });
-    test('returns null for riverCornerBR', () {
-      expect(layer.getFeatureAssetPath(FeatureType.riverCornerBR), isNull);
+    test('returns riverCornerBR path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.riverCornerBR),
+        TerrainAssets.riverCornerBR,
+      );
     });
-    test('returns null for lakeSmall', () {
-      expect(layer.getFeatureAssetPath(FeatureType.lakeSmall), isNull);
+    test('returns lakeSmall path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.lakeSmall),
+        TerrainAssets.lakeSmall,
+      );
     });
-    test('returns null for lakeLarge', () {
-      expect(layer.getFeatureAssetPath(FeatureType.lakeLarge), isNull);
+    test('returns lakeLarge path', () {
+      expect(
+        layer.getFeatureAssetPath(FeatureType.lakeLarge),
+        TerrainAssets.lakeLarge,
+      );
     });
   });
 
