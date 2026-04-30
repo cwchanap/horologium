@@ -68,13 +68,30 @@ class TerrainAssets {
   static const String ambientLight =
       'terrain/effects/lighting/ambient_light.png';
 
-  // Get all asset paths for preloading (only available assets)
+  // Get all asset paths for preloading.
   static List<String> get allAssets => [
-    // Base terrains (only available assets)
+    // Base terrains
     grassBase, dirtBase, sandBase, rockBase, snowBase,
-    // Trees (only available assets)
-    treeOakSmall, treeOakLarge,
-    // TODO: Add more assets as they become available
-    // Details, bushes, rocks, water features, paths, effects
+    // Details
+    grassFlowers, rockPebbles, sandDunes, dirtPatches,
+    // Trees
+    treeOakSmall, treeOakLarge, treePineSmall, treePineLarge,
+    // Bushes
+    bushGreen, bushFlowering,
+    // Rocks
+    rockSmall, rockMedium, rockLarge,
+    // Water features
+    riverHorizontal,
+    riverVertical,
+    riverCornerTL,
+    riverCornerTR,
+    riverCornerBL,
+    riverCornerBR,
+    lakeSmall,
+    lakeLarge,
+    // Paths
+    pathDirtStraight, pathDirtCorner, pathStoneStraight, pathStoneCorner,
+    // Effects
+    buildingShadow, treeShadow, ambientLight,
   ];
 }

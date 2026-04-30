@@ -91,9 +91,8 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
       return null;
     }
     try {
-      // Simple try-catch approach - if asset exists, load it
-      // If not, return null and we'll use fallback rendering
-      return await Sprite.load(path);
+      final image = await game.images.load(path);
+      return Sprite(image);
     } catch (e) {
       // Asset doesn't exist or can't be loaded (common in tests)
       // Return null to use fallback rendering
@@ -412,23 +411,36 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
         return TerrainAssets.treeOakSmall;
       case FeatureType.treeOakLarge:
         return TerrainAssets.treeOakLarge;
-      // Other features not available yet - will use fallback rendering
       case FeatureType.treePineSmall:
+        return TerrainAssets.treePineSmall;
       case FeatureType.treePineLarge:
+        return TerrainAssets.treePineLarge;
       case FeatureType.bushGreen:
+        return TerrainAssets.bushGreen;
       case FeatureType.bushFlowering:
+        return TerrainAssets.bushFlowering;
       case FeatureType.rockSmall:
+        return TerrainAssets.rockSmall;
       case FeatureType.rockMedium:
+        return TerrainAssets.rockMedium;
       case FeatureType.rockLarge:
+        return TerrainAssets.rockLarge;
       case FeatureType.riverHorizontal:
+        return TerrainAssets.riverHorizontal;
       case FeatureType.riverVertical:
+        return TerrainAssets.riverVertical;
       case FeatureType.riverCornerTL:
+        return TerrainAssets.riverCornerTL;
       case FeatureType.riverCornerTR:
+        return TerrainAssets.riverCornerTR;
       case FeatureType.riverCornerBL:
+        return TerrainAssets.riverCornerBL;
       case FeatureType.riverCornerBR:
+        return TerrainAssets.riverCornerBR;
       case FeatureType.lakeSmall:
+        return TerrainAssets.lakeSmall;
       case FeatureType.lakeLarge:
-        return null;
+        return TerrainAssets.lakeLarge;
     }
   }
 }

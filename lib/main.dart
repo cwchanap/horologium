@@ -1,7 +1,23 @@
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
+
 import 'main_menu.dart';
 
 void main() {
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('FlutterError: ${details.exceptionAsString()}');
+    if (details.stack != null) {
+      debugPrint(details.stack.toString());
+    }
+  };
+
+  ui.PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    debugPrint('PlatformDispatcher error: $error');
+    debugPrint(stack.toString());
+    return false;
+  };
+
   runApp(const HorologiumApp());
 }
 
