@@ -94,8 +94,7 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
       final image = await game.images.load(path);
       return Sprite(image);
     } catch (e) {
-      // Asset doesn't exist or can't be loaded (common in tests)
-      // Return null to use fallback rendering
+      debugPrint('ParallaxTerrainLayer: failed to load sprite "$path": $e');
       return null;
     }
   }
@@ -104,14 +103,16 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     try {
       final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
       return manifest.listAssets().toSet();
-    } catch (_) {
+    } catch (e, stack) {
+      debugPrint('Warning: Failed to load asset manifest: $e\n$stack');
       return <String>{};
     }
   }
 
   bool _assetExists(String path) {
     final manifestAssets = _manifestAssets;
-    if (manifestAssets == null) {
+    // Null = not loaded yet; empty = manifest unavailable. Both mean: attempt the load.
+    if (manifestAssets == null || manifestAssets.isEmpty) {
       return true;
     }
     return manifestAssets.contains('$_assetPrefix$path');
