@@ -11,6 +11,187 @@ void main() {
     layer = TerrainLayer(terrainType: TerrainType.grass);
   });
 
+  group('TerrainAssets.getBaseAssetPath', () {
+    test('grass returns grassBase', () {
+      expect(
+        TerrainAssets.getBaseAssetPath(TerrainType.grass),
+        TerrainAssets.grassBase,
+      );
+    });
+    test('dirt returns dirtBase', () {
+      expect(
+        TerrainAssets.getBaseAssetPath(TerrainType.dirt),
+        TerrainAssets.dirtBase,
+      );
+    });
+    test('sand returns sandBase', () {
+      expect(
+        TerrainAssets.getBaseAssetPath(TerrainType.sand),
+        TerrainAssets.sandBase,
+      );
+    });
+    test('rock returns rockBase', () {
+      expect(
+        TerrainAssets.getBaseAssetPath(TerrainType.rock),
+        TerrainAssets.rockBase,
+      );
+    });
+    test('snow returns snowBase', () {
+      expect(
+        TerrainAssets.getBaseAssetPath(TerrainType.snow),
+        TerrainAssets.snowBase,
+      );
+    });
+    test('water returns null', () {
+      expect(TerrainAssets.getBaseAssetPath(TerrainType.water), isNull);
+    });
+  });
+
+  group('TerrainAssets.getFeatureAssetPath', () {
+    test('treeOakSmall', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.treeOakSmall),
+        TerrainAssets.treeOakSmall,
+      );
+    });
+    test('treeOakLarge', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.treeOakLarge),
+        TerrainAssets.treeOakLarge,
+      );
+    });
+    test('treePineSmall', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.treePineSmall),
+        TerrainAssets.treePineSmall,
+      );
+    });
+    test('treePineLarge', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.treePineLarge),
+        TerrainAssets.treePineLarge,
+      );
+    });
+    test('bushGreen', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.bushGreen),
+        TerrainAssets.bushGreen,
+      );
+    });
+    test('bushFlowering', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.bushFlowering),
+        TerrainAssets.bushFlowering,
+      );
+    });
+    test('rockSmall', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.rockSmall),
+        TerrainAssets.rockSmall,
+      );
+    });
+    test('rockMedium', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.rockMedium),
+        TerrainAssets.rockMedium,
+      );
+    });
+    test('rockLarge', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.rockLarge),
+        TerrainAssets.rockLarge,
+      );
+    });
+    test('riverHorizontal', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.riverHorizontal),
+        TerrainAssets.riverHorizontal,
+      );
+    });
+    test('riverVertical', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.riverVertical),
+        TerrainAssets.riverVertical,
+      );
+    });
+    test('riverCornerTL', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.riverCornerTL),
+        TerrainAssets.riverCornerTL,
+      );
+    });
+    test('riverCornerTR', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.riverCornerTR),
+        TerrainAssets.riverCornerTR,
+      );
+    });
+    test('riverCornerBL', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.riverCornerBL),
+        TerrainAssets.riverCornerBL,
+      );
+    });
+    test('riverCornerBR', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.riverCornerBR),
+        TerrainAssets.riverCornerBR,
+      );
+    });
+    test('lakeSmall', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.lakeSmall),
+        TerrainAssets.lakeSmall,
+      );
+    });
+    test('lakeLarge', () {
+      expect(
+        TerrainAssets.getFeatureAssetPath(FeatureType.lakeLarge),
+        TerrainAssets.lakeLarge,
+      );
+    });
+  });
+
+  group('TerrainAssets.allAssets', () {
+    test('contains every non-null path from getBaseAssetPath', () {
+      final allAssetsSet = TerrainAssets.allAssets.toSet();
+      for (final type in TerrainType.values) {
+        final path = TerrainAssets.getBaseAssetPath(type);
+        if (path != null) {
+          expect(
+            allAssetsSet,
+            contains(path),
+            reason: '$type resolves to "$path" but is missing from allAssets',
+          );
+        }
+      }
+    });
+
+    test('contains every non-null path from getFeatureAssetPath', () {
+      final allAssetsSet = TerrainAssets.allAssets.toSet();
+      for (final feature in FeatureType.values) {
+        final path = TerrainAssets.getFeatureAssetPath(feature);
+        if (path != null) {
+          expect(
+            allAssetsSet,
+            contains(path),
+            reason:
+                '$feature resolves to "$path" but is missing from allAssets',
+          );
+        }
+      }
+    });
+
+    test('has no duplicate entries', () {
+      final allAssets = TerrainAssets.allAssets;
+      expect(
+        allAssets.toSet().length,
+        allAssets.length,
+        reason: 'allAssets contains duplicate paths',
+      );
+    });
+  });
+
   group('TerrainLayer.getBaseAssetPath', () {
     test('returns grass path for grass', () {
       expect(

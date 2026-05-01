@@ -48,8 +48,7 @@ class TerrainComponent extends PositionComponent with HasGameReference {
       try {
         await game.images.load(assetPath);
       } catch (e) {
-        // Skip missing assets for now - they'll use fallback colors
-        // print('Warning: Could not load terrain asset: $assetPath');
+        debugPrint('Warning: Could not load terrain asset "$assetPath": $e');
       }
     }
   }

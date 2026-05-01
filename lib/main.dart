@@ -4,6 +4,8 @@ import 'dart:ui' as ui;
 import 'main_menu.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     debugPrint('FlutterError: ${details.exceptionAsString()}');
@@ -15,7 +17,7 @@ void main() {
   ui.PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
     debugPrint('PlatformDispatcher error: $error');
     debugPrint(stack.toString());
-    return false;
+    return true;
   };
 
   runApp(const HorologiumApp());

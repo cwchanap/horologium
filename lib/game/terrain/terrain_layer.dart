@@ -34,8 +34,14 @@ class TerrainLayer extends PositionComponent with HasGameReference {
     // Load base terrain sprite
     final baseAssetPath = getBaseAssetPath(terrainType);
     if (baseAssetPath != null) {
-      final image = await game.images.load(baseAssetPath);
-      _baseSprite = Sprite(image);
+      try {
+        final image = await game.images.load(baseAssetPath);
+        _baseSprite = Sprite(image);
+      } catch (e) {
+        debugPrint(
+          'TerrainLayer: failed to load base sprite "$baseAssetPath": $e',
+        );
+      }
     }
 
     // Load feature sprites
@@ -43,11 +49,17 @@ class TerrainLayer extends PositionComponent with HasGameReference {
     for (final feature in features) {
       final featureAssetPath = getFeatureAssetPath(feature);
       if (featureAssetPath != null) {
-        if (!_spriteCache.containsKey(featureAssetPath)) {
-          final image = await game.images.load(featureAssetPath);
-          _spriteCache[featureAssetPath] = Sprite(image);
+        try {
+          if (!_spriteCache.containsKey(featureAssetPath)) {
+            final image = await game.images.load(featureAssetPath);
+            _spriteCache[featureAssetPath] = Sprite(image);
+          }
+          _featureSprites.add(_spriteCache[featureAssetPath]!);
+        } catch (e) {
+          debugPrint(
+            'TerrainLayer: failed to load feature sprite "$featureAssetPath": $e',
+          );
         }
-        _featureSprites.add(_spriteCache[featureAssetPath]!);
       }
     }
   }
