@@ -12,29 +12,31 @@ from PIL import Image
 
 
 CODEX_HOME = Path.home() / ".codex"
-REMOVE_CHROMA = (
+DEFAULT_REMOVE_CHROMA = (
     CODEX_HOME / "skills" / ".system" / "imagegen" / "scripts" / "remove_chroma_key.py"
 )
-GENERATED_IMAGES = CODEX_HOME / "generated_images"
+DEFAULT_GENERATED_IMAGES = CODEX_HOME / "generated_images"
 
 
-def latest_generated_png() -> Path:
-    pngs = list(GENERATED_IMAGES.rglob("*.png"))
+def latest_generated_png(generated_images_dir: Path) -> Path:
+    pngs = list(generated_images_dir.rglob("*.png"))
     if not pngs:
-        raise FileNotFoundError("No generated PNGs found under ~/.codex/generated_images")
+        raise FileNotFoundError(
+            f"No generated PNGs found under {generated_images_dir}"
+        )
     return max(pngs, key=lambda path: path.stat().st_mtime)
 
 
-def remove_background(source: Path, temp_output: Path) -> None:
-    if not REMOVE_CHROMA.is_file():
+def remove_background(source: Path, temp_output: Path, remove_chroma_script: Path) -> None:
+    if not remove_chroma_script.is_file():
         raise FileNotFoundError(
-            f"remove_chroma_key.py not found at {REMOVE_CHROMA}. "
-            "Ensure the codex skills imagegen scripts are installed."
+            f"remove_chroma_key.py not found at {remove_chroma_script}. "
+            "Provide the path via --remove-chroma-key or install the codex imagegen scripts."
         )
     subprocess.run(
         [
             sys.executable,
-            str(REMOVE_CHROMA),
+            str(remove_chroma_script),
             "--input",
             str(source),
             "--out",
@@ -82,9 +84,27 @@ def main() -> None:
         "--source",
         help="Explicit generated source PNG. Defaults to the latest generated image.",
     )
+    parser.add_argument(
+        "--remove-chroma-key",
+        default=str(DEFAULT_REMOVE_CHROMA),
+        help=(
+            "Path to remove_chroma_key.py. "
+            f"Defaults to {DEFAULT_REMOVE_CHROMA}"
+        ),
+    )
+    parser.add_argument(
+        "--generated-images-dir",
+        default=str(DEFAULT_GENERATED_IMAGES),
+        help=(
+            "Directory to search for generated PNGs when --source is omitted. "
+            f"Defaults to {DEFAULT_GENERATED_IMAGES}"
+        ),
+    )
     args = parser.parse_args()
 
-    source = Path(args.source) if args.source else latest_generated_png()
+    remove_chroma_script = Path(args.remove_chroma_key)
+    generated_images_dir = Path(args.generated_images_dir)
+    source = Path(args.source) if args.source else latest_generated_png(generated_images_dir)
     destination = Path(args.dest)
 
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -93,7 +113,7 @@ def main() -> None:
         temp_alpha = tmp_path / f"{destination.stem}_alpha.png"
 
         shutil.copy2(source, temp_source)
-        remove_background(temp_source, temp_alpha)
+        remove_background(temp_source, temp_alpha, remove_chroma_script)
         fit_asset(temp_alpha, destination, args.width, args.height)
 
     print(destination)

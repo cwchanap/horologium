@@ -17,7 +17,7 @@ void main() {
   ui.PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
     debugPrint('PlatformDispatcher error: $error');
     debugPrint(stack.toString());
-    return true;
+    return false;
   };
 
   runApp(const HorologiumApp());
