@@ -73,13 +73,20 @@ def fit_asset(source: Path, destination: Path, width: int, height: int) -> None:
         output.save(destination)
 
 
+def positive_int(value: str) -> int:
+    ivalue = int(value)
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError(f"{value} is not a positive integer")
+    return ivalue
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Finalize a built-in image_gen output into a terrain asset."
     )
     parser.add_argument("--dest", required=True, help="Destination PNG path.")
-    parser.add_argument("--width", required=True, type=int)
-    parser.add_argument("--height", required=True, type=int)
+    parser.add_argument("--width", required=True, type=positive_int)
+    parser.add_argument("--height", required=True, type=positive_int)
     parser.add_argument(
         "--source",
         help="Explicit generated source PNG. Defaults to the latest generated image.",

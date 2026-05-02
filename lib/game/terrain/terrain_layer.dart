@@ -1,4 +1,6 @@
 // ignore_for_file: unnecessary_import
+import 'dart:ui' as ui;
+
 import 'package:flame/components.dart';
 import 'package:flame/extensions.dart';
 import 'package:flutter/foundation.dart';
@@ -15,7 +17,7 @@ class TerrainLayer extends PositionComponent with HasGameReference {
 
   Sprite? _baseSprite;
   final List<Sprite> _featureSprites = [];
-  final Map<String, Sprite> _spriteCache = {};
+  final Map<String, ui.Image> _imageCache = {};
 
   TerrainLayer({
     required this.terrainType,
@@ -38,6 +40,7 @@ class TerrainLayer extends PositionComponent with HasGameReference {
         final image = await game.images.load(baseAssetPath);
         _baseSprite = Sprite(image);
       } catch (e) {
+        _baseSprite = null;
         debugPrint(
           'TerrainLayer: failed to load base sprite "$baseAssetPath": $e',
         );
@@ -50,11 +53,11 @@ class TerrainLayer extends PositionComponent with HasGameReference {
       final featureAssetPath = getFeatureAssetPath(feature);
       if (featureAssetPath != null) {
         try {
-          if (!_spriteCache.containsKey(featureAssetPath)) {
+          if (!_imageCache.containsKey(featureAssetPath)) {
             final image = await game.images.load(featureAssetPath);
-            _spriteCache[featureAssetPath] = Sprite(image);
+            _imageCache[featureAssetPath] = image;
           }
-          _featureSprites.add(_spriteCache[featureAssetPath]!);
+          _featureSprites.add(Sprite(_imageCache[featureAssetPath]!));
         } catch (e) {
           debugPrint(
             'TerrainLayer: failed to load feature sprite "$featureAssetPath": $e',
