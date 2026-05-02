@@ -140,6 +140,11 @@ class TerrainLayer extends PositionComponent with HasGameReference {
     return Vector2(x, y);
   }
 
+  @visibleForTesting
+  Vector2 getFeaturePositionForTest(Sprite sprite) {
+    return _getFeaturePosition(sprite);
+  }
+
   Vector2 _getFeatureSize(Sprite sprite) {
     // Return appropriate size based on feature type
     // This should match the original asset dimensions
@@ -153,6 +158,16 @@ class TerrainLayer extends PositionComponent with HasGameReference {
     }
 
     return originalSize;
+  }
+
+  @visibleForTesting
+  Vector2 getFeatureSizeForTest(Sprite sprite) {
+    return _getFeatureSize(sprite);
+  }
+
+  @visibleForTesting
+  void addFeatureSpriteForTest(Sprite sprite) {
+    _featureSprites.add(sprite);
   }
 
   /// Update terrain type and reload sprites
