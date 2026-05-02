@@ -1,3 +1,6 @@
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/terrain/terrain_biome.dart';
 import 'package:horologium/game/terrain/terrain_component.dart';
@@ -5,6 +8,18 @@ import 'package:horologium/game/terrain/terrain_layer.dart';
 
 void main() {
   group('TerrainComponent', () {
+    test('render returns before drawing when the component is not loaded', () {
+      final component = TerrainComponent(gridSize: 4)..prepareForTest();
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+
+      component.render(canvas);
+      final picture = recorder.endRecording();
+
+      expect(picture.approximateBytesUsed, greaterThanOrEqualTo(0));
+      picture.dispose();
+    });
+
     test(
       'getTerrainAt, isBuildableAt, and stats work with injected terrain data',
       () {

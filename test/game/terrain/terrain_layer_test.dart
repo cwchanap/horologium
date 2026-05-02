@@ -1,3 +1,6 @@
+import 'dart:ui' as ui;
+
+import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/terrain/terrain_assets.dart';
@@ -5,6 +8,8 @@ import 'package:horologium/game/terrain/terrain_biome.dart';
 import 'package:horologium/game/terrain/terrain_layer.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late TerrainLayer layer;
 
   setUp(() {
@@ -348,6 +353,64 @@ void main() {
     });
   });
 
+  group('TerrainLayer lifecycle and rendering', () {
+    test('render draws a fallback rectangle when no base sprite is loaded', () {
+      layer.size = Vector2(12, 8);
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      layer.render(canvas);
+      final picture = recorder.endRecording();
+
+      expect(picture.approximateBytesUsed, greaterThan(0));
+      picture.dispose();
+    });
+
+    test('feature sizing scales oversized sprites to fit the layer', () async {
+      layer.size = Vector2(50, 50);
+      final sprite = Sprite(await _createImage(width: 100, height: 50));
+
+      expect(layer.getFeatureSizeForTest(sprite), Vector2(40, 20));
+    });
+
+    test('feature sizing keeps sprites that already fit', () async {
+      layer.size = Vector2(50, 50);
+      final sprite = Sprite(await _createImage(width: 20, height: 10));
+
+      expect(layer.getFeatureSizeForTest(sprite), Vector2(20, 10));
+    });
+
+    test(
+      'feature positioning stays in the central band of the layer',
+      () async {
+        layer.size = Vector2(100, 80);
+        final sprite = Sprite(await _createImage(width: 10, height: 10));
+
+        final position = layer.getFeaturePositionForTest(sprite);
+
+        expect(position.x, greaterThanOrEqualTo(20));
+        expect(position.x, lessThanOrEqualTo(80));
+        expect(position.y, greaterThanOrEqualTo(16));
+        expect(position.y, lessThanOrEqualTo(64));
+      },
+    );
+
+    test('render draws injected feature sprites', () async {
+      layer.size = Vector2(50, 50);
+      layer.addFeatureSpriteForTest(
+        Sprite(await _createImage(width: 10, height: 10)),
+      );
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      layer.render(canvas);
+      final picture = recorder.endRecording();
+
+      expect(picture.approximateBytesUsed, greaterThan(0));
+      picture.dispose();
+    });
+  });
+
   group('TerrainLayer.listsEqual', () {
     test('returns true for two identical single-element lists', () {
       expect(
@@ -392,4 +455,14 @@ void main() {
       );
     });
   });
+}
+
+Future<ui.Image> _createImage({required int width, required int height}) {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  canvas.drawRect(
+    Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+    Paint()..color = Colors.white,
+  );
+  return recorder.endRecording().toImage(width, height);
 }

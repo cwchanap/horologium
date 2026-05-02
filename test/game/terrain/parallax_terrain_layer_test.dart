@@ -1,4 +1,4 @@
-import 'package:flame/components.dart';
+import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/terrain/parallax_terrain_layer.dart';
@@ -6,6 +6,8 @@ import 'package:horologium/game/terrain/terrain_biome.dart';
 import 'package:horologium/game/terrain/terrain_depth_manager.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late ParallaxTerrainLayer layer;
 
   setUp(() {
@@ -157,6 +159,29 @@ void main() {
       );
       expect(p1.x, p2.x);
       expect(p1.y, p2.y);
+    });
+  });
+
+  group('ParallaxTerrainLayer.update', () {
+    test('applies parallax offset when enabled', () async {
+      final game = FlameGame();
+      await game.onLoad();
+      await game.add(layer);
+      await game.ready();
+
+      layer
+        ..size = Vector2(200, 200)
+        ..enableParallax = true;
+      game.camera.viewfinder.position = Vector2(40, 20);
+
+      layer.update(0.016);
+
+      final config = TerrainDepthManager.getConfig(TerrainDepth.nearBackground);
+      expect(
+        layer.position,
+        (layer.size / 2) +
+            game.camera.viewfinder.position * (config.parallaxSpeed - 1.0),
+      );
     });
   });
 }
