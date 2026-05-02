@@ -1,12 +1,16 @@
 import 'dart:ui' as ui;
 
+import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:horologium/game/terrain/terrain_assets.dart';
 import 'package:horologium/game/terrain/terrain_biome.dart';
 import 'package:horologium/game/terrain/terrain_component.dart';
 import 'package:horologium/game/terrain/terrain_layer.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('TerrainComponent', () {
     test('render returns before drawing when the component is not loaded', () {
       final component = TerrainComponent(gridSize: 4)..prepareForTest();
@@ -122,6 +126,22 @@ void main() {
         expect(component.getTerrainAt(0, 0), isNotNull);
       },
     );
+
+    test('onLoad handles missing terrain assets gracefully', () async {
+      final game = FlameGame();
+      game.onGameResize(Vector2(800, 600));
+      await game.onLoad();
+      final firstAsset = TerrainAssets.allAssets.first;
+      for (final asset in TerrainAssets.allAssets) {
+        if (asset != firstAsset) {
+          game.images.add(asset, await _createTestImage());
+        }
+      }
+      final component = TerrainComponent(gridSize: 2);
+      await game.add(component);
+      await game.ready();
+      expect(component.getTerrainAt(0, 0), isNotNull);
+    });
   });
 }
 
@@ -138,4 +158,14 @@ class FakeTerrainLayer extends TerrainLayer {
   ) async {
     updateCalls.add((newType, newFeatures));
   }
+}
+
+Future<ui.Image> _createTestImage() {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  canvas.drawRect(
+    const Rect.fromLTWH(0, 0, 64, 64),
+    Paint()..color = Colors.white,
+  );
+  return recorder.endRecording().toImage(64, 64);
 }

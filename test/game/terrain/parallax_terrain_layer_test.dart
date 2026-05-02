@@ -1,7 +1,10 @@
+import 'dart:ui' as ui;
+
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/terrain/parallax_terrain_layer.dart';
+import 'package:horologium/game/terrain/terrain_assets.dart';
 import 'package:horologium/game/terrain/terrain_biome.dart';
 import 'package:horologium/game/terrain/terrain_depth_manager.dart';
 
@@ -165,6 +168,7 @@ void main() {
   group('ParallaxTerrainLayer.update', () {
     test('applies parallax offset when enabled', () async {
       final game = FlameGame();
+      game.onGameResize(Vector2(800, 600));
       await game.onLoad();
       await game.add(layer);
       await game.ready();
@@ -184,4 +188,60 @@ void main() {
       );
     });
   });
+
+  group('ParallaxTerrainLayer onLoad', () {
+    test('loads feature sprites when assets are cached', () async {
+      final testImage = await _createTestImage();
+      final game = FlameGame();
+      game.onGameResize(Vector2(800, 600));
+      await game.onLoad();
+      game.images.add(TerrainAssets.treeOakLarge, testImage);
+      game.images.add(TerrainAssets.treePineLarge, testImage);
+      game.images.add(TerrainAssets.rockLarge, testImage);
+      game.images.add(TerrainAssets.rockMedium, testImage);
+
+      final loadedLayer = ParallaxTerrainLayer(
+        depth: TerrainDepth.nearBackground,
+        terrainData: const <String, TerrainCell>{},
+        gridSize: 4,
+        cellWidth: 50,
+        cellHeight: 50,
+      );
+      await game.add(loadedLayer);
+      await game.ready();
+    });
+
+    test(
+      'calls _getBaseAssetPath for depths with allowed terrain types',
+      () async {
+        final testImage = await _createTestImage();
+        final game = FlameGame();
+        game.onGameResize(Vector2(800, 600));
+        await game.onLoad();
+        game.images.add(TerrainAssets.grassBase, testImage);
+        game.images.add(TerrainAssets.dirtBase, testImage);
+        game.images.add(TerrainAssets.sandBase, testImage);
+
+        final loadedLayer = ParallaxTerrainLayer(
+          depth: TerrainDepth.midBackground,
+          terrainData: const <String, TerrainCell>{},
+          gridSize: 4,
+          cellWidth: 50,
+          cellHeight: 50,
+        );
+        await game.add(loadedLayer);
+        await game.ready();
+      },
+    );
+  });
+}
+
+Future<ui.Image> _createTestImage() {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  canvas.drawRect(
+    const Rect.fromLTWH(0, 0, 64, 64),
+    Paint()..color = Colors.white,
+  );
+  return recorder.endRecording().toImage(64, 64);
 }

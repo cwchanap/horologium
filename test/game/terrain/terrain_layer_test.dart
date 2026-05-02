@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flame/components.dart';
+import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/terrain/terrain_assets.dart';
@@ -453,6 +454,71 @@ void main() {
         ),
         isFalse,
       );
+    });
+  });
+
+  group('TerrainLayer onLoad', () {
+    test('loads sprites from image cache', () async {
+      final game = FlameGame();
+      game.onGameResize(Vector2(800, 600));
+      await game.onLoad();
+      final testImage = await _createImage(width: 64, height: 64);
+      game.images.add(TerrainAssets.grassBase, testImage);
+      game.images.add(TerrainAssets.treeOakSmall, testImage);
+
+      final loadedLayer = TerrainLayer(
+        terrainType: TerrainType.grass,
+        features: [FeatureType.treeOakSmall],
+      );
+      await game.add(loadedLayer);
+      await game.ready();
+
+      loadedLayer.size = Vector2(64, 64);
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      loadedLayer.render(canvas);
+      final picture = recorder.endRecording();
+      expect(picture.approximateBytesUsed, greaterThan(0));
+      picture.dispose();
+    });
+
+    test('handles missing assets gracefully', () async {
+      final game = FlameGame();
+      game.onGameResize(Vector2(800, 600));
+      await game.onLoad();
+
+      final loadedLayer = TerrainLayer(
+        terrainType: TerrainType.grass,
+        features: [FeatureType.treeOakSmall],
+      );
+      await game.add(loadedLayer);
+      await game.ready();
+
+      loadedLayer.size = Vector2(64, 64);
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      loadedLayer.render(canvas);
+      final picture = recorder.endRecording();
+      expect(picture.approximateBytesUsed, greaterThan(0));
+      picture.dispose();
+    });
+
+    test('skips loading for terrain types with null asset path', () async {
+      final game = FlameGame();
+      game.onGameResize(Vector2(800, 600));
+      await game.onLoad();
+
+      final loadedLayer = TerrainLayer(terrainType: TerrainType.water);
+      await game.add(loadedLayer);
+      await game.ready();
+
+      loadedLayer.size = Vector2(64, 64);
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      loadedLayer.render(canvas);
+      final picture = recorder.endRecording();
+      expect(picture.approximateBytesUsed, greaterThan(0));
+      picture.dispose();
     });
   });
 }
