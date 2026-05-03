@@ -65,6 +65,27 @@ void main() {
       expect(find.text('Bread'), findsOneWidget);
     });
 
+    testWidgets('refinement tab shows kitchen food resources', (tester) async {
+      await pumpPage(tester);
+
+      await tester.tap(find.text('Refinement'));
+      await tester.pump();
+
+      expect(find.text('Tortillas'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Rice Meals'),
+        100,
+        scrollable: find.byType(Scrollable),
+      );
+      expect(find.text('Rice Meals'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Malt Drink'),
+        100,
+        scrollable: find.byType(Scrollable),
+      );
+      expect(find.text('Malt Drink'), findsOneWidget);
+    });
+
     testWidgets('back button pops the route', (tester) async {
       await tester.pumpWidget(
         MaterialApp(

@@ -348,6 +348,24 @@ class _ResourcesPageState extends State<ResourcesPage> {
             color: Colors.orange,
             resourceType: ResourceType.pastries,
           ),
+          _ResourceData(
+            name: 'Tortillas',
+            amount: widget.resources.tortillas,
+            color: Colors.orangeAccent,
+            resourceType: ResourceType.tortillas,
+          ),
+          _ResourceData(
+            name: 'Rice Meals',
+            amount: widget.resources.riceMeals,
+            color: Colors.lightGreen,
+            resourceType: ResourceType.riceMeals,
+          ),
+          _ResourceData(
+            name: 'Malt Drink',
+            amount: widget.resources.maltDrink,
+            color: Colors.amber,
+            resourceType: ResourceType.maltDrink,
+          ),
         ];
     }
   }

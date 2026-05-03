@@ -48,6 +48,9 @@ void main() {
     ResourceType.maltedBarley: Icons.grain,
     ResourceType.bread: Icons.bakery_dining,
     ResourceType.pastries: Icons.bakery_dining,
+    ResourceType.tortillas: Icons.restaurant,
+    ResourceType.riceMeals: Icons.rice_bowl,
+    ResourceType.maltDrink: Icons.local_drink,
   };
 
   final fallbackColors = <ResourceType, Color>{
@@ -72,6 +75,9 @@ void main() {
     ResourceType.maltedBarley: Colors.amber,
     ResourceType.bread: Colors.orange,
     ResourceType.pastries: Colors.orange,
+    ResourceType.tortillas: Colors.orangeAccent,
+    ResourceType.riceMeals: Colors.lightGreen,
+    ResourceType.maltDrink: Colors.amber,
   };
 
   testWidgets('uses fallback icons for non-asset resources', (
@@ -133,6 +139,24 @@ void main() {
     final icon = tester.widget<Icon>(find.byType(Icon));
     expect(icon.icon, equals(Icons.attach_money));
     expect(icon.color, equals(Colors.red));
+  });
+
+  testWidgets('renders kitchen food resource icons', (tester) async {
+    for (final type in [
+      ResourceType.tortillas,
+      ResourceType.riceMeals,
+      ResourceType.maltDrink,
+    ]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: ResourceIcon(resourceType: type)),
+        ),
+      );
+
+      final icon = tester.widget<Icon>(find.byType(Icon));
+      expect(icon.icon, equals(fallbackIcons[type]));
+      expect(icon.color, equals(fallbackColors[type]));
+    }
   });
 
   testWidgets('errorBuilder falls back to the expected icon and color', (
