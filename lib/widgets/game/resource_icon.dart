@@ -127,6 +127,12 @@ class ResourceIcon extends StatelessWidget {
         return Icons.bakery_dining;
       case ResourceType.pastries:
         return Icons.bakery_dining;
+      case ResourceType.tortillas:
+        return Icons.restaurant;
+      case ResourceType.riceMeals:
+        return Icons.rice_bowl;
+      case ResourceType.maltDrink:
+        return Icons.local_drink;
     }
   }
 
@@ -174,6 +180,12 @@ class ResourceIcon extends StatelessWidget {
         return Colors.orange;
       case ResourceType.pastries:
         return Colors.orange;
+      case ResourceType.tortillas:
+        return Colors.orangeAccent;
+      case ResourceType.riceMeals:
+        return Colors.lightGreen;
+      case ResourceType.maltDrink:
+        return Colors.amber;
     }
   }
 }

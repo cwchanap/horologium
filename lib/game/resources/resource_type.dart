@@ -22,6 +22,9 @@ enum ResourceType {
   maltedBarley,
   bread,
   pastries,
+  tortillas,
+  riceMeals,
+  maltDrink,
 }
 
 class Resource {
@@ -148,6 +151,24 @@ class ResourceRegistry {
       value: 15,
       category: ResourceCategory.refinement,
     ),
+    Resource(
+      type: ResourceType.tortillas,
+      name: 'Tortillas',
+      value: 10,
+      category: ResourceCategory.refinement,
+    ),
+    Resource(
+      type: ResourceType.riceMeals,
+      name: 'Rice Meals',
+      value: 10,
+      category: ResourceCategory.refinement,
+    ),
+    Resource(
+      type: ResourceType.maltDrink,
+      name: 'Malt Drink',
+      value: 12,
+      category: ResourceCategory.refinement,
+    ),
   ];
 
   static Resource? find(ResourceType type) {
@@ -159,5 +180,7 @@ class ResourceRegistry {
 }
 
 enum BakeryProduct { bread, pastries }
+
+enum KitchenProduct { tortillas, riceMeals, maltDrink }
 
 enum CropType { wheat, corn, rice, barley }

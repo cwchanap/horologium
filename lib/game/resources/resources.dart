@@ -29,6 +29,9 @@ class Resources {
     ResourceType.maltedBarley: 0,
     ResourceType.bread: 0,
     ResourceType.pastries: 0,
+    ResourceType.tortillas: 0,
+    ResourceType.riceMeals: 0,
+    ResourceType.maltDrink: 0,
   };
   int population = 20; // Starting population
   int availableWorkers = 20; // Workers not assigned to buildings
@@ -257,6 +260,9 @@ class Resources {
   double get maltedBarley => resources[ResourceType.maltedBarley]!;
   double get bread => resources[ResourceType.bread]!;
   double get pastries => resources[ResourceType.pastries]!;
+  double get tortillas => resources[ResourceType.tortillas]!;
+  double get riceMeals => resources[ResourceType.riceMeals]!;
+  double get maltDrink => resources[ResourceType.maltDrink]!;
 
   set cash(double value) => resources[ResourceType.cash] = value;
   set electricity(double value) => resources[ResourceType.electricity] = value;
@@ -280,6 +286,9 @@ class Resources {
       resources[ResourceType.maltedBarley] = value;
   set bread(double value) => resources[ResourceType.bread] = value;
   set pastries(double value) => resources[ResourceType.pastries] = value;
+  set tortillas(double value) => resources[ResourceType.tortillas] = value;
+  set riceMeals(double value) => resources[ResourceType.riceMeals] = value;
+  set maltDrink(double value) => resources[ResourceType.maltDrink] = value;
 
   double getResource(ResourceType type) => resources[type] ?? 0;
   void setResource(ResourceType type, double value) => resources[type] = value;

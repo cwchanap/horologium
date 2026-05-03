@@ -32,6 +32,9 @@ void main() {
           ResourceType.maltedBarley: 'Malted Barley',
           ResourceType.bread: 'Bread',
           ResourceType.pastries: 'Pastries',
+          ResourceType.tortillas: 'Tortillas',
+          ResourceType.riceMeals: 'Rice Meals',
+          ResourceType.maltDrink: 'Malt Drink',
         };
         for (final entry in expectations.entries) {
           final resource = ResourceRegistry.find(entry.key);
@@ -107,7 +110,13 @@ void main() {
       });
 
       test('refined products have refinement category', () {
-        final refinedTypes = [ResourceType.bread, ResourceType.pastries];
+        final refinedTypes = [
+          ResourceType.bread,
+          ResourceType.pastries,
+          ResourceType.tortillas,
+          ResourceType.riceMeals,
+          ResourceType.maltDrink,
+        ];
         for (final type in refinedTypes) {
           final resource = ResourceRegistry.find(type);
           expect(
@@ -235,6 +244,19 @@ void main() {
       expect(
         BakeryProduct.values,
         containsAll([BakeryProduct.bread, BakeryProduct.pastries]),
+      );
+    });
+  });
+
+  group('KitchenProduct enum', () {
+    test('contains all kitchen product modes', () {
+      expect(
+        KitchenProduct.values,
+        containsAll([
+          KitchenProduct.tortillas,
+          KitchenProduct.riceMeals,
+          KitchenProduct.maltDrink,
+        ]),
       );
     });
   });
