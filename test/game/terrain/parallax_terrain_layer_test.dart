@@ -202,7 +202,16 @@ void main() {
 
       final loadedLayer = ParallaxTerrainLayer(
         depth: TerrainDepth.nearBackground,
-        terrainData: const <String, TerrainCell>{},
+        terrainData: <String, TerrainCell>{
+          '0,0': const TerrainCell(
+            baseType: TerrainType.grass,
+            features: [FeatureType.treeOakLarge, FeatureType.rockLarge],
+          ),
+          '1,0': const TerrainCell(
+            baseType: TerrainType.dirt,
+            features: [FeatureType.treePineLarge, FeatureType.rockMedium],
+          ),
+        },
         gridSize: 4,
         cellWidth: 50,
         cellHeight: 50,
@@ -224,7 +233,11 @@ void main() {
 
         final loadedLayer = ParallaxTerrainLayer(
           depth: TerrainDepth.midBackground,
-          terrainData: const <String, TerrainCell>{},
+          terrainData: <String, TerrainCell>{
+            '0,0': const TerrainCell(baseType: TerrainType.grass),
+            '1,0': const TerrainCell(baseType: TerrainType.dirt),
+            '2,0': const TerrainCell(baseType: TerrainType.sand),
+          },
           gridSize: 4,
           cellWidth: 50,
           cellHeight: 50,
