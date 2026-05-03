@@ -3,11 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/building/category.dart';
 import 'package:horologium/game/resources/resource_type.dart';
+import 'package:horologium/game/resources/resources.dart';
 import 'package:horologium/widgets/game/building_options_dialog.dart';
 
 void main() {
   group('BuildingOptionsDialog Widget Tests', () {
     late Building testBuilding;
+    Resources affordableResources({double cash = 1000}) {
+      return Resources()
+        ..cash = cash
+        ..planks = 100
+        ..stone = 100;
+    }
 
     setUp(() {
       testBuilding = Building(
@@ -34,7 +41,7 @@ void main() {
           home: Scaffold(
             body: BuildingOptionsDialog(
               building: testBuilding,
-              currentCash: 1000,
+              resources: affordableResources(),
               onUpgrade: () {},
               onDelete: () {},
             ),
@@ -54,7 +61,7 @@ void main() {
           home: Scaffold(
             body: BuildingOptionsDialog(
               building: testBuilding,
-              currentCash: 1000,
+              resources: affordableResources(),
               onUpgrade: () {},
               onDelete: () {},
             ),
@@ -63,7 +70,7 @@ void main() {
       );
 
       expect(find.textContaining('Upgrade'), findsOneWidget);
-      expect(find.textContaining('200'), findsOneWidget); // Upgrade cost
+      expect(find.textContaining('Cash'), findsWidgets);
     });
 
     testWidgets('upgrade button disabled when insufficient cash', (
@@ -74,7 +81,36 @@ void main() {
           home: Scaffold(
             body: BuildingOptionsDialog(
               building: testBuilding,
-              currentCash: 50, // Not enough for upgrade cost of 200
+              resources: affordableResources(cash: 50),
+              onUpgrade: () {},
+              onDelete: () {},
+            ),
+          ),
+        ),
+      );
+
+      final upgradeButton = tester.widget<ElevatedButton>(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is ElevatedButton &&
+              widget.child is Text &&
+              (widget.child as Text).data?.contains('Upgrade') == true,
+        ),
+      );
+      expect(upgradeButton.onPressed, isNull);
+    });
+
+    testWidgets('upgrade button disabled when material resources are missing', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: BuildingOptionsDialog(
+              building: testBuilding,
+              resources: Resources()
+                ..cash = 1000
+                ..stone = 0,
               onUpgrade: () {},
               onDelete: () {},
             ),
@@ -116,7 +152,7 @@ void main() {
           home: Scaffold(
             body: BuildingOptionsDialog(
               building: testBuilding,
-              currentCash: 10000,
+              resources: affordableResources(cash: 10000),
               onUpgrade: () {},
               onDelete: () {},
             ),
@@ -137,7 +173,7 @@ void main() {
           home: Scaffold(
             body: BuildingOptionsDialog(
               building: testBuilding,
-              currentCash: 1000,
+              resources: affordableResources(),
               onUpgrade: () => upgradeCalled = true,
               onDelete: () {},
             ),
@@ -157,7 +193,7 @@ void main() {
           home: Scaffold(
             body: BuildingOptionsDialog(
               building: testBuilding,
-              currentCash: 1000,
+              resources: affordableResources(),
               onUpgrade: () {},
               onDelete: () {},
             ),
@@ -178,7 +214,7 @@ void main() {
           home: Scaffold(
             body: BuildingOptionsDialog(
               building: testBuilding,
-              currentCash: 1000,
+              resources: affordableResources(),
               onUpgrade: () {},
               onDelete: () => deleteCalled = true,
             ),
@@ -200,7 +236,7 @@ void main() {
           home: Scaffold(
             body: BuildingOptionsDialog(
               building: testBuilding,
-              currentCash: 1000,
+              resources: affordableResources(),
               onUpgrade: () {},
               onDelete: () {},
             ),
@@ -232,7 +268,7 @@ void main() {
             home: Scaffold(
               body: BuildingOptionsDialog(
                 building: field,
-                currentCash: 1000,
+                resources: affordableResources(),
                 onUpgrade: () {},
                 onDelete: () {},
               ),
@@ -270,7 +306,7 @@ void main() {
             home: Scaffold(
               body: BuildingOptionsDialog(
                 building: bakery,
-                currentCash: 1000,
+                resources: affordableResources(),
                 onUpgrade: () {},
                 onDelete: () {},
               ),
@@ -317,7 +353,7 @@ void main() {
           home: Scaffold(
             body: BuildingOptionsDialog(
               building: bakery,
-              currentCash: 1000,
+              resources: affordableResources(),
               onUpgrade: () {},
               onDelete: () {},
             ),

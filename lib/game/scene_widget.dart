@@ -689,7 +689,7 @@ class _MainGameWidgetState extends State<MainGameWidget>
     BuildingOptionsDialog.show(
       context: context,
       building: building,
-      currentCash: widget.planet.resources.cash,
+      resources: widget.planet.resources,
       onUpgrade: () {
         _upgradeBuilding(x, y, building);
       },
@@ -705,19 +705,23 @@ class _MainGameWidgetState extends State<MainGameWidget>
 
   void _upgradeBuilding(int x, int y, Building building) {
     if (!building.canUpgrade) return;
-    if (widget.planet.resources.cash < building.upgradeCost) return;
+    final upgradeCost = building.upgradeCost;
+    if (!upgradeCost.canAfford(widget.planet.resources)) return;
 
+    var upgraded = false;
     setState(() {
-      // Deduct upgrade cost
-      widget.planet.resources.cash -= building.upgradeCost;
+      final deducted = upgradeCost.deductFrom(widget.planet.resources);
+      if (!deducted) return;
 
       // Upgrade the building
       building.upgrade();
 
       // Update the planet's building data
       _updatePlanetBuildingLevel(x, y, building.level);
+      upgraded = true;
     });
 
+    if (!upgraded) return;
     _handleResourcesChanged(immediateSave: true);
   }
 
