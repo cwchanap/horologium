@@ -74,7 +74,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
 
   /// Compute a stable signature of the building list for change detection.
   /// Includes type, level, workers, and crop/product selections (which affect
-  /// generation/consumption for Field and Bakery buildings).
+  /// generation/consumption for Field, Bakery, and Kitchen buildings).
   String _computeBuildingsSignature(List<Building> buildings) {
     final signatures = buildings.map((b) {
       var signature = '${b.type.name}:${b.level}:${b.assignedWorkers}';
@@ -82,6 +82,8 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
       if (b is Field) {
         signature += ':${b.cropType.name}';
       } else if (b is Bakery) {
+        signature += ':${b.productType.name}';
+      } else if (b is Kitchen) {
         signature += ':${b.productType.name}';
       }
       return signature;

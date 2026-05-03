@@ -356,11 +356,13 @@ class _MainGameWidgetState extends State<MainGameWidget>
         placedBuilding.y,
       );
       if (existingData != null) {
-        // Sync variant for Field/Bakery subtypes
+        // Sync variant for buildings whose resource flow depends on a subtype.
         String? variant = existingData.variant;
         if (building is Field) {
           variant = building.cropType.name;
         } else if (building is Bakery) {
+          variant = building.productType.name;
+        } else if (building is Kitchen) {
           variant = building.productType.name;
         }
 

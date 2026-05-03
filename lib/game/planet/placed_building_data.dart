@@ -133,7 +133,7 @@ class PlacedBuildingData {
   }
 
   /// Create a Building instance from this placement data.
-  /// Restores Field/Bakery subtypes using the variant field.
+  /// Restores Field/Bakery/Kitchen subtypes using the variant field.
   /// Returns null if the building type is no longer in the registry.
   Building? createBuilding() {
     final template = BuildingRegistry.availableBuildings
@@ -199,6 +199,41 @@ class PlacedBuildingData {
         }
       }
       return Bakery(
+        id: id,
+        type: template.type,
+        name: template.name,
+        description: template.description,
+        icon: template.icon,
+        assetPath: template.assetPath,
+        color: template.color,
+        baseCost: template.baseCost,
+        basePopulation: template.basePopulation,
+        maxLevel: template.maxLevel,
+        gridSize: template.gridSize,
+        baseBuildingLimit: template.baseBuildingLimit,
+        requiredWorkers: template.requiredWorkers,
+        category: template.category,
+        level: level,
+        productType: productType,
+      )..assignedWorkers = assignedWorkers;
+    }
+
+    if (template is Kitchen) {
+      KitchenProduct productType = KitchenProduct.tortillas;
+      if (variant != null) {
+        final matched = KitchenProduct.values
+            .where((e) => e.name == variant)
+            .firstOrNull;
+        if (matched != null) {
+          productType = matched;
+        } else {
+          debugPrint(
+            'Warning: Unknown kitchen variant "$variant" for Kitchen at ($x,$y). '
+            'Falling back to tortillas.',
+          );
+        }
+      }
+      return Kitchen(
         id: id,
         type: template.type,
         name: template.name,

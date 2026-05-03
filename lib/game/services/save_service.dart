@@ -182,6 +182,12 @@ class SaveService {
         prefs.getDouble(_planetResourceKey(planetId, 'bread')) ?? 0.0;
     resources.pastries =
         prefs.getDouble(_planetResourceKey(planetId, 'pastries')) ?? 0.0;
+    resources.tortillas =
+        prefs.getDouble(_planetResourceKey(planetId, 'tortillas')) ?? 0.0;
+    resources.riceMeals =
+        prefs.getDouble(_planetResourceKey(planetId, 'riceMeals')) ?? 0.0;
+    resources.maltDrink =
+        prefs.getDouble(_planetResourceKey(planetId, 'maltDrink')) ?? 0.0;
   }
 
   /// Deprecated: Use [savePlanet] instead.

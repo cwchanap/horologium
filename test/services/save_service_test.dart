@@ -261,4 +261,46 @@ void main() {
       },
     );
   });
+
+  group('SaveService Kitchen resource persistence', () {
+    test('savePlanet persists new Kitchen output resources', () async {
+      SharedPreferences.setMockInitialValues({});
+
+      const planetId = 'kitchen-resource-json';
+      final planet = Planet(id: planetId, name: 'Kitchen Resources');
+      planet.resources.tortillas = 7;
+      planet.resources.riceMeals = 8;
+      planet.resources.maltDrink = 9;
+
+      await SaveService.savePlanet(planet);
+      final loaded = await SaveService.loadOrCreatePlanet(
+        planetId,
+        name: 'Kitchen Resources',
+      );
+
+      expect(loaded.resources.tortillas, equals(7));
+      expect(loaded.resources.riceMeals, equals(8));
+      expect(loaded.resources.maltDrink, equals(9));
+    });
+
+    test('legacy fallback loads new Kitchen output resource keys', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+
+      const planetId = 'kitchen-resource-legacy';
+      await prefs.setDouble('planet.$planetId.resources.cash', 1000);
+      await prefs.setDouble('planet.$planetId.resources.tortillas', 7);
+      await prefs.setDouble('planet.$planetId.resources.riceMeals', 8);
+      await prefs.setDouble('planet.$planetId.resources.maltDrink', 9);
+
+      final loaded = await SaveService.loadOrCreatePlanet(
+        planetId,
+        name: 'Kitchen Resources',
+      );
+
+      expect(loaded.resources.tortillas, equals(7));
+      expect(loaded.resources.riceMeals, equals(8));
+      expect(loaded.resources.maltDrink, equals(9));
+    });
+  });
 }
