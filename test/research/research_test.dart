@@ -102,6 +102,14 @@ void main() {
       expect(modern.unlocksBuildings, contains(BuildingType.largeHouse));
     });
 
+    test('foodProcessing unlocks Kitchen', () {
+      final foodProcessing = Research.availableResearch.firstWhere(
+        (research) => research.type == ResearchType.foodProcessing,
+      );
+
+      expect(foodProcessing.unlocksBuildings, contains(BuildingType.kitchen));
+    });
+
     test('all types are represented in availableResearch', () {
       final researchedTypes = Research.availableResearch
           .map((r) => r.type)

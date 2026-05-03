@@ -37,6 +37,24 @@ Bakery _makeBakery({
   );
 }
 
+Kitchen _makeKitchen({
+  KitchenProduct productType = KitchenProduct.tortillas,
+  int level = 1,
+}) {
+  return Kitchen(
+    type: BuildingType.kitchen,
+    name: 'Kitchen',
+    description: 'Prepares finished foods from processed staples',
+    icon: Icons.restaurant,
+    color: Colors.deepOrange,
+    baseCost: 180,
+    requiredWorkers: 1,
+    category: BuildingCategory.refinement,
+    level: level,
+    productType: productType,
+  );
+}
+
 void main() {
   group('Field building', () {
     group('generation by crop type', () {
@@ -176,6 +194,51 @@ void main() {
         expect(bakery.productType, equals(BakeryProduct.bread));
         expect(bakery.generation[ResourceType.bread], equals(1.0));
       });
+    });
+  });
+
+  group('Kitchen', () {
+    test('generates tortillas from cornmeal and water', () {
+      final kitchen = _makeKitchen(productType: KitchenProduct.tortillas);
+
+      expect(kitchen.generation, equals({ResourceType.tortillas: 1.0}));
+      expect(
+        kitchen.consumption,
+        equals({ResourceType.cornmeal: 2.0, ResourceType.water: 1.0}),
+      );
+    });
+
+    test('generates rice meals from polished rice and water', () {
+      final kitchen = _makeKitchen(productType: KitchenProduct.riceMeals);
+
+      expect(kitchen.generation, equals({ResourceType.riceMeals: 1.0}));
+      expect(
+        kitchen.consumption,
+        equals({ResourceType.polishedRice: 2.0, ResourceType.water: 1.0}),
+      );
+    });
+
+    test('generates malt drink from malted barley and water', () {
+      final kitchen = _makeKitchen(productType: KitchenProduct.maltDrink);
+
+      expect(kitchen.generation, equals({ResourceType.maltDrink: 1.0}));
+      expect(
+        kitchen.consumption,
+        equals({ResourceType.maltedBarley: 2.0, ResourceType.water: 1.0}),
+      );
+    });
+
+    test('level scales kitchen generation and consumption', () {
+      final kitchen = _makeKitchen(
+        productType: KitchenProduct.tortillas,
+        level: 3,
+      );
+
+      expect(kitchen.generation, equals({ResourceType.tortillas: 3.0}));
+      expect(
+        kitchen.consumption,
+        equals({ResourceType.cornmeal: 6.0, ResourceType.water: 3.0}),
+      );
     });
   });
 }

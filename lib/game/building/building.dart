@@ -21,6 +21,7 @@ enum BuildingType {
   riceHuller,
   maltHouse,
   bakery,
+  kitchen,
 }
 
 class Building {
@@ -176,6 +177,64 @@ class Bakery extends Building {
         return {ResourceType.flour: 2.0 * level};
       case BakeryProduct.pastries:
         return {ResourceType.flour: 3.0 * level};
+    }
+  }
+}
+
+class Kitchen extends Building {
+  KitchenProduct productType;
+
+  Kitchen({
+    super.id,
+    required super.type,
+    required super.name,
+    required super.description,
+    required super.icon,
+    super.assetPath,
+    required super.color,
+    required super.baseCost,
+    super.baseGeneration = const {},
+    super.baseConsumption = const {},
+    super.basePopulation = 0,
+    super.maxLevel = 5,
+    super.gridSize = 4,
+    super.baseBuildingLimit = 4,
+    super.requiredWorkers = 1,
+    required super.category,
+    super.level = 1,
+    this.productType = KitchenProduct.tortillas,
+  });
+
+  @override
+  Map<ResourceType, double> get generation {
+    switch (productType) {
+      case KitchenProduct.tortillas:
+        return {ResourceType.tortillas: 1.0 * level};
+      case KitchenProduct.riceMeals:
+        return {ResourceType.riceMeals: 1.0 * level};
+      case KitchenProduct.maltDrink:
+        return {ResourceType.maltDrink: 1.0 * level};
+    }
+  }
+
+  @override
+  Map<ResourceType, double> get consumption {
+    switch (productType) {
+      case KitchenProduct.tortillas:
+        return {
+          ResourceType.cornmeal: 2.0 * level,
+          ResourceType.water: 1.0 * level,
+        };
+      case KitchenProduct.riceMeals:
+        return {
+          ResourceType.polishedRice: 2.0 * level,
+          ResourceType.water: 1.0 * level,
+        };
+      case KitchenProduct.maltDrink:
+        return {
+          ResourceType.maltedBarley: 2.0 * level,
+          ResourceType.water: 1.0 * level,
+        };
     }
   }
 }
@@ -427,6 +486,16 @@ class BuildingRegistry {
       assetPath: Assets.bakery,
       color: Colors.orange,
       baseCost: 150,
+      requiredWorkers: 1,
+      category: BuildingCategory.refinement,
+    ),
+    Kitchen(
+      type: BuildingType.kitchen,
+      name: 'Kitchen',
+      description: 'Prepares tortillas, rice meals, or malt drinks.',
+      icon: Icons.restaurant,
+      color: Colors.deepOrange,
+      baseCost: 180,
       requiredWorkers: 1,
       category: BuildingCategory.refinement,
     ),
