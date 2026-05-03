@@ -43,6 +43,7 @@ void main() {
         recommendations[ResourceType.coal]!.targetBuildingType,
         BuildingType.coalMine,
       );
+      expect(recommendations[ResourceType.coal]!.targetBuildingId, coalMine.id);
     });
 
     test('recommends switching Field crop for crop shortages', () {
@@ -82,6 +83,7 @@ void main() {
         recommendations[ResourceType.corn]!.targetBuildingType,
         BuildingType.field,
       );
+      expect(recommendations[ResourceType.corn]!.targetBuildingId, field.id);
       expect(recommendations[ResourceType.corn]!.message, contains('corn'));
     });
 
@@ -136,6 +138,10 @@ void main() {
           BuildingType.kitchen,
         );
         expect(
+          recommendations[ResourceType.riceMeals]!.targetBuildingId,
+          kitchen.id,
+        );
+        expect(
           recommendations[ResourceType.riceMeals]!.message,
           contains('riceMeals'),
         );
@@ -172,6 +178,10 @@ void main() {
       expect(
         recommendations[ResourceType.electricity]!.targetBuildingType,
         BuildingType.powerPlant,
+      );
+      expect(
+        recommendations[ResourceType.electricity]!.targetBuildingId,
+        isNull,
       );
     });
 
@@ -222,6 +232,10 @@ void main() {
         recommendations[ResourceType.availableWorkers]!.type,
         RecommendationType.noProducer,
       );
+      expect(
+        recommendations[ResourceType.availableWorkers]!.targetBuildingId,
+        isNull,
+      );
     });
 
     test(
@@ -243,6 +257,7 @@ void main() {
           recommendations[ResourceType.corn]!.targetBuildingType,
           BuildingType.field,
         );
+        expect(recommendations[ResourceType.corn]!.targetBuildingId, isNull);
       },
     );
 
@@ -297,6 +312,10 @@ void main() {
         RecommendationType.upgrade,
       );
       expect(recommendations[ResourceType.coal]!.missingResources, isEmpty);
+      expect(
+        recommendations[ResourceType.coal]!.targetBuildingId,
+        affordableCoalMine.id,
+      );
     });
 
     test('does not recommend assigning workers when none are available', () {
@@ -322,6 +341,32 @@ void main() {
         recommendations[ResourceType.coal]!.type,
         RecommendationType.upgrade,
       );
+      expect(recommendations[ResourceType.coal]!.targetBuildingId, coalMine.id);
+    });
+
+    test('sets target id for missing-resource upgrade recommendations', () {
+      final coalMine = _building(
+        type: BuildingType.coalMine,
+        generation: {ResourceType.coal: 1},
+        assignedWorkers: 1,
+      );
+      final resources = Resources()
+        ..cash = 0
+        ..planks = 0;
+
+      final recommendations = ProductionRecommendationEngine.recommend(
+        graph: _graphWithBottleneck(ResourceType.coal),
+        buildings: [coalMine],
+        resources: resources,
+        researchManager: ResearchManager(),
+        buildingLimitManager: BuildingLimitManager(),
+      );
+
+      expect(
+        recommendations[ResourceType.coal]!.type,
+        RecommendationType.missingUpgradeResources,
+      );
+      expect(recommendations[ResourceType.coal]!.targetBuildingId, coalMine.id);
     });
 
     test('recommends switching Bakery product for pastry shortages', () {
@@ -352,6 +397,10 @@ void main() {
       expect(
         recommendations[ResourceType.pastries]!.targetBuildingType,
         BuildingType.bakery,
+      );
+      expect(
+        recommendations[ResourceType.pastries]!.targetBuildingId,
+        bakery.id,
       );
     });
 

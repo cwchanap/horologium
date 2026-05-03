@@ -624,6 +624,8 @@ class _MainGameWidgetState extends State<MainGameWidget>
               ProductionOverlay(
                 getBuildings: () => _game.grid.getAllBuildings(),
                 getResources: () => widget.planet.resources,
+                researchManager: _gameStateManager.researchManager,
+                buildingLimitManager: _gameStateManager.buildingLimitManager,
                 onClose: () {
                   setState(() {
                     _showProductionOverlay = false;
