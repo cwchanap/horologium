@@ -1,7 +1,6 @@
 import 'package:flame/components.dart';
 import 'package:flame/extensions.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'terrain_assets.dart';
 import 'terrain_biome.dart';
@@ -20,8 +19,6 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
   bool enableParallax = false;
 
   final Map<String, Sprite> _spriteCache = {};
-  Set<String>? _manifestAssets;
-  static const String _assetPrefix = 'assets/images/';
   late double _parallaxSpeed;
 
   ParallaxTerrainLayer({
@@ -60,10 +57,13 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
   Future<void> _loadSprites() async {
     // Load sprites for terrain types and features that appear on this depth
     final config = TerrainDepthManager.getConfig(depth);
-    _manifestAssets ??= await _loadManifestAssets();
 
     // Load terrain base sprites
-    for (final terrainType in config.allowedTerrainTypes) {
+    final terrainTypes = terrainData.values
+        .map((cell) => cell.baseType)
+        .where(config.allowedTerrainTypes.contains)
+        .toSet();
+    for (final terrainType in terrainTypes) {
       final assetPath = _getBaseAssetPath(terrainType);
       if (assetPath != null) {
         final sprite = await _loadSpriteWithFallback(assetPath);
@@ -74,7 +74,11 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
     }
 
     // Load feature sprites
-    for (final feature in config.allowedFeatureTypes) {
+    final features = terrainData.values
+        .expand((cell) => cell.features)
+        .where(config.allowedFeatureTypes.contains)
+        .toSet();
+    for (final feature in features) {
       final assetPath = _getFeatureAssetPath(feature);
       if (assetPath != null) {
         final sprite = await _loadSpriteWithFallback(assetPath);
@@ -87,9 +91,6 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
 
   /// Safely loads a sprite with fallback handling for missing assets
   Future<Sprite?> _loadSpriteWithFallback(String path) async {
-    if (!_assetExists(path)) {
-      return null;
-    }
     try {
       final image = await game.images.load(path);
       return Sprite(image);
@@ -97,25 +98,6 @@ class ParallaxTerrainLayer extends PositionComponent with HasGameReference {
       debugPrint('ParallaxTerrainLayer: failed to load sprite "$path": $e');
       return null;
     }
-  }
-
-  Future<Set<String>> _loadManifestAssets() async {
-    try {
-      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
-      return manifest.listAssets().toSet();
-    } catch (e, stack) {
-      debugPrint('Warning: Failed to load asset manifest: $e\n$stack');
-      return <String>{};
-    }
-  }
-
-  bool _assetExists(String path) {
-    final manifestAssets = _manifestAssets;
-    // Null = not loaded yet; empty = manifest unavailable. Both mean: attempt the load.
-    if (manifestAssets == null || manifestAssets.isEmpty) {
-      return true;
-    }
-    return manifestAssets.contains('$_assetPrefix$path');
   }
 
   @override

@@ -3,7 +3,6 @@ import 'package:flame/extensions.dart';
 import 'package:flutter/material.dart';
 
 import '../grid.dart';
-import 'terrain_assets.dart';
 import 'terrain_biome.dart';
 import 'terrain_generator.dart';
 import 'terrain_layer.dart';
@@ -30,9 +29,6 @@ class TerrainComponent extends PositionComponent with HasGameReference {
     // Set component size to match the grid
     size = Vector2(gridSize * cellWidth, gridSize * cellHeight);
 
-    // Pre-load all terrain assets
-    await _preloadAssets();
-
     // Generate terrain data
     _generateTerrain();
 
@@ -40,17 +36,6 @@ class TerrainComponent extends PositionComponent with HasGameReference {
     await _createTerrainLayers();
 
     _isLoaded = true;
-  }
-
-  Future<void> _preloadAssets() async {
-    // Pre-load all terrain assets for better performance
-    for (final assetPath in TerrainAssets.allAssets) {
-      try {
-        await game.images.load(assetPath);
-      } catch (e) {
-        debugPrint('Warning: Could not load terrain asset "$assetPath": $e');
-      }
-    }
   }
 
   void _generateTerrain() {
