@@ -267,6 +267,36 @@ class BuildingMenu {
                             .toList(),
                       ),
                     ],
+                    if (building is Kitchen) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Product Type:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      DropdownButton<KitchenProduct>(
+                        value: building.productType,
+                        onChanged: (KitchenProduct? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              building.productType = newValue;
+                            });
+                          }
+                        },
+                        items: KitchenProduct.values
+                            .map<DropdownMenuItem<KitchenProduct>>((
+                              KitchenProduct value,
+                            ) {
+                              return DropdownMenuItem<KitchenProduct>(
+                                value: value,
+                                child: Text(value.name),
+                              );
+                            })
+                            .toList(),
+                      ),
+                    ],
                   ],
                 ),
               ),

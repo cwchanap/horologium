@@ -278,6 +278,34 @@ void main() {
     expect(bakery.productType, equals(BakeryProduct.pastries));
   });
 
+  testWidgets('shows Kitchen product selector and updates product', (
+    WidgetTester tester,
+  ) async {
+    final kitchen = Kitchen(
+      type: BuildingType.kitchen,
+      name: 'Kitchen',
+      description: 'Prepares food',
+      icon: Icons.restaurant,
+      color: Colors.deepOrange,
+      baseCost: 180,
+      requiredWorkers: 1,
+      category: BuildingCategory.refinement,
+    );
+    final resources = Resources();
+
+    await openDialog(tester, building: kitchen, resources: resources);
+
+    expect(find.text('Product Type:'), findsOneWidget);
+    expect(find.byType(DropdownButton<KitchenProduct>), findsOneWidget);
+
+    await tester.tap(find.byType(DropdownButton<KitchenProduct>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('riceMeals').last);
+    await tester.pumpAndSettle();
+
+    expect(kitchen.productType, equals(KitchenProduct.riceMeals));
+  });
+
   testWidgets(
     'upgrades the building and dismisses the dialog when affordable',
     (WidgetTester tester) async {
