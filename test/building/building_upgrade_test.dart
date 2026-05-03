@@ -47,13 +47,38 @@ void main() {
       expect(testBuilding.canUpgrade, isFalse);
     });
 
-    test('upgradeCost is baseCost times next level', () {
-      // At level 1, upgrade to level 2 costs baseCost * 2
-      expect(testBuilding.upgradeCost, 200);
+    test('upgradeCost includes cash for the next level', () {
+      expect(testBuilding.upgradeCost.resources[ResourceType.cash], 200);
 
       testBuilding.upgrade();
-      // At level 2, upgrade to level 3 costs baseCost * 3
-      expect(testBuilding.upgradeCost, 300);
+
+      expect(testBuilding.upgradeCost.resources[ResourceType.cash], 300);
+    });
+
+    test('processing building upgradeCost includes planks and stone', () {
+      final windMill = BuildingRegistry.availableBuildings.firstWhere(
+        (building) => building.type == BuildingType.windMill,
+      );
+
+      expect(windMill.upgradeCost.resources[ResourceType.cash], equals(200));
+      expect(
+        windMill.upgradeCost.resources[ResourceType.planks],
+        greaterThan(0),
+      );
+      expect(
+        windMill.upgradeCost.resources[ResourceType.stone],
+        greaterThan(0),
+      );
+    });
+
+    test('refinement building upgradeCost includes planks and stone', () {
+      final bakery = BuildingRegistry.availableBuildings.firstWhere(
+        (building) => building.type == BuildingType.bakery,
+      );
+
+      expect(bakery.upgradeCost.resources[ResourceType.cash], equals(300));
+      expect(bakery.upgradeCost.resources[ResourceType.planks], greaterThan(0));
+      expect(bakery.upgradeCost.resources[ResourceType.stone], greaterThan(0));
     });
 
     test('upgrade increases level by 1', () {

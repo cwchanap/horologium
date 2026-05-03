@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:horologium/constants/assets_path.dart';
 import 'package:horologium/game/building/building.dart';
+import 'package:horologium/game/resources/resource_cost.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/game/resources/resources.dart';
 
@@ -273,9 +274,8 @@ class BuildingMenu {
                 if (building.canUpgrade)
                   ElevatedButton(
                     onPressed: () {
-                      if (resources.cash >= building.upgradeCost) {
+                      if (building.upgradeCost.deductFrom(resources)) {
                         setState(() {
-                          resources.cash -= building.upgradeCost;
                           building.upgrade();
                           onResourcesChanged();
                         });
@@ -283,7 +283,9 @@ class BuildingMenu {
                         onBuildingUpgraded();
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Not enough cash!')),
+                          const SnackBar(
+                            content: Text('Not enough resources!'),
+                          ),
                         );
                       }
                     },
@@ -291,7 +293,9 @@ class BuildingMenu {
                       backgroundColor: building.color,
                       foregroundColor: Colors.white,
                     ),
-                    child: Text('Upgrade (${building.upgradeCost})'),
+                    child: Text(
+                      'Upgrade (${_formatCost(building.upgradeCost)})',
+                    ),
                   ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
@@ -323,6 +327,28 @@ class BuildingMenu {
         ],
       ),
     );
+  }
+
+  static String _formatCost(ResourceCost cost) {
+    return cost.resources.entries
+        .map(
+          (entry) =>
+              '${_formatAmount(entry.value)} ${_getCostResourceDisplayName(entry.key)}',
+        )
+        .join(', ');
+  }
+
+  static String _getCostResourceDisplayName(ResourceType type) {
+    final resource = ResourceRegistry.find(type);
+    if (resource != null) return resource.name;
+    final name = type.name;
+    return name.isEmpty ? name : '${name[0].toUpperCase()}${name.substring(1)}';
+  }
+
+  static String _formatAmount(double value) {
+    return value.truncateToDouble() == value
+        ? value.toStringAsFixed(0)
+        : value.toStringAsFixed(1);
   }
 
   static Widget _buildBuildingImage(Building building, {double size = 24}) {

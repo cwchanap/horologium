@@ -282,7 +282,9 @@ void main() {
     'upgrades the building and dismisses the dialog when affordable',
     (WidgetTester tester) async {
       final building = powerPlant(requiredWorkers: 0);
-      final resources = Resources()..cash = 500;
+      final resources = Resources()
+        ..cash = 500
+        ..stone = 100;
       int resourcesChanged = 0;
       int upgrades = 0;
 
@@ -294,11 +296,12 @@ void main() {
         onBuildingUpgraded: () => upgrades++,
       );
 
-      await tester.tap(find.text('Upgrade (${building.upgradeCost})'));
+      await tester.tap(find.textContaining('Upgrade'));
       await tester.pumpAndSettle();
 
       expect(building.level, equals(2));
       expect(resources.cash, equals(300));
+      expect(resources.stone, equals(96));
       expect(resourcesChanged, equals(1));
       expect(upgrades, equals(1));
       expect(find.byType(AlertDialog), findsNothing);
@@ -306,10 +309,12 @@ void main() {
   );
 
   testWidgets(
-    'shows a snackbar instead of upgrading when cash is insufficient',
+    'shows a snackbar instead of upgrading when resources are insufficient',
     (WidgetTester tester) async {
       final building = powerPlant(requiredWorkers: 0);
-      final resources = Resources()..cash = 50;
+      final resources = Resources()
+        ..cash = 500
+        ..stone = 0;
       int upgrades = 0;
 
       await openDialog(
@@ -319,12 +324,12 @@ void main() {
         onBuildingUpgraded: () => upgrades++,
       );
 
-      await tester.tap(find.text('Upgrade (${building.upgradeCost})'));
+      await tester.tap(find.textContaining('Upgrade'));
       await tester.pump();
 
       expect(building.level, equals(1));
       expect(upgrades, equals(0));
-      expect(find.text('Not enough cash!'), findsOneWidget);
+      expect(find.text('Not enough resources!'), findsOneWidget);
       expect(find.byType(AlertDialog), findsOneWidget);
     },
   );

@@ -110,7 +110,7 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(find.text(building.name), findsOneWidget);
       expect(find.text(building.description), findsOneWidget);
-      expect(find.text('Upgrade (${building.upgradeCost})'), findsOneWidget);
+      expect(find.text('Upgrade (200 Cash, 4 Stone)'), findsOneWidget);
       expect(find.text('Close'), findsOneWidget);
       expect(emptyGridTapCoordinates, isNull);
     });

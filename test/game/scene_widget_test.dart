@@ -328,6 +328,7 @@ void main() {
           ],
         );
         planet.resources.cash = 1000;
+        planet.resources.stone = 100;
 
         await _pumpMainGameWidget(tester, planet: planet);
         await _pumpUntilFound(tester, find.byType(ResourceDisplay));
@@ -345,6 +346,7 @@ void main() {
 
         expect(planet.getBuildingAt(1, 1)?.level, 2);
         expect(planet.resources.cash, 800);
+        expect(planet.resources.stone, 96);
       },
     );
 

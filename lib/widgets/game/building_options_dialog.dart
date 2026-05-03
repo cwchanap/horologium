@@ -1,24 +1,31 @@
 import 'package:flutter/material.dart';
 
 import '../../game/building/building.dart';
+import '../../game/resources/resource_cost.dart';
 import '../../game/resources/resource_type.dart';
+import '../../game/resources/resources.dart';
 
 String _getResourceDisplayName(ResourceType type) {
   // Use the registry display name if available, fallback to enum name
   final resource = ResourceRegistry.find(type);
-  return resource?.name ?? type.name;
+  return resource?.name ?? _capitalize(type.name);
+}
+
+String _capitalize(String value) {
+  if (value.isEmpty) return value;
+  return '${value[0].toUpperCase()}${value.substring(1)}';
 }
 
 class BuildingOptionsDialog extends StatelessWidget {
   final Building building;
-  final double currentCash;
+  final Resources resources;
   final VoidCallback onUpgrade;
   final VoidCallback onDelete;
 
   const BuildingOptionsDialog({
     super.key,
     required this.building,
-    required this.currentCash,
+    required this.resources,
     required this.onUpgrade,
     required this.onDelete,
   });
@@ -26,7 +33,7 @@ class BuildingOptionsDialog extends StatelessWidget {
   static Future<void> show({
     required BuildContext context,
     required Building building,
-    required double currentCash,
+    required Resources resources,
     required VoidCallback onUpgrade,
     required VoidCallback onDelete,
   }) {
@@ -34,7 +41,7 @@ class BuildingOptionsDialog extends StatelessWidget {
       context: context,
       builder: (context) => BuildingOptionsDialog(
         building: building,
-        currentCash: currentCash,
+        resources: resources,
         onUpgrade: onUpgrade,
         onDelete: onDelete,
       ),
@@ -43,7 +50,7 @@ class BuildingOptionsDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canAffordUpgrade = currentCash >= building.upgradeCost;
+    final canAffordUpgrade = building.upgradeCost.canAfford(resources);
     final canUpgrade = building.canUpgrade && canAffordUpgrade;
 
     return AlertDialog(
@@ -86,9 +93,8 @@ class BuildingOptionsDialog extends StatelessWidget {
           ],
         ],
       ),
-      actionsAlignment: MainAxisAlignment.spaceBetween,
+      actionsAlignment: MainAxisAlignment.end,
       actions: [
-        // Delete button
         TextButton.icon(
           onPressed: () {
             Navigator.pop(context);
@@ -100,42 +106,33 @@ class BuildingOptionsDialog extends StatelessWidget {
             style: TextStyle(color: Colors.redAccent),
           ),
         ),
-        // Right side buttons
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Cancel button
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            const SizedBox(width: 8),
-            // Upgrade button
-            if (building.canUpgrade)
-              ElevatedButton(
-                onPressed: canUpgrade
-                    ? () {
-                        Navigator.pop(context);
-                        onUpgrade();
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[700],
-                  foregroundColor: Colors.white,
-                ),
-                child: Text('Upgrade (${building.upgradeCost})'),
-              )
-            else
-              ElevatedButton(
-                onPressed: null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[700],
-                  foregroundColor: Colors.grey[400],
-                ),
-                child: const Text('Max Level'),
-              ),
-          ],
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
         ),
+        if (building.canUpgrade)
+          ElevatedButton(
+            onPressed: canUpgrade
+                ? () {
+                    Navigator.pop(context);
+                    onUpgrade();
+                  }
+                : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green[700],
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Upgrade (${_formatCost(building.upgradeCost)})'),
+          )
+        else
+          ElevatedButton(
+            onPressed: null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey[700],
+              foregroundColor: Colors.grey[400],
+            ),
+            child: const Text('Max Level'),
+          ),
       ],
     );
   }
@@ -190,6 +187,21 @@ class BuildingOptionsDialog extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatCost(ResourceCost cost) {
+    return cost.resources.entries
+        .map(
+          (entry) =>
+              '${_formatAmount(entry.value)} ${_getResourceDisplayName(entry.key)}',
+        )
+        .join(', ');
+  }
+
+  String _formatAmount(double value) {
+    return value.truncateToDouble() == value
+        ? value.toStringAsFixed(0)
+        : value.toStringAsFixed(1);
   }
 
   Widget _buildUpgradePreview() {

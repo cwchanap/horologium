@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:horologium/constants/assets_path.dart';
 import 'package:horologium/game/building/category.dart';
+import 'package:horologium/game/resources/resource_cost.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:uuid/uuid.dart';
 
@@ -88,8 +89,46 @@ class Building {
     }
   }
 
-  // Upgrade cost is the cost of the next level
-  int get upgradeCost => baseCost * (level + 1);
+  // Upgrade cost is the cost of the next level.
+  ResourceCost get upgradeCost {
+    final nextLevel = level + 1;
+    final costs = <ResourceType, double>{
+      ResourceType.cash: (baseCost * nextLevel).toDouble(),
+    };
+
+    void add(ResourceType type, double amount) {
+      costs.update(type, (value) => value + amount, ifAbsent: () => amount);
+    }
+
+    switch (category) {
+      case BuildingCategory.residential:
+        add(ResourceType.planks, 2.0 * nextLevel);
+        if (type == BuildingType.largeHouse) {
+          add(ResourceType.stone, 1.0 * nextLevel);
+        }
+        break;
+      case BuildingCategory.rawMaterials:
+      case BuildingCategory.foodResources:
+        add(ResourceType.planks, 1.0 * nextLevel);
+        break;
+      case BuildingCategory.services:
+        add(ResourceType.stone, 2.0 * nextLevel);
+        break;
+      case BuildingCategory.primaryFactory:
+      case BuildingCategory.processing:
+      case BuildingCategory.refinement:
+        add(ResourceType.planks, 2.0 * nextLevel);
+        add(ResourceType.stone, 1.0 * nextLevel);
+        break;
+    }
+
+    if (type == BuildingType.kitchen) {
+      costs.remove(ResourceType.stone);
+      costs[ResourceType.planks] = 2.0 * nextLevel;
+    }
+
+    return ResourceCost(costs);
+  }
 
   bool get canUpgrade => level < maxLevel;
 
