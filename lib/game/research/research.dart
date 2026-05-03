@@ -95,12 +95,12 @@ class Research {
     Research(
       type: ResearchType.foodProcessing,
       name: 'Food Processing',
-      description: 'Unlocks Bakeries for producing bread and pastries',
+      description: 'Unlocks Bakeries and Kitchens for producing finished foods',
       icon: Icons.bakery_dining,
       color: Colors.orange,
       cost: 30,
       prerequisites: [ResearchType.grainProcessing],
-      unlocksBuildings: [BuildingType.bakery],
+      unlocksBuildings: [BuildingType.bakery, BuildingType.kitchen],
     ),
   ];
 }
