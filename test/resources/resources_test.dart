@@ -42,6 +42,17 @@ void main() {
     return building;
   }
 
+  test('initializes kitchen finished food resources to zero', () {
+    final resources = Resources();
+
+    expect(resources.tortillas, equals(0));
+    expect(resources.riceMeals, equals(0));
+    expect(resources.maltDrink, equals(0));
+    expect(resources.getResource(ResourceType.tortillas), equals(0));
+    expect(resources.getResource(ResourceType.riceMeals), equals(0));
+    expect(resources.getResource(ResourceType.maltDrink), equals(0));
+  });
+
   group('Resources.update', () {
     test(
       'generates resources for worker-operated building without consumption',
