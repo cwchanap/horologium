@@ -174,11 +174,11 @@ class Resources {
       housingFactor = (shelteredPop / population) * 100;
     }
 
-    // 2. Food factor (0-100): based on bread and pastries availability
+    // 2. Food factor (0-100): based on finished food availability
     // Target: 1 food per 5 population for 100% satisfaction
     double foodFactor = 0;
     if (population > 0) {
-      final totalFood = bread + pastries;
+      final totalFood = bread + pastries + tortillas + riceMeals + maltDrink;
       final targetFood = population / 5.0;
       foodFactor = targetFood > 0
           ? ((totalFood / targetFood) * 100).clamp(0, 100)
