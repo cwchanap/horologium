@@ -439,6 +439,34 @@ void main() {
       expect(HappinessThresholds.low, 30.0);
     });
 
+    test('happiness food factor includes each kitchen finished food', () {
+      final kitchenFoods = <ResourceType>[
+        ResourceType.tortillas,
+        ResourceType.riceMeals,
+        ResourceType.maltDrink,
+      ];
+
+      for (final kitchenFood in kitchenFoods) {
+        final resources = Resources()
+          ..population = 20
+          ..availableWorkers = 20
+          ..bread = 0
+          ..pastries = 0
+          ..tortillas = 0
+          ..riceMeals = 0
+          ..maltDrink = 0;
+
+        resources.resources[kitchenFood] = 4;
+        resources.update([]);
+
+        expect(
+          resources.happiness,
+          greaterThan(45),
+          reason: '${kitchenFood.name} should contribute to happiness',
+        );
+      }
+    });
+
     test('happiness setter clamps value to valid range', () {
       final resources = Resources();
 
