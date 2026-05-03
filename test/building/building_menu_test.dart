@@ -230,8 +230,14 @@ void main() {
       category: BuildingCategory.foodResources,
     );
     final resources = Resources();
+    int resourcesChanged = 0;
 
-    await openDialog(tester, building: field, resources: resources);
+    await openDialog(
+      tester,
+      building: field,
+      resources: resources,
+      onResourcesChanged: () => resourcesChanged++,
+    );
 
     expect(find.text('Crop Type:'), findsOneWidget);
     expect(field.cropType, equals(CropType.wheat));
@@ -244,6 +250,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(field.cropType, equals(CropType.corn));
+    expect(resourcesChanged, equals(1));
   });
 
   testWidgets('updates bakery product selection from the dropdown', (
@@ -260,8 +267,14 @@ void main() {
       category: BuildingCategory.refinement,
     );
     final resources = Resources();
+    int resourcesChanged = 0;
 
-    await openDialog(tester, building: bakery, resources: resources);
+    await openDialog(
+      tester,
+      building: bakery,
+      resources: resources,
+      onResourcesChanged: () => resourcesChanged++,
+    );
 
     expect(find.text('Product Type:'), findsOneWidget);
     expect(bakery.productType, equals(BakeryProduct.bread));
@@ -276,6 +289,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(bakery.productType, equals(BakeryProduct.pastries));
+    expect(resourcesChanged, equals(1));
   });
 
   testWidgets('shows Kitchen product selector and updates product', (
@@ -292,8 +306,14 @@ void main() {
       category: BuildingCategory.refinement,
     );
     final resources = Resources();
+    int resourcesChanged = 0;
 
-    await openDialog(tester, building: kitchen, resources: resources);
+    await openDialog(
+      tester,
+      building: kitchen,
+      resources: resources,
+      onResourcesChanged: () => resourcesChanged++,
+    );
 
     expect(find.text('Product Type:'), findsOneWidget);
     expect(find.byType(DropdownButton<KitchenProduct>), findsOneWidget);
@@ -304,6 +324,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(kitchen.productType, equals(KitchenProduct.riceMeals));
+    expect(resourcesChanged, equals(1));
   });
 
   testWidgets(

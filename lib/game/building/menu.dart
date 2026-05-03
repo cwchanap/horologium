@@ -224,6 +224,7 @@ class BuildingMenu {
                           if (newValue != null) {
                             setState(() {
                               building.cropType = newValue;
+                              onResourcesChanged();
                             });
                           }
                         },
@@ -252,6 +253,7 @@ class BuildingMenu {
                           if (newValue != null) {
                             setState(() {
                               building.productType = newValue;
+                              onResourcesChanged();
                             });
                           }
                         },
@@ -282,6 +284,7 @@ class BuildingMenu {
                           if (newValue != null) {
                             setState(() {
                               building.productType = newValue;
+                              onResourcesChanged();
                             });
                           }
                         },
