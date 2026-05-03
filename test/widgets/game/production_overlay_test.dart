@@ -667,6 +667,45 @@ void main() {
       expect(buildingsChanged, greaterThan(0));
     });
 
+    testWidgets('rebuilds graph when Kitchen productType changes', (
+      tester,
+    ) async {
+      final kitchen = Kitchen(
+        type: BuildingType.kitchen,
+        name: 'Kitchen',
+        description: 'Prepares food',
+        icon: Icons.restaurant,
+        color: Colors.deepOrange,
+        baseCost: 180,
+        requiredWorkers: 1,
+        category: BuildingCategory.refinement,
+        productType: KitchenProduct.tortillas,
+      )..assignWorker();
+
+      var buildingsChanged = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => [kitchen],
+            getResources: () => Resources(),
+            onClose: () {},
+            onBuildingsChanged: () => buildingsChanged++,
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(buildingsChanged, 0);
+
+      kitchen.productType = KitchenProduct.riceMeals;
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(buildingsChanged, greaterThan(0));
+    });
+
     testWidgets('stable signature for regular buildings without crop/product', (
       tester,
     ) async {

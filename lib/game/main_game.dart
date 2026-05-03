@@ -184,11 +184,13 @@ class MainGame extends FlameGame
   void _onBuildingPlaced(int x, int y, Building building) {
     if (_planet == null) return;
 
-    // Store variant for Field/Bakery subtypes
+    // Store variant for buildings whose resource flow depends on a subtype.
     String? variant;
     if (building is Field) {
       variant = building.cropType.name;
     } else if (building is Bakery) {
+      variant = building.productType.name;
+    } else if (building is Kitchen) {
       variant = building.productType.name;
     }
 

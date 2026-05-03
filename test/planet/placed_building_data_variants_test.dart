@@ -148,6 +148,44 @@ void main() {
     });
   });
 
+  group('PlacedBuildingData.createBuilding - Kitchen variants', () {
+    test('restores Kitchen product variant', () {
+      const data = PlacedBuildingData(
+        id: 'kitchen-1',
+        x: 2,
+        y: 3,
+        type: BuildingType.kitchen,
+        variant: 'riceMeals',
+      );
+
+      final building = data.createBuilding();
+
+      expect(building, isA<Kitchen>());
+      expect(
+        (building! as Kitchen).productType,
+        equals(KitchenProduct.riceMeals),
+      );
+    });
+
+    test('falls back to tortillas for unknown Kitchen variant', () {
+      const data = PlacedBuildingData(
+        id: 'kitchen-1',
+        x: 2,
+        y: 3,
+        type: BuildingType.kitchen,
+        variant: 'unknown',
+      );
+
+      final building = data.createBuilding();
+
+      expect(building, isA<Kitchen>());
+      expect(
+        (building! as Kitchen).productType,
+        equals(KitchenProduct.tortillas),
+      );
+    });
+  });
+
   group('PlacedBuildingData.createBuilding - regular buildings', () {
     test('creates regular Building with correct type', () {
       const data = PlacedBuildingData(
