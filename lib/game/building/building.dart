@@ -137,6 +137,27 @@ class Building {
       level++;
     }
   }
+
+  Building copyForPlacement() {
+    return Building(
+      type: type,
+      name: name,
+      description: description,
+      icon: icon,
+      assetPath: assetPath,
+      color: color,
+      baseCost: baseCost,
+      baseGeneration: Map<ResourceType, double>.from(baseGeneration),
+      baseConsumption: Map<ResourceType, double>.from(baseConsumption),
+      basePopulation: basePopulation,
+      maxLevel: maxLevel,
+      gridSize: gridSize,
+      baseBuildingLimit: baseBuildingLimit,
+      requiredWorkers: requiredWorkers,
+      category: category,
+      level: level,
+    );
+  }
 }
 
 class Field extends Building {
@@ -172,6 +193,29 @@ class Field extends Building {
       CropType.barley => ResourceType.barley,
     };
     return {resourceType: 1.0 * level};
+  }
+
+  @override
+  Field copyForPlacement() {
+    return Field(
+      type: type,
+      name: name,
+      description: description,
+      icon: icon,
+      assetPath: assetPath,
+      color: color,
+      baseCost: baseCost,
+      baseGeneration: Map<ResourceType, double>.from(baseGeneration),
+      baseConsumption: Map<ResourceType, double>.from(baseConsumption),
+      basePopulation: basePopulation,
+      maxLevel: maxLevel,
+      gridSize: gridSize,
+      baseBuildingLimit: baseBuildingLimit,
+      requiredWorkers: requiredWorkers,
+      category: category,
+      level: level,
+      cropType: cropType,
+    );
   }
 }
 
@@ -217,6 +261,29 @@ class Bakery extends Building {
       case BakeryProduct.pastries:
         return {ResourceType.flour: 3.0 * level};
     }
+  }
+
+  @override
+  Bakery copyForPlacement() {
+    return Bakery(
+      type: type,
+      name: name,
+      description: description,
+      icon: icon,
+      assetPath: assetPath,
+      color: color,
+      baseCost: baseCost,
+      baseGeneration: Map<ResourceType, double>.from(baseGeneration),
+      baseConsumption: Map<ResourceType, double>.from(baseConsumption),
+      basePopulation: basePopulation,
+      maxLevel: maxLevel,
+      gridSize: gridSize,
+      baseBuildingLimit: baseBuildingLimit,
+      requiredWorkers: requiredWorkers,
+      category: category,
+      level: level,
+      productType: productType,
+    );
   }
 }
 
@@ -275,6 +342,29 @@ class Kitchen extends Building {
           ResourceType.water: 1.0 * level,
         };
     }
+  }
+
+  @override
+  Kitchen copyForPlacement() {
+    return Kitchen(
+      type: type,
+      name: name,
+      description: description,
+      icon: icon,
+      assetPath: assetPath,
+      color: color,
+      baseCost: baseCost,
+      baseGeneration: Map<ResourceType, double>.from(baseGeneration),
+      baseConsumption: Map<ResourceType, double>.from(baseConsumption),
+      basePopulation: basePopulation,
+      maxLevel: maxLevel,
+      gridSize: gridSize,
+      baseBuildingLimit: baseBuildingLimit,
+      requiredWorkers: requiredWorkers,
+      category: category,
+      level: level,
+      productType: productType,
+    );
   }
 }
 
