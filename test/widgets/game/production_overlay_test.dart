@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/building/category.dart';
 import 'package:horologium/game/production/production_graph.dart';
+import 'package:horologium/game/research/research.dart';
+import 'package:horologium/game/research/research_type.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/game/resources/resources.dart';
 import 'package:horologium/widgets/game/production_overlay/building_node.dart';
@@ -436,6 +438,606 @@ void main() {
         expect(find.byType(NodeDetailPanel), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'selected idle producer bottleneck shows engine recommendation',
+      (tester) async {
+        final coalMine = Building(
+          type: BuildingType.coalMine,
+          name: 'Coal Mine',
+          description: 'Produces coal',
+          icon: Icons.fireplace,
+          color: Colors.grey,
+          baseCost: 100,
+          baseGeneration: {ResourceType.coal: 1},
+          requiredWorkers: 1,
+          category: BuildingCategory.rawMaterials,
+        );
+        final powerPlant = Building(
+          type: BuildingType.powerPlant,
+          name: 'Power Plant',
+          description: 'Consumes coal',
+          icon: Icons.bolt,
+          color: Colors.yellow,
+          baseCost: 100,
+          baseConsumption: {ResourceType.coal: 1},
+          requiredWorkers: 1,
+          category: BuildingCategory.processing,
+        )..assignWorker();
+
+        tester.view.physicalSize = const Size(320, 640);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ProductionOverlay(
+              getBuildings: () => [coalMine, powerPlant],
+              getResources: () => Resources(),
+              onClose: () {},
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        await tester.tap(find.widgetWithText(ListTile, 'Coal Mine'));
+        await tester.pump();
+
+        expect(find.byType(NodeDetailPanel), findsOneWidget);
+        expect(find.text('Assign workers to Coal Mine.'), findsOneWidget);
+        expect(find.text('Add a Coal Mine'), findsNothing);
+      },
+    );
+
+    testWidgets('recommendation updates when worker availability changes', (
+      tester,
+    ) async {
+      final coalMine = Building(
+        type: BuildingType.coalMine,
+        name: 'Coal Mine',
+        description: 'Produces coal',
+        icon: Icons.fireplace,
+        color: Colors.grey,
+        baseCost: 100,
+        baseGeneration: {ResourceType.coal: 1},
+        requiredWorkers: 1,
+        category: BuildingCategory.rawMaterials,
+      );
+      final powerPlant = Building(
+        type: BuildingType.powerPlant,
+        name: 'Power Plant',
+        description: 'Consumes coal',
+        icon: Icons.bolt,
+        color: Colors.yellow,
+        baseCost: 100,
+        baseConsumption: {ResourceType.coal: 1},
+        requiredWorkers: 1,
+        category: BuildingCategory.processing,
+      )..assignWorker();
+      final resources = Resources()..availableWorkers = 0;
+
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => [coalMine, powerPlant],
+            getResources: () => resources,
+            onClose: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ListTile, 'Coal Mine'));
+      await tester.pump();
+
+      expect(find.byType(NodeDetailPanel), findsOneWidget);
+      expect(find.text('Assign workers to Coal Mine.'), findsNothing);
+
+      resources.availableWorkers = 1;
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+
+      expect(find.text('Assign workers to Coal Mine.'), findsOneWidget);
+    });
+
+    testWidgets(
+      'selected non-target node does not show target-specific recommendation',
+      (tester) async {
+        final coalMine = Building(
+          type: BuildingType.coalMine,
+          name: 'Coal Mine',
+          description: 'Produces coal',
+          icon: Icons.fireplace,
+          color: Colors.grey,
+          baseCost: 100,
+          baseGeneration: {ResourceType.coal: 1},
+          requiredWorkers: 1,
+          category: BuildingCategory.rawMaterials,
+        );
+        final powerPlant = Building(
+          type: BuildingType.powerPlant,
+          name: 'Power Plant',
+          description: 'Consumes coal',
+          icon: Icons.bolt,
+          color: Colors.yellow,
+          baseCost: 100,
+          baseConsumption: {ResourceType.coal: 1},
+          requiredWorkers: 1,
+          category: BuildingCategory.processing,
+        )..assignWorker();
+
+        tester.view.physicalSize = const Size(320, 640);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ProductionOverlay(
+              getBuildings: () => [coalMine, powerPlant],
+              getResources: () => Resources(),
+              onClose: () {},
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        await tester.tap(find.widgetWithText(ListTile, 'Power Plant'));
+        await tester.pump();
+
+        expect(find.byType(NodeDetailPanel), findsOneWidget);
+        expect(find.text('Assign workers to Coal Mine.'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'selected same-type non-target node does not show assignment recommendation',
+      (tester) async {
+        final idleCoalMine = Building(
+          type: BuildingType.coalMine,
+          name: 'Coal Mine',
+          description: 'Produces coal',
+          icon: Icons.fireplace,
+          color: Colors.grey,
+          baseCost: 100,
+          baseGeneration: {ResourceType.coal: 1},
+          requiredWorkers: 1,
+          category: BuildingCategory.rawMaterials,
+        );
+        final staffedCoalMine = Building(
+          type: BuildingType.coalMine,
+          name: 'Coal Mine',
+          description: 'Produces coal',
+          icon: Icons.fireplace,
+          color: Colors.grey,
+          baseCost: 100,
+          baseGeneration: {ResourceType.coal: 1},
+          requiredWorkers: 1,
+          category: BuildingCategory.rawMaterials,
+        )..assignWorker();
+        final powerPlant = Building(
+          type: BuildingType.powerPlant,
+          name: 'Power Plant',
+          description: 'Consumes coal',
+          icon: Icons.bolt,
+          color: Colors.yellow,
+          baseCost: 100,
+          baseConsumption: {ResourceType.coal: 2},
+          requiredWorkers: 1,
+          category: BuildingCategory.processing,
+        )..assignWorker();
+
+        tester.view.physicalSize = const Size(320, 640);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ProductionOverlay(
+              getBuildings: () => [idleCoalMine, staffedCoalMine, powerPlant],
+              getResources: () => Resources(),
+              onClose: () {},
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        await tester.tap(find.widgetWithText(ListTile, 'Coal Mine').last);
+        await tester.pump();
+
+        expect(find.byType(NodeDetailPanel), findsOneWidget);
+        expect(find.text('Assign workers to Coal Mine.'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'selected duplicate-name non-target node does not show assignment recommendation',
+      (tester) async {
+        final targetCoalMine = Building(
+          type: BuildingType.coalMine,
+          name: 'Coal Mine',
+          description: 'Produces coal',
+          icon: Icons.fireplace,
+          color: Colors.grey,
+          baseCost: 100,
+          baseGeneration: {ResourceType.coal: 1},
+          requiredWorkers: 1,
+          category: BuildingCategory.rawMaterials,
+        );
+        final otherCoalMine = Building(
+          type: BuildingType.coalMine,
+          name: 'Coal Mine',
+          description: 'Produces coal',
+          icon: Icons.fireplace,
+          color: Colors.grey,
+          baseCost: 100,
+          baseGeneration: {ResourceType.coal: 1},
+          requiredWorkers: 1,
+          category: BuildingCategory.rawMaterials,
+        );
+        final powerPlant = Building(
+          type: BuildingType.powerPlant,
+          name: 'Power Plant',
+          description: 'Consumes coal',
+          icon: Icons.bolt,
+          color: Colors.yellow,
+          baseCost: 100,
+          baseConsumption: {ResourceType.coal: 2},
+          requiredWorkers: 1,
+          category: BuildingCategory.processing,
+        )..assignWorker();
+
+        tester.view.physicalSize = const Size(320, 640);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ProductionOverlay(
+              getBuildings: () => [targetCoalMine, otherCoalMine, powerPlant],
+              getResources: () => Resources(),
+              onClose: () {},
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        await tester.tap(find.widgetWithText(ListTile, 'Coal Mine').last);
+        await tester.pump();
+
+        expect(find.byType(NodeDetailPanel), findsOneWidget);
+        expect(find.text('Assign workers to Coal Mine.'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'selected same-type non-target node does not show upgrade recommendation',
+      (tester) async {
+        final upgradeTarget = Building(
+          type: BuildingType.coalMine,
+          name: 'Coal Mine',
+          description: 'Produces coal',
+          icon: Icons.fireplace,
+          color: Colors.grey,
+          baseCost: 100,
+          baseGeneration: {ResourceType.coal: 1},
+          requiredWorkers: 1,
+          category: BuildingCategory.rawMaterials,
+        )..assignWorker();
+        final otherCoalMine = Building(
+          type: BuildingType.coalMine,
+          name: 'Coal Mine',
+          description: 'Produces coal',
+          icon: Icons.fireplace,
+          color: Colors.grey,
+          baseCost: 100,
+          baseGeneration: {ResourceType.coal: 1},
+          requiredWorkers: 1,
+          category: BuildingCategory.rawMaterials,
+        )..assignWorker();
+        final powerPlant = Building(
+          type: BuildingType.powerPlant,
+          name: 'Power Plant',
+          description: 'Consumes coal',
+          icon: Icons.bolt,
+          color: Colors.yellow,
+          baseCost: 100,
+          baseConsumption: {ResourceType.coal: 3},
+          requiredWorkers: 1,
+          category: BuildingCategory.processing,
+        )..assignWorker();
+        final resources = Resources()..planks = 10;
+
+        tester.view.physicalSize = const Size(320, 640);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ProductionOverlay(
+              getBuildings: () => [upgradeTarget, otherCoalMine, powerPlant],
+              getResources: () => resources,
+              onClose: () {},
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        await tester.tap(find.widgetWithText(ListTile, 'Coal Mine').last);
+        await tester.pump();
+
+        expect(find.byType(NodeDetailPanel), findsOneWidget);
+        expect(find.text('Upgrade Coal Mine.'), findsNothing);
+      },
+    );
+
+    testWidgets('selected switch recipe target shows recommendation', (
+      tester,
+    ) async {
+      final field = Field(
+        type: BuildingType.field,
+        name: 'Field',
+        description: 'Grows crops',
+        icon: Icons.grass,
+        color: Colors.green,
+        baseCost: 50,
+        requiredWorkers: 1,
+        category: BuildingCategory.foodResources,
+        cropType: CropType.wheat,
+      )..assignWorker();
+      final grinder = Building(
+        type: BuildingType.grinderMill,
+        name: 'Grinder Mill',
+        description: 'Consumes corn',
+        icon: Icons.precision_manufacturing,
+        color: Colors.brown,
+        baseCost: 100,
+        baseConsumption: {ResourceType.corn: 1},
+        requiredWorkers: 1,
+        category: BuildingCategory.processing,
+      )..assignWorker();
+
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => [field, grinder],
+            getResources: () => Resources(),
+            onClose: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ListTile, 'Field'));
+      await tester.pump();
+
+      expect(find.byType(NodeDetailPanel), findsOneWidget);
+      expect(find.text('Switch a Field to corn.'), findsOneWidget);
+    });
+
+    testWidgets('build recommendation shows on impacted consumer', (
+      tester,
+    ) async {
+      final house = Building(
+        type: BuildingType.largeHouse,
+        name: 'Large House',
+        description: 'Needs electricity',
+        icon: Icons.apartment,
+        color: Colors.lightGreen,
+        baseCost: 250,
+        baseConsumption: {ResourceType.electricity: 1},
+        requiredWorkers: 0,
+        category: BuildingCategory.residential,
+      );
+      final researchManager = ResearchManager()
+        ..completeResearch(ResearchType.electricity);
+
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => [house],
+            getResources: () => Resources(),
+            researchManager: researchManager,
+            onClose: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ListTile, 'Large House'));
+      await tester.pump();
+
+      expect(find.byType(NodeDetailPanel), findsOneWidget);
+      expect(find.text('Build a Power Plant.'), findsOneWidget);
+    });
+
+    testWidgets('research recommendation shows on impacted consumer', (
+      tester,
+    ) async {
+      final house = Building(
+        type: BuildingType.largeHouse,
+        name: 'Large House',
+        description: 'Needs electricity',
+        icon: Icons.apartment,
+        color: Colors.lightGreen,
+        baseCost: 250,
+        baseConsumption: {ResourceType.electricity: 1},
+        requiredWorkers: 0,
+        category: BuildingCategory.residential,
+      );
+
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => [house],
+            getResources: () => Resources(),
+            onClose: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ListTile, 'Large House'));
+      await tester.pump();
+
+      expect(find.byType(NodeDetailPanel), findsOneWidget);
+      expect(
+        find.text('Research electricity to unlock Power Plant.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('recommendation updates when research changes', (tester) async {
+      final powerPlant = Building(
+        type: BuildingType.powerPlant,
+        name: 'Power Plant',
+        description: 'Needs electricity',
+        icon: Icons.bolt,
+        color: Colors.yellow,
+        baseCost: 100,
+        baseConsumption: {ResourceType.electricity: 1},
+        requiredWorkers: 1,
+        category: BuildingCategory.processing,
+      )..assignWorker();
+      final researchManager = ResearchManager();
+
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => [powerPlant],
+            getResources: () => Resources(),
+            researchManager: researchManager,
+            onClose: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ListTile, 'Power Plant'));
+      await tester.pump();
+
+      expect(
+        find.text('Research electricity to unlock Power Plant.'),
+        findsOneWidget,
+      );
+
+      researchManager.completeResearch(ResearchType.electricity);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+
+      expect(find.text('Build a Power Plant.'), findsOneWidget);
+      expect(
+        find.text('Research electricity to unlock Power Plant.'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('recommendation updates when building limit changes', (
+      tester,
+    ) async {
+      final coalMines = List.generate(
+        4,
+        (index) => Building(
+          type: BuildingType.coalMine,
+          name: 'Coal Mine ${index + 1}',
+          description: 'Produces coal',
+          icon: Icons.fireplace,
+          color: Colors.grey,
+          baseCost: 100,
+          baseGeneration: {ResourceType.coal: 1},
+          maxLevel: 1,
+          requiredWorkers: 1,
+          category: BuildingCategory.rawMaterials,
+        )..assignWorker(),
+      );
+      final powerPlant = Building(
+        type: BuildingType.powerPlant,
+        name: 'Power Plant',
+        description: 'Consumes coal',
+        icon: Icons.bolt,
+        color: Colors.yellow,
+        baseCost: 100,
+        baseConsumption: {ResourceType.coal: 5},
+        requiredWorkers: 1,
+        category: BuildingCategory.processing,
+      )..assignWorker();
+      final buildingLimitManager = BuildingLimitManager();
+
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductionOverlay(
+            getBuildings: () => [...coalMines, powerPlant],
+            getResources: () => Resources(),
+            buildingLimitManager: buildingLimitManager,
+            onClose: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ListTile, 'Coal Mine 1'));
+      await tester.pump();
+
+      expect(
+        find.text('Build a Coal Mine. Building limit reached (4/4).'),
+        findsOneWidget,
+      );
+
+      buildingLimitManager.increaseBuildingLimit(BuildingType.coalMine, 1);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+
+      expect(find.text('Build a Coal Mine.'), findsOneWidget);
+      expect(
+        find.text('Build a Coal Mine. Building limit reached (4/4).'),
+        findsNothing,
+      );
+    });
   });
 
   group('BuildingNodeWidget', () {

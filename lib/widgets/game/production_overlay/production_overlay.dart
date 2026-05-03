@@ -13,6 +13,8 @@ import 'package:horologium/game/building/category.dart';
 import 'package:horologium/game/production/chain_highlighter.dart';
 import 'package:horologium/game/production/flow_analyzer.dart';
 import 'package:horologium/game/production/production_graph.dart';
+import 'package:horologium/game/production/production_recommendation_engine.dart';
+import 'package:horologium/game/research/research.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/game/resources/resources.dart';
 import 'package:horologium/widgets/game/production_overlay/building_node.dart';
@@ -35,6 +37,8 @@ class ProductionOverlay extends StatefulWidget {
   final GetResources getResources;
   final VoidCallback onClose;
   final VoidCallback? onBuildingsChanged;
+  final ResearchManager? researchManager;
+  final BuildingLimitManager? buildingLimitManager;
 
   const ProductionOverlay({
     super.key,
@@ -42,6 +46,8 @@ class ProductionOverlay extends StatefulWidget {
     required this.getResources,
     required this.onClose,
     this.onBuildingsChanged,
+    this.researchManager,
+    this.buildingLimitManager,
   });
 
   @override
@@ -55,8 +61,12 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   ResourceType? _activeFilter;
   Timer? _autoRefreshTimer;
   String _lastBuildingsSignature = '';
+  String _lastRecommendationSignature = '';
   List<NodeCluster> _clusters = [];
   final Set<String> _expandedClusterIds = {};
+  late final ResearchManager _fallbackResearchManager;
+  late final BuildingLimitManager _fallbackBuildingLimitManager;
+  Map<ResourceType, ProductionRecommendation> _recommendations = {};
 
   // Layout constants
   static const double _horizontalSpacing = 180;
@@ -67,6 +77,8 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   @override
   void initState() {
     super.initState();
+    _fallbackResearchManager = ResearchManager();
+    _fallbackBuildingLimitManager = BuildingLimitManager();
     _lastBuildingsSignature = _computeBuildingsSignature(widget.getBuildings());
     _buildGraph();
     _startAutoRefresh();
@@ -91,6 +103,33 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     return signatures.join(',');
   }
 
+  String _computeRecommendationSignature(Resources resources) {
+    final resourceValues = resources.resources.entries.map((entry) {
+      return '${entry.key.name}:${entry.value}';
+    }).toList()..sort();
+    final completedResearch = _effectiveResearchManager.toList()..sort();
+    final buildingLimits =
+        _effectiveBuildingLimitManager
+            .toMap()
+            .entries
+            .map((entry) => '${entry.key}:${entry.value}')
+            .toList()
+          ..sort();
+
+    return [
+      'workers:${resources.availableWorkers}',
+      'resources:${resourceValues.join(',')}',
+      'research:${completedResearch.join(',')}',
+      'limits:${buildingLimits.join(',')}',
+    ].join('|');
+  }
+
+  ResearchManager get _effectiveResearchManager =>
+      widget.researchManager ?? _fallbackResearchManager;
+
+  BuildingLimitManager get _effectiveBuildingLimitManager =>
+      widget.buildingLimitManager ?? _fallbackBuildingLimitManager;
+
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
@@ -101,14 +140,22 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   void _startAutoRefresh() {
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      final currentSignature = _computeBuildingsSignature(
-        widget.getBuildings(),
+      final buildings = widget.getBuildings();
+      final resources = widget.getResources();
+      final currentSignature = _computeBuildingsSignature(buildings);
+      final currentRecommendationSignature = _computeRecommendationSignature(
+        resources,
       );
       if (currentSignature != _lastBuildingsSignature) {
         _lastBuildingsSignature = currentSignature;
+        _lastRecommendationSignature = currentRecommendationSignature;
         _buildGraph(preserveSelection: true);
         // Notify external listeners of building changes
         widget.onBuildingsChanged?.call();
+      } else if (currentRecommendationSignature !=
+          _lastRecommendationSignature) {
+        _lastRecommendationSignature = currentRecommendationSignature;
+        _buildGraph(preserveSelection: true);
       }
     });
   }
@@ -116,9 +163,17 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   void _buildGraph({bool preserveSelection = false}) {
     final buildings = widget.getBuildings();
     final resources = widget.getResources();
+    final recommendationSignature = _computeRecommendationSignature(resources);
 
     var graph = ProductionGraph.fromBuildings(buildings, resources);
     graph = FlowAnalyzer.analyzeGraph(graph);
+    final recommendations = ProductionRecommendationEngine.recommend(
+      graph: graph,
+      buildings: buildings,
+      resources: resources,
+      researchManager: _effectiveResearchManager,
+      buildingLimitManager: _effectiveBuildingLimitManager,
+    );
     graph = _applyLayout(graph);
 
     if (_activeFilter != null) {
@@ -183,6 +238,8 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     setState(() {
       _graph = graph;
       _clusters = clusters;
+      _recommendations = recommendations;
+      _lastRecommendationSignature = recommendationSignature;
       if (!preserveSelection) {
         _selectedNode = null;
         _chainHighlight = null;
@@ -646,10 +703,35 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   Widget _buildDetailPanel() {
     // Find actual bottleneck or null if none exists
     BottleneckInsight? matchingBottleneck;
+    ProductionRecommendation? matchingRecommendation;
     if (_graph != null) {
       for (final bottleneck in _graph!.bottlenecks) {
-        if (bottleneck.impactedNodeIds.contains(_selectedNode!.id)) {
+        final selectedNode = _selectedNode!;
+        final recommendation = _recommendations[bottleneck.resourceType];
+        final impactsSelectedNode = bottleneck.impactedNodeIds.contains(
+          selectedNode.id,
+        );
+        final recommendationTargetsSelectedNode =
+            _recommendationTargetsSelectedNode(recommendation, selectedNode);
+        final matchesSelectedResource =
+            selectedNode.inputs.any(
+              (input) => input.resourceType == bottleneck.resourceType,
+            ) ||
+            selectedNode.outputs.any(
+              (output) => output.resourceType == bottleneck.resourceType,
+            );
+        final recommendationIsResourceLevel =
+            recommendation == null ||
+            _isResourceLevelRecommendation(recommendation);
+
+        if (impactsSelectedNode ||
+            recommendationTargetsSelectedNode ||
+            (matchesSelectedResource && recommendationIsResourceLevel)) {
           matchingBottleneck = bottleneck;
+          if (recommendationTargetsSelectedNode ||
+              recommendationIsResourceLevel) {
+            matchingRecommendation = recommendation;
+          }
           break;
         }
       }
@@ -658,8 +740,30 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     return NodeDetailPanel(
       node: _selectedNode!,
       bottleneck: matchingBottleneck,
+      recommendation: matchingRecommendation,
       onClose: _onBackgroundTap,
     );
+  }
+
+  bool _recommendationTargetsSelectedNode(
+    ProductionRecommendation? recommendation,
+    BuildingNode selectedNode,
+  ) {
+    return recommendation?.targetBuildingId == selectedNode.id;
+  }
+
+  bool _isResourceLevelRecommendation(ProductionRecommendation recommendation) {
+    switch (recommendation.type) {
+      case RecommendationType.build:
+      case RecommendationType.research:
+      case RecommendationType.noProducer:
+        return true;
+      case RecommendationType.assignWorkers:
+      case RecommendationType.switchRecipe:
+      case RecommendationType.upgrade:
+      case RecommendationType.missingUpgradeResources:
+        return false;
+    }
   }
 
   BuildingNode? _findNode(String nodeId) {

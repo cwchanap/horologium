@@ -20,6 +20,7 @@ class ProductionRecommendation {
   final ResourceType resourceType;
   final String message;
   final BuildingType? targetBuildingType;
+  final String? targetBuildingId;
   final ResearchType? researchType;
   final Map<ResourceType, double> missingResources;
 
@@ -28,6 +29,7 @@ class ProductionRecommendation {
     required this.resourceType,
     required this.message,
     this.targetBuildingType,
+    this.targetBuildingId,
     this.researchType,
     this.missingResources = const {},
   });
@@ -80,6 +82,7 @@ class ProductionRecommendationEngine {
         type: RecommendationType.assignWorkers,
         resourceType: resourceType,
         targetBuildingType: idleProducer.type,
+        targetBuildingId: idleProducer.id,
         message: 'Assign workers to ${idleProducer.name}.',
       );
     }
@@ -101,6 +104,7 @@ class ProductionRecommendationEngine {
         type: RecommendationType.upgrade,
         resourceType: resourceType,
         targetBuildingType: affordableUpgradeProducer.type,
+        targetBuildingId: affordableUpgradeProducer.id,
         message: 'Upgrade ${affordableUpgradeProducer.name}.',
       );
     }
@@ -113,6 +117,7 @@ class ProductionRecommendationEngine {
         type: RecommendationType.missingUpgradeResources,
         resourceType: resourceType,
         targetBuildingType: missingResourceUpgradeProducer.type,
+        targetBuildingId: missingResourceUpgradeProducer.id,
         missingResources: missing,
         message:
             'Gather more resources to upgrade ${missingResourceUpgradeProducer.name}.',
@@ -180,6 +185,7 @@ class ProductionRecommendationEngine {
           type: RecommendationType.switchRecipe,
           resourceType: resourceType,
           targetBuildingType: BuildingType.field,
+          targetBuildingId: field.id,
           message: 'Switch a Field to ${crop.name}.',
         );
       }
@@ -196,6 +202,7 @@ class ProductionRecommendationEngine {
           type: RecommendationType.switchRecipe,
           resourceType: resourceType,
           targetBuildingType: BuildingType.kitchen,
+          targetBuildingId: kitchen.id,
           message: 'Switch a Kitchen to ${kitchenProduct.name}.',
         );
       }
@@ -212,6 +219,7 @@ class ProductionRecommendationEngine {
           type: RecommendationType.switchRecipe,
           resourceType: resourceType,
           targetBuildingType: BuildingType.bakery,
+          targetBuildingId: bakery.id,
           message: 'Switch a Bakery to ${bakeryProduct.name}.',
         );
       }

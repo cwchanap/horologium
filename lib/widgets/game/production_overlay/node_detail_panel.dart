@@ -3,18 +3,21 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:horologium/game/production/production_graph.dart';
+import 'package:horologium/game/production/production_recommendation_engine.dart';
 import 'package:horologium/widgets/game/production_overlay/production_theme.dart';
 
 /// Panel displaying detailed information about a selected building node.
 class NodeDetailPanel extends StatelessWidget {
   final BuildingNode node;
   final BottleneckInsight? bottleneck;
+  final ProductionRecommendation? recommendation;
   final VoidCallback? onClose;
 
   const NodeDetailPanel({
     super.key,
     required this.node,
     this.bottleneck,
+    this.recommendation,
     this.onClose,
   });
 
@@ -128,7 +131,7 @@ class NodeDetailPanel extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          bottleneck!.recommendation,
+                          recommendation?.message ?? bottleneck!.recommendation,
                           style: TextStyle(
                             color: Colors.grey[400],
                             fontSize: 11,
@@ -155,9 +158,11 @@ class NodeDetailPanel extends StatelessWidget {
                 children: [
                   Icon(Icons.person_off, color: Colors.orange, size: 16),
                   SizedBox(width: 8),
-                  Text(
-                    'No workers assigned - building idle',
-                    style: TextStyle(color: Colors.orange, fontSize: 12),
+                  Flexible(
+                    child: Text(
+                      'No workers assigned - building idle',
+                      style: TextStyle(color: Colors.orange, fontSize: 12),
+                    ),
                   ),
                 ],
               ),
