@@ -22,8 +22,8 @@ class BuildingPlacementManager {
     if (game.buildingToPlace == null) return false;
 
     // Validate placement against grid occupancy and terrain suitability
-    final building = game.buildingToPlace!;
-    final canPlace = game.grid.isAreaAvailable(x, y, building.gridSize);
+    final selectedBuilding = game.buildingToPlace!;
+    final canPlace = game.grid.isAreaAvailable(x, y, selectedBuilding.gridSize);
     if (!canPlace) {
       // Show feedback and keep placement mode active so the player can move cursor
       ScaffoldMessenger.of(context).showSnackBar(
@@ -35,7 +35,7 @@ class BuildingPlacementManager {
       return false;
     }
 
-    final buildingType = building.type;
+    final buildingType = selectedBuilding.type;
     final currentCount = game.grid.countBuildingsOfType(buildingType);
     final limit = buildingLimitManager.getBuildingLimit(buildingType);
 
@@ -50,7 +50,7 @@ class BuildingPlacementManager {
       return false;
     }
 
-    if (!ResourceService.canAffordBuilding(resources, building)) {
+    if (!ResourceService.canAffordBuilding(resources, selectedBuilding)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Insufficient funds!'),
@@ -61,6 +61,7 @@ class BuildingPlacementManager {
     }
 
     // Place the building
+    final building = selectedBuilding.copyForPlacement();
     game.grid.placeBuilding(x, y, building);
     ResourceService.purchaseBuilding(resources, building);
 

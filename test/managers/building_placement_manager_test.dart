@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/building/building.dart';
 import 'package:horologium/game/building/category.dart';
 import 'package:horologium/game/managers/building_placement_manager.dart';
+import 'package:horologium/game/production/production_graph.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/game/resources/resources.dart';
 
@@ -156,7 +157,12 @@ void main() {
         await tester.pump();
 
         expect(placed, isTrue);
-        expect(game.grid.getBuildingAt(5, 5), same(building));
+        final placedBuilding = game.grid.getBuildingAt(5, 5);
+        expect(placedBuilding, isNotNull);
+        expect(placedBuilding, isNot(same(building)));
+        expect(placedBuilding!.id, isNot(equals(building.id)));
+        expect(placedBuilding.type, equals(building.type));
+        expect(placedBuilding.name, equals(building.name));
         expect(resources.cash, equals(880));
         expect(game.buildingToPlace, isNull);
         expect(game.hidePlacementPreviewCallCount, equals(1));
@@ -164,6 +170,108 @@ void main() {
         expect(find.byType(SnackBar), findsNothing);
       },
     );
+
+    testWidgets(
+      'places repeated Kitchen selections as independent recipe instances',
+      (tester) async {
+        final context = await pumpPlacementHarness(tester);
+        final kitchenTemplate = Kitchen(
+          type: BuildingType.kitchen,
+          name: 'Kitchen',
+          description: 'Prepares food',
+          icon: Icons.restaurant,
+          color: Colors.deepOrange,
+          baseCost: 180,
+          requiredWorkers: 1,
+          category: BuildingCategory.refinement,
+          productType: KitchenProduct.maltDrink,
+        )..level = 2;
+
+        game.buildingToPlace = kitchenTemplate;
+        expect(manager.handleBuildingPlacement(0, 0, context), isTrue);
+
+        game.buildingToPlace = kitchenTemplate;
+        expect(manager.handleBuildingPlacement(3, 0, context), isTrue);
+
+        final firstKitchen = game.grid.getBuildingAt(0, 0)! as Kitchen;
+        final secondKitchen = game.grid.getBuildingAt(3, 0)! as Kitchen;
+
+        expect(firstKitchen, isNot(same(kitchenTemplate)));
+        expect(secondKitchen, isNot(same(kitchenTemplate)));
+        expect(firstKitchen, isNot(same(secondKitchen)));
+        expect(firstKitchen.id, isNot(equals(kitchenTemplate.id)));
+        expect(secondKitchen.id, isNot(equals(kitchenTemplate.id)));
+        expect(firstKitchen.id, isNot(equals(secondKitchen.id)));
+        expect(firstKitchen.productType, equals(KitchenProduct.maltDrink));
+        expect(secondKitchen.productType, equals(KitchenProduct.maltDrink));
+        expect(firstKitchen.level, equals(2));
+        expect(secondKitchen.level, equals(2));
+
+        firstKitchen.productType = KitchenProduct.riceMeals;
+
+        expect(firstKitchen.productType, equals(KitchenProduct.riceMeals));
+        expect(secondKitchen.productType, equals(KitchenProduct.maltDrink));
+        expect(kitchenTemplate.productType, equals(KitchenProduct.maltDrink));
+
+        final graph = ProductionGraph.fromBuildings(
+          game.grid.getAllBuildings(),
+          resources,
+        );
+        final kitchenNodeIds = graph.nodes
+            .where((node) => node.type == BuildingType.kitchen)
+            .map((node) => node.id)
+            .toSet();
+
+        expect(kitchenNodeIds.length, equals(2));
+        expect(kitchenNodeIds, contains(firstKitchen.id));
+        expect(kitchenNodeIds, contains(secondKitchen.id));
+      },
+    );
+
+    testWidgets('preserves Field and Bakery selected variants on placement', (
+      tester,
+    ) async {
+      final context = await pumpPlacementHarness(tester);
+      final fieldTemplate = Field(
+        type: BuildingType.field,
+        name: 'Field',
+        description: 'Grows crops',
+        icon: Icons.grass,
+        color: Colors.lightGreen,
+        baseCost: 50,
+        requiredWorkers: 1,
+        category: BuildingCategory.foodResources,
+        cropType: CropType.barley,
+      );
+      final bakeryTemplate = Bakery(
+        type: BuildingType.bakery,
+        name: 'Bakery',
+        description: 'Bakes food',
+        icon: Icons.bakery_dining,
+        color: Colors.orange,
+        baseCost: 150,
+        requiredWorkers: 1,
+        category: BuildingCategory.refinement,
+        productType: BakeryProduct.pastries,
+      );
+
+      game.buildingToPlace = fieldTemplate;
+      expect(manager.handleBuildingPlacement(0, 0, context), isTrue);
+
+      game.buildingToPlace = bakeryTemplate;
+      expect(manager.handleBuildingPlacement(3, 0, context), isTrue);
+
+      final placedField = game.grid.getBuildingAt(0, 0)! as Field;
+      final placedBakery = game.grid.getBuildingAt(3, 0)! as Bakery;
+
+      expect(placedField, isNot(same(fieldTemplate)));
+      expect(placedField.id, isNot(equals(fieldTemplate.id)));
+      expect(placedField.cropType, equals(CropType.barley));
+
+      expect(placedBakery, isNot(same(bakeryTemplate)));
+      expect(placedBakery.id, isNot(equals(bakeryTemplate.id)));
+      expect(placedBakery.productType, equals(BakeryProduct.pastries));
+    });
 
     test('selectBuilding and cancelPlacement update placement state', () {
       final building = createBuilding(
