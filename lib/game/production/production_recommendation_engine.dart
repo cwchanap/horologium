@@ -43,6 +43,16 @@ class ProductionRecommendationEngine {
     required ResearchManager researchManager,
     required BuildingLimitManager buildingLimitManager,
   }) {
+    // Identify buildings whose inputs are starved (at least one input in
+    // deficit). Upgrading these won't help until the upstream bottleneck
+    // is resolved.
+    final blockedProducerIds = <String>{};
+    for (final node in graph.nodes) {
+      if (node.inputs.any((input) => input.status == FlowStatus.deficit)) {
+        blockedProducerIds.add(node.id);
+      }
+    }
+
     final result = <ResourceType, ProductionRecommendation>{};
 
     for (final bottleneck in graph.bottlenecks) {
@@ -52,6 +62,7 @@ class ProductionRecommendationEngine {
         resources,
         researchManager,
         buildingLimitManager,
+        blockedProducerIds: blockedProducerIds,
       );
     }
 
@@ -63,8 +74,9 @@ class ProductionRecommendationEngine {
     List<Building> buildings,
     Resources resources,
     ResearchManager researchManager,
-    BuildingLimitManager buildingLimitManager,
-  ) {
+    BuildingLimitManager buildingLimitManager, {
+    Set<String> blockedProducerIds = const {},
+  }) {
     final producers = buildings
         .where((building) => building.generation.containsKey(resourceType))
         .toList();
@@ -94,7 +106,10 @@ class ProductionRecommendationEngine {
     if (switchRecommendation != null) return switchRecommendation;
 
     final upgradeProducers = producers
-        .where((building) => building.canUpgrade)
+        .where(
+          (building) =>
+              building.canUpgrade && !blockedProducerIds.contains(building.id),
+        )
         .toList();
     final affordableUpgradeProducer = upgradeProducers
         .where((building) => building.upgradeCost.canAfford(resources))

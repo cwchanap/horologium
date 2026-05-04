@@ -429,6 +429,58 @@ void main() {
         );
       },
     );
+
+    test('does not recommend upgrading input-starved producer', () {
+      // Scenario: Grinder Mill produces cornmeal from corn, but corn is in
+      // deficit (no corn producer). The engine should NOT recommend upgrading
+      // the Grinder Mill since it can't produce until corn supply is fixed.
+      final grinderMill = _building(
+        type: BuildingType.grinderMill,
+        generation: {ResourceType.cornmeal: 1},
+        consumption: {ResourceType.corn: 4},
+        assignedWorkers: 1,
+      );
+      final kitchen = Kitchen(
+        type: BuildingType.kitchen,
+        name: 'Kitchen',
+        description: 'Prepares food',
+        icon: Icons.restaurant,
+        color: Colors.deepOrange,
+        baseCost: 180,
+        requiredWorkers: 1,
+        category: BuildingCategory.refinement,
+        productType: KitchenProduct.tortillas,
+      )..assignWorker();
+
+      // Build the graph so FlowAnalyzer detects the corn deficit on
+      // the Grinder Mill node.
+      final graph = FlowAnalyzer.analyzeGraph(
+        ProductionGraph.fromBuildings([grinderMill, kitchen], Resources()),
+      );
+
+      final resources = Resources()
+        ..cash = 500
+        ..planks = 5;
+
+      final recommendations = ProductionRecommendationEngine.recommend(
+        graph: graph,
+        buildings: [grinderMill, kitchen],
+        resources: resources,
+        researchManager: ResearchManager(),
+        buildingLimitManager: BuildingLimitManager(),
+      );
+
+      // Cornmeal should be a bottleneck (Grinder Mill can't produce), but
+      // the recommendation must NOT suggest upgrading the Grinder Mill.
+      // Instead it falls through to "build" (suggesting another Grinder Mill).
+      final cornmealRec = recommendations[ResourceType.cornmeal];
+      expect(cornmealRec, isNotNull);
+      expect(cornmealRec!.type, isNot(equals(RecommendationType.upgrade)));
+      expect(
+        cornmealRec.type,
+        isNot(equals(RecommendationType.missingUpgradeResources)),
+      );
+    });
   });
 }
 
