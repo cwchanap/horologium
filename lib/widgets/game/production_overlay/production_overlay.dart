@@ -104,8 +104,12 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
   }
 
   String _computeRecommendationSignature(Resources resources) {
+    // Round resource values to reduce churn from small float deltas during
+    // production ticks. Recommendations only change when values cross
+    // meaningful thresholds (e.g. can afford an upgrade), so rounding to
+    // whole numbers is sufficient.
     final resourceValues = resources.resources.entries.map((entry) {
-      return '${entry.key.name}:${entry.value}';
+      return '${entry.key.name}:${entry.value.round()}';
     }).toList()..sort();
     final completedResearch = _effectiveResearchManager.toList()..sort();
     final buildingLimits =

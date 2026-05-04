@@ -43,4 +43,26 @@ class ResourceCost {
     }
     return true;
   }
+
+  /// Formats this cost as a human-readable string (e.g. "100 Cash, 5 Wood").
+  String toDisplayString() {
+    return resources.entries
+        .map(
+          (entry) => '${_formatAmount(entry.value)} ${_displayName(entry.key)}',
+        )
+        .join(', ');
+  }
+
+  static String _formatAmount(double value) {
+    return value.truncateToDouble() == value
+        ? value.toStringAsFixed(0)
+        : value.toStringAsFixed(1);
+  }
+
+  static String _displayName(ResourceType type) {
+    final resource = ResourceRegistry.find(type);
+    if (resource != null) return resource.name;
+    final name = type.name;
+    return name.isEmpty ? name : '${name[0].toUpperCase()}${name.substring(1)}';
+  }
 }

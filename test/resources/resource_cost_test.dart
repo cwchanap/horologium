@@ -82,5 +82,33 @@ void main() {
       expect(resources.planks, equals(1));
       expect(resources.stone, equals(5));
     });
+
+    test('toDisplayString formats whole numbers without decimals', () {
+      final cost = ResourceCost({ResourceType.cash: 200, ResourceType.wood: 5});
+
+      final result = cost.toDisplayString();
+      expect(result, contains('200'));
+      expect(result, contains('5'));
+      expect(result, contains('Cash'));
+      expect(result, contains('Wood'));
+      // Whole numbers should not have ".0"
+      expect(result, isNot(contains('200.0')));
+    });
+
+    test('toDisplayString formats fractional values with one decimal', () {
+      final cost = ResourceCost({ResourceType.water: 0.5});
+
+      expect(cost.toDisplayString(), contains('0.5'));
+    });
+
+    test('toDisplayString uses registry display names', () {
+      final cost = ResourceCost({ResourceType.polishedRice: 2});
+
+      expect(cost.toDisplayString(), contains('Polished Rice'));
+    });
+
+    test('toDisplayString returns empty for zero-cost', () {
+      expect(ResourceCost.empty.toDisplayString(), equals(''));
+    });
   });
 }
