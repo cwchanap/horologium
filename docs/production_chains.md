@@ -19,6 +19,7 @@ Each placed `Building` contributes:
 
 - `Field.cropType` selects wheat, corn, rice, or barley.
 - `Bakery.productType` selects bread or pastries.
+- `Kitchen.productType` selects tortillas, rice meals, or malt drinks.
 
 ## Production Rules
 
@@ -70,6 +71,13 @@ flowchart LR
 
   Barley --> MaltHouse["Malt House\n-2 barley/s\n+1 malted barley/s"]
   MaltHouse --> MaltedBarley["Malted Barley"]
+
+  Cornmeal --> KitchenTortillas["Kitchen: Tortillas\n-2 cornmeal/s\n-1 water/s\n+1 tortillas/s"]
+  PolishedRice --> KitchenRiceMeals["Kitchen: Rice Meals\n-2 polished rice/s\n-1 water/s\n+1 rice meals/s"]
+  MaltedBarley --> KitchenMaltDrink["Kitchen: Malt Drink\n-2 malted barley/s\n-1 water/s\n+1 malt drink/s"]
+  KitchenTortillas --> Tortillas["Tortillas"]
+  KitchenRiceMeals --> RiceMeals["Rice Meals"]
+  KitchenMaltDrink --> MaltDrink["Malt Drink"]
 
   GoldMine["Gold Mine\n1 gold / 10s"] --> Gold["Gold"]
   Quarry["Quarry\n1 stone/s"] --> Stone["Stone"]
@@ -163,6 +171,13 @@ flowchart LR
 
   Barley --> MaltHouse["Malt House"]
   MaltHouse --> MaltedBarley["Malted Barley"]
+
+  Cornmeal --> KitchenTortillas["Kitchen: Tortillas"]
+  PolishedRice --> KitchenRiceMeals["Kitchen: Rice Meals"]
+  MaltedBarley --> KitchenMaltDrink["Kitchen: Malt Drink"]
+  KitchenTortillas --> Tortillas["Tortillas"]
+  KitchenRiceMeals --> RiceMeals["Rice Meals"]
+  KitchenMaltDrink --> MaltDrink["Malt Drink"]
 ```
 
 | Building | Inputs | Outputs | Workers | Category | Research Gate |
@@ -174,6 +189,9 @@ flowchart LR
 | Malt House | 2 barley/s | 1 malted barley/s | 1 | processing | Advanced Grain Processing |
 | Bakery: Bread | 2 flour/s | 1 bread/s | 1 | refinement | Food Processing |
 | Bakery: Pastries | 3 flour/s | 1 pastries/s | 1 | refinement | Food Processing |
+| Kitchen: Tortillas | 2 cornmeal/s, 1 water/s | 1 tortillas/s | 1 | refinement | Food Processing |
+| Kitchen: Rice Meals | 2 polished rice/s, 1 water/s | 1 rice meals/s | 1 | refinement | Food Processing |
+| Kitchen: Malt Drink | 2 malted barley/s, 1 water/s | 1 malt drink/s | 1 | refinement | Food Processing |
 
 ## Current End-To-End Chains
 
@@ -188,6 +206,9 @@ flowchart LR
 | Corn -> Cornmeal | Field(corn) -> Grinder Mill | Cornmeal |
 | Rice -> Polished Rice | Field(rice) -> Rice Huller | Polished rice |
 | Barley -> Malted Barley | Field(barley) -> Malt House | Malted barley |
+| Corn -> Cornmeal -> Tortillas | Field(corn) -> Grinder Mill -> Kitchen(tortillas) | Tortillas |
+| Rice -> Polished Rice -> Rice Meals | Field(rice) -> Rice Huller -> Kitchen(riceMeals) | Rice meals |
+| Barley -> Malted Barley -> Malt Drink | Field(barley) -> Malt House -> Kitchen(maltDrink) | Malt drink |
 
 ## Research Gates
 
@@ -198,4 +219,4 @@ flowchart LR
 | Grain Processing | Wind Mill, Grinder Mill |
 | Advanced Grain Processing | Rice Huller, Malt House |
 | Modern Housing | Large House |
-| Food Processing | Bakery |
+| Food Processing | Bakery, Kitchen |

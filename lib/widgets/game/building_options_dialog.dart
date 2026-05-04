@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../game/building/building.dart';
-import '../../game/resources/resource_cost.dart';
 import '../../game/resources/resource_type.dart';
 import '../../game/resources/resources.dart';
 
@@ -122,7 +121,7 @@ class BuildingOptionsDialog extends StatelessWidget {
               backgroundColor: Colors.green[700],
               foregroundColor: Colors.white,
             ),
-            child: Text('Upgrade (${_formatCost(building.upgradeCost)})'),
+            child: Text('Upgrade (${building.upgradeCost.toDisplayString()})'),
           )
         else
           ElevatedButton(
@@ -187,21 +186,6 @@ class BuildingOptionsDialog extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _formatCost(ResourceCost cost) {
-    return cost.resources.entries
-        .map(
-          (entry) =>
-              '${_formatAmount(entry.value)} ${_getResourceDisplayName(entry.key)}',
-        )
-        .join(', ');
-  }
-
-  String _formatAmount(double value) {
-    return value.truncateToDouble() == value
-        ? value.toStringAsFixed(0)
-        : value.toStringAsFixed(1);
   }
 
   Widget _buildUpgradePreview() {
