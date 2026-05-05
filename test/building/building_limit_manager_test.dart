@@ -176,5 +176,97 @@ void main() {
       );
       expect(customBuilding.baseBuildingLimit, equals(2));
     });
+
+    group('backfillLimitUpgradesForCompletedResearch', () {
+      late BuildingLimitManager manager;
+
+      setUp(() {
+        manager = BuildingLimitManager();
+      });
+
+      test('adds +2 for expansionPlanning', () {
+        manager.backfillLimitUpgradesForCompletedResearch({
+          'expansion_planning',
+        });
+
+        expect(
+          manager.getBuildingLimit(BuildingType.house),
+          equals(6), // base 4 + 2
+        );
+        expect(
+          manager.getBuildingLimit(BuildingType.kitchen),
+          equals(6), // kitchen was new, base 4 + 2
+        );
+      });
+
+      test('adds +3 for advancedConstruction alone', () {
+        manager.backfillLimitUpgradesForCompletedResearch({
+          'advanced_construction',
+        });
+
+        expect(
+          manager.getBuildingLimit(BuildingType.house),
+          equals(7), // base 4 + 3
+        );
+        expect(
+          manager.getBuildingLimit(BuildingType.kitchen),
+          equals(7), // base 4 + 3
+        );
+      });
+
+      test(
+        'adds +5 total when both expansionPlanning and advancedConstruction completed',
+        () {
+          manager.backfillLimitUpgradesForCompletedResearch({
+            'expansion_planning',
+            'advanced_construction',
+          });
+
+          expect(
+            manager.getBuildingLimit(BuildingType.house),
+            equals(9), // base 4 + 5
+          );
+          expect(
+            manager.getBuildingLimit(BuildingType.kitchen),
+            equals(9), // base 4 + 5
+          );
+        },
+      );
+
+      test('preserves existing upgrades for known building types', () {
+        // Simulate an old save where house already had limit upgrade
+        // (research was completed when house existed, but kitchen wasn't added yet)
+        manager.increaseBuildingLimit(BuildingType.house, 3);
+
+        // Kitchen was added later, no entry yet
+        manager.backfillLimitUpgradesForCompletedResearch({
+          'expansion_planning',
+        });
+
+        // house keeps existing +3, kitchen gets new +2 (they were different "cohorts")
+        expect(
+          manager.getBuildingLimit(BuildingType.house),
+          equals(7),
+        ); // 4 + 3
+        // kitchen gets the +2 backfill
+        expect(
+          manager.getBuildingLimit(BuildingType.kitchen),
+          equals(6),
+        ); // 4 + 2
+      });
+
+      test('does nothing when no relevant research completed', () {
+        manager.backfillLimitUpgradesForCompletedResearch({'electricity'});
+
+        expect(manager.getBuildingLimit(BuildingType.house), equals(4));
+        expect(manager.getBuildingLimit(BuildingType.kitchen), equals(4));
+      });
+
+      test('handles empty set gracefully', () {
+        manager.backfillLimitUpgradesForCompletedResearch({});
+
+        expect(manager.getBuildingLimit(BuildingType.house), equals(4));
+      });
+    });
   });
 }

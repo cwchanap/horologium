@@ -508,6 +508,13 @@ class SaveService {
       }
     }
 
+    // Backfill limit upgrades for building types that were added after
+    // research was already completed (e.g., if Kitchen was added in a later
+    // version but player already completed expansion planning).
+    buildingLimitManager.backfillLimitUpgradesForCompletedResearch(
+      researchManager.toList().toSet(),
+    );
+
     // Load buildings
     final buildingStrings =
         prefs.getStringList(_planetBuildingsKey(planetId)) ?? [];
