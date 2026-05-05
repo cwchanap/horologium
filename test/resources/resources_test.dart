@@ -143,6 +143,110 @@ void main() {
       expect(resources.research, 1.0);
       expect(resources.electricity, 10);
     });
+
+    test('Kitchen consumes cornmeal+water and produces tortillas', () {
+      final resources = Resources();
+      resources.resources[ResourceType.cornmeal] = 10;
+      resources.resources[ResourceType.water] = 5;
+      resources.resources[ResourceType.tortillas] = 0;
+
+      final kitchen = Kitchen(
+        type: BuildingType.kitchen,
+        name: 'Kitchen',
+        description: 'Prepares food',
+        icon: Icons.restaurant,
+        color: Colors.deepOrange,
+        baseCost: 180,
+        requiredWorkers: 1,
+        category: BuildingCategory.refinement,
+        productType: KitchenProduct.tortillas,
+      )..assignWorker();
+
+      resources.update([kitchen]);
+
+      // Kitchen at level 1 consumes 2 cornmeal + 1 water, produces 1 tortillas
+      expect(resources.cornmeal, equals(8));
+      expect(resources.water, equals(4));
+      expect(resources.tortillas, equals(1));
+    });
+
+    test('Kitchen does not produce when input resources are missing', () {
+      final resources = Resources();
+      resources.resources[ResourceType.cornmeal] = 1; // Not enough (needs 2)
+      resources.resources[ResourceType.water] = 5;
+      resources.resources[ResourceType.tortillas] = 0;
+
+      final kitchen = Kitchen(
+        type: BuildingType.kitchen,
+        name: 'Kitchen',
+        description: 'Prepares food',
+        icon: Icons.restaurant,
+        color: Colors.deepOrange,
+        baseCost: 180,
+        requiredWorkers: 1,
+        category: BuildingCategory.refinement,
+        productType: KitchenProduct.tortillas,
+      )..assignWorker();
+
+      resources.update([kitchen]);
+
+      // Not enough cornmeal — nothing consumed, nothing produced
+      expect(resources.cornmeal, equals(1));
+      expect(resources.water, equals(5));
+      expect(resources.tortillas, equals(0));
+    });
+
+    test('Kitchen does not produce without assigned workers', () {
+      final resources = Resources();
+      resources.resources[ResourceType.cornmeal] = 10;
+      resources.resources[ResourceType.water] = 5;
+      resources.resources[ResourceType.tortillas] = 0;
+
+      final kitchen = Kitchen(
+        type: BuildingType.kitchen,
+        name: 'Kitchen',
+        description: 'Prepares food',
+        icon: Icons.restaurant,
+        color: Colors.deepOrange,
+        baseCost: 180,
+        requiredWorkers: 1,
+        category: BuildingCategory.refinement,
+        productType: KitchenProduct.tortillas,
+      ); // No workers assigned
+
+      resources.update([kitchen]);
+
+      // No workers — nothing consumed or produced
+      expect(resources.cornmeal, equals(10));
+      expect(resources.water, equals(5));
+      expect(resources.tortillas, equals(0));
+    });
+
+    test('Kitchen produces riceMeals from polishedRice+water', () {
+      final resources = Resources();
+      resources.resources[ResourceType.polishedRice] = 10;
+      resources.resources[ResourceType.water] = 5;
+      resources.resources[ResourceType.riceMeals] = 0;
+
+      final kitchen = Kitchen(
+        type: BuildingType.kitchen,
+        name: 'Kitchen',
+        description: 'Prepares food',
+        icon: Icons.restaurant,
+        color: Colors.deepOrange,
+        baseCost: 180,
+        requiredWorkers: 1,
+        category: BuildingCategory.refinement,
+        productType: KitchenProduct.riceMeals,
+      )..assignWorker();
+
+      resources.update([kitchen]);
+
+      // Kitchen with riceMeals consumes 2 polishedRice + 1 water, produces 1 riceMeals
+      expect(resources.polishedRice, equals(8));
+      expect(resources.water, equals(4));
+      expect(resources.riceMeals, equals(1));
+    });
   });
 
   group('Resource transactions', () {

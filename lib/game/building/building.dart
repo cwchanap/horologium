@@ -123,6 +123,9 @@ class Building {
     }
 
     if (type == BuildingType.kitchen) {
+      // Kitchen is in the refinement category but doesn't need stone — it's
+      // a food processor, not a heavy industrial building. Override the
+      // category-derived formula to use only planks as material cost.
       costs.remove(ResourceType.stone);
       costs[ResourceType.planks] = 2.0 * nextLevel;
     }

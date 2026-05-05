@@ -241,4 +241,67 @@ void main() {
       );
     });
   });
+
+  group('copyForPlacement isolation', () {
+    test('resets assignedWorkers to zero for base Building', () {
+      final building = Building(
+        type: BuildingType.powerPlant,
+        name: 'Power Plant',
+        description: 'Test',
+        icon: Icons.bolt,
+        color: Colors.yellow,
+        baseCost: 100,
+        requiredWorkers: 1,
+        category: BuildingCategory.rawMaterials,
+      )..assignWorker();
+
+      expect(building.assignedWorkers, equals(1));
+
+      final copy = building.copyForPlacement();
+      expect(copy.assignedWorkers, equals(0));
+      expect(copy.id, isNot(equals(building.id)));
+      expect(copy.type, equals(building.type));
+    });
+
+    test('resets assignedWorkers to zero for Field', () {
+      final field = _makeField(cropType: CropType.corn)..assignWorker();
+
+      expect(field.assignedWorkers, equals(1));
+
+      final copy = field.copyForPlacement();
+      expect(copy.assignedWorkers, equals(0));
+      expect(copy.cropType, equals(CropType.corn));
+    });
+
+    test('resets assignedWorkers to zero for Kitchen', () {
+      final kitchen = _makeKitchen(productType: KitchenProduct.riceMeals)
+        ..assignWorker();
+
+      expect(kitchen.assignedWorkers, equals(1));
+
+      final copy = kitchen.copyForPlacement();
+      expect(copy.assignedWorkers, equals(0));
+      expect(copy.productType, equals(KitchenProduct.riceMeals));
+    });
+
+    test('does not share mutable generation map with template', () {
+      final building = Building(
+        type: BuildingType.powerPlant,
+        name: 'Power Plant',
+        description: 'Test',
+        icon: Icons.bolt,
+        color: Colors.yellow,
+        baseCost: 100,
+        baseGeneration: {ResourceType.electricity: 1},
+        requiredWorkers: 1,
+        category: BuildingCategory.rawMaterials,
+      );
+
+      final copy = building.copyForPlacement();
+
+      // Mutating the copy's generation should not affect the template
+      copy.baseGeneration[ResourceType.electricity] = 99;
+      expect(building.baseGeneration[ResourceType.electricity], equals(1));
+    });
+  });
 }
