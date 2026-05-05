@@ -405,6 +405,44 @@ class BuildingLimitManager {
     }
   }
 
+  /// Backfills missing limit upgrades for building types that were added after
+  /// research was already completed. When new building types are added to the
+  /// game via updates, existing players who have already completed
+  /// expansionPlanning and/or advancedConstruction need their limits
+  /// upgraded for these new building types.
+  void backfillLimitUpgradesForCompletedResearch(
+    Set<String> completedResearchIds,
+  ) {
+    // expansionPlanning adds +2 to all building limits
+    if (completedResearchIds.contains('expansion_planning')) {
+      for (final type in BuildingType.values) {
+        // Only add if not already upgraded (preserve existing values)
+        if (!_limitUpgrades.containsKey(type)) {
+          _limitUpgrades[type] = 2;
+        }
+      }
+    }
+
+    // advancedConstruction adds +3 more (cumulative +5 from expansionPlanning)
+    if (completedResearchIds.contains('advanced_construction')) {
+      // Check if we already added +2 from expansionPlanning, then add remaining +3
+      // Or if expansionPlanning wasn't done, just add +3
+      final hadExpansion = completedResearchIds.contains('expansion_planning');
+      for (final type in BuildingType.values) {
+        final existing = _limitUpgrades[type] ?? 0;
+        if (hadExpansion) {
+          // Already got +2 from expansionPlanning backfill, need +3 more
+          _limitUpgrades[type] = existing + 3;
+        } else {
+          // No expansionPlanning, just +3
+          if (existing == 0) {
+            _limitUpgrades[type] = 3;
+          }
+        }
+      }
+    }
+  }
+
   Map<String, int> toMap() {
     return _limitUpgrades.map((key, value) => MapEntry(key.name, value));
   }
