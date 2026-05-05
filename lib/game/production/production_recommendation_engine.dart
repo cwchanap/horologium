@@ -12,6 +12,7 @@ enum RecommendationType {
   missingUpgradeResources,
   build,
   research,
+  buildingLimitReached,
   noProducer,
 }
 
@@ -173,15 +174,41 @@ class ProductionRecommendationEngine {
     final buildingLimit = buildingLimitManager.getBuildingLimit(
       producerTemplate.type,
     );
-    final limitMessage = buildingCount >= buildingLimit
-        ? ' Building limit reached ($buildingCount/$buildingLimit).'
-        : '';
+
+    if (buildingCount >= buildingLimit) {
+      // Building limit reached — try to recommend research that expands
+      // limits before falling back to a dead-end message.
+      final limitResearch = _researchForBuildingLimit(researchManager);
+      if (limitResearch != null) {
+        final actionableResearch =
+            _actionableResearchFor(limitResearch, researchManager) ??
+            limitResearch;
+        final message = actionableResearch.type == limitResearch.type
+            ? 'Research ${actionableResearch.id} to increase building limits and build more ${producerTemplate.name}s.'
+            : 'Research ${actionableResearch.id} to progress toward increasing building limits.';
+        return ProductionRecommendation(
+          type: RecommendationType.research,
+          resourceType: resourceType,
+          targetBuildingType: producerTemplate.type,
+          researchType: actionableResearch.type,
+          message: message,
+        );
+      }
+
+      return ProductionRecommendation(
+        type: RecommendationType.buildingLimitReached,
+        resourceType: resourceType,
+        targetBuildingType: producerTemplate.type,
+        message:
+            'Building limit reached for ${producerTemplate.name} ($buildingCount/$buildingLimit). No further expansion research available.',
+      );
+    }
 
     return ProductionRecommendation(
       type: RecommendationType.build,
       resourceType: resourceType,
       targetBuildingType: producerTemplate.type,
-      message: 'Build a ${producerTemplate.name}.$limitMessage',
+      message: 'Build a ${producerTemplate.name}.',
     );
   }
 
@@ -321,6 +348,21 @@ class ProductionRecommendationEngine {
       if (actionable != null) return actionable;
     }
 
+    return null;
+  }
+
+  /// Returns the next uncompleted research that increases building limits, or
+  /// null if all limit-expansion research has been completed.
+  static Research? _researchForBuildingLimit(ResearchManager researchManager) {
+    const limitResearchIds = [
+      ResearchType.expansionPlanning,
+      ResearchType.advancedConstruction,
+    ];
+    for (final researchType in limitResearchIds) {
+      if (!researchManager.isResearched(researchType)) {
+        return _researchByType(researchType);
+      }
+    }
     return null;
   }
 }

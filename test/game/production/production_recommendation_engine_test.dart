@@ -481,6 +481,157 @@ void main() {
         isNot(equals(RecommendationType.missingUpgradeResources)),
       );
     });
+
+    test(
+      'recommends research instead of build when building limit is reached',
+      () {
+        // Create a building limit manager that caps coal mines at 1.
+        final buildingLimitManager = BuildingLimitManager()
+          ..increaseBuildingLimit(
+            BuildingType.coalMine,
+            // default baseBuildingLimit is 4, set upgrade to -3 to make limit 1.
+            -3,
+          );
+
+        // One coal mine exists at max level (at the limit of 1).
+        final coalMine = _building(
+          type: BuildingType.coalMine,
+          generation: {ResourceType.coal: 1},
+          assignedWorkers: 1,
+          level: 5,
+        );
+
+        final recommendations = ProductionRecommendationEngine.recommend(
+          graph: _graphWithBottleneck(ResourceType.coal),
+          buildings: [coalMine],
+          resources: Resources(),
+          researchManager: ResearchManager(),
+          buildingLimitManager: buildingLimitManager,
+        );
+
+        expect(
+          recommendations[ResourceType.coal]!.type,
+          RecommendationType.research,
+        );
+        expect(
+          recommendations[ResourceType.coal]!.researchType,
+          ResearchType.expansionPlanning,
+        );
+        expect(
+          recommendations[ResourceType.coal]!.message,
+          contains('expansion_planning'),
+        );
+      },
+    );
+
+    test(
+      'recommends buildingLimitReached when all limit research is completed',
+      () {
+        // Set coal mine limit to 1.
+        final buildingLimitManager = BuildingLimitManager()
+          ..increaseBuildingLimit(BuildingType.coalMine, -3);
+
+        // One coal mine at limit, and both limit-expansion researches done.
+        final researchManager = ResearchManager()
+          ..completeResearch(ResearchType.expansionPlanning)
+          ..completeResearch(ResearchType.advancedConstruction);
+
+        final coalMine = _building(
+          type: BuildingType.coalMine,
+          generation: {ResourceType.coal: 1},
+          assignedWorkers: 1,
+          level: 5,
+        );
+
+        final recommendations = ProductionRecommendationEngine.recommend(
+          graph: _graphWithBottleneck(ResourceType.coal),
+          buildings: [coalMine],
+          resources: Resources(),
+          researchManager: researchManager,
+          buildingLimitManager: buildingLimitManager,
+        );
+
+        expect(
+          recommendations[ResourceType.coal]!.type,
+          RecommendationType.buildingLimitReached,
+        );
+        expect(
+          recommendations[ResourceType.coal]!.targetBuildingType,
+          BuildingType.coalMine,
+        );
+        expect(
+          recommendations[ResourceType.coal]!.message,
+          contains('limit reached'),
+        );
+      },
+    );
+
+    test('recommends build when building limit is not yet reached', () {
+      // Default limit is 4, we have 1 building at max level — under limit.
+      final coalMine = _building(
+        type: BuildingType.coalMine,
+        generation: {ResourceType.coal: 1},
+        assignedWorkers: 1,
+        level: 5,
+      );
+
+      final recommendations = ProductionRecommendationEngine.recommend(
+        graph: _graphWithBottleneck(ResourceType.coal),
+        buildings: [coalMine],
+        resources: Resources(),
+        researchManager: ResearchManager(),
+        buildingLimitManager: BuildingLimitManager(),
+      );
+
+      expect(
+        recommendations[ResourceType.coal]!.type,
+        RecommendationType.build,
+      );
+      expect(
+        recommendations[ResourceType.coal]!.message,
+        isNot(contains('limit')),
+      );
+    });
+
+    test(
+      'recommends prerequisite research for limit expansion when direct research locked',
+      () {
+        // expansionPlanning is completed but advancedConstruction is not.
+        // Set coal mine limit to 1 with 1 building at limit.
+        // But this scenario requires both to be capped. Actually, let's test
+        // that when expansionPlanning is done and limit is still reached,
+        // it recommends advancedConstruction.
+        final buildingLimitManager = BuildingLimitManager()
+          ..increaseBuildingLimit(BuildingType.coalMine, -5);
+
+        final researchManager = ResearchManager()
+          ..completeResearch(ResearchType.expansionPlanning);
+
+        final coalMine = _building(
+          type: BuildingType.coalMine,
+          generation: {ResourceType.coal: 1},
+          assignedWorkers: 1,
+          level: 5,
+        );
+
+        final recommendations = ProductionRecommendationEngine.recommend(
+          graph: _graphWithBottleneck(ResourceType.coal),
+          buildings: [coalMine],
+          resources: Resources(),
+          researchManager: researchManager,
+          buildingLimitManager: buildingLimitManager,
+        );
+
+        expect(
+          recommendations[ResourceType.coal]!.type,
+          RecommendationType.research,
+        );
+        expect(
+          recommendations[ResourceType.coal]!.researchType,
+          ResearchType.advancedConstruction,
+        );
+      },
+    );
   });
 }
 
@@ -509,17 +660,22 @@ Building _building({
   Map<ResourceType, double> consumption = const {},
   int assignedWorkers = 0,
   int requiredWorkers = 1,
+  int? level,
+  int maxLevel = 5,
 }) {
   return Building(
-    type: type,
-    name: type.name,
-    description: type.name,
-    icon: Icons.factory,
-    color: Colors.blue,
-    baseCost: 100,
-    baseGeneration: generation,
-    baseConsumption: consumption,
-    requiredWorkers: requiredWorkers,
-    category: BuildingCategory.rawMaterials,
-  )..assignedWorkers = assignedWorkers;
+      type: type,
+      name: type.name,
+      description: type.name,
+      icon: Icons.factory,
+      color: Colors.blue,
+      baseCost: 100,
+      baseGeneration: generation,
+      baseConsumption: consumption,
+      requiredWorkers: requiredWorkers,
+      category: BuildingCategory.rawMaterials,
+      maxLevel: maxLevel,
+    )
+    ..assignedWorkers = assignedWorkers
+    ..level = level ?? 1;
 }
