@@ -760,6 +760,7 @@ class _ProductionOverlayState extends State<ProductionOverlay> {
     switch (recommendation.type) {
       case RecommendationType.build:
       case RecommendationType.research:
+      case RecommendationType.buildingLimitReached:
       case RecommendationType.noProducer:
         return true;
       case RecommendationType.assignWorkers:

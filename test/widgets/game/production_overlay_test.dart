@@ -1024,7 +1024,9 @@ void main() {
       await tester.pump();
 
       expect(
-        find.text('Build a Coal Mine. Building limit reached (4/4).'),
+        find.text(
+          'Research expansion_planning to increase building limits and build more Coal Mines.',
+        ),
         findsOneWidget,
       );
 
@@ -1034,7 +1036,9 @@ void main() {
 
       expect(find.text('Build a Coal Mine.'), findsOneWidget);
       expect(
-        find.text('Build a Coal Mine. Building limit reached (4/4).'),
+        find.text(
+          'Research expansion_planning to increase building limits and build more Coal Mines.',
+        ),
         findsNothing,
       );
     });
