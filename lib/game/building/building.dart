@@ -413,32 +413,19 @@ class BuildingLimitManager {
   void backfillLimitUpgradesForCompletedResearch(
     Set<String> completedResearchIds,
   ) {
-    // expansionPlanning adds +2 to all building limits
-    if (completedResearchIds.contains('expansion_planning')) {
-      for (final type in BuildingType.values) {
-        // Only add if not already upgraded (preserve existing values)
-        if (!_limitUpgrades.containsKey(type)) {
-          _limitUpgrades[type] = 2;
-        }
-      }
-    }
+    final hasExpansion = completedResearchIds.contains('expansion_planning');
+    final hasAdvanced = completedResearchIds.contains('advanced_construction');
 
-    // advancedConstruction adds +3 more (cumulative +5 from expansionPlanning)
-    if (completedResearchIds.contains('advanced_construction')) {
-      // Check if we already added +2 from expansionPlanning, then add remaining +3
-      // Or if expansionPlanning wasn't done, just add +3
-      final hadExpansion = completedResearchIds.contains('expansion_planning');
-      for (final type in BuildingType.values) {
-        final existing = _limitUpgrades[type] ?? 0;
-        if (hadExpansion) {
-          // Already got +2 from expansionPlanning backfill, need +3 more
-          _limitUpgrades[type] = existing + 3;
-        } else {
-          // No expansionPlanning, just +3
-          if (existing == 0) {
-            _limitUpgrades[type] = 3;
-          }
-        }
+    if (!hasExpansion && !hasAdvanced) return;
+
+    // Determine the target upgrade for missing building types.
+    // Both completed = +5, only advanced = +3, only expansion = +2.
+    // Types already present in _limitUpgrades (restored via loadFromMap)
+    // are never modified — only newly-added building types get backfilled.
+    final targetUpgrade = hasAdvanced ? (hasExpansion ? 5 : 3) : 2;
+    for (final type in BuildingType.values) {
+      if (!_limitUpgrades.containsKey(type)) {
+        _limitUpgrades[type] = targetUpgrade;
       }
     }
   }

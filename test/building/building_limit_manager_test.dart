@@ -267,6 +267,50 @@ void main() {
 
         expect(manager.getBuildingLimit(BuildingType.house), equals(4));
       });
+
+      test(
+        'does not inflate limits when loadFromMap already has both upgrades',
+        () {
+          // Simulate a save where both research were already completed:
+          // loadFromMap restores +5 for all existing building types.
+          manager.loadFromMap({'house': 5, 'powerPlant': 5, 'coalMine': 5});
+
+          // Now backfill runs (as it does on every load).
+          manager.backfillLimitUpgradesForCompletedResearch({
+            'expansion_planning',
+            'advanced_construction',
+          });
+
+          // All existing types must stay at +5, not +8 or higher.
+          expect(manager.getBuildingLimit(BuildingType.house), equals(9));
+          expect(manager.getBuildingLimit(BuildingType.powerPlant), equals(9));
+          expect(manager.getBuildingLimit(BuildingType.coalMine), equals(9));
+
+          // Newly-added types (not in save) still get +5.
+          expect(manager.getBuildingLimit(BuildingType.kitchen), equals(9));
+        },
+      );
+
+      test('does not inflate limits across repeated backfill calls', () {
+        manager.backfillLimitUpgradesForCompletedResearch({
+          'expansion_planning',
+          'advanced_construction',
+        });
+
+        final firstLimit = manager.getBuildingLimit(BuildingType.house);
+        expect(firstLimit, equals(9));
+
+        // Call backfill again — limits must not grow.
+        manager.backfillLimitUpgradesForCompletedResearch({
+          'expansion_planning',
+          'advanced_construction',
+        });
+
+        expect(
+          manager.getBuildingLimit(BuildingType.house),
+          equals(firstLimit),
+        );
+      });
     });
   });
 }
