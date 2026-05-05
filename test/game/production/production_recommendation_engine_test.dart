@@ -318,20 +318,53 @@ void main() {
       );
     });
 
-    test('does not recommend assigning workers when none are available', () {
-      final coalMine = _building(
+    test(
+      'does not recommend upgrading unstaffed producer when no workers available',
+      () {
+        final coalMine = _building(
+          type: BuildingType.coalMine,
+          generation: {ResourceType.coal: 1},
+          assignedWorkers: 0,
+        );
+        final resources = Resources()
+          ..availableWorkers = 0
+          ..cash = 200
+          ..planks = 2;
+
+        final recommendations = ProductionRecommendationEngine.recommend(
+          graph: _graphWithBottleneck(ResourceType.coal),
+          buildings: [coalMine],
+          resources: resources,
+          researchManager: ResearchManager(),
+          buildingLimitManager: BuildingLimitManager(),
+        );
+
+        // Upgrading a worker-less building won't help, so the engine skips
+        // the upgrade branch and falls through to "build" (adding another
+        // producer for when workers become available).
+        expect(
+          recommendations[ResourceType.coal]!.type,
+          RecommendationType.build,
+        );
+      },
+    );
+
+    test('can recommend upgrading workerless (requiredWorkers=0) building', () {
+      // Buildings that require 0 workers always produce, so they should
+      // be eligible for upgrade recommendations even without assigned workers.
+      final autoProducer = _building(
         type: BuildingType.coalMine,
         generation: {ResourceType.coal: 1},
         assignedWorkers: 0,
+        requiredWorkers: 0,
       );
       final resources = Resources()
-        ..availableWorkers = 0
         ..cash = 200
         ..planks = 2;
 
       final recommendations = ProductionRecommendationEngine.recommend(
         graph: _graphWithBottleneck(ResourceType.coal),
-        buildings: [coalMine],
+        buildings: [autoProducer],
         resources: resources,
         researchManager: ResearchManager(),
         buildingLimitManager: BuildingLimitManager(),
@@ -341,7 +374,10 @@ void main() {
         recommendations[ResourceType.coal]!.type,
         RecommendationType.upgrade,
       );
-      expect(recommendations[ResourceType.coal]!.targetBuildingId, coalMine.id);
+      expect(
+        recommendations[ResourceType.coal]!.targetBuildingId,
+        autoProducer.id,
+      );
     });
 
     test('sets target id for missing-resource upgrade recommendations', () {

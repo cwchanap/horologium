@@ -303,4 +303,116 @@ void main() {
       expect(loaded.resources.maltDrink, equals(9));
     });
   });
+
+  group('SaveService building limits parse error handling', () {
+    test(
+      'does not inflate building limits when limits JSON is corrupt',
+      () async {
+        const planetId = 'corrupt-limits';
+        final prefs = await SharedPreferences.getInstance();
+
+        // Set up research so backfill would normally inflate limits.
+        await prefs.setStringList('planet.$planetId.research.completed', [
+          'expansion_planning',
+          'advanced_construction',
+        ]);
+        // Set corrupt building limits JSON — will trigger parse error.
+        await prefs.setString(
+          'planet.$planetId.buildingLimits',
+          'not-valid-json',
+        );
+        // Set resources JSON so loadOrCreatePlanet enters the loading branch.
+        await prefs.setString('planet.$planetId.resources_json', '{}');
+
+        final loaded = await SaveService.loadOrCreatePlanet(
+          planetId,
+          name: 'Corrupt Limits',
+        );
+
+        // Limits should remain at base values, not inflated by backfill.
+        // house has baseBuildingLimit of 4, powerPlant of 4.
+        // If backfill ran incorrectly, these would be 9 (4+5).
+        final houseLimit = loaded.buildingLimitManager.getBuildingLimit(
+          BuildingType.house,
+        );
+        final powerPlantLimit = loaded.buildingLimitManager.getBuildingLimit(
+          BuildingType.powerPlant,
+        );
+
+        expect(
+          houseLimit,
+          equals(4),
+          reason: 'House limit should stay at base when JSON parse fails',
+        );
+        expect(
+          powerPlantLimit,
+          equals(4),
+          reason: 'PowerPlant limit should stay at base when JSON parse fails',
+        );
+      },
+    );
+
+    test(
+      'repeated loadOrCreatePlanet does not double-inflate building limits',
+      () async {
+        const planetId = 'double-load';
+        final prefs = await SharedPreferences.getInstance();
+
+        // Complete both limit-expansion researches.
+        await prefs.setStringList('planet.$planetId.research.completed', [
+          'expansion_planning',
+          'advanced_construction',
+        ]);
+        // Save valid building limits with +5 for house only.
+        await prefs.setString(
+          'planet.$planetId.buildingLimits',
+          '{"house": 5}',
+        );
+        await prefs.setString('planet.$planetId.resources_json', '{}');
+
+        final first = await SaveService.loadOrCreatePlanet(
+          planetId,
+          name: 'Double Load',
+        );
+        final firstHouseLimit = first.buildingLimitManager.getBuildingLimit(
+          BuildingType.house,
+        );
+        final firstKitchenLimit = first.buildingLimitManager.getBuildingLimit(
+          BuildingType.kitchen,
+        );
+
+        // house: base 4 + 5 from saved limits = 9
+        // kitchen: base 4 + 5 from backfill = 9
+        expect(firstHouseLimit, equals(9));
+        expect(firstKitchenLimit, equals(9));
+
+        // Save what was loaded (so the second load picks up the same data).
+        await SaveService.savePlanet(first);
+
+        // Load again — limits must not grow further.
+        final second = await SaveService.loadOrCreatePlanet(
+          planetId,
+          name: 'Double Load',
+        );
+
+        final secondHouseLimit = second.buildingLimitManager.getBuildingLimit(
+          BuildingType.house,
+        );
+        final secondKitchenLimit = second.buildingLimitManager.getBuildingLimit(
+          BuildingType.kitchen,
+        );
+
+        expect(
+          secondHouseLimit,
+          equals(firstHouseLimit),
+          reason: 'House limit should not inflate on repeated load',
+        );
+        expect(
+          secondKitchenLimit,
+          equals(firstKitchenLimit),
+          reason: 'Kitchen limit should not inflate on repeated load',
+        );
+      },
+    );
+  });
 }

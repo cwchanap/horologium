@@ -109,7 +109,9 @@ class ProductionRecommendationEngine {
     final upgradeProducers = producers
         .where(
           (building) =>
-              building.canUpgrade && !blockedProducerIds.contains(building.id),
+              building.canUpgrade &&
+              !blockedProducerIds.contains(building.id) &&
+              (building.requiredWorkers == 0 || building.hasWorkers),
         )
         .toList();
     final affordableUpgradeProducer = upgradeProducers
