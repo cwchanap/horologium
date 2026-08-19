@@ -4,9 +4,9 @@
 
 **Goal:** Ship and validate Horologium's complete one-planet mining-idle MVP: reveal fixed deposits, build and upgrade mines, accrue deterministic cargo, sell it for cash, reveal all three sectors, and restore capped offline production in a portrait-first Flutter/Flame experience.
 
-**Architecture:** Add one isolated `lib/mining/` vertical slice beside the city runtime. Pure Dart content/state/simulation/save/controller/sheet-model code owns the mining rules; Flutter owns screen state, lifecycle and sheets; a separate Flame `MiningGame` owns world rendering, camera and effects. Reuse the existing `ResourceType`, `Assets`, terrain, audio preferences and icons, but do not reuse the city economy (`Resources`, `Building`, `GameStateManager`, `Planet`, `SaveService`).
+**Architecture:** Add one isolated `lib/mining/` vertical slice beside the city runtime. Pure Dart content/state/simulation/save/controller/sheet-model code owns mining rules; Flutter owns screen state, lifecycle and sheets; a separate Flame `MiningGame` owns world rendering, camera and effects. Reuse existing `ResourceType`, `Assets`, `ResourceIcon`, terrain, audio preferences, and camera math, but do not reuse the city economy (`Resources`, `Building`, `GameStateManager`, `Planet`, `ActivePlanet`, `SaveService`). Serialize every asynchronous mining mutation through one controller future chain.
 
-**Tech Stack:** Dart 3.8+, Flutter 3.32.5, Flame 1.30, SharedPreferences 2.5, existing Flutter/Flame test infrastructure and existing terrain/mine/resource assets.
+**Tech Stack:** Dart 3.8+, Flutter 3.32.5, Flame 1.30, SharedPreferences 2.5, existing Flutter/Flame test infrastructure, existing terrain/mine/resource assets.
 
 **Spec:** `docs/superpowers/specs/2026-08-18-hpa-631-one-planet-mining-mvp-design.md`
 
@@ -15,22 +15,40 @@
 - Deliver HPA-631 in **one implementation PR** on `jack65786656/hpa-631-build-and-validate-the-one-planet-mining-mvp`.
 - Linear HPA-630/HPA-631 are authoritative when older pivot documentation differs.
 - Keep `Resources`, `Building`, `GameStateManager`, `Planet`, `ActivePlanet`, worker/research/quest systems, and `SaveService` out of mining economics and persistence.
-- Reuse `ResourceType.gold|coal|stone`, `Assets.goldMine|coalMine|quarry`, `ResourceIcon`, `ParallaxTerrainComponent`, and `AudioManager` where useful.
-- Keep immutable content separate from mutable mining progress.
+- Reuse `ResourceType.gold|coal|stone`, `Assets.goldMine|coalMine|quarry`, `ResourceIcon`, `ParallaxTerrainComponent`, and `AudioManager`.
+- Use `MiningSectorId` as the only Phase 1 sector/deposit identity.
+- Keep immutable content separate from mutable progress.
 - Cash is the only spendable currency.
-- Landing Basin / Gold, Carbon Ridge / Coal, and Granite Crater / Stone share one typed domain path.
-- Use five mine levels with visibly distinct presentation structures at levels 1, 3, and 5.
-- Use elapsed UTC time as the production source of truth; cap offline production at 8 hours; clock rollback produces zero.
-- Failed Reveal, Build, Upgrade, and Sell actions do not partially mutate in-memory or persisted state.
-- Persist one strict JSON document at `horologium.mining.save`; there is no schema-version envelope, migration layer, backup rotation, or missing-sector default-fill in this first unshipped mining format.
-- Do not write persistence on one-second foreground refreshes.
-- `MiningController` stays plain Dart; do not add `ChangeNotifier`, Provider, Riverpod, Bloc, a command bus, or service locator.
-- Derive contextual sheet affordance through pure `MiningSheetView.from(...)`, not inside widget `build()` logic.
+- Use five mine levels with visibly distinct structures at levels 1, 3, and 5.
+- Use elapsed UTC time as production truth; cap offline production at 8 hours; clock rollback produces zero.
+- Serialize async Reveal/Build/Upgrade/Sell/checkpoint/resume operations; a successful mutation must never be overwritten by a concurrent call.
+- Do not persist one-second foreground refreshes.
+- Persist one strict unversioned JSON document at `horologium.mining.save`; no schema migration, backup rotation, legacy conversion, or speculative future-field handling.
+- Structural save corruption resets; positive stored cargo above newly tuned capacity clamps to current capacity without a recovery warning.
+- `MiningController` stays plain Dart; no `ChangeNotifier`, Provider, Riverpod, Bloc, command bus, or service locator.
+- Derive contextual sheet affordance through pure `MiningSheetView.from(...)`, including busy state and tiny-sale copy.
+- Floor Sell All Cargo once on the total gross value, not once per sector.
 - Flutter owns HUD/sheets/actions/lifecycle/recovery/offline summaries; Flame owns terrain/sectors/facilities/camera/effects.
-- Copy only the minimum camera behavior needed from `MainGame`; do not extract a shared camera framework.
-- Portrait is canonical. Primary touch actions are at least 56 logical px high. Automated layout checks cover 360×640 and 430×932.
-- Primary actions remain understandable with audio disabled and with `MediaQueryData.disableAnimations == true`.
+- Mining world geometry is 36×36 terrain cells × 50 world px = 1800×1800, centered at world origin.
+- Explicitly size terrain before camera-fit math; do not depend on asynchronous terrain `onLoad()` ordering.
+- Copy only minimum camera behavior from `MainGame`; no shared camera framework.
+- Portrait is canonical. Primary touch actions are at least 56 logical px. Automated layout checks cover 360×640 and 430×932 for both `MiningScreen` and the modified `MainMenu`.
+- Primary actions remain understandable with audio disabled and `MediaQueryData.disableAnimations == true`.
+- Stop after the Task 7 portrait playtest if the core loop is not worth finishing.
 - No technology, second planet, processing, dynamic market, resource buying, worker/housing/service mechanics, cloud save, or generic framework work.
+
+---
+
+## Risks and Gates
+
+| Risk | Mitigation / proof |
+| --- | --- |
+| Overlapping async actions compute from stale state | One controller future chain + `isBusy`; delayed-save and double-action tests in Task 4 |
+| Balance tuning makes a valid playtest save look corrupt | Structural reset vs current-capacity clamp split in Task 3 |
+| Terrain size/anchor units produce a blank or badly fitted portrait world | Explicit 1800×1800 world-pixel contract + terrain sizing before fit + initial-visibility test in Task 6 |
+| Product invalidation arrives only after polish work | Mandatory real-device stop/continue gate after Task 7 |
+| Per-sector rounding or tiny cargo makes selling confusing | Sum gross value, floor once; pure sheet disables sub-1-cash sales |
+| Sixth menu button overflows small portrait screens | 360×640 and 430×932 menu tests in Task 7 |
 
 ---
 
@@ -69,11 +87,11 @@ test/main_menu_test.dart
 lib/main_menu.dart
 ```
 
-Do not modify `pubspec.yaml`, CI workflows, `lib/game/main_game.dart`, `lib/game/scene_widget.dart`, `lib/game/resources/resources.dart`, `lib/game/building/`, `lib/game/planet/`, or `lib/game/services/save_service.dart` unless a concrete compile/runtime blocker is proven first.
+Do not modify `pubspec.yaml`, CI workflows, `lib/game/main_game.dart`, `lib/game/scene_widget.dart`, `lib/game/resources/resources.dart`, `lib/game/building/`, `lib/game/planet/`, or `lib/game/services/save_service.dart` unless a concrete compile/runtime blocker is demonstrated first.
 
 ---
 
-## Task 1: Lock Typed Phase 1 Content and State
+## Task 1: Lock Typed Content, State, and World Units
 
 **Files:**
 - Create: `lib/mining/mining_content.dart`
@@ -81,11 +99,11 @@ Do not modify `pubspec.yaml`, CI workflows, `lib/game/main_game.dart`, `lib/game
 - Test: `test/mining/mining_content_test.dart`
 
 **Interfaces:**
-- Consumes: existing `ResourceType`, existing `Assets`.
+- Consumes: existing `ResourceType`, `Assets`.
 - Produces: `MiningSectorId`, `MiningWorldAnchor`, `MiningSectorDefinition`, `MiningContentRegistry`, `MiningSave`, `SectorProgress`, `MineState`.
-- Later tasks use sector IDs as the single identity; do not add deposit IDs.
+- Later tasks use sector IDs as the sole mining identity.
 
-- [ ] **Step 1: Write the failing content/state test**
+- [ ] **Step 1: Write the failing content/state/world-contract test**
 
 ```dart
 import 'package:flutter_test/flutter_test.dart';
@@ -95,7 +113,7 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
 
 void main() {
-  test('phase one has exactly three typed sectors using existing identities', () {
+  test('phase one reuses existing resource and mine identities', () {
     final content = MiningContentRegistry.phaseOne();
 
     expect(content.sectors.map((s) => s.id), MiningSectorId.values);
@@ -105,7 +123,19 @@ void main() {
     expect(content.sector(MiningSectorId.carbonRidge).mineAsset, Assets.coalMine);
     expect(content.sector(MiningSectorId.graniteCrater).resource, ResourceType.stone);
     expect(content.sector(MiningSectorId.graniteCrater).mineAsset, Assets.quarry);
-    expect(MiningContentRegistry.offlineCap, const Duration(hours: 8));
+  });
+
+  test('world units are explicit and every authored anchor is in bounds', () {
+    final content = MiningContentRegistry.phaseOne();
+    expect(MiningContentRegistry.terrainGridSize, 36);
+    expect(MiningContentRegistry.terrainCellSize, 50);
+    expect(MiningContentRegistry.worldExtent, 1800);
+    expect(MiningContentRegistry.worldHalfExtent, 900);
+
+    for (final sector in content.sectors) {
+      expect(sector.anchor.x, inInclusiveRange(-900, 900));
+      expect(sector.anchor.y, inInclusiveRange(-900, 900));
+    }
   });
 
   test('clean mining state reveals only Landing Basin', () {
@@ -123,17 +153,15 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run it and confirm RED**
+- [ ] **Step 2: Run RED**
 
 ```bash
 flutter test test/mining/mining_content_test.dart
 ```
 
-Expected: FAIL because the mining core files do not exist.
+Expected: FAIL because mining core files do not exist.
 
-- [ ] **Step 3: Implement the content table using existing `ResourceType` and `Assets`**
-
-Create `lib/mining/mining_content.dart`:
+- [ ] **Step 3: Implement the content table with explicit world-pixel anchors**
 
 ```dart
 import 'package:horologium/constants/assets_path.dart';
@@ -180,6 +208,10 @@ class MiningSectorDefinition {
 class MiningContentRegistry {
   const MiningContentRegistry._(this.sectors);
 
+  static const int terrainGridSize = 36;
+  static const double terrainCellSize = 50;
+  static const double worldExtent = terrainGridSize * terrainCellSize;
+  static const double worldHalfExtent = worldExtent / 2;
   static const offlineCap = Duration(hours: 8);
   static const rateMultipliers = <double>[1.0, 1.5, 2.25, 3.25, 4.5];
   static const capacityMultipliers = <double>[1.0, 1.5, 2.0, 3.0, 4.0];
@@ -199,7 +231,7 @@ class MiningContentRegistry {
           baseCapacity: 90,
           saleValuePerUnit: 4,
           upgradeCosts: [80, 160, 320, 640],
-          anchor: MiningWorldAnchor(0.46, 0.72),
+          anchor: MiningWorldAnchor(-72, 396),
         ),
         MiningSectorDefinition(
           id: MiningSectorId.carbonRidge,
@@ -213,7 +245,7 @@ class MiningContentRegistry {
           baseCapacity: 120,
           saleValuePerUnit: 3,
           upgradeCosts: [150, 300, 600, 1200],
-          anchor: MiningWorldAnchor(0.28, 0.46),
+          anchor: MiningWorldAnchor(-396, -72),
         ),
         MiningSectorDefinition(
           id: MiningSectorId.graniteCrater,
@@ -227,24 +259,26 @@ class MiningContentRegistry {
           baseCapacity: 120,
           saleValuePerUnit: 5,
           upgradeCosts: [350, 700, 1400, 2800],
-          anchor: MiningWorldAnchor(0.68, 0.30),
+          anchor: MiningWorldAnchor(324, -360),
         ),
       ]);
 
   MiningSectorDefinition sector(MiningSectorId id) =>
       sectors.singleWhere((sector) => sector.id == id);
+
+  double rateFor(MiningSectorId id, int level) =>
+      sector(id).baseRatePerSecond * rateMultipliers[level - 1];
+
+  double capacityFor(MiningSectorId id, int level) =>
+      sector(id).baseCapacity * capacityMultipliers[level - 1];
 }
 ```
 
-Keep the values here. Do not read `BuildingRegistry` rows; city mine generation is worker-scaled and is not the mining economy.
+The anchor comment in the file must state: **world-pixel offset from centered 1800×1800 terrain origin**.
 
-- [ ] **Step 4: Implement immutable enum-keyed state with no deposit ID**
-
-Create `lib/mining/mining_state.dart`:
+- [ ] **Step 4: Implement immutable enum-keyed state**
 
 ```dart
-import 'mining_content.dart';
-
 class MineState {
   const MineState({required this.level, required this.storedAmount});
   final int level;
@@ -266,11 +300,7 @@ class SectorProgress {
   final bool revealed;
   final MineState? mine;
 
-  SectorProgress copyWith({
-    bool? revealed,
-    MineState? mine,
-    bool clearMine = false,
-  }) =>
+  SectorProgress copyWith({bool? revealed, MineState? mine, bool clearMine = false}) =>
       SectorProgress(
         revealed: revealed ?? this.revealed,
         mine: clearMine ? null : mine ?? this.mine,
@@ -307,8 +337,7 @@ class MiningSave {
     int? cash,
     DateTime? lastAccruedAtUtc,
     Map<MiningSectorId, SectorProgress>? sectors,
-  }) =>
-      MiningSave(
+  }) => MiningSave(
         cash: cash ?? this.cash,
         lastAccruedAtUtc: lastAccruedAtUtc ?? this.lastAccruedAtUtc,
         sectors: Map.unmodifiable(sectors ?? this.sectors),
@@ -317,9 +346,7 @@ class MiningSave {
   Map<String, Object?> toJson() => {
         'cash': cash,
         'lastAccruedAtUtc': lastAccruedAtUtc.toUtc().toIso8601String(),
-        'sectors': sectors.map(
-          (id, progress) => MapEntry(id.name, progress.toJson()),
-        ),
+        'sectors': sectors.map((id, progress) => MapEntry(id.name, progress.toJson())),
       };
 }
 ```
@@ -351,7 +378,6 @@ git commit -m "feat: add mining MVP content and state"
 **Interfaces:**
 - Consumes: `MiningContentRegistry`, `MiningSave`, `MiningSectorId`, `ResourceType`.
 - Produces: `MiningSimulation`, `AccrualResult`, `OfflineProductionSummary`.
-- No clocks are read inside the simulation; `nowUtc` is always supplied.
 
 - [ ] **Step 1: Write failing deterministic-production tests**
 
@@ -392,29 +418,22 @@ void main() {
       result.state.sectors[MiningSectorId.landingBasin]!.mine!.storedAmount,
       90,
     );
-    expect(result.summary.fullSectors, contains(MiningSectorId.landingBasin));
   });
 
-  test('clock rollback produces zero and does not move timestamp backward', () {
+  test('clock rollback produces zero and does not move time backward', () {
     final state = goldState(start, stored: 10);
-    final result = simulation.accrue(state, start.subtract(const Duration(hours: 1)));
+    final result = simulation.accrue(state, start.subtract(const Duration(minutes: 1)));
     expect(result.state.toJson(), state.toJson());
     expect(result.summary.totalProduced, 0);
   });
 
-  test('elapsed production is capped at eight hours and excess is discarded', () {
+  test('twelve hours uses at most the eight hour cap', () {
     final result = simulation.accrue(
       goldState(start),
       start.add(const Duration(hours: 12)),
     );
     expect(result.summary.elapsedUsed, const Duration(hours: 8));
     expect(result.summary.wasOfflineCapped, isTrue);
-    expect(result.state.lastAccruedAtUtc, start.add(const Duration(hours: 12)));
-  });
-
-  test('level multipliers affect rate and capacity', () {
-    expect(simulation.rateFor(MiningSectorId.landingBasin, 3), closeTo(1.125, 0.0001));
-    expect(simulation.capacityFor(MiningSectorId.landingBasin, 3), 180);
   });
 }
 ```
@@ -425,16 +444,11 @@ void main() {
 flutter test test/mining/mining_simulation_test.dart
 ```
 
-Expected: FAIL because simulation types do not exist.
+Expected: FAIL because simulation classes do not exist.
 
-- [ ] **Step 3: Implement pure result types and accrual**
+- [ ] **Step 3: Implement pure accrual and summary**
 
 ```dart
-import 'package:horologium/game/resources/resource_type.dart';
-
-import 'mining_content.dart';
-import 'mining_state.dart';
-
 class OfflineProductionSummary {
   const OfflineProductionSummary({
     required this.elapsedUsed,
@@ -448,8 +462,7 @@ class OfflineProductionSummary {
   final Set<MiningSectorId> fullSectors;
   final bool wasOfflineCapped;
 
-  double get totalProduced =>
-      produced.values.fold(0, (sum, value) => sum + value);
+  double get totalProduced => produced.values.fold(0, (sum, value) => sum + value);
 }
 
 class AccrualResult {
@@ -461,14 +474,6 @@ class AccrualResult {
 class MiningSimulation {
   const MiningSimulation(this.content);
   final MiningContentRegistry content;
-
-  double rateFor(MiningSectorId id, int level) =>
-      content.sector(id).baseRatePerSecond *
-      MiningContentRegistry.rateMultipliers[level - 1];
-
-  double capacityFor(MiningSectorId id, int level) =>
-      content.sector(id).baseCapacity *
-      MiningContentRegistry.capacityMultipliers[level - 1];
 
   AccrualResult accrue(MiningSave state, DateTime nowUtc) {
     final now = nowUtc.toUtc();
@@ -488,23 +493,21 @@ class MiningSimulation {
     final elapsed = rawElapsed > MiningContentRegistry.offlineCap
         ? MiningContentRegistry.offlineCap
         : rawElapsed;
-    final sectors = <MiningSectorId, SectorProgress>{...state.sectors};
+    final seconds = elapsed.inMicroseconds / Duration.microsecondsPerSecond;
     final produced = <ResourceType, double>{};
     final full = <MiningSectorId>{};
+    final sectors = <MiningSectorId, SectorProgress>{...state.sectors};
 
     for (final definition in content.sectors) {
       final progress = sectors[definition.id]!;
       final mine = progress.mine;
       if (!progress.revealed || mine == null) continue;
 
-      final capacity = capacityFor(definition.id, mine.level);
+      final capacity = content.capacityFor(definition.id, mine.level);
       final remaining = (capacity - mine.storedAmount).clamp(0.0, capacity);
-      final amount = (rateFor(definition.id, mine.level) *
-              elapsed.inMilliseconds /
-              1000.0)
+      final amount = (content.rateFor(definition.id, mine.level) * seconds)
           .clamp(0.0, remaining);
       final stored = mine.storedAmount + amount;
-
       sectors[definition.id] = progress.copyWith(
         mine: mine.copyWith(storedAmount: stored),
       );
@@ -529,9 +532,9 @@ class MiningSimulation {
 }
 ```
 
-- [ ] **Step 4: Add equal-input/equal-time regression coverage**
+- [ ] **Step 4: Add equal-input/equal-time coverage**
 
-Call `accrue()` twice from the same serialized state and `nowUtc`; assert both next-state JSON values and summaries match. This is the single foreground/resume/cold-launch invariant.
+Call `accrue()` twice from the same `MiningSave` and identical `nowUtc`; assert state JSON and summary fields match exactly. This pins foreground/resume/cold launch to one deterministic function.
 
 - [ ] **Step 5: Run GREEN**
 
@@ -550,27 +553,20 @@ git commit -m "feat: add deterministic mining production"
 
 ---
 
-## Task 3: Persist One Strict Unversioned Mining Document
+## Task 3: Persist One Strict Save Without Resetting Tuned Cargo
 
 **Files:**
 - Create: `lib/mining/mining_save_repository.dart`
 - Test: `test/mining/mining_save_repository_test.dart`
 
 **Interfaces:**
-- Consumes: `MiningSave`, content, simulation capacity validation.
+- Consumes: `MiningSave`, `MiningContentRegistry`.
 - Produces: `MiningSaveRepository.load`, `save`, `MiningLoadResult`.
 - Writes only `horologium.mining.save`.
 
 - [ ] **Step 1: Write failing repository tests**
 
 ```dart
-import 'dart:convert';
-
-import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:horologium/mining/mining_save_repository.dart';
-import 'package:horologium/mining/mining_state.dart';
-
 void main() {
   const key = 'horologium.mining.save';
   final now = DateTime.utc(2026, 8, 18, 12);
@@ -608,22 +604,36 @@ void main() {
     expect(result.state.cash, 100);
     expect(result.state.sectors[MiningSectorId.landingBasin]!.mine, isNull);
   });
+
+  test('positive cargo above newly tuned capacity clamps without recovery', () async {
+    final raw = <String, Object?>{
+      'cash': 100,
+      'lastAccruedAtUtc': now.toIso8601String(),
+      'sectors': {
+        'landingBasin': {
+          'revealed': true,
+          'mine': {'level': 1, 'storedAmount': 120.0},
+        },
+        'carbonRidge': {'revealed': false, 'mine': null},
+        'graniteCrater': {'revealed': false, 'mine': null},
+      },
+    };
+    SharedPreferences.setMockInitialValues({key: jsonEncode(raw)});
+
+    final result = await MiningSaveRepository().load(nowUtc: now);
+
+    expect(result.recoveredFromInvalidSave, isFalse);
+    expect(
+      result.state.sectors[MiningSectorId.landingBasin]!.mine!.storedAmount,
+      90,
+    );
+  });
 }
 ```
 
-Add table-driven reset cases for:
+Add table-driven **reset** cases for negative/non-int cash, missing root fields, unknown/missing sector keys, malformed/non-UTC timestamp, non-bool `revealed`, mine level outside 1–5, negative/non-numeric cargo, and extra structural keys.
 
-- negative/non-int cash;
-- missing `cash`, `lastAccruedAtUtc`, or `sectors`;
-- malformed/non-UTC timestamp;
-- missing one of the three sector entries;
-- unknown sector key;
-- non-bool `revealed`;
-- mine level outside 1–5;
-- negative/non-numeric cargo;
-- cargo above that sector's configured capacity.
-
-Do **not** add a `schemaVersion` case, a `futureField` case, or a missing-sector default-fill case.
+Do **not** add a schema-version case, future-field case, missing-sector default-fill case, or over-capacity reset case.
 
 - [ ] **Step 2: Run RED**
 
@@ -633,7 +643,7 @@ flutter test test/mining/mining_save_repository_test.dart
 
 Expected: FAIL because repository code does not exist.
 
-- [ ] **Step 3: Implement strict decode helpers**
+- [ ] **Step 3: Implement strict decode plus balance clamp**
 
 ```dart
 class MiningLoadResult {
@@ -641,7 +651,6 @@ class MiningLoadResult {
     required this.state,
     required this.recoveredFromInvalidSave,
   });
-
   final MiningSave state;
   final bool recoveredFromInvalidSave;
 }
@@ -686,23 +695,28 @@ class MiningSaveRepository {
 
 Inside `_decode`:
 
-1. require a JSON object with exactly `cash`, `lastAccruedAtUtc`, `sectors`;
+1. require the root object to contain exactly `cash`, `lastAccruedAtUtc`, `sectors`;
 2. require the sector key set to equal `MiningSectorId.values.map((id) => id.name).toSet()`;
-3. map each string to `MiningSectorId.values.singleWhere((id) => id.name == rawKey)` only after exact-key validation;
-4. require each sector object to contain `revealed` and `mine`;
-5. require mine `null` or exactly `{level, storedAmount}`;
-6. validate mine level/cargo against that sector's capacity;
-7. reject rather than clamp corrupt data.
+3. require each sector object to contain exactly `revealed`, `mine`;
+4. require mine `null` or exactly `{level, storedAmount}`;
+5. require `level` in 1–5 and `storedAmount` numeric + non-negative;
+6. decode UTC timestamp and non-negative integer cash;
+7. normalize a valid mine with:
 
-Use a small helper:
+```dart
+final capacity = content.capacityFor(sectorId, level);
+final normalizedStored = math.min(storedAmount, capacity);
+```
+
+Clamping current configured capacity is not a recovery event.
+
+Use one exact-key helper:
 
 ```dart
 bool hasExactKeys(Map<String, Object?> map, Set<String> expected) =>
     map.keys.toSet().length == expected.length &&
     map.keys.toSet().containsAll(expected);
 ```
-
-No migration/version dispatch is added.
 
 - [ ] **Step 4: Assert write scope**
 
@@ -725,7 +739,7 @@ git commit -m "feat: persist mining MVP state"
 
 ---
 
-## Task 4: Add One Plain Atomic MiningController
+## Task 4: Serialize Atomic Controller Mutations and Fix Sale Rounding
 
 **Files:**
 - Create: `lib/mining/mining_controller.dart`
@@ -733,10 +747,10 @@ git commit -m "feat: persist mining MVP state"
 
 **Interfaces:**
 - Consumes: content, simulation, repository, injectable UTC clock.
-- Produces: plain controller state plus `MiningActionResult` and `MiningSaleResult`.
+- Produces: plain controller state, `isBusy`, `MiningActionResult`, `MiningSaleResult`.
 - Does not import Flutter or call `notifyListeners()`.
 
-- [ ] **Step 1: Write failing action tests with a mutable clock**
+- [ ] **Step 1: Write normal action tests**
 
 ```dart
 class TestClock {
@@ -771,34 +785,94 @@ void main() {
     final result = await controller.buildMine(MiningSectorId.landingBasin);
     expect(result.isSuccess, isTrue);
     expect(controller.state.cash, 50);
-    expect(
-      controller.state.sectors[MiningSectorId.landingBasin]!.mine!.level,
-      1,
-    );
-  });
-
-  test('failed upgrade leaves accrued candidate unpublished', () async {
-    await controller.buildMine(MiningSectorId.landingBasin);
-    clock.now = clock.now.add(const Duration(seconds: 30));
-    final before = controller.state.toJson();
-    final result = await controller.upgradeMine(MiningSectorId.landingBasin);
-    expect(result.isSuccess, isFalse); // 50 cash < 80
-    expect(controller.state.toJson(), before);
+    expect(controller.state.sectors[MiningSectorId.landingBasin]!.mine!.level, 1);
   });
 }
 ```
 
-Add success/failure tests for Reveal, duplicate Build, Upgrade, max level, mixed-resource Sell All Cargo, zero-cargo sale, checkpoint, resume, and passive refresh.
+Add normal tests for Reveal, duplicate Build, Upgrade, max level, zero-cargo Sell, checkpoint, resume, and passive refresh.
 
-- [ ] **Step 2: Run RED**
+- [ ] **Step 2: Add a delayed repository that can expose interleaving**
+
+```dart
+class DelayedMiningSaveRepository extends MiningSaveRepository {
+  final saveStarted = Completer<void>();
+  final allowFirstSave = Completer<void>();
+  var saveCount = 0;
+
+  @override
+  Future<void> save(MiningSave state) async {
+    saveCount++;
+    if (saveCount == 1) {
+      if (!saveStarted.isCompleted) saveStarted.complete();
+      await allowFirstSave.future;
+    }
+    await super.save(state);
+  }
+}
+```
+
+- [ ] **Step 3: Write the two concurrency regressions**
+
+```dart
+test('build then sell issued without awaiting cannot erase the build', () async {
+  SharedPreferences.setMockInitialValues({});
+  final repository = DelayedMiningSaveRepository();
+  final controller = MiningController(
+    content: MiningContentRegistry.phaseOne(),
+    repository: repository,
+    nowUtc: clock.call,
+  );
+  await controller.initialize();
+
+  final buildFuture = controller.buildMine(MiningSectorId.landingBasin);
+  await repository.saveStarted.future;
+  final sellFuture = controller.sellAllCargo();
+
+  expect(controller.isBusy, isTrue);
+  repository.allowFirstSave.complete();
+
+  expect((await buildFuture).isSuccess, isTrue);
+  expect((await sellFuture).isSuccess, isFalse); // built mine has zero cargo
+  expect(
+    controller.state.sectors[MiningSectorId.landingBasin]!.mine,
+    isNotNull,
+  );
+  expect(controller.state.cash, 50);
+});
+
+test('double reveal queues and deducts exactly once', () async {
+  final seeded = MiningSave.initial(nowUtc: clock.now).copyWith(cash: 1000);
+  await MiningSaveRepository().save(seeded);
+  final repository = DelayedMiningSaveRepository();
+  final controller = MiningController(
+    content: MiningContentRegistry.phaseOne(),
+    repository: repository,
+    nowUtc: clock.call,
+  );
+  await controller.initialize();
+
+  final first = controller.revealSector(MiningSectorId.carbonRidge);
+  await repository.saveStarted.future;
+  final second = controller.revealSector(MiningSectorId.carbonRidge);
+  repository.allowFirstSave.complete();
+
+  expect((await first).isSuccess, isTrue);
+  expect((await second).isSuccess, isFalse);
+  expect(controller.state.cash, 750);
+  expect(controller.state.sectors[MiningSectorId.carbonRidge]!.revealed, isTrue);
+});
+```
+
+- [ ] **Step 4: Run RED**
 
 ```bash
 flutter test test/mining/mining_controller_test.dart
 ```
 
-Expected: FAIL because the controller does not exist.
+Expected: FAIL because the controller/serialization does not exist.
 
-- [ ] **Step 3: Implement a plain controller**
+- [ ] **Step 5: Implement the plain future-chain queue**
 
 ```dart
 class MiningController {
@@ -817,58 +891,77 @@ class MiningController {
   late MiningSave _state;
   MiningSave get state => _state;
 
+  Future<void> _mutationChain = Future<void>.value();
+  int _pendingMutations = 0;
+  bool get isBusy => _pendingMutations > 0;
+
   bool recoveredFromInvalidSave = false;
   OfflineProductionSummary? _pendingReturnSummary;
 
-  Future<void> initialize() async {
-    final loaded = await repository.load(nowUtc: _nowUtc().toUtc());
-    recoveredFromInvalidSave = loaded.recoveredFromInvalidSave;
-    final accrued = simulation.accrue(loaded.state, _nowUtc().toUtc());
-    _state = accrued.state;
-    if (accrued.summary.totalProduced > 0) {
-      _pendingReturnSummary = accrued.summary;
-    }
-  }
-
-  AccrualResult refresh() {
-    final accrued = simulation.accrue(_state, _nowUtc().toUtc());
-    _state = accrued.state;
-    return accrued;
+  Future<T> _enqueueMutation<T>(Future<T> Function() operation) {
+    final completer = Completer<T>();
+    _pendingMutations++;
+    _mutationChain = _mutationChain.then((_) async {
+      try {
+        completer.complete(await operation());
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      } finally {
+        _pendingMutations--;
+      }
+    });
+    return completer.future;
   }
 }
 ```
 
-Do not save in `refresh()`.
+The queue body catches operation failures rather than rethrowing them, so one failed save does not poison later queued operations.
 
-- [ ] **Step 4: Implement one candidate/commit path**
+- [ ] **Step 6: Implement initialize and busy-safe refresh**
 
 ```dart
-AccrualResult _candidateNow() => simulation.accrue(_state, _nowUtc().toUtc());
+Future<void> initialize() async {
+  final loaded = await repository.load(nowUtc: _nowUtc().toUtc());
+  recoveredFromInvalidSave = loaded.recoveredFromInvalidSave;
+  final accrued = simulation.accrue(loaded.state, _nowUtc().toUtc());
+  _state = accrued.state;
+  if (accrued.summary.totalProduced > 0) {
+    _pendingReturnSummary = accrued.summary;
+  }
+}
 
-Future<void> _commit(MiningSave next) async {
-  await repository.save(next);
-  _state = next;
+AccrualResult refresh() {
+  if (isBusy) {
+    return simulation.accrue(_state, _state.lastAccruedAtUtc);
+  }
+  final accrued = simulation.accrue(_state, _nowUtc().toUtc());
+  _state = accrued.state;
+  return accrued;
 }
 ```
 
-Every explicit action:
+Do not persist from `refresh()`.
 
-1. gets `_candidateNow()`;
-2. validates the action without assigning `_state`;
-3. creates one new `MiningSave`;
-4. awaits `_commit(next)` once;
-5. returns a result carrying presentation data.
+- [ ] **Step 7: Put each explicit action inside `_enqueueMutation`**
 
-If validation fails, return before `_commit()` and leave both memory and persistence unchanged.
-
-- [ ] **Step 5: Implement typed operations**
-
-Use `MiningSectorId` for Reveal/Build/Upgrade. Do not accept string/deposit IDs.
-
-For Sell All Cargo:
+Inside each queued operation:
 
 ```dart
-var revenue = 0;
+final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+// validate candidate without assigning _state
+// build next immutable state
+await repository.save(next);
+_state = next;
+return result;
+```
+
+Reveal/Build/Upgrade all use `MiningSectorId`. A queued duplicate evaluates after the previous operation has published.
+
+- [ ] **Step 8: Implement Sell All Cargo with one final floor**
+
+```dart
+var totalCargo = 0.0;
+var grossValue = 0.0;
 final sold = <ResourceType, double>{};
 final sectors = <MiningSectorId, SectorProgress>{...candidate.state.sectors};
 
@@ -877,7 +970,8 @@ for (final definition in content.sectors) {
   final mine = progress.mine;
   if (mine == null || mine.storedAmount <= 0) continue;
 
-  revenue += (mine.storedAmount * definition.saleValuePerUnit).floor();
+  totalCargo += mine.storedAmount;
+  grossValue += mine.storedAmount * definition.saleValuePerUnit;
   sold.update(
     definition.resource,
     (value) => value + mine.storedAmount,
@@ -887,42 +981,49 @@ for (final definition in content.sectors) {
     mine: mine.copyWith(storedAmount: 0),
   );
 }
+
+if (totalCargo <= 0) {
+  return MiningSaleResult.failure('No cargo to sell.');
+}
+
+final revenue = grossValue.floor();
+final next = candidate.state.copyWith(
+  cash: candidate.state.cash + revenue,
+  sectors: sectors,
+);
+await repository.save(next);
+_state = next;
+return MiningSaleResult.success(revenue: revenue, sold: sold);
 ```
 
-If `revenue == 0`, return a non-mutating failure.
+Add a test with 0.9 units at sale values 4, 3, and 5 and assert revenue is `floor(3.6 + 2.7 + 4.5) == 10`, not 9.
 
-- [ ] **Step 6: Implement lifecycle helpers**
+- [ ] **Step 9: Serialize checkpoint and resume**
 
 ```dart
-Future<void> checkpoint() async {
-  final accrued = simulation.accrue(_state, _nowUtc().toUtc());
-  await repository.save(accrued.state);
-  _state = accrued.state;
-}
+Future<void> checkpoint() => _enqueueMutation(() async {
+      final accrued = simulation.accrue(_state, _nowUtc().toUtc());
+      await repository.save(accrued.state);
+      _state = accrued.state;
+    });
 
-Future<OfflineProductionSummary?> resume() async {
-  final accrued = simulation.accrue(_state, _nowUtc().toUtc());
-  _state = accrued.state;
-  if (accrued.summary.totalProduced > 0) {
-    _pendingReturnSummary = accrued.summary;
-  }
-  return takePendingReturnSummary();
-}
-
-OfflineProductionSummary? takePendingReturnSummary() {
-  final value = _pendingReturnSummary;
-  _pendingReturnSummary = null;
-  return value;
-}
+Future<OfflineProductionSummary?> resume() => _enqueueMutation(() async {
+      final accrued = simulation.accrue(_state, _nowUtc().toUtc());
+      _state = accrued.state;
+      if (accrued.summary.totalProduced > 0) {
+        _pendingReturnSummary = accrued.summary;
+      }
+      return takePendingReturnSummary();
+    });
 ```
 
-Resume does not need a second automatic save; the preceding pause checkpoint, next explicit action, or next lifecycle checkpoint persists state. If the process dies first, deterministic cold launch recalculates from the last persisted timestamp.
+Resume need not write immediately; pause/explicit actions/next checkpoint persist, and a killed process recomputes from the last persisted timestamp.
 
-- [ ] **Step 7: Prove refresh does not persist**
+- [ ] **Step 10: Prove refresh does not persist**
 
-After one successful action, read the raw save payload, advance the clock, call `refresh()`, and assert the SharedPreferences payload is unchanged while controller state accrued.
+After one successful action, read the raw SharedPreferences payload, advance the clock, call `refresh()`, and assert the payload is unchanged while in-memory state accrues. Also call refresh while the delayed first save is blocked and assert it does not change `_state`.
 
-- [ ] **Step 8: Run GREEN**
+- [ ] **Step 11: Run GREEN**
 
 ```bash
 flutter test test/mining/mining_controller_test.dart
@@ -930,23 +1031,23 @@ flutter test test/mining/mining_controller_test.dart
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
 git add lib/mining/mining_controller.dart test/mining/mining_controller_test.dart
-git commit -m "feat: add atomic mining controller"
+git commit -m "feat: serialize mining controller actions"
 ```
 
 ---
 
-## Task 5: Derive Contextual Sheet State in One Pure Model
+## Task 5: Derive Busy, Affordability, and Sale State in One Pure Sheet Model
 
 **Files:**
 - Create: `lib/mining/mining_sheet_view.dart`
 - Test: `test/mining/mining_sheet_view_test.dart`
 
 **Interfaces:**
-- Consumes: `MiningSave`, `MiningContentRegistry`, `MiningSectorId?`.
+- Consumes: `MiningSave`, `MiningContentRegistry`, `MiningSectorId?`, `isBusy`.
 - Produces: `MiningSheetView`, `MiningSheetAction`.
 - No Flutter widgets, contexts, callbacks, or controller calls.
 
@@ -957,48 +1058,52 @@ void main() {
   final content = MiningContentRegistry.phaseOne();
   final now = DateTime.utc(2026, 8, 18, 12);
 
-  test('no selection exposes sell action but disables it with no cargo', () {
+  test('no cargo disables Sell All', () {
     final view = MiningSheetView.from(
       state: MiningSave.initial(nowUtc: now),
       content: content,
       selectedSectorId: null,
+      isBusy: false,
     );
     expect(view.action, MiningSheetAction.sell);
-    expect(view.primaryLabel, 'SELL ALL CARGO');
     expect(view.primaryEnabled, isFalse);
-    expect(view.disabledReason, isNotNull);
+    expect(view.disabledReason, contains('No cargo'));
   });
 
-  test('Carbon Ridge shows prerequisite while Landing Basin is unrevealed', () {
-    final base = MiningSave.initial(nowUtc: now);
-    final state = base.copyWith(sectors: {
-      ...base.sectors,
-      MiningSectorId.landingBasin: const SectorProgress(revealed: false),
-    });
-    final view = MiningSheetView.from(
-      state: state,
-      content: content,
-      selectedSectorId: MiningSectorId.carbonRidge,
-    );
-    expect(view.action, MiningSheetAction.reveal);
-    expect(view.primaryEnabled, isFalse);
-    expect(view.disabledReason, contains('Landing Basin'));
-  });
-
-  test('revealed empty Landing Basin exposes Build Mine', () {
+  test('busy controller disables otherwise available action', () {
     final view = MiningSheetView.from(
       state: MiningSave.initial(nowUtc: now),
       content: content,
       selectedSectorId: MiningSectorId.landingBasin,
+      isBusy: true,
     );
     expect(view.action, MiningSheetAction.build);
-    expect(view.primaryLabel, 'BUILD MINE');
-    expect(view.primaryEnabled, isTrue);
+    expect(view.primaryEnabled, isFalse);
+    expect(view.disabledReason, 'Finishing previous action…');
+  });
+
+  test('tiny non-zero cargo explains why sale waits', () {
+    final base = MiningSave.initial(nowUtc: now);
+    final state = base.copyWith(sectors: {
+      ...base.sectors,
+      MiningSectorId.landingBasin: const SectorProgress(
+        revealed: true,
+        mine: MineState(level: 1, storedAmount: 0.2),
+      ),
+    });
+    final view = MiningSheetView.from(
+      state: state,
+      content: content,
+      selectedSectorId: null,
+      isBusy: false,
+    );
+    expect(view.primaryEnabled, isFalse);
+    expect(view.disabledReason, contains('worth at least 1 cash'));
   });
 }
 ```
 
-Add cases for insufficient cash, active mine upgrade, max level, and Sell All with mixed cargo.
+Add cases for prerequisite, insufficient cash, revealed empty sector, active upgrade, max level, mixed cargo, and normal sellable cargo.
 
 - [ ] **Step 2: Run RED**
 
@@ -1034,25 +1139,43 @@ class MiningSheetView {
     required MiningSave state,
     required MiningContentRegistry content,
     required MiningSectorId? selectedSectorId,
+    required bool isBusy,
   }) {
-    if (selectedSectorId == null) {
-      return _sellView(state, content);
-    }
+    final base = selectedSectorId == null
+        ? _sellView(state, content)
+        : _sectorView(state, content, selectedSectorId);
 
-    final definition = content.sector(selectedSectorId);
-    final progress = state.sectors[selectedSectorId]!;
-    if (!progress.revealed) {
-      return _revealView(state, content, definition);
-    }
-    if (progress.mine == null) {
-      return _buildView(state, definition);
-    }
-    return _upgradeView(state, definition, progress.mine!);
+    if (!isBusy) return base;
+    return base.copyWith(
+      primaryEnabled: false,
+      disabledReason: 'Finishing previous action…',
+    );
   }
 }
 ```
 
-Keep the helper methods in this file. They may calculate affordability, rate/capacity display values, prerequisite names, and disabled reasons. They do not mutate state.
+For `_sellView`, calculate:
+
+```dart
+var totalCargo = 0.0;
+var grossValue = 0.0;
+for (final definition in content.sectors) {
+  final mine = state.sectors[definition.id]!.mine;
+  if (mine == null) continue;
+  totalCargo += mine.storedAmount;
+  grossValue += mine.storedAmount * definition.saleValuePerUnit;
+}
+
+if (totalCargo <= 0) {
+  return disabledSell('No cargo to sell yet.');
+}
+if (grossValue.floor() == 0) {
+  return disabledSell('Keep mining until cargo is worth at least 1 cash.');
+}
+return enabledSell(revenue: grossValue.floor());
+```
+
+Keep prerequisite/affordability/rate/capacity helpers in this file; do not mutate state.
 
 - [ ] **Step 4: Run GREEN**
 
@@ -1071,7 +1194,7 @@ git commit -m "feat: derive mining action sheet state"
 
 ---
 
-## Task 6: Add the Authored Flame World and Structural Tier Verification
+## Task 6: Add the Authored Flame World with Deterministic Fit
 
 **Files:**
 - Create: `lib/mining/world/mining_game.dart`
@@ -1080,15 +1203,24 @@ git commit -m "feat: derive mining action sheet state"
 
 **Interfaces:**
 - Consumes: content + read-only `MiningSave` snapshots.
-- Produces: `MiningGame.applyState`, `focusOnSelection`, `playReward`, selection callback.
+- Produces: `MiningGame.applyState`, `focusOnSelection`, `playReward`, typed selection callback.
 - Does not import controller, repository, `Resources`, `Building`, `Planet`, or `SaveService`.
 
-- [ ] **Step 1: Write failing structural tier tests**
-
-Do not stop at testing `MiningVisualTier.forLevel()`. Mount the real game and inspect the sector component after applying states.
+- [ ] **Step 1: Write a mounted-game helper using an explicit portrait viewport**
 
 ```dart
-Future<void> pumpMiningGame(WidgetTester tester, MiningGame game) async {
+Future<void> pumpMiningGame(
+  WidgetTester tester,
+  MiningGame game, {
+  Size size = const Size(360, 640),
+}) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = size;
+  addTearDown(() {
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+
   await tester.pumpWidget(
     MaterialApp(home: Scaffold(body: GameWidget(game: game))),
   );
@@ -1097,54 +1229,67 @@ Future<void> pumpMiningGame(WidgetTester tester, MiningGame game) async {
   }
   expect(game.hasLoaded, isTrue);
 }
-
-void main() {
-  testWidgets('mounted mining game owns all three authored sectors', (tester) async {
-    final game = MiningGame(content: MiningContentRegistry.phaseOne());
-    await pumpMiningGame(tester, game);
-    expect(game.sectorIds.toSet(), MiningSectorId.values.toSet());
-  });
-
-  testWidgets('levels one three and five add distinct visual structure', (tester) async {
-    final content = MiningContentRegistry.phaseOne();
-    final game = MiningGame(content: content);
-    await pumpMiningGame(tester, game);
-
-    final base = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 18, 12));
-
-    MiningSave withGoldLevel(int level) => base.copyWith(sectors: {
-          ...base.sectors,
-          MiningSectorId.landingBasin: SectorProgress(
-            revealed: true,
-            mine: MineState(level: level, storedAmount: 0),
-          ),
-        });
-
-    game.applyState(withGoldLevel(1));
-    await tester.pump();
-    final sector = game.sector(MiningSectorId.landingBasin);
-    expect(sector.children.whereType<OperationLightComponent>(), hasLength(1));
-    expect(sector.children.whereType<AdvancedPlatformComponent>(), isEmpty);
-    expect(sector.children.whereType<EliteRingComponent>(), isEmpty);
-
-    game.applyState(withGoldLevel(3));
-    await tester.pump();
-    expect(sector.children.whereType<AdvancedPlatformComponent>(), hasLength(1));
-    expect(sector.children.whereType<SecondaryMachineryComponent>(), hasLength(1));
-    expect(sector.children.whereType<EliteRingComponent>(), isEmpty);
-
-    game.applyState(withGoldLevel(5));
-    await tester.pump();
-    expect(sector.children.whereType<AdvancedPlatformComponent>(), hasLength(1));
-    expect(sector.children.whereType<SecondaryMachineryComponent>(), hasLength(1));
-    expect(sector.children.whereType<EliteRingComponent>(), hasLength(1));
-  });
-}
 ```
 
-This uses the `GameWidget` pumping style already proven indirectly by `test/game/scene_widget_test.dart`; `test/game/main_game_test.dart` is useful for injected camera/grid logic but does not boot `MainGame.onLoad()` itself.
+This follows the existing `GameWidget` widget-test pattern; do not call `MiningGame.onLoad()` naked.
 
-- [ ] **Step 2: Run RED**
+- [ ] **Step 2: Write failing world-fit and structural-tier tests**
+
+```dart
+testWidgets('all authored anchors are visible at initial 360x640 fit', (tester) async {
+  final content = MiningContentRegistry.phaseOne();
+  final game = MiningGame(content: content);
+  await pumpMiningGame(tester, game);
+
+  expect(game.worldSize.x, 1800);
+  expect(game.worldSize.y, 1800);
+  expect(game.camera.viewfinder.zoom, closeTo(0.2, 0.0001));
+
+  for (final definition in content.sectors) {
+    final screenX = 180 + definition.anchor.x * game.camera.viewfinder.zoom;
+    final screenY = 320 + definition.anchor.y * game.camera.viewfinder.zoom;
+    expect(screenX, inInclusiveRange(0, 360));
+    expect(screenY, inInclusiveRange(0, 640));
+  }
+});
+
+testWidgets('levels one three and five add distinct mounted structure', (tester) async {
+  final content = MiningContentRegistry.phaseOne();
+  final game = MiningGame(content: content);
+  await pumpMiningGame(tester, game);
+  final base = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 18, 12));
+
+  MiningSave withGoldLevel(int level) => base.copyWith(sectors: {
+        ...base.sectors,
+        MiningSectorId.landingBasin: SectorProgress(
+          revealed: true,
+          mine: MineState(level: level, storedAmount: 0),
+        ),
+      });
+
+  final sector = game.sector(MiningSectorId.landingBasin);
+
+  game.applyState(withGoldLevel(1));
+  await tester.pump();
+  expect(sector.children.whereType<OperationLightComponent>(), hasLength(1));
+  expect(sector.children.whereType<AdvancedPlatformComponent>(), isEmpty);
+  expect(sector.children.whereType<EliteRingComponent>(), isEmpty);
+
+  game.applyState(withGoldLevel(3));
+  await tester.pump();
+  expect(sector.children.whereType<AdvancedPlatformComponent>(), hasLength(1));
+  expect(sector.children.whereType<SecondaryMachineryComponent>(), hasLength(1));
+  expect(sector.children.whereType<EliteRingComponent>(), isEmpty);
+
+  game.applyState(withGoldLevel(5));
+  await tester.pump();
+  expect(sector.children.whereType<EliteRingComponent>(), hasLength(1));
+});
+```
+
+Add selection/focus test verifying a bottom-obscured fraction shifts target upward and remains clamped inside world bounds.
+
+- [ ] **Step 3: Run RED**
 
 ```bash
 flutter test test/mining/world/mining_game_test.dart
@@ -1152,31 +1297,18 @@ flutter test test/mining/world/mining_game_test.dart
 
 Expected: FAIL because mining world classes do not exist.
 
-- [ ] **Step 3: Implement tier marker/presentation components**
+- [ ] **Step 4: Implement presentation marker components**
 
 ```dart
-enum MiningVisualTier {
-  base,
-  advanced,
-  elite;
-
-  static MiningVisualTier forLevel(int level) => switch (level) {
-        1 || 2 => MiningVisualTier.base,
-        3 || 4 => MiningVisualTier.advanced,
-        5 => MiningVisualTier.elite,
-        _ => throw ArgumentError.value(level, 'level'),
-      };
-}
-
 class OperationLightComponent extends PositionComponent {}
 class AdvancedPlatformComponent extends PositionComponent {}
 class SecondaryMachineryComponent extends PositionComponent {}
 class EliteRingComponent extends PositionComponent {}
 ```
 
-`MiningSectorComponent` loads the base mine sprite from `definition.mineAsset` and rebuilds these structural presentation children when mine level crosses tier boundaries. Do not add a `mineAssetFor()` mapping.
+`MiningSectorComponent` loads `definition.mineAsset`, positions itself at `Vector2(definition.anchor.x, definition.anchor.y)`, and rebuilds structural children only when tier changes.
 
-- [ ] **Step 4: Implement `MiningGame` with terrain reuse**
+- [ ] **Step 5: Explicitly size terrain before adding and fitting it**
 
 ```dart
 class MiningGame extends FlameGame with TapCallbacks, ScaleDetector {
@@ -1187,42 +1319,49 @@ class MiningGame extends FlameGame with TapCallbacks, ScaleDetector {
   void Function(MiningSectorId?)? onSelectionChanged;
   bool reducedMotion = false;
   bool hasLoaded = false;
-
-  List<MiningSectorId> get sectorIds => List.unmodifiable(_sectors.keys);
-  MiningSectorComponent sector(MiningSectorId id) => _sectors[id]!;
+  Vector2 get worldSize => Vector2.all(MiningContentRegistry.worldExtent);
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
     camera.viewfinder.anchor = Anchor.center;
 
-    final terrain = ParallaxTerrainComponent(gridSize: 36, seed: 631)
+    final terrain = ParallaxTerrainComponent(
+      gridSize: MiningContentRegistry.terrainGridSize,
+      seed: 631,
+    )
       ..parallaxEnabled = false
+      ..size = Vector2.all(MiningContentRegistry.worldExtent)
       ..anchor = Anchor.center
       ..position = Vector2.zero();
+
     world.add(terrain);
 
     for (final definition in content.sectors) {
-      final component = MiningSectorComponent(definition: definition);
+      final component = MiningSectorComponent(definition: definition)
+        ..position = Vector2(definition.anchor.x, definition.anchor.y);
       _sectors[definition.id] = component;
       world.add(component);
     }
 
-    _fitCameraToWorld();
+    final viewport = camera.viewport.size;
+    final fit = math.min(
+      viewport.x / MiningContentRegistry.worldExtent,
+      viewport.y / MiningContentRegistry.worldExtent,
+    );
+    _fitZoom = fit;
+    camera.viewfinder.zoom = fit.clamp(_minZoom, _maxZoom);
+    camera.viewfinder.position = Vector2.zero();
     hasLoaded = true;
-  }
-
-  void applyState(MiningSave state) {
-    for (final definition in content.sectors) {
-      _sectors[definition.id]!.applyProgress(state.sectors[definition.id]!);
-    }
   }
 }
 ```
 
-Copy only the minimum fit/pan/zoom clamping behavior needed from `MainGame`; do not refactor the city camera.
+Copy only the minimal pan/zoom clamp and center/focus logic from `MainGame`.
 
-- [ ] **Step 5: Add typed selection and camera focus**
+- [ ] **Step 6: Implement state application and typed selection/focus**
+
+`applyState(MiningSave state)` updates every sector component from its typed progress. Taps invoke `onSelectionChanged?.call(definition.id)`.
 
 ```dart
 void focusOnSelection({
@@ -1231,19 +1370,17 @@ void focusOnSelection({
 });
 ```
 
-Tapping a sector invokes `onSelectionChanged?.call(definition.id)`. Focus moves the selected anchor into the unobscured upper region and clamps to world bounds. Reduced motion snaps immediately.
+Reduced motion snaps to the target. Normal mode may use a short Flame movement effect, but the final camera target must be the same.
 
-Add a test that verifies a non-zero obscured fraction moves the camera target upward compared with centered focus.
-
-- [ ] **Step 6: Run GREEN**
+- [ ] **Step 7: Run GREEN**
 
 ```bash
 flutter test test/mining/world/mining_game_test.dart
 ```
 
-Expected: PASS, including the level 1/3/5 structural assertions.
+Expected: PASS, including initial visibility and structural level checks.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add lib/mining/world test/mining/world/mining_game_test.dart
@@ -1252,7 +1389,7 @@ git commit -m "feat: add authored mining world"
 
 ---
 
-## Task 7: Add Portrait MiningScreen and Temporary Menu Entry
+## Task 7: Add Portrait MiningScreen, Safe Menu Entry, and the Early Product Gate
 
 **Files:**
 - Create: `lib/mining/presentation/mining_screen.dart`
@@ -1264,31 +1401,41 @@ git commit -m "feat: add authored mining world"
 
 **Interfaces:**
 - Consumes: plain controller, pure `MiningSheetView`, `MiningGame`.
-- `MiningActionSheet` renders a view model + one callback; it does not derive economy rules.
+- `MiningActionSheet` renders the view model + one callback only.
 
-- [ ] **Step 1: Write failing responsive-screen tests**
+- [ ] **Step 1: Write MiningScreen tests at both portrait sizes**
 
-Pump 360×640 and 430×932 with deterministic SharedPreferences/clock. Assert:
+For each `Size(360, 640)` and `Size(430, 932)`, pump deterministic SharedPreferences + clock and assert:
 
 ```dart
 expect(find.text('Landing Basin'), findsWidgets);
 expect(find.text('SELL ALL CARGO'), findsOneWidget);
 expect(tester.takeException(), isNull);
-
 final size = tester.getSize(find.byKey(const Key('mining-primary-action')));
 expect(size.height, greaterThanOrEqualTo(56));
 ```
 
-Select Landing Basin and assert `BUILD MINE`; build and assert Level/Upgrade state. Assert status never displays Population, Workers, Happiness, or Research.
+Select Landing Basin and assert Build; build and assert Level/Upgrade state. Assert status never displays Population, Workers, Happiness, or Research.
 
-- [ ] **Step 2: Write the menu-entry test**
+- [ ] **Step 2: Write menu-entry and menu-layout tests at the same sizes**
+
+Use the existing menu test convention: pump the app, advance 3 seconds instead of `pumpAndSettle()` because the star animation repeats.
 
 ```dart
-expect(find.text('START EXPEDITION'), findsOneWidget);
-expect(find.text('MINING MVP'), findsOneWidget);
+for (final size in const [Size(360, 640), Size(430, 932)]) {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = size;
+  await tester.pumpWidget(const HorologiumApp());
+  await tester.pump(const Duration(seconds: 3));
+
+  expect(find.text('START EXPEDITION'), findsOneWidget);
+  expect(find.text('MINING MVP'), findsOneWidget);
+  expect(find.text('SETTINGS'), findsOneWidget);
+  expect(tester.takeException(), isNull);
+}
 ```
 
-Tap **MINING MVP** and verify `MiningScreen` appears while city Start remains unchanged.
+Also tap **MINING MVP** and verify `MiningScreen` appears. **START EXPEDITION** must remain unchanged.
 
 - [ ] **Step 3: Run RED**
 
@@ -1296,9 +1443,9 @@ Tap **MINING MVP** and verify `MiningScreen` appears while city Start remains un
 flutter test test/mining/presentation/mining_screen_test.dart test/main_menu_test.dart
 ```
 
-Expected: FAIL because presentation/menu entry do not exist.
+Expected: FAIL because screen/menu entry do not exist.
 
-- [ ] **Step 4: Implement the status bar**
+- [ ] **Step 4: Implement status bar and dumb action-sheet renderer**
 
 ```dart
 class MiningStatusBar extends StatelessWidget {
@@ -1315,13 +1462,7 @@ class MiningStatusBar extends StatelessWidget {
   final int totalSectors;
   final int cargoValue;
 }
-```
 
-Render Cash, Sectors, Cargo only.
-
-- [ ] **Step 5: Implement a dumb action-sheet renderer**
-
-```dart
 class MiningActionSheet extends StatelessWidget {
   const MiningActionSheet({
     super.key,
@@ -1334,21 +1475,12 @@ class MiningActionSheet extends StatelessWidget {
 }
 ```
 
-Use `SizedBox(height: 56, width: double.infinity)` with key `mining-primary-action`. Disabled actions render `view.disabledReason`; they do not recompute affordability.
+Primary action uses `SizedBox(height: 56, width: double.infinity)` and key `mining-primary-action`. Disabled copy comes only from `view.disabledReason`.
 
-- [ ] **Step 6: Implement plain-controller screen ownership**
+- [ ] **Step 5: Implement plain-controller screen ownership**
 
 ```dart
-class MiningScreen extends StatefulWidget {
-  const MiningScreen({super.key, this.nowUtc});
-  final DateTime Function()? nowUtc;
-
-  @override
-  State<MiningScreen> createState() => _MiningScreenState();
-}
-
-class _MiningScreenState extends State<MiningScreen>
-    with WidgetsBindingObserver {
+class _MiningScreenState extends State<MiningScreen> with WidgetsBindingObserver {
   late final MiningContentRegistry _content;
   late final MiningController _controller;
   late final MiningGame _game;
@@ -1356,60 +1488,41 @@ class _MiningScreenState extends State<MiningScreen>
   MiningSectorId? _selectedSectorId;
   late MiningSheetView _sheetView;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _content = MiningContentRegistry.phaseOne();
-    _controller = MiningController(
+  void _refreshPresentation() {
+    _game.applyState(_controller.state);
+    _sheetView = MiningSheetView.from(
+      state: _controller.state,
       content: _content,
-      repository: MiningSaveRepository(content: _content),
-      nowUtc: widget.nowUtc ?? () => DateTime.now().toUtc(),
+      selectedSectorId: _selectedSectorId,
+      isBusy: _controller.isBusy,
     );
-    _game = MiningGame(content: _content)
-      ..onSelectionChanged = _onSelectionChanged;
-    _initialize();
+    if (mounted) setState(() {});
   }
 }
 ```
 
-After initialization, set `_sheetView = MiningSheetView.from(...)`, apply controller state to the game, and start a one-second timer.
-
-Use one helper after any controller state/selection change:
+The one-second timer calls:
 
 ```dart
-void _refreshPresentation() {
-  _game.applyState(_controller.state);
-  _sheetView = MiningSheetView.from(
-    state: _controller.state,
-    content: _content,
-    selectedSectorId: _selectedSectorId,
-  );
-  if (mounted) setState(() {});
+if (!_controller.isBusy) {
+  _controller.refresh();
+  _refreshPresentation();
 }
 ```
 
-The timer calls `_controller.refresh(); _refreshPresentation();` and never persistence.
+- [ ] **Step 6: Route one pure action enum to typed controller calls**
 
-- [ ] **Step 7: Route the pure action enum to typed controller calls**
+When a primary action is tapped:
 
-`MiningScreen` switches on `_sheetView.action`. For Reveal/Build/Upgrade, require `_selectedSectorId` and call the corresponding controller method. Sell calls `sellAllCargo()`.
+1. start the controller future (the queue increments busy synchronously);
+2. immediately call `_refreshPresentation()` so the button disables;
+3. await the result;
+4. call `_refreshPresentation()` again;
+5. show visible success/failure copy.
 
-After an awaited success:
+Do not derive a second affordability/prerequisite rule in the widget.
 
-1. call `_refreshPresentation()`;
-2. show visible success text/number change;
-3. call `_game.playReward(...)` for the selected/affected sector(s).
-
-On failure, display the controller result reason. Do not derive a second affordability/prerequisite rule in the widget.
-
-- [ ] **Step 8: Add the temporary menu entry**
-
-```dart
-import 'package:horologium/mining/presentation/mining_screen.dart';
-```
-
-Add near **START EXPEDITION**:
+- [ ] **Step 7: Add the temporary menu entry**
 
 ```dart
 _buildMenuButton(
@@ -1421,9 +1534,9 @@ _buildMenuButton(
 ),
 ```
 
-Do not rename/reroute **START EXPEDITION**.
+Keep **START EXPEDITION** and all legacy routes unchanged.
 
-- [ ] **Step 9: Run GREEN**
+- [ ] **Step 8: Run GREEN**
 
 ```bash
 flutter test test/mining/mining_sheet_view_test.dart \
@@ -1431,15 +1544,40 @@ flutter test test/mining/mining_sheet_view_test.dart \
   test/main_menu_test.dart
 ```
 
-Expected: PASS with no portrait overflow.
+Expected: PASS with no overflow at either portrait size.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 9: Commit the first runnable loop**
 
 ```bash
 git add lib/mining/presentation lib/main_menu.dart \
   test/mining/presentation/mining_screen_test.dart test/main_menu_test.dart
 git commit -m "feat: add mining MVP screen"
 ```
+
+- [ ] **Step 10: Mandatory early real-device product gate**
+
+Before Task 8, run the committed build on one real/simulated portrait mobile target and complete:
+
+1. open **MINING MVP**;
+2. build Landing Basin gold;
+3. accrue enough cargo for a meaningful first sale;
+4. sell;
+5. upgrade gold;
+6. reveal Carbon Ridge.
+
+Record a short checkpoint note answering:
+
+```text
+Core loop worth finishing? Yes | No
+First-mine clarity: <observation>
+First-sale clarity: <observation>
+Upgrade/reveal motivation: <observation>
+Blocking UX issue, if any: <observation or none>
+```
+
+If **No**, stop implementation here and record HPA-631 **Stop/reconsider**. Do not spend time on Task 8 reward/lifecycle polish or Task 9 full-journey coverage.
+
+If **Yes**, proceed to Task 8. This is an interim gate; Task 10 still records the formal final decision.
 
 ---
 
@@ -1455,19 +1593,19 @@ git commit -m "feat: add mining MVP screen"
 
 **Interfaces:**
 - Consumes controller results + `OfflineProductionSummary`.
-- Effects remain presentation-only and run after committed success.
+- Effects are presentation-only and run after committed success.
 
 - [ ] **Step 1: Add failing lifecycle/recovery/reduced-motion tests**
 
 Test:
 
-1. active gold mine is persisted;
+1. active gold mine persisted;
 2. pause/checkpoint;
 3. clock advances;
 4. resume/recreate;
 5. one offline sheet reports Gold production;
-6. dismiss and rebuild does not show it again;
-7. malformed mining JSON causes one non-blocking recovery `SnackBar`;
+6. dismiss + rebuild does not repeat it;
+7. malformed mining JSON causes one non-blocking recovery SnackBar;
 8. `MediaQueryData(disableAnimations: true)` still gives visible Build/Reveal/Upgrade/Sell confirmation.
 
 - [ ] **Step 2: Run RED**
@@ -1480,17 +1618,9 @@ Expected: FAIL because lifecycle/reward behavior is incomplete.
 
 - [ ] **Step 3: Implement `OfflineReturnSheet`**
 
-Render:
+Render elapsed duration used, non-zero Gold/Coal/Stone production, storage-full notes for `fullSectors`, cap note when reached, and one next-action hint. There is no claim button because cargo is already state.
 
-- elapsed duration actually used;
-- non-zero Gold/Coal/Stone produced;
-- storage-full notes for `fullSectors`;
-- offline-limit note when capped;
-- one next-action hint.
-
-No claim button; cargo is already authoritative state.
-
-- [ ] **Step 4: Wire pause/resume**
+- [ ] **Step 4: Wire lifecycle through the serialized controller**
 
 ```dart
 @override
@@ -1500,6 +1630,7 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
     case AppLifecycleState.paused:
       _refreshTimer?.cancel();
       unawaited(_controller.checkpoint());
+      _refreshPresentation();
       break;
     case AppLifecycleState.resumed:
       unawaited(_resumeMining());
@@ -1511,11 +1642,11 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
 }
 ```
 
-`_resumeMining()` calls `controller.resume()`, refreshes presentation, shows the returned summary once, and restarts the timer. Cold initialization consumes `takePendingReturnSummary()` after first frame.
+`_resumeMining()` awaits queued `controller.resume()`, refreshes presentation, shows the returned summary once, and restarts the timer.
 
 - [ ] **Step 5: Show invalid-save recovery once**
 
-After initialize, when `controller.recoveredFromInvalidSave` is true, schedule one `SnackBar`:
+When `controller.recoveredFromInvalidSave` is true after initialization, schedule one post-frame SnackBar:
 
 ```text
 Mining progress could not be loaded, so a fresh mining save was started.
@@ -1527,11 +1658,9 @@ Mining progress could not be loaded, so a fresh mining save was started.
 enum MiningRewardEffect { reveal, construction, tierUpgrade, sale }
 ```
 
-`MiningGame.playReward(effect, sectorId)`:
-
 - reveal: scanner line/ring + fog fade;
-- construction: facility scale/fade + dust/glow;
-- tier upgrade: pulse the newly added level 3/5 structural children;
+- construction: scale/fade + dust/glow;
+- tier upgrade: pulse newly added level-3/5 structure;
 - sale: short cargo/particle movement toward HUD direction.
 
 No effect completion is awaited before economic success.
@@ -1542,15 +1671,15 @@ No effect completion is awaited before economic success.
 _game.reducedMotion = MediaQuery.of(context).disableAnimations;
 ```
 
-When true, use fades/number changes and snapped/short camera movement. Keep visible text confirmation identical.
+Use fades/number transitions and snapped/short camera movement. Keep the same visible confirmation text.
 
 - [ ] **Step 8: Add optional success haptics**
 
-Call `HapticFeedback.lightImpact()` or `mediumImpact()` after successful primary actions. Do not await it and do not add a platform abstraction.
+Call `HapticFeedback.lightImpact()` or `mediumImpact()` after successful actions. Do not await it and do not add a platform abstraction.
 
-- [ ] **Step 9: Strengthen world tests after reward implementation**
+- [ ] **Step 9: Strengthen mounted world tests after effects**
 
-Re-run structural assertions after `playReward` and reduced-motion state changes. Ensure tier children remain based on authoritative `MiningSave`, not effect timing.
+Re-run structural assertions after `playReward` and reduced-motion changes. Tier children must remain a function of `MiningSave`, not effect timing.
 
 - [ ] **Step 10: Run GREEN**
 
@@ -1576,17 +1705,17 @@ git commit -m "feat: complete mining return and reward UX"
 
 **Files:**
 - Create: `test/integration/mining_mvp_journey_test.dart`
-- Modify mining source only for testability bugs proven by this journey.
+- Modify mining source only for integration bugs proven by this journey.
 
 **Interfaces:**
 - Exercises menu → real screen → pure sheet model → controller → simulation → persistence → world together.
-- Uses visible UI + injected time only; no controller shortcuts.
+- Uses visible UI + injected time only; no controller shortcuts or cash injection.
 
 - [ ] **Step 1: Write the journey test**
 
 ```dart
 await tester.tap(find.text('MINING MVP'));
-await tester.pumpAndSettle();
+await tester.pump();
 
 await tester.tap(find.text('Landing Basin').first);
 await tester.tap(find.text('BUILD MINE'));
@@ -1601,35 +1730,30 @@ await tester.tap(find.text('UPGRADE'));
 await tester.pump();
 ```
 
-Continue earning/selling through visible controls until Carbon Ridge is revealed/built, then Granite Crater is revealed/built. Do not inject cash or call controller methods.
+Continue through visible controls until Carbon Ridge is revealed/built, then Granite Crater is revealed/built.
 
-- [ ] **Step 2: Verify mixed-cargo sale**
+- [ ] **Step 2: Verify mixed-cargo sale and one-floor rounding**
 
-Through visible UI state, verify:
-
-- all three mines exist;
-- gold mine has upgraded;
-- more than one resource contributes cargo value;
-- one **SELL ALL CARGO** clears every active mine's cargo and increases cash once.
+Through visible state verify all three mines exist, gold has upgraded, multiple resources contribute cargo, one Sell All clears all active cargo, and the cash increase matches `floor(total gross value)` from all resource cargo combined.
 
 - [ ] **Step 3: Verify offline return against the pure simulation**
 
 After a persisted checkpoint:
 
-1. read `horologium.mining.save` without modifying it;
-2. advance clock by two hours;
+1. read `horologium.mining.save` unchanged;
+2. advance clock two hours;
 3. recreate `MiningScreen`;
-4. verify the offline summary appears;
+4. verify one offline summary;
 5. compare restored storage to `MiningSimulation.accrue(savedState, T1)`;
-6. separately prove 12 hours uses at most 8 hours before storage caps.
+6. separately prove 12 hours uses at most 8 hours before capacity caps.
 
-- [ ] **Step 4: Run RED/GREEN on the integration seam**
+- [ ] **Step 4: Run the integration seam**
 
 ```bash
 flutter test test/integration/mining_mvp_journey_test.dart
 ```
 
-Expected first run: a concrete integration failure or PASS if all seams align. If it fails, fix only the demonstrated seam and keep the same production path.
+Expected first run: either PASS or one concrete integration mismatch. Fix only demonstrated production seams; do not add test-only alternate paths.
 
 - [ ] **Step 5: Run all mining tests together**
 
@@ -1646,15 +1770,15 @@ git add test/integration/mining_mvp_journey_test.dart lib/mining
 git commit -m "test: cover complete mining MVP journey"
 ```
 
-Only source files actually changed for a proven integration gap belong in this commit.
+Only source files changed for a proven integration bug belong in this commit.
 
 ---
 
-## Task 10: Run Repository Verification and Record Product Evidence
+## Task 10: Run Repository Verification and Record Final Product Evidence
 
 **Files:**
 - No planned source changes.
-- Linear HPA-631 gets the final review comment only after implementation/playtest evidence exists.
+- Linear HPA-631 receives the final review comment only after implementation/playtest evidence exists.
 
 - [ ] **Step 1: Run formatting**
 
@@ -1680,7 +1804,7 @@ flutter test --coverage
 
 Expected: exit 0.
 
-- [ ] **Step 4: Run the web test target already used by CI**
+- [ ] **Step 4: Run the web test target used by CI**
 
 ```bash
 flutter test --reporter=expanded --platform chrome
@@ -1699,9 +1823,9 @@ Expected: both exit 0.
 
 On macOS with the normal iOS toolchain, also run the development build used for the portrait playtest. This is acceptance evidence, not a new CI job.
 
-- [ ] **Step 6: Perform narrow/tall portrait smoke**
+- [ ] **Step 6: Perform final narrow/tall portrait smoke**
 
-Verify on representative portrait targets:
+Verify:
 
 - fresh player identifies gold and builds within one minute;
 - selected sector stays visible above the sheet;
@@ -1711,13 +1835,12 @@ Verify on representative portrait targets:
 - audio-off still confirms success;
 - reduced-motion remains understandable;
 - return summary makes the next useful action obvious;
+- modified MainMenu fits the supported narrow/tall portrait targets;
 - no city page is required for the mining loop.
 
-Record device/simulator, OS/runtime, build SHA, first-mine/first-sale timing, and observations.
+Record exact device/simulator, OS/runtime, build SHA, first-mine/first-sale timing, and observations.
 
-- [ ] **Step 7: Verify the isolation boundary with a narrow grep**
-
-Allow `game/resources/resource_type.dart`; reject actual city economy dependencies:
+- [ ] **Step 7: Verify isolation and forbidden framework dependencies**
 
 ```bash
 grep -R -E \
@@ -1725,9 +1848,7 @@ grep -R -E \
   lib/mining || true
 ```
 
-Expected: no output.
-
-Also verify no listener framework slipped in:
+Expected: no output. `game/resources/resource_type.dart` is allowed.
 
 ```bash
 grep -R "ChangeNotifier\|notifyListeners" lib/mining || true
@@ -1737,11 +1858,9 @@ Expected: no output.
 
 - [ ] **Step 8: Check the spec acceptance list line by line**
 
-Use `docs/superpowers/specs/2026-08-18-hpa-631-one-planet-mining-mvp-design.md`. Do not substitute “tests passed” for the portrait/product evidence items.
+Use `docs/superpowers/specs/2026-08-18-hpa-631-one-planet-mining-mvp-design.md`. Do not substitute passing tests for real portrait/product evidence.
 
-- [ ] **Step 9: Post the HPA-631 product conclusion**
-
-After human/product review, add exactly one decision:
+- [ ] **Step 9: Post the HPA-631 final conclusion**
 
 ```text
 Reviewed build: <commit SHA>
@@ -1756,14 +1875,7 @@ Do not start HPA-636 unless the decision is **Proceed to cutover**.
 
 - [ ] **Step 10: Fix any verification gap in the same PR**
 
-If verification reveals a real bug, add its regression test, fix it on this branch, and commit:
-
-```bash
-git add <changed source and tests>
-git commit -m "fix: close mining MVP verification gap"
-```
-
-Do not create a second PR.
+If verification reveals a real bug, add its regression test, fix it on this branch, and commit it. Do not create a second PR.
 
 ---
 
@@ -1771,29 +1883,30 @@ Do not create a second PR.
 
 ### Spec coverage
 
-- Three typed sectors, reused resource/assets, five levels: Tasks 1 and 6.
+- Typed sectors, reused resource/assets, explicit world units: Task 1.
 - Deterministic production, rollback/storage/8-hour cap: Task 2.
-- Strict single document, invalid reset, no speculative compatibility: Task 3.
-- Atomic Reveal/Build/Upgrade/Sell with plain controller: Task 4.
-- Pure action-sheet derivation outside widgets: Task 5.
-- Mounted Flame world + structural level 1/3/5 proof + copied camera: Task 6.
-- Portrait UI, typed actions, temporary menu entry: Task 7.
+- Strict structural save + tunable capacity clamp: Task 3.
+- Serialized atomic Reveal/Build/Upgrade/Sell/checkpoint/resume + one-floor sale: Task 4.
+- Pure busy/affordability/tiny-sale sheet derivation: Task 5.
+- Mounted Flame world, explicit terrain size, initial visibility, structural level 1/3/5 proof: Task 6.
+- Portrait UI, typed actions, temporary menu, both-size menu checks, early product gate: Task 7.
 - Offline return/recovery/reduced motion/four reward moments: Task 8.
 - Real first-session + three-sector + mixed-sale + offline journey: Task 9.
-- Format/analyze/tests/web/APK/build/manual/isolation/product decision: Task 10.
+- Format/analyze/tests/web/APK/manual/isolation/final decision: Task 10.
 
 ### Placeholder scan
 
-There are no `TBD`, `TODO`, “similar to another task”, future compatibility hooks, missing sector defaults, schema migration steps, generic “add tests” steps, or unspecified framework seams.
+There are no `TBD`, `TODO`, future compatibility hooks, missing-sector defaults, schema migration steps, generic framework seams, or test-only alternate production paths.
 
 ### Type consistency
 
 - `MiningSectorId` is the single sector/deposit identity across content, state, persistence, controller, sheet, and world.
 - `ResourceType` is reused for Gold/Coal/Stone identity and production summaries.
-- `MiningSave` is the single mutable-progress document; there is no `MiningSaveV2`.
+- `MiningContentRegistry.rateFor/capacityFor` is the shared balance calculation seam.
+- `MiningSave` is the single progress document.
 - `MineState` is only `{level, storedAmount}`.
-- `MiningController` is plain Dart and is the sole mutation boundary exposed to `MiningScreen`.
-- `MiningSheetView` is pure derived presentation state.
+- `MiningController` is plain Dart, serializes async mutations, and is the sole mutation boundary exposed to `MiningScreen`.
+- `MiningSheetView` is pure derived presentation state and receives `isBusy` explicitly.
 - `MiningGame.applyState()` consumes read-only snapshots and owns no economics.
 
 ## Execution Handoff
