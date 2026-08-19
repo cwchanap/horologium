@@ -4,44 +4,54 @@
 
 Implementation design for Linear HPA-631, **Build and validate the one-planet mining MVP**.
 
-This design is scoped to one implementation PR. It intentionally does not split domain, persistence, sectors, presentation, or testing into separate tickets or PRs.
+This design is intentionally one PR and one product-validation slice. It does not split domain, persistence, sectors, presentation, animation, or testing into child tickets or PRs.
 
 ## Source priority
 
 When requirements differ, use this order:
 
-1. Linear HPA-630, the authoritative Horologium mining roadmap.
-2. Linear HPA-631, the acceptance contract for this MVP.
+1. Linear HPA-630, the Horologium mining roadmap.
+2. Linear HPA-631, the MVP acceptance contract.
 3. This task-specific design.
-4. `docs/superpowers/specs/2026-08-17-stellar-mining-idle-pivot-design.md` on commit `40ef643bc99e6686ee99c797e289232b4e45e407` as supporting rationale only.
-5. Existing city-simulation documentation only as implementation context.
+4. The earlier stellar-mining pivot design as supporting rationale only.
+5. Legacy city documentation as implementation context only.
 
-The August 18 review deliberately simplifies one part of the earlier pivot design: HPA-631 uses one strict mining JSON save without a schema-version envelope, backup rotation, missing-field defaults, or speculative forward-compatibility behavior. There is no shipped mining save to migrate yet.
+The current HPA-631 decisions supersede older platform-oriented details: the first mining save is strict and unversioned, the first planet has one deposit per sector, and no migration, backup, multi-planet, or generic content framework is prebuilt.
 
 ## Goal
 
-Ship the first complete mining-idle product loop inside the existing Flutter/Flame app without coupling it to the legacy city simulation:
+Ship the smallest complete loop that can answer the product question:
 
-> Identify Landing Basin's gold deposit → build a mine → accrue cargo → sell → upgrade → reveal Carbon Ridge → build coal → reveal Granite Crater → build stone → leave → return to deterministic offline production.
+> Is revealing fixed deposits, building automated mines, selling cargo, upgrading facilities, and returning to offline production compelling enough to become Horologium's default direction?
 
-The slice exists to answer a product question, not to create a platform: is simple mining, discovery, selling, upgrading, and strong visual reward feedback compelling enough to become Horologium's default direction?
+The player journey is:
+
+> Landing Basin gold → build → accrue → sell → upgrade → reveal Carbon Ridge → build coal → reveal Granite Crater → build stone → leave → return to deterministic offline cargo.
 
 ## Current repository baseline
 
-`main` is still the May 2026 city-building runtime:
+`main` is still the city-building product:
 
-- `lib/main_menu.dart` loads a legacy `Planet` and sends **START EXPEDITION** to `MainGameWidget`.
+- `lib/main_menu.dart` initializes a legacy `Planet` and routes **START EXPEDITION** to `MainGameWidget`.
 - `lib/game/main_game.dart` is a Flame world centered on the city grid and `Building` placement.
-- `lib/game/scene_widget.dart` coordinates worker/resource/research/quest state around that city runtime.
-- `lib/game/services/save_service.dart` persists the legacy model across many SharedPreferences keys.
-- City production is driven by a one-second timer in `GameStateManager`; it is not suitable as the authority for offline mining production.
-- `ResourceType`, `Assets`, `ParallaxTerrainComponent`, camera interaction patterns, `AudioManager`, `ResourceIcon`, and existing mine sprites are reusable without reusing the city economy.
+- `lib/game/scene_widget.dart` coordinates workers, resources, research, quests, and city persistence.
+- `lib/game/services/save_service.dart` persists city state across many SharedPreferences keys.
+- city production is a one-second mutation loop, not elapsed-time offline accrual.
 
-HPA-631 therefore adds a parallel mining vertical slice and a temporary menu entry. HPA-636, not this issue, owns replacing the default Start flow and deleting obsolete city systems.
+Useful infrastructure already exists and should be reused without inheriting the city economy:
+
+- `ResourceType.gold`, `ResourceType.coal`, `ResourceType.stone`;
+- `Assets.goldMine`, `Assets.coalMine`, `Assets.quarry`;
+- `ResourceIcon`;
+- `ParallaxTerrainComponent`;
+- `AudioManager`;
+- the camera fit/pan/zoom math in `MainGame`;
+- the future-chain serialization idiom in `PlanetSaveDebouncer`;
+- the mounted `GameWidget` testing pattern used by the existing widget suite.
+
+HPA-631 adds a parallel mining path. HPA-636, not this task, owns making mining the default and deleting obsolete city code.
 
 ## Selected architecture
-
-Add one focused mining feature:
 
 ```text
 Flutter MiningScreen
@@ -52,33 +62,23 @@ Flutter MiningScreen
     -> MiningSheetView.from(...)
 
 Flame MiningGame
-    <- read-only MiningSave + callbacks from MiningScreen
+    <- read-only MiningSave snapshots
+    -> typed selection callbacks to MiningScreen
 ```
 
-The feature reuses existing identity and presentation primitives where they are already clean:
+Reuse clean identity/presentation primitives, but do not route mining economics or persistence through:
 
-- `ResourceType.gold`, `ResourceType.coal`, `ResourceType.stone`;
-- `Assets.goldMine`, `Assets.coalMine`, `Assets.quarry`;
-- `ResourceIcon` for Flutter resource icons;
-- `ParallaxTerrainComponent` for terrain;
-- `AudioManager` for existing BGM preferences/lifecycle behavior;
-- the minimal fit/pan/zoom logic copied from `MainGame`.
+- `Resources`;
+- `Building` / `BuildingRegistry`;
+- `GameStateManager`;
+- `Planet` / `ActivePlanet`;
+- `SaveService`.
 
-It does **not** reuse `Resources`, `Building`, `BuildingRegistry`, `GameStateManager`, `Planet`, `ActivePlanet`, or `SaveService` for mining state or economics.
-
-This is the smallest boundary that keeps HPA-636 cheap: mining does not inherit workers, population, happiness, research, free-form placement, or city persistence, while identity/constants are not needlessly forked.
-
-### Rejected: retrofit the city economy
-
-Routing mining through `Resources.update()`, `Building`, or `SaveService` would drag worker assignment, happiness/research state, building placement, and many-key persistence into the new loop. That makes offline accrual and later city deletion harder.
-
-### Rejected: generic platform work
-
-Do not add a package split, event bus, command bus, dependency-injection framework, shared camera framework, asset pipeline, generic planet engine, or content DSL for one planet and three fixed deposits.
+Do not add Provider, Riverpod, Bloc, `ChangeNotifier`, a command bus, service locator, package split, generic planet engine, shared camera framework, or asset-generation pipeline.
 
 ## Feature layout
 
-Keep the small core flat and reserve subdirectories for actual presentation/world groups:
+Keep the core flat because it is small:
 
 ```text
 lib/mining/
@@ -98,13 +98,11 @@ lib/mining/
     mining_components.dart
 ```
 
-`MiningController`, `MiningSimulation`, content, state, save decoding, and sheet derivation remain free of Flutter widgets and Flame components. `MiningController` is a plain Dart class; `MiningScreen` owns repainting with `setState`, matching the existing app's StatefulWidget + callback style.
+`MiningSimulation`, save decoding, controller logic, and `MiningSheetView` remain free of Flutter widgets and Flame components. `MiningScreen` owns `setState`, lifecycle, selection, and the one-second repaint timer.
 
-Do not add Provider, Riverpod, Bloc, `ChangeNotifier`, service locators, code generation, or repository interfaces.
+## Phase 1 content and identity
 
-## Immutable Phase 1 content
-
-Use the existing `ResourceType` enum and `Assets` constants rather than creating mining-specific copies.
+Use one closed identity:
 
 ```dart
 enum MiningSectorId {
@@ -112,13 +110,13 @@ enum MiningSectorId {
   carbonRidge,
   graniteCrater,
 }
+```
 
-class MiningWorldAnchor {
-  const MiningWorldAnchor(this.x, this.y);
-  final double x;
-  final double y;
-}
+Each Phase 1 sector has exactly one fixed deposit, so there is no second deposit ID namespace.
 
+Use the existing resource enum and asset constants:
+
+```dart
 class MiningSectorDefinition {
   const MiningSectorDefinition({
     required this.id,
@@ -150,17 +148,41 @@ class MiningSectorDefinition {
 }
 ```
 
-Each Phase 1 sector contains exactly one fixed deposit, so a second deposit ID namespace is unnecessary. The sector ID is the stable identity for content, progress, selection, persistence, and world components.
+### World coordinate contract
+
+The mining world deliberately uses the same terrain cell scale as the existing terrain renderer, but it does not import the city grid into the mining domain.
+
+Phase 1 locks:
+
+```text
+terrain grid: 36 × 36 cells
+terrain cell size: 50 world px
+world extent: 1800 × 1800 world px
+world origin: center of the terrain
+valid world x/y: -900 ... +900
+```
+
+`MiningWorldAnchor` values are **world-pixel offsets from the centered terrain origin**, not normalized fractions, Flutter `Offset`s, or grid coordinates.
+
+The authored anchors are:
+
+| Sector | World anchor (x, y) |
+| --- | ---: |
+| Landing Basin | (-72, 396) |
+| Carbon Ridge | (-396, -72) |
+| Granite Crater | (324, -360) |
+
+These preserve the earlier composition while making the coordinate units explicit.
 
 ### Initial balance
 
-| Sector | Initial state | Resource | Mine asset | Reveal | Build | Rate/s | Capacity | Sale/unit | Upgrade L2→L5 |
+| Sector | Initial | Resource | Mine asset | Reveal | Build | Rate/s | Capacity | Sale/unit | Upgrade L2→L5 |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | Landing Basin | revealed | Gold | `Assets.goldMine` | 0 | 50 | 0.50 | 90 | 4 | 80, 160, 320, 640 |
 | Carbon Ridge | locked | Coal | `Assets.coalMine` | 250 | 100 | 0.75 | 120 | 3 | 150, 300, 600, 1200 |
 | Granite Crater | locked | Stone | `Assets.quarry` | 700 | 250 | 0.60 | 120 | 5 | 350, 700, 1400, 2800 |
 
-Starting cash is **100**.
+Starting cash: **100**.
 
 Mine multipliers:
 
@@ -172,13 +194,13 @@ Mine multipliers:
 | 4 | 3.25 | 3.00 | advanced |
 | 5 | 4.50 | 4.00 | elite |
 
-Carbon Ridge requires Landing Basin revealed. Granite Crater requires Carbon Ridge revealed. There is no scanner energy, reveal timer, mastery currency, resource depletion, or technology requirement.
+Carbon Ridge requires Landing Basin revealed. Granite Crater requires Carbon Ridge revealed. There is no scanner energy, reveal timer, depletion, mastery currency, or technology requirement.
 
 The offline cap is **8 hours**.
 
-## Mutable state
+`MiningContentRegistry` owns pure helpers such as `rateFor(sectorId, level)` and `capacityFor(sectorId, level)` so simulation, persistence normalization, sheet display, and tests use one formula.
 
-Use one closed first-planet state shape:
+## Mutable state
 
 ```dart
 class MiningSave {
@@ -206,106 +228,112 @@ Initial state:
 - no mines;
 - `lastAccruedAtUtc` = initialization UTC time.
 
-A global accrual timestamp is enough because all active mines advance on the same clock. Building a new mine first accrues existing mines to `nowUtc`, then creates the new mine with the save timestamp already advanced to that instant.
+One global accrual timestamp is sufficient because every active mine advances on the same clock.
 
-All state changes create new values. Widgets and Flame components receive snapshots; they do not own authoritative economics.
+All transitions create new values. Widgets and Flame components receive snapshots only.
 
 ## Deterministic simulation
 
-`MiningSimulation` is pure Dart with no Flutter, Flame, SharedPreferences, timers, or wall-clock reads.
-
-For each revealed sector with a mine:
+`MiningSimulation` is pure Dart. It has no Flutter, Flame, SharedPreferences, timer, or wall-clock dependency.
 
 ```text
 rawElapsed = nowUtc - lastAccruedAtUtc
 usableElapsed = clamp(rawElapsed, 0, 8 hours)
-rate = sector.baseRatePerSecond * rateMultiplier[level]
-capacity = sector.baseCapacity * capacityMultiplier[level]
+rate = content.rateFor(sectorId, level)
+capacity = content.capacityFor(sectorId, level)
 produced = min(rate * usableElapsedSeconds, capacity - storedAmount)
 storedAmount += max(0, produced)
 ```
 
 Rules:
 
-- clock rollback produces zero and never moves the timestamp backward;
-- elapsed time above 8 hours uses only 8 hours, then advances the resulting timestamp to `nowUtc` so excess time cannot be claimed later;
+- clock rollback produces zero and does not move the timestamp backward;
+- elapsed time above 8 hours uses only 8 hours, then advances the resulting timestamp to `nowUtc` so excess time cannot be reclaimed;
 - storage never exceeds current capacity;
-- equal persisted state + equal `nowUtc` produces the same result for foreground refresh, resume, and cold launch;
-- a one-second UI timer may call refresh, but timers are not the economic source of truth.
+- equal state + equal `nowUtc` gives the same result for foreground refresh, resume, and cold launch;
+- the one-second timer is repaint only and never authoritative.
 
-`MiningSimulation.accrue(...)` returns the next state plus an `OfflineProductionSummary` containing produced amounts by `ResourceType`, elapsed duration used, full sectors, and whether the offline cap was reached.
+`MiningSimulation.accrue(...)` returns the next state plus `OfflineProductionSummary` containing produced amounts by `ResourceType`, elapsed duration used, full sectors, and whether the cap was reached.
 
-## Plain controller and atomic actions
+## Serialized plain controller
 
-`MiningController` is a plain class. It receives:
+`MiningController` remains a plain Dart class, but every asynchronous state mutation is serialized through one future chain.
 
-- `MiningContentRegistry`;
-- `MiningSaveRepository`;
-- an injectable `DateTime Function()` UTC clock.
-
-Representative operations:
+It owns:
 
 ```dart
-Future<void> initialize();
-AccrualResult refresh();
-Future<MiningActionResult> revealSector(MiningSectorId sectorId);
-Future<MiningActionResult> buildMine(MiningSectorId sectorId);
-Future<MiningActionResult> upgradeMine(MiningSectorId sectorId);
-Future<MiningSaleResult> sellAllCargo();
-Future<void> checkpoint();
-Future<OfflineProductionSummary?> resume();
-OfflineProductionSummary? takePendingReturnSummary();
+Future<void> _mutationChain = Future<void>.value();
+int _pendingMutations = 0;
+
+bool get isBusy => _pendingMutations > 0;
 ```
 
-Each explicit mutation follows one sequence:
+All async mutations use one queue helper. The helper increments `_pendingMutations` synchronously, appends the operation to `_mutationChain`, catches operation errors so the chain remains usable, and completes the caller's typed future when that queued operation finishes.
 
-1. accrue a candidate state at `nowUtc` without publishing it;
-2. validate the action against the candidate;
-3. if invalid, return failure and keep in-memory + persisted state unchanged;
+Serialize:
+
+- Reveal;
+- Build;
+- Upgrade;
+- Sell All Cargo;
+- lifecycle checkpoint;
+- resume persistence when it writes.
+
+`refresh()` is not queued every second. If `isBusy` is true, refresh skips that tick; the next tick accrues from the newly published state.
+
+This prevents a second tap or timer refresh from computing against stale `_state` while the previous save is in flight.
+
+### Atomic mutation sequence
+
+Inside the serialized operation:
+
+1. accrue a candidate at current UTC;
+2. validate against that candidate;
+3. on failure, leave memory and persistence unchanged;
 4. create one complete next state;
-5. save that complete state once;
-6. publish it as controller state once the save succeeds;
-7. return the success result used by presentation effects.
+5. save it once;
+6. publish it to `_state` only after the save succeeds;
+7. return presentation data.
 
-No command bus, transaction framework, or listener framework is needed.
+No command bus or transaction framework is needed.
 
-`refresh()` updates controller state in memory only. `MiningScreen` calls `setState()` and `MiningGame.applyState(controller.state)` after refresh/actions. It does not persist one-second refreshes.
+### Reveal / Build / Upgrade
 
-### Reveal
+- Reveal: known + locked + prerequisite revealed + enough cash.
+- Build: known + revealed + no mine + enough cash.
+- Upgrade: mine exists + level 1–4 + enough cash.
 
-Validate sector is known, locked, prerequisite is revealed, and cash covers reveal cost. Success deducts once and reveals exactly that sector.
-
-### Build
-
-Validate sector is known, revealed, has no mine, and cash covers build cost. Success deducts once and creates level 1 with zero cargo.
-
-### Upgrade
-
-Validate a mine exists, level is 1–4, and cash covers the authored next-level cost. Success deducts once and increases exactly one level. Existing cargo remains valid under the larger capacity.
+A queued duplicate Reveal or Build evaluates after the first mutation publishes, so it becomes a normal non-mutating failure rather than overwriting the first success.
 
 ### Sell All Cargo
 
-Accrue first, then calculate:
+Do not floor each sector separately.
 
 ```text
-revenue = Σ floor(storedAmount * sector.saleValuePerUnit)
+totalCargo = Σ storedAmount
+grossValue = Σ (storedAmount * sector.saleValuePerUnit)
+revenue = floor(grossValue)
 ```
 
-Success clears cargo on all active mines and adds one summed integer revenue to cash. Zero cargo is a non-mutating failure/no-op.
+- `totalCargo <= 0` is the controller's no-cargo failure condition.
+- For non-zero cargo, one sale clears every active mine and adds `floor(grossValue)` once.
+- Normal UI disables Sell All Cargo while projected revenue is below 1 cash, so the player does not discard tiny cargo for zero payout.
 
-## Persistence: one strict JSON document
+This makes rounding independent of how cargo is distributed across resources.
+
+## Persistence: strict structure, tolerant balance normalization
 
 Create mining-specific persistence; do not widen `SaveService`.
 
-Use one key:
+Use exactly one key:
 
 ```text
 horologium.mining.save
 ```
 
-There is no schema version because there is no shipped mining save and no compatibility requirement yet.
+There is no schema version or migration framework because no mining save has shipped.
 
-The JSON shape is deliberately closed:
+The document is closed:
 
 ```json
 {
@@ -319,42 +347,50 @@ The JSON shape is deliberately closed:
 }
 ```
 
-A mine is:
+Mine JSON:
 
 ```json
 {"level": 1, "storedAmount": 12.5}
 ```
 
-### Load rules
+### Structural reset rules
 
-- missing save key → clean initial state, no warning;
-- valid exact document → decode to typed enum-keyed state;
-- malformed JSON, wrong types, missing required root fields, missing/duplicate/unknown sector IDs, invalid timestamps, negative cash, mine level outside 1–5, negative cargo, or cargo above configured capacity → clean initial state + `recoveredFromInvalidSave = true`;
-- do not default-fill missing sectors;
-- do not add/test speculative `futureField` behavior;
-- do not read city save keys;
-- no backup, forensic recovery, migration layer, or legacy conversion.
+Reset to clean state with `recoveredFromInvalidSave = true` for:
 
-The UI shows one non-blocking recovery message after a reset.
+- malformed JSON;
+- wrong JSON types;
+- extra or missing required root keys;
+- missing, duplicate, or unknown sector IDs;
+- invalid/non-UTC timestamp;
+- negative/non-int cash;
+- invalid `revealed` type;
+- mine keys other than exactly `level` + `storedAmount`;
+- mine level outside 1–5;
+- negative/non-numeric cargo.
+
+Do not default-fill missing sectors, ignore speculative future fields, migrate legacy data, or clamp structural corruption.
+
+### Tunable balance normalization
+
+Configured capacity is **not** a structural validity rule because capacity and its multipliers are deliberately tuned during HPA-631 playtesting.
+
+If a structurally valid save contains positive cargo above the currently configured capacity for that sector/level:
+
+```text
+storedAmount = min(storedAmount, content.capacityFor(sectorId, level))
+```
+
+Load succeeds without a recovery warning.
+
+This keeps playtest progress usable when balance numbers shrink between builds while still guaranteeing runtime storage invariants.
 
 ### Write rules
 
-Write only after:
-
-- successful Reveal;
-- successful Build;
-- successful Upgrade;
-- successful Sell All Cargo;
-- application pause/inactive checkpoint;
-- controlled screen-exit checkpoint.
-
-Do not write on one-second foreground refresh.
+Write only after successful explicit mutations and lifecycle/screen-exit checkpoints. Never write from the one-second foreground refresh.
 
 ## Pure contextual sheet model
 
-Do not derive affordability, prerequisite copy, or action state inside `MiningScreen.build()`.
-
-Add one pure model:
+`MiningScreen.build()` does not derive affordability, prerequisite copy, busy state, or sale eligibility.
 
 ```dart
 enum MiningSheetAction { sell, reveal, build, upgrade, none }
@@ -371,228 +407,246 @@ class MiningSheetView {
     required MiningSave state,
     required MiningContentRegistry content,
     required MiningSectorId? selectedSectorId,
+    required bool isBusy,
   });
 }
 ```
 
-It derives the four Phase 1 sheet states:
+Rules:
 
-- no selection: next objective + **Sell All Cargo**;
-- locked sector: reveal cost, prerequisite, **Reveal Sector**;
-- revealed sector/no mine: resource/rate/capacity/build cost, **Build Mine**;
-- active mine: level/storage/rate/upgrade delta, **Upgrade** or max-level state.
+- when `isBusy`, the primary action is disabled with **Finishing previous action…**;
+- no selection derives Sell All Cargo availability from total cargo and projected total revenue;
+- cargo == 0 disables with no-cargo copy;
+- cargo > 0 but `floor(total gross value) == 0` disables with **Keep mining until cargo is worth at least 1 cash.**;
+- locked sector derives prerequisite/cost + Reveal;
+- revealed empty sector derives resource/rate/capacity/build cost + Build;
+- active mine derives level/storage/rate/upgrade delta + Upgrade/max-level state.
 
-Domain-level tests cover affordance/copy decisions without pumping widgets. `MiningActionSheet` renders the model and callbacks only. Widget tests focus on layout and taps.
+Domain tests cover these choices. `MiningActionSheet` renders the view and callback only.
 
 ## Flutter presentation
 
-`MiningScreen` is a `StatefulWidget` with `WidgetsBindingObserver`. It owns one plain controller, one `MiningGame`, one `AudioManager`, the selected sector ID, and a one-second repaint timer.
+`MiningScreen` is a `StatefulWidget` with `WidgetsBindingObserver`. It owns:
+
+- one `MiningController`;
+- one `MiningGame`;
+- one `AudioManager`;
+- selected `MiningSectorId?`;
+- one-second repaint timer.
 
 Canonical portrait stack:
 
 ```text
 SafeArea
   Stack
-    MiningGame world
-    top MiningStatusBar
-    bottom MiningActionSheet
-    temporary reward/confirmation overlays
+    MiningGame
+    MiningStatusBar
+    MiningActionSheet
+    transient confirmation/reward overlays
 ```
 
-Status bar shows at most:
+Status shows only cash, sector progress, and cargo status/value.
 
-1. cash;
-2. revealed sectors (`1/3`, `2/3`, `3/3`);
-3. stored cargo value/status.
+Primary actions are at least **56 logical px** high. The action sheet is capped around 42% of usable height. Selection focus keeps the selected sector above the sheet.
 
-Primary action buttons are at least **56 logical pixels** high. The bottom sheet is capped around 42% of the usable viewport on small phones. Selection changes tell `MiningGame` the selected sector and obscured fraction so the camera keeps it visible above the sheet.
-
-Automated layouts:
+Automated layout targets:
 
 - 360×640 logical px;
 - 430×932 logical px.
 
-Landscape gets safe constraints, not a second authored layout.
+The same two sizes also test the modified `MainMenu`, because adding **MINING MVP** creates a sixth fixed-height menu button in the existing non-scrollable menu column.
 
-## Flame world
+Landscape gets safe constraints only; no second layout is authored.
 
-`MiningGame` is separate from `MainGame`. It may reuse `ParallaxTerrainComponent` and copy only the minimal fit/pan/zoom behavior needed from `MainGame`; do not extract a shared camera abstraction.
+## Flame world and camera contract
 
-The world owns three `MiningSectorComponent`s keyed by `MiningSectorId`. World taps return the enum ID to Flutter. `MiningGame.applyState(MiningSave state)` updates presentation only.
+`MiningGame` is separate from `MainGame`.
 
-### Existing art reuse
+Use `ParallaxTerrainComponent(gridSize: 36, seed: 631)` but do **not** depend on its asynchronous `onLoad()` to establish world size before camera fit.
 
-Use:
+Before `world.add(terrain)`, explicitly set the same geometry that `MainGame` sets:
 
-- `Assets.goldMine`;
-- `Assets.coalMine`;
-- `Assets.quarry`;
-- existing `ResourceIcon` / resource asset constants;
-- current terrain sprites via `ParallaxTerrainComponent`.
+```dart
+final terrain = ParallaxTerrainComponent(gridSize: 36, seed: 631)
+  ..parallaxEnabled = false
+  ..size = Vector2(1800, 1800)
+  ..anchor = Anchor.center
+  ..position = Vector2.zero();
+```
 
-No `mineAssetFor()` string mapping is added because the registry already stores the existing asset constant.
+Then add the authored sector components and compute fit from the explicit 1800×1800 extent and the actual camera viewport.
 
-### Structural visual tiers
+The initial camera centers on world origin and uses:
 
-Levels 1, 3, and 5 must differ in component structure, not only in an enum value:
+```text
+fitZoom = min(viewportWidth / 1800, viewportHeight / 1800)
+```
 
-- level 1: base sprite + operation light;
-- level 3: level 1 + advanced platform + secondary machinery + brighter lights;
-- level 5: level 3 + elite ring/glow + stronger cargo/particle treatment.
+clamped by the copied zoom rules.
 
-Tests apply progress and assert the corresponding presentation children/flags. A real `GameWidget` harness based on the existing `scene_widget_test.dart` pump pattern verifies the asset-backed mining game loads and owns all three authored sectors. Do not call `MiningGame.onLoad()` naked and then weaken the test if Flame requires a mounted game reference.
+World tests prove:
 
-Manual portrait smoke still judges art quality, motion, readability, and feel; it is not the only proof that levels 1/3/5 differ.
+- every authored anchor is within -900…+900 bounds;
+- at 360×640 initial fit, all three sector anchors project inside the visible viewport;
+- selection focus with bottom obstruction shifts the selected sector upward while remaining inside world bounds.
+
+Copy only the minimum fit/pan/zoom logic from `MainGame`; do not extract a shared camera abstraction.
+
+## Existing art and visual tiers
+
+Use existing mine/resource/terrain assets. No asset pipeline is added.
+
+Facility structure:
+
+- level 1: base mine sprite + operation light;
+- level 3: level-1 structure + advanced platform + secondary machinery;
+- level 5: level-3 structure + elite ring/glow.
+
+Mounted Flame tests assert the actual structural children after `applyState()` at levels 1, 3, and 5. Manual portrait review remains responsible for judging composition and visual quality.
 
 ## Reward moments
 
-All effects start **after** controller success:
+After controller success only:
 
-1. scanner reveal — fog/cover fade + sweep;
-2. mine construction — facility appears with dust/glow + visible confirmation;
-3. tier upgrade — level 3/5 structural layers appear with a short pulse;
-4. cargo sale — cargo-to-wallet effect + visible cash delta.
+1. scanner reveal;
+2. mine construction;
+3. level-3/5 tier upgrade pulse;
+4. cargo sale/cash feedback.
 
-Animation completion never gates economic state.
+Effects never gate economic state.
 
-With reduced motion:
-
-- scanner becomes a short fade;
-- construction/tier changes use cross-fades;
-- cargo motion becomes a number/cash transition;
-- camera movement snaps or becomes very short.
-
-Every action also has text/number confirmation, so audio is optional. Haptics are presentation-only and may no-op on unsupported platforms.
+Reduced motion replaces large camera/particle movement with fades, short number transitions, and snapped/short camera repositioning. Visible confirmation remains present with audio off.
 
 ## Lifecycle and offline return
 
-The one-second foreground timer calls `controller.refresh()`, then `setState()` and `MiningGame.applyState()`. It never writes persistence.
+- foreground: one-second timer calls `refresh()` only when controller is not busy;
+- inactive/paused: stop timer and enqueue one checkpoint;
+- resumed: serialize resume accrual/checkpoint as needed, refresh presentation, show one return summary, restart timer;
+- cold launch: load persisted state and run the same simulation to current UTC;
+- screen exit: enqueue one controlled checkpoint when practical.
 
-Lifecycle:
-
-- `inactive` / `paused`: stop refresh and checkpoint once; pass lifecycle to `AudioManager`;
-- `resumed`: call `controller.resume()`, repaint/apply state, show one offline summary if production occurred, restart refresh;
-- cold launch: `initialize()` loads then accrues through the same simulation function and exposes the same one-shot summary;
-- controlled exit: checkpoint once when practical.
-
-The offline summary shows elapsed time used, non-zero resource production, storage-full notes, offline-cap note, and one next-action hint. There is no claim button because cargo is already authoritative state.
+A killed process does not need periodic saves: cold launch recomputes from the last persisted `lastAccruedAtUtc`.
 
 ## Temporary entry point
 
-Add **MINING MVP** to `lib/main_menu.dart` and navigate directly to `MiningScreen`.
+Add **MINING MVP** near **START EXPEDITION**.
 
-Do not replace **START EXPEDITION**, remove **TRADE**, alter legacy `Planet` initialization, or route city state into mining. HPA-636 owns cutover only after HPA-631 records **Proceed to cutover**.
+Do not reroute or rename **START EXPEDITION**, remove legacy menu items, or make mining default. HPA-636 owns cutover after HPA-631 records **Proceed to cutover**.
+
+## Early product gate
+
+The first human product test happens as soon as Task 7 produces the runnable core loop, **before** reward-polish/offline-summary work.
+
+On a real portrait mobile target, perform:
+
+1. enter **MINING MVP**;
+2. build the Landing Basin gold mine;
+3. wait/advance through a real playable sale;
+4. sell cargo;
+5. upgrade gold;
+6. reveal Carbon Ridge.
+
+Answer one question:
+
+> Is the core reveal → mine → sell → upgrade loop worth finishing?
+
+If **no**, stop HPA-631 implementation and record **Stop/reconsider** rather than spending time on reward layers, reduced-motion polish, and the full journey harness.
+
+If **yes**, continue Tasks 8–10. The final HPA-631 product verdict still occurs after complete acceptance evidence.
 
 ## Testing strategy
 
-Keep the existing Flutter/Flame test stack; add no new runtime or mocking framework.
-
-### Core tests
+### Core/unit
 
 Prove:
 
-- exact three-sector registry and enum IDs;
-- reused `ResourceType` + `Assets` mappings;
+- content identity, balance, and world-anchor bounds;
 - level rate/capacity math;
-- elapsed accrual, storage cap, 8-hour cap, clock rollback, excess-time discard;
-- equal state/time gives equal result;
-- all failed actions preserve complete state and persistence;
-- successful Reveal/Build/Upgrade deduct exactly once;
-- mixed Sell All Cargo sums revenue and clears all active cargo atomically.
-
-### Persistence tests
-
-Using `SharedPreferences.setMockInitialValues()`:
-
-- missing key → clean state;
-- strict unversioned round trip;
-- malformed JSON/bad types/missing sector/unknown sector/invalid timestamp/negative cash/bad level/bad cargo → reset + recovery flag;
-- city keys are ignored;
-- only `horologium.mining.save` is written;
+- deterministic elapsed accrual, storage cap, 8-hour cap, and clock rollback;
+- strict save structure;
+- over-capacity positive cargo clamps without recovery;
+- explicit actions validate before mutation;
+- queued concurrent/double actions serialize and cannot overwrite earlier success;
 - passive refresh does not persist;
-- explicit action/checkpoint does persist.
+- Sell All floors total gross value once;
+- `MiningSheetView` handles busy/no-cargo/sub-$1/affordability states.
 
-Do not add tests for schema versions, missing-field default-fill, or future unknown fields.
-
-### Sheet tests
-
-Pure `MiningSheetView.from(...)` tests prove locked prerequisite, affordability, build/upgrade/max-level states, Sell All availability, labels, and disabled reasons without widget pumping.
-
-### World/widget tests
+### World/widget
 
 Prove:
 
-- mounted `MiningGame` owns all three enum-keyed sectors;
-- locked/revealed/mine state maps correctly;
-- level 1/3/5 structural children/flags are distinct;
-- 360×640 and 430×932 have no overflow and primary actions are ≥56 px;
-- sheet renders the pure view model and routes taps to the correct controller action;
-- recovery and offline summary appear once;
-- reduced-motion actions remain visibly confirmed;
-- selected content is focused above the sheet.
+- mounted world loads all three sectors;
+- level 1/3/5 structural children differ;
+- all anchors are visible at initial 360×640 fit;
+- selection focus respects bottom obstruction;
+- MiningScreen has no overflow at 360×640 and 430×932;
+- MainMenu with six buttons has no overflow at the same sizes;
+- primary buttons are ≥56 px;
+- recovery/offline summary appears once;
+- reduced-motion mode preserves confirmation.
 
-### Full journey
+### Integration
 
-`test/integration/mining_mvp_journey_test.dart` pumps the real menu/mining screen with mocked SharedPreferences and an injected clock, then uses visible UI only:
+Use the real `MiningScreen`, controller, repository, simulation, and world with mocked SharedPreferences and an injected UTC clock. Walk visible controls through first mine, sales/upgrades, all three sectors, mixed cargo sale, checkpoint, dispose, and offline recreate. Do not inject cash or call controller shortcuts.
 
-1. enter **MINING MVP**;
-2. build gold;
-3. advance time and sell;
-4. upgrade gold;
-5. reveal/build Carbon Ridge;
-6. reveal/build Granite Crater;
-7. accrue and sell mixed cargo;
-8. checkpoint/dispose;
-9. advance clock and recreate;
-10. verify offline summary and restored deterministic cargo.
+## Risks and gates
 
-No controller shortcuts or test-only economy path.
+### Risk 1: overlapping async actions lose successful state
+
+Mitigation: serialize every async mutation/checkpoint through one controller future chain, expose `isBusy`, skip refresh while busy, and test with a Completer-backed delayed repository.
+
+### Risk 2: balance tuning invalidates playtest saves
+
+Mitigation: structural corruption resets; positive cargo above newly tuned capacity clamps without warning. Test both classes separately.
+
+### Risk 3: terrain/grid coordinate mismatch produces a blank or badly fitted world
+
+Mitigation: lock 36×36 × 50px world geometry, store anchors in centered world pixels, size terrain explicitly before fit, and test all anchors inside the initial portrait viewport.
+
+### Risk 4: product invalidation arrives after polish cost
+
+Mitigation: mandatory stop/continue portrait playtest immediately after the first runnable Task 7 loop.
+
+### Risk 5: tiny/mixed cargo produces confusing sale values
+
+Mitigation: floor total gross value once; use total cargo for no-cargo detection; disable sub-$1 sales in `MiningSheetView` with explicit copy.
+
+### Risk 6: sixth menu button overflows small portrait screens
+
+Mitigation: run the existing menu at 360×640 and 430×932 in Task 7 tests.
 
 ## One-PR delivery
 
-All work remains on `jack65786656/hpa-631-build-and-validate-the-one-planet-mining-mvp` and draft PR #14. Use focused commits, not child PRs.
-
-Recommended commit sequence:
-
-1. content/state/simulation;
-2. strict persistence/plain controller;
-3. pure sheet view;
-4. Flame world + structural tier tests;
-5. Flutter screen + menu entry;
-6. offline/reward/accessibility UX;
-7. full journey + acceptance fixes.
+All implementation and review fixes remain on the existing HPA-631 branch and draft PR. Use focused commits for reviewability, not child PRs.
 
 ## Explicit non-goals
 
-HPA-631 does not implement:
-
-- mining as default Start/Continue;
-- city deletion/migration;
+- product cutover or city deletion;
 - technology;
-- second planet or generic multi-planet state;
-- retention/daily systems;
-- processing/refining/recipes;
-- dynamic markets, demand, resource buying, or contracts;
-- workers, housing, population, services, logistics, power, maintenance, or depletion;
-- backup saves, schema-version migration, forensic recovery, cloud save, accounts, or server time;
-- generic controller/camera/content/asset frameworks.
+- second planet / multi-planet save;
+- processing/refining;
+- retention systems;
+- dynamic markets or resource buying;
+- workers/housing/services/logistics/power/depletion;
+- schema migration, backup rotation, forensic recovery, cloud save;
+- controller/camera/content frameworks;
+- new asset pipeline.
 
 ## Acceptance mapping
 
-The PR is complete only when it proves:
+HPA-631 is complete only when:
 
-- three sectors use one typed content/state path;
-- Gold/Coal/Stone reuse `ResourceType` and share one simulation/sale path;
-- fresh play builds gold in under one minute and sells during opening session;
-- Reveal/Build/Upgrade/Sell/refresh/resume/cold launch are deterministic;
-- failed actions do not partially mutate state;
-- mixed cargo sells atomically;
-- rollback/storage/8-hour cap are tested;
-- strict single-document persistence round-trips, ignores city keys, avoids refresh writes, and resets invalid data cleanly;
-- pure sheet derivation keeps affordance logic out of widget `build()`;
-- level 1/3/5 structural presentation is automatically verified and manually judged;
-- scanner/build/tier/sale rewards have reduced-motion/no-audio confirmation;
-- both portrait layouts work without entering city pages;
-- unit/persistence/sheet/world/widget/full-journey coverage passes;
-- format, analyze, full tests, web tests, APK build, and web build pass;
-- HPA-631 receives one final reviewed-build comment with **Proceed to cutover**, **Revise once**, or **Stop/reconsider**.
+- three typed sectors share one mining path;
+- gold/coal/stone reuse existing resource identity and one simulation path;
+- the first mine and first sale are understandable in the opening session;
+- async mutations are serialized and cannot overwrite one another;
+- foreground/resume/cold launch share deterministic elapsed-time accrual;
+- storage/rollback/8-hour cap are tested;
+- the strict save round-trips, ignores city keys, clamps only tunable over-capacity cargo, and resets structural corruption;
+- Sell All floors once across total value and clears mixed cargo atomically;
+- level 1/3/5 presentation is structurally distinct and visually reviewed;
+- scanner/build/upgrade/sale rewards have reduced-motion equivalents;
+- MiningScreen and the modified MainMenu fit 360×640 and 430×932;
+- the real full journey and offline return pass;
+- repository format/analyze/test/web/APK/build gates pass;
+- the final HPA-631 comment records build/device observations and exactly one decision: **Proceed to cutover**, **Revise once**, or **Stop/reconsider**.
