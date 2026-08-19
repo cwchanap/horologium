@@ -1,0 +1,307 @@
+import 'dart:async';
+
+import 'package:flame/game.dart';
+import 'package:flutter/material.dart';
+import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_controller.dart';
+import 'package:horologium/mining/mining_save_repository.dart';
+import 'package:horologium/mining/mining_sheet_view.dart';
+import 'package:horologium/mining/mining_state.dart';
+import 'package:horologium/mining/presentation/mining_action_sheet.dart';
+import 'package:horologium/mining/presentation/mining_status_bar.dart';
+import 'package:horologium/mining/world/mining_game.dart';
+
+class MiningScreen extends StatefulWidget {
+  const MiningScreen({super.key, this.content, this.repository, this.nowUtc});
+
+  final MiningContentRegistry? content;
+  final MiningSaveRepository? repository;
+  final DateTime Function()? nowUtc;
+
+  @override
+  State<MiningScreen> createState() => _MiningScreenState();
+}
+
+class _MiningScreenState extends State<MiningScreen>
+    with WidgetsBindingObserver {
+  late final MiningContentRegistry _content;
+  late final MiningController _controller;
+  late final MiningGame _game;
+  late MiningSave _displayState;
+  Timer? _refreshTimer;
+  MiningSectorId? _selectedSectorId;
+  late MiningSheetView _sheetView;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _content = widget.content ?? MiningContentRegistry.phaseOne();
+    final nowUtc = widget.nowUtc ?? () => DateTime.now().toUtc();
+    _controller = MiningController(
+      content: _content,
+      repository: widget.repository ?? MiningSaveRepository(content: _content),
+      nowUtc: nowUtc,
+    );
+    _displayState = MiningSave.initial(nowUtc: nowUtc());
+    _game = MiningGame(content: _content)
+      ..onSelectionChanged = _handleSelectionChanged;
+    _sheetView = MiningSheetView.from(
+      state: _displayState,
+      content: _content,
+      selectedSectorId: _selectedSectorId,
+      isBusy: false,
+    );
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_initialize());
+  }
+
+  Future<void> _initialize() async {
+    await _controller.initialize();
+    if (!mounted) return;
+    _initialized = true;
+    _refreshPresentation();
+    _startRefreshTimer();
+  }
+
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!_controller.isBusy) {
+        _controller.refresh();
+        _refreshPresentation();
+      }
+    });
+  }
+
+  void _refreshPresentation() {
+    if (!_initialized) return;
+    _displayState = _controller.state;
+    _game.applyState(_displayState);
+    _sheetView = MiningSheetView.from(
+      state: _displayState,
+      content: _content,
+      selectedSectorId: _selectedSectorId,
+      isBusy: _controller.isBusy,
+    );
+    if (mounted) setState(() {});
+  }
+
+  void _handleSelectionChanged(MiningSectorId? id) {
+    _selectSector(id);
+  }
+
+  void _selectSector(MiningSectorId? id) {
+    _selectedSectorId = id;
+    if (!_initialized) {
+      if (mounted) setState(() {});
+      return;
+    }
+    if (id != null && _game.hasLoaded) {
+      _game.focusOnSelection(sectorId: id, bottomObscuredFraction: 0.32);
+    }
+    _refreshPresentation();
+  }
+
+  Future<void> _onPrimaryAction() async {
+    if (!_initialized || !_sheetView.primaryEnabled) return;
+
+    final action = _sheetView.action;
+    final selected = _selectedSectorId;
+    late final Future<dynamic> operation;
+    switch (action) {
+      case MiningSheetAction.sell:
+        operation = _controller.sellAllCargo();
+      case MiningSheetAction.reveal:
+        if (selected == null) return;
+        operation = _controller.revealSector(selected);
+      case MiningSheetAction.build:
+        if (selected == null) return;
+        operation = _controller.buildMine(selected);
+      case MiningSheetAction.upgrade:
+        if (selected == null) return;
+        operation = _controller.upgradeMine(selected);
+      case MiningSheetAction.none:
+        return;
+    }
+
+    _refreshPresentation();
+    try {
+      final result = await operation;
+      _refreshPresentation();
+      if (!mounted) return;
+      _showResult(_successMessage(action, result));
+    } catch (_) {
+      _refreshPresentation();
+      if (mounted) _showResult('Action failed.');
+    }
+  }
+
+  String _successMessage(MiningSheetAction action, dynamic result) {
+    if (result is MiningActionResult) {
+      if (!result.isSuccess) return result.message ?? 'Action failed.';
+      switch (action) {
+        case MiningSheetAction.reveal:
+          return 'Sector revealed.';
+        case MiningSheetAction.build:
+          return 'Mine built.';
+        case MiningSheetAction.upgrade:
+          return 'Mine upgraded.';
+        case MiningSheetAction.sell:
+        case MiningSheetAction.none:
+          return 'Action complete.';
+      }
+    }
+    if (result is MiningSaleResult) {
+      return result.isSuccess
+          ? 'Sold cargo for ${result.revenue} cash.'
+          : result.message ?? 'Action failed.';
+    }
+    return 'Action complete.';
+  }
+
+  void _showResult(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  int _revealedSectorCount() => _displayState.sectors.values
+      .where((progress) => progress.revealed)
+      .length;
+
+  int _cargoValue() {
+    var value = 0.0;
+    for (final definition in _content.sectors) {
+      final mine = _displayState.sectors[definition.id]?.mine;
+      if (mine != null) {
+        value += mine.storedAmount * definition.saleValuePerUnit;
+      }
+    }
+    return value.floor();
+  }
+
+  Widget _buildSectorTabs() {
+    return SizedBox(
+      height: 42,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            _buildTab(
+              key: const Key('mining-sell-tab'),
+              label: 'SELL ALL CARGO',
+              selected: _selectedSectorId == null,
+              onPressed: () => _selectSector(null),
+            ),
+            for (final definition in _content.sectors)
+              _buildTab(
+                key: Key('mining-sector-${definition.id.name}'),
+                label: definition.name,
+                selected: _selectedSectorId == definition.id,
+                onPressed: () => _selectSector(definition.id),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTab({
+    required Key key,
+    required String label,
+    required bool selected,
+    required VoidCallback onPressed,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: TextButton(
+        key: key,
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: selected ? Colors.black : Colors.cyanAccent,
+          backgroundColor: selected
+              ? Colors.cyanAccent
+              : const Color(0xCC162133),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          minimumSize: const Size(0, 38),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: const BorderSide(color: Colors.cyanAccent),
+          ),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+    } else if (state == AppLifecycleState.resumed && _initialized) {
+      _controller.refresh();
+      _refreshPresentation();
+      _startRefreshTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          GameWidget(game: _game),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                    child: MiningStatusBar(
+                      cash: _displayState.cash,
+                      revealedSectors: _revealedSectorCount(),
+                      totalSectors: _content.sectors.length,
+                      cargoValue: _cargoValue(),
+                    ),
+                  ),
+                  _buildSectorTabs(),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: MiningActionSheet(
+              view: _sheetView,
+              onPrimaryAction: _onPrimaryAction,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

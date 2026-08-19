@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:horologium/game/planet/index.dart';
 import 'package:horologium/game/services/save_service.dart';
+import 'package:horologium/mining/presentation/mining_screen.dart';
 import 'package:horologium/pages/trade_page.dart';
 import 'game/scene_widget.dart';
 
@@ -176,6 +177,16 @@ class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
                                     'START EXPEDITION',
                                     Icons.rocket_launch,
                                     () => _startGame(),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _buildMenuButton(
+                                    'MINING MVP',
+                                    Icons.precision_manufacturing,
+                                    () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const MiningScreen(),
+                                      ),
+                                    ),
                                   ),
                                   const SizedBox(height: 20),
                                   _buildMenuButton(
