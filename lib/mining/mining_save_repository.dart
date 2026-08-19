@@ -1,0 +1,153 @@
+import 'dart:convert';
+import 'dart:math' as math;
+
+import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_state.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class MiningLoadResult {
+  const MiningLoadResult({
+    required this.state,
+    required this.recoveredFromInvalidSave,
+  });
+  final MiningSave state;
+  final bool recoveredFromInvalidSave;
+}
+
+bool hasExactKeys(Map<String, Object?> map, Set<String> expected) =>
+    map.keys.toSet().length == expected.length &&
+    map.keys.toSet().containsAll(expected);
+
+class MiningSaveRepository {
+  static const saveKey = 'horologium.mining.save';
+
+  MiningSaveRepository({MiningContentRegistry? content})
+    : content = content ?? MiningContentRegistry.phaseOne();
+
+  final MiningContentRegistry content;
+
+  Future<MiningLoadResult> load({required DateTime nowUtc}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(saveKey);
+    if (raw == null) {
+      return MiningLoadResult(
+        state: MiningSave.initial(nowUtc: nowUtc),
+        recoveredFromInvalidSave: false,
+      );
+    }
+
+    try {
+      return MiningLoadResult(
+        state: _decode(jsonDecode(raw)),
+        recoveredFromInvalidSave: false,
+      );
+    } catch (_) {
+      return MiningLoadResult(
+        state: MiningSave.initial(nowUtc: nowUtc),
+        recoveredFromInvalidSave: true,
+      );
+    }
+  }
+
+  Future<void> save(MiningSave state) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(saveKey, jsonEncode(state.toJson()));
+  }
+
+  MiningSave _decode(Object? raw) {
+    if (raw is! Map<String, Object?>) {
+      throw const FormatException('root must be an object');
+    }
+    if (!hasExactKeys(raw, const {'cash', 'lastAccruedAtUtc', 'sectors'})) {
+      throw const FormatException(
+        'root keys must be exactly '
+        'cash, lastAccruedAtUtc, sectors',
+      );
+    }
+
+    final cash = raw['cash'];
+    if (cash is! int || cash < 0) {
+      throw const FormatException('cash must be a non-negative integer');
+    }
+
+    final timestampRaw = raw['lastAccruedAtUtc'];
+    if (timestampRaw is! String) {
+      throw const FormatException('lastAccruedAtUtc must be a string');
+    }
+    final timestamp = DateTime.tryParse(timestampRaw);
+    if (timestamp == null || !timestamp.isUtc) {
+      throw const FormatException('lastAccruedAtUtc must be a UTC timestamp');
+    }
+
+    final sectorsRaw = raw['sectors'];
+    if (sectorsRaw is! Map<String, Object?>) {
+      throw const FormatException('sectors must be an object');
+    }
+    final expectedSectorKeys = MiningSectorId.values
+        .map((id) => id.name)
+        .toSet();
+    if (!hasExactKeys(sectorsRaw, expectedSectorKeys)) {
+      throw const FormatException(
+        'sector keys must be exactly '
+        'landingBasin, carbonRidge, graniteCrater',
+      );
+    }
+
+    final sectors = <MiningSectorId, SectorProgress>{};
+    for (final id in MiningSectorId.values) {
+      final sectorRaw = sectorsRaw[id.name];
+      if (sectorRaw is! Map<String, Object?>) {
+        throw FormatException('sector ${id.name} must be an object');
+      }
+      if (!hasExactKeys(sectorRaw, const {'revealed', 'mine'})) {
+        throw FormatException(
+          'sector ${id.name} keys must be exactly revealed, mine',
+        );
+      }
+      final revealed = sectorRaw['revealed'];
+      if (revealed is! bool) {
+        throw FormatException('sector ${id.name} revealed must be a bool');
+      }
+      sectors[id] = SectorProgress(
+        revealed: revealed,
+        mine: _decodeMine(id, sectorRaw['mine']),
+      );
+    }
+
+    return MiningSave(
+      cash: cash,
+      lastAccruedAtUtc: timestamp,
+      sectors: Map.unmodifiable(sectors),
+    );
+  }
+
+  MineState? _decodeMine(MiningSectorId sectorId, Object? raw) {
+    if (raw == null) {
+      return null;
+    }
+    if (raw is! Map<String, Object?>) {
+      throw const FormatException('mine must be null or an object');
+    }
+    if (!hasExactKeys(raw, const {'level', 'storedAmount'})) {
+      throw const FormatException(
+        'mine keys must be exactly level, storedAmount',
+      );
+    }
+
+    final level = raw['level'];
+    if (level is! int || level < 1 || level > 5) {
+      throw const FormatException('mine level must be between 1 and 5');
+    }
+
+    final storedAmount = raw['storedAmount'];
+    if (storedAmount is! num || storedAmount < 0) {
+      throw const FormatException('storedAmount must be a non-negative number');
+    }
+
+    final capacity = content.capacityFor(sectorId, level);
+    return MineState(
+      level: level,
+      storedAmount: math.min(storedAmount.toDouble(), capacity),
+    );
+  }
+}
