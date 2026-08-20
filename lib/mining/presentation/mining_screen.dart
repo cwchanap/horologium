@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flame/game.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:horologium/game/audio_manager.dart';
@@ -150,7 +151,10 @@ class _MiningScreenState extends State<MiningScreen>
       final result = await operation;
       if (!mounted) return;
       _refreshPresentation();
-      _playRewardAfterSuccess(action, result);
+      // Pass the sector captured before the await so the reward plays on
+      // the sector that initiated the action, even if the player changed
+      // tabs while the save was in flight.
+      _playRewardAfterSuccess(action, result, sectorId: selected);
       _showResult(_successMessage(action, result));
     } catch (_) {
       if (!mounted) return;
@@ -188,7 +192,11 @@ class _MiningScreenState extends State<MiningScreen>
     messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _playRewardAfterSuccess(MiningSheetAction action, dynamic result) {
+  void _playRewardAfterSuccess(
+    MiningSheetAction action,
+    dynamic result, {
+    MiningSectorId? sectorId,
+  }) {
     if (result is MiningActionResult && result.isSuccess) {
       unawaited(HapticFeedback.lightImpact());
       final effect = switch (action) {
@@ -197,10 +205,10 @@ class _MiningScreenState extends State<MiningScreen>
         MiningSheetAction.upgrade => MiningRewardEffect.tierUpgrade,
         MiningSheetAction.sell || MiningSheetAction.none => null,
       };
-      if (effect != null) _game.playReward(effect);
+      if (effect != null) _game.playReward(effect, sectorId: sectorId);
     } else if (result is MiningSaleResult && result.isSuccess) {
       unawaited(HapticFeedback.mediumImpact());
-      _game.playReward(MiningRewardEffect.sale);
+      _game.playReward(MiningRewardEffect.sale, sectorId: sectorId);
     }
   }
 
@@ -320,7 +328,7 @@ class _MiningScreenState extends State<MiningScreen>
         _refreshTimer?.cancel();
         _refreshTimer = null;
         if (_initialized) {
-          unawaited(_controller.checkpoint());
+          _checkpoint();
           _refreshPresentation();
         }
         break;
@@ -337,9 +345,28 @@ class _MiningScreenState extends State<MiningScreen>
   void dispose() {
     _refreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
-    if (_initialized) unawaited(_controller.checkpoint(accrue: false));
+    if (_initialized) _checkpoint(accrue: false);
     unawaited(_audioManager.dispose());
     super.dispose();
+  }
+
+  /// Best-effort lifecycle checkpoint. MiningSaveRepository.save() throws
+  /// when SharedPreferences rejects a write; unawaited() does not consume
+  /// that error, so a storage failure during pause/dispose would surface as
+  /// an uncaught async exception. Swallow it here as a best-effort save
+  /// failure — there is no UI to recover from after dispose, and the next
+  /// load will re-accrue from the last persisted timestamp.
+  void _checkpoint({bool accrue = true}) {
+    unawaited(
+      _controller.checkpoint(accrue: accrue).catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        if (kDebugMode) {
+          debugPrint('Mining lifecycle checkpoint failed: $error\n$stackTrace');
+        }
+      }),
+    );
   }
 
   @override

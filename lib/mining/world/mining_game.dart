@@ -80,12 +80,16 @@ class MiningGame extends FlameGame
     _selectedSectorId = id;
   }
 
-  void playReward(MiningRewardEffect effect) {
+  void playReward(MiningRewardEffect effect, {MiningSectorId? sectorId}) {
     if (!hasLoaded) return;
 
-    final selected = _selectedSectorId == null
-        ? null
-        : _sectors[_selectedSectorId];
+    // Resolve the reward target from the explicit sectorId when provided
+    // (the sector that was selected when the action started), falling back
+    // to the current selection only when no target was passed. This keeps
+    // the reward tied to the action that triggered it even if the player
+    // changes tabs while the save is in flight.
+    final resolvedId = sectorId ?? _selectedSectorId;
+    final selected = resolvedId == null ? null : _sectors[resolvedId];
     switch (effect) {
       case MiningRewardEffect.reveal:
         selected?.playRevealReward(reducedMotion: reducedMotion);
