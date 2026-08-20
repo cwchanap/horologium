@@ -7,7 +7,21 @@ import 'package:flame/events.dart' as flame_events;
 import '../mining_content.dart';
 import '../mining_state.dart';
 
-class OperationLightComponent extends PositionComponent {
+/// Mixin that lets a mining structure component participate in [OpacityEffect]
+/// animations (e.g. the reduced-motion tier-upgrade dim flash) by exposing the
+/// [OpacityProvider] interface and scaling paint alphas by [opacity].
+mixin MiningStructureOpacity on Component implements OpacityProvider {
+  @override
+  double opacity = 1;
+
+  /// Returns [color] with its alpha multiplied by the current [opacity], so
+  /// opacity effects visibly dim the structure without changing its hue.
+  Color dimmed(Color color) =>
+      color.withAlpha((color.a * 255 * opacity).round().clamp(0, 255));
+}
+
+class OperationLightComponent extends PositionComponent
+    with MiningStructureOpacity {
   OperationLightComponent()
     : super(
         size: Vector2.all(16),
@@ -21,7 +35,7 @@ class OperationLightComponent extends PositionComponent {
     canvas.drawCircle(
       center,
       size.x * 0.48,
-      Paint()..color = const Color(0x6653D4E8),
+      Paint()..color = dimmed(const Color(0x6653D4E8)),
     );
     canvas.drawRect(
       Rect.fromCenter(
@@ -29,12 +43,13 @@ class OperationLightComponent extends PositionComponent {
         width: size.x * 0.5,
         height: size.y * 0.7,
       ),
-      Paint()..color = const Color(0xFFFFD54A),
+      Paint()..color = dimmed(const Color(0xFFFFD54A)),
     );
   }
 }
 
-class AdvancedPlatformComponent extends PositionComponent {
+class AdvancedPlatformComponent extends PositionComponent
+    with MiningStructureOpacity {
   AdvancedPlatformComponent()
     : super(
         size: Vector2(124, 18),
@@ -44,7 +59,7 @@ class AdvancedPlatformComponent extends PositionComponent {
 
   @override
   void render(Canvas canvas) {
-    final platform = Paint()..color = const Color(0xFF53D4E8);
+    final platform = Paint()..color = dimmed(const Color(0xFF53D4E8));
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Offset.zero & Size(size.x, size.y * 0.58),
@@ -52,7 +67,7 @@ class AdvancedPlatformComponent extends PositionComponent {
       ),
       platform,
     );
-    final support = Paint()..color = const Color(0xFF2B7E94);
+    final support = Paint()..color = dimmed(const Color(0xFF2B7E94));
     canvas.drawRect(
       Rect.fromLTWH(size.x * 0.12, size.y * 0.52, size.x * 0.1, size.y * 0.48),
       support,
@@ -64,7 +79,8 @@ class AdvancedPlatformComponent extends PositionComponent {
   }
 }
 
-class SecondaryMachineryComponent extends PositionComponent {
+class SecondaryMachineryComponent extends PositionComponent
+    with MiningStructureOpacity {
   SecondaryMachineryComponent()
     : super(
         size: Vector2(30, 44),
@@ -74,7 +90,7 @@ class SecondaryMachineryComponent extends PositionComponent {
 
   @override
   void render(Canvas canvas) {
-    final body = Paint()..color = const Color(0xFF9B7EDE);
+    final body = Paint()..color = dimmed(const Color(0xFF9B7EDE));
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Offset.zero & Size(size.x * 0.72, size.y * 0.72),
@@ -83,7 +99,7 @@ class SecondaryMachineryComponent extends PositionComponent {
       body,
     );
     final pipe = Paint()
-      ..color = const Color(0xFFE0D4FF)
+      ..color = dimmed(const Color(0xFFE0D4FF))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
     canvas.drawLine(
@@ -99,7 +115,7 @@ class SecondaryMachineryComponent extends PositionComponent {
   }
 }
 
-class EliteRingComponent extends PositionComponent {
+class EliteRingComponent extends PositionComponent with MiningStructureOpacity {
   EliteRingComponent()
     : super(
         size: Vector2.all(152),
@@ -111,7 +127,7 @@ class EliteRingComponent extends PositionComponent {
   void render(Canvas canvas) {
     final center = Offset(size.x / 2, size.y / 2);
     final ring = Paint()
-      ..color = const Color(0xFFFF6B8A)
+      ..color = dimmed(const Color(0xFFFF6B8A))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4;
     canvas.drawCircle(center, size.x * 0.45, ring);
