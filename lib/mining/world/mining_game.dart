@@ -103,12 +103,54 @@ class MiningGame extends FlameGame
     required double bottomObscuredFraction,
   }) {
     final definition = content.sector(sectorId);
-    final zoom = camera.viewfinder.zoom;
-    final obscuredWorldHeight =
-        camera.viewport.size.y / zoom * bottomObscuredFraction.clamp(0.0, 1.0);
+    final fraction = bottomObscuredFraction.clamp(0.0, 1.0).toDouble();
+    final viewportHeight = camera.viewport.size.y;
+    final sheetTop = viewportHeight * (1 - fraction);
+    final currentZoom = camera.viewfinder.zoom;
+
+    double targetYAt(double zoom) =>
+        definition.anchor.y + viewportHeight * fraction / (2 * zoom);
+
+    bool targetFitsAt(double zoom) {
+      final halfViewHeight = viewportHeight / zoom / 2;
+      if (halfViewHeight >= MiningContentRegistry.worldHalfExtent) {
+        return false;
+      }
+      final minY = -MiningContentRegistry.worldHalfExtent + halfViewHeight;
+      final maxY = MiningContentRegistry.worldHalfExtent - halfViewHeight;
+      final targetY = targetYAt(zoom);
+      return targetY >= minY && targetY <= maxY;
+    }
+
+    final currentTarget = Vector2(definition.anchor.x, targetYAt(currentZoom));
+    final currentCamera = _clampCameraPosition(currentTarget);
+    final currentProjectedY =
+        viewportHeight / 2 +
+        (definition.anchor.y - currentCamera.y) * currentZoom;
+
+    if (currentProjectedY > sheetTop && currentZoom < _maxZoom) {
+      double focusZoom;
+      if (!targetFitsAt(_maxZoom)) {
+        focusZoom = _maxZoom;
+      } else {
+        var low = currentZoom;
+        var high = _maxZoom;
+        for (var i = 0; i < 30; i++) {
+          final mid = (low + high) / 2;
+          if (targetFitsAt(mid)) {
+            high = mid;
+          } else {
+            low = mid;
+          }
+        }
+        focusZoom = high;
+      }
+      camera.viewfinder.zoom = focusZoom;
+    }
+
     final target = Vector2(
       definition.anchor.x,
-      definition.anchor.y - obscuredWorldHeight,
+      targetYAt(camera.viewfinder.zoom),
     );
     camera.viewfinder.position = _clampCameraPosition(target);
   }

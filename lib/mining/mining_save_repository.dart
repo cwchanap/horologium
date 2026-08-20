@@ -51,7 +51,10 @@ class MiningSaveRepository {
 
   Future<void> save(MiningSave state) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(saveKey, jsonEncode(state.toJson()));
+    final saved = await prefs.setString(saveKey, jsonEncode(state.toJson()));
+    if (!saved) {
+      throw StateError('Mining save was rejected by SharedPreferences.');
+    }
   }
 
   MiningSave _decode(Object? raw) {

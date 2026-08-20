@@ -232,10 +232,12 @@ class MiningController {
     return MiningSaleResult.success(revenue: revenue, sold: sold);
   });
 
-  Future<void> checkpoint() => _enqueueMutation(() async {
-    final accrued = simulation.accrue(_state, _nowUtc().toUtc());
-    await repository.save(accrued.state);
-    _state = accrued.state;
+  Future<void> checkpoint({bool accrue = true}) => _enqueueMutation(() async {
+    final next = accrue
+        ? simulation.accrue(_state, _nowUtc().toUtc()).state
+        : _state;
+    await repository.save(next);
+    _state = next;
   });
 
   Future<OfflineProductionSummary?> resume() => _enqueueMutation(() async {

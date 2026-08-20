@@ -114,7 +114,7 @@ class _MiningScreenState extends State<MiningScreen>
       return;
     }
     if (id != null && _game.hasLoaded) {
-      _game.focusOnSelection(sectorId: id, bottomObscuredFraction: 0.32);
+      _game.focusOnSelection(sectorId: id, bottomObscuredFraction: 0.44);
     }
     _refreshPresentation();
   }
@@ -144,13 +144,14 @@ class _MiningScreenState extends State<MiningScreen>
     _refreshPresentation();
     try {
       final result = await operation;
-      _refreshPresentation();
       if (!mounted) return;
+      _refreshPresentation();
       _playRewardAfterSuccess(action, result);
       _showResult(_successMessage(action, result));
     } catch (_) {
+      if (!mounted) return;
       _refreshPresentation();
-      if (mounted) _showResult('Action failed.');
+      _showResult('Action failed.');
     }
   }
 
@@ -332,6 +333,7 @@ class _MiningScreenState extends State<MiningScreen>
   void dispose() {
     _refreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
+    if (_initialized) unawaited(_controller.checkpoint(accrue: false));
     unawaited(_audioManager.dispose());
     super.dispose();
   }
