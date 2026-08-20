@@ -155,9 +155,7 @@ void main() {
   );
 
   group('Performance: UI load ≤500ms (NFR-QST-003)', skip: _skipInCi, () {
-    testWidgets('QuestLogPage builds within 500ms after framework warm-up', (
-      tester,
-    ) async {
+    testWidgets('QuestLogPage cold start builds within 500ms', (tester) async {
       // Build quest manager with starter + rotating quests
       final questManager = QuestManager(quests: QuestRegistry.starterQuests);
       final daily = DailyQuestGenerator.generateDaily(seed: 42);
@@ -182,12 +180,12 @@ void main() {
         ),
       );
 
-      // Warm up Flutter and the page's Material/text/widget code paths. The
-      // first frame includes one-time framework setup that is not page work;
-      // use a fresh page below so the measured frame still builds its state.
+      // Warm up only the Flutter test framework — one-time setup that is
+      // not page work. The page itself is NOT built here so the first
+      // measured build below is a true cold start for QuestLogPage's code
+      // and resource paths.
       await tester.pumpWidget(const MaterialApp(home: Scaffold()));
-      await tester.pumpWidget(page());
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       const measurements = 5;
       final buildTimes = <int>[];
@@ -198,14 +196,14 @@ void main() {
         sw.stop();
         buildTimes.add(sw.elapsedMilliseconds);
         debugPrint(
-          'QuestLogPage build (warm ${i + 1}/$measurements): '
+          'QuestLogPage build (${i == 0 ? 'cold' : 'warm $i/$measurements'}): '
           '${sw.elapsedMilliseconds}ms',
         );
       }
 
       // Scheduler contention can only inflate wall-clock samples, so the
-      // median of repeated warm builds estimates true build cost without
-      // letting one fast sample mask persistently slow builds.
+      // median of repeated builds estimates true build cost without letting
+      // one fast sample mask persistently slow builds.
       final sortedTimes = buildTimes.toList()..sort();
       final medianBuildTime = sortedTimes[sortedTimes.length ~/ 2];
 
@@ -215,7 +213,8 @@ void main() {
         medianBuildTime,
         lessThan(500),
         reason:
-            'QuestLogPage should load within 500ms even in test environment',
+            'QuestLogPage median build should load within 500ms even in '
+            'test environment',
       );
     });
   });

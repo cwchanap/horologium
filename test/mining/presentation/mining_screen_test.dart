@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_screen.dart';
+import 'package:horologium/mining/world/mining_components.dart';
+import 'package:horologium/mining/world/mining_game.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DelayedMiningSaveRepository extends MiningSaveRepository {
@@ -20,6 +23,13 @@ class DelayedMiningSaveRepository extends MiningSaveRepository {
       await allowSave.future;
     }
     await super.save(state);
+  }
+}
+
+class FailingMiningSaveRepository extends MiningSaveRepository {
+  @override
+  Future<void> save(MiningSave state) async {
+    throw StateError('Mining save was rejected by SharedPreferences.');
   }
 }
 
@@ -432,6 +442,103 @@ void main() {
       await tester.tap(sellTab);
       await tester.pump();
       await tapAction('Sold cargo for 40 cash.');
+    },
+  );
+
+  testWidgets(
+    'construction reward targets the sector that started the action when '
+    'tabs change during the save',
+    (tester) async {
+      final repository = DelayedMiningSaveRepository();
+      await pumpMiningScreen(
+        tester,
+        _viewports.first,
+        repository: repository,
+        // Reduced motion shortens the reward visual lifetime, but we
+        // inspect children immediately after the save completes, before
+        // the fade-out removes the component.
+        disableAnimations: true,
+      );
+
+      // Start "Build Landing Basin" — the save gates on repository.allowSave.
+      await tester.tap(find.byKey(const Key('mining-sector-landingBasin')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('mining-primary-action')));
+      await repository.saveStarted.future;
+      await tester.pump();
+
+      // While the save is in flight, switch to Carbon Ridge. The sector
+      // tabs stay enabled during a save, so this changes _selectedSectorId
+      // before the reward plays.
+      final carbonTab = find.byKey(const Key('mining-sector-carbonRidge'));
+      await tester.ensureVisible(carbonTab);
+      await tester.tap(carbonTab);
+      await tester.pump();
+
+      // Complete the save — the reward should now play on Landing Basin
+      // (the sector captured when the action started), not Carbon Ridge.
+      repository.allowSave.complete();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 20));
+
+      final game =
+          (tester.widget(find.byWidgetPredicate((w) => w is GameWidget))
+                      as GameWidget)
+                  .game
+              as MiningGame;
+      final landing = game.sector(MiningSectorId.landingBasin);
+      final carbon = game.sector(MiningSectorId.carbonRidge);
+
+      expect(
+        landing.children.whereType<MiningRewardVisualComponent>(),
+        isNotEmpty,
+        reason:
+            'Construction reward should play on Landing Basin, the '
+            'sector that started the build action.',
+      );
+      expect(
+        carbon.children.whereType<MiningRewardVisualComponent>(),
+        isEmpty,
+        reason:
+            'Construction reward must not leak to Carbon Ridge just '
+            'because the player switched tabs during the save.',
+      );
+
+      expect(find.text('Mine built.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'pause checkpoint swallows storage failure as a best-effort save',
+    (tester) async {
+      final repository = FailingMiningSaveRepository();
+      await pumpMiningScreen(tester, _viewports.first, repository: repository);
+
+      // Trigger a lifecycle pause — checkpoint() calls save(), which the
+      // failing repository rejects. The screen must consume that error
+      // rather than letting it surface as an uncaught async exception.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'dispose checkpoint swallows storage failure as a best-effort save',
+    (tester) async {
+      final repository = FailingMiningSaveRepository();
+      await pumpMiningScreen(tester, _viewports.first, repository: repository);
+
+      // Unmount the MiningScreen to trigger dispose(), which checkpoints
+      // with accrue: false. The failing repository rejects the save; the
+      // screen must consume that error rather than surfacing it after
+      // dispose when there is no UI to recover.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(tester.takeException(), isNull);
     },
   );
 }
