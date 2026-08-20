@@ -9,12 +9,15 @@ import '../mining_content.dart';
 import '../mining_state.dart';
 import 'mining_components.dart';
 
+enum MiningRewardEffect { reveal, construction, tierUpgrade, sale }
+
 class MiningGame extends FlameGame
     with flame_events.TapCallbacks, flame_events.ScaleDetector {
   MiningGame({required this.content});
 
   final MiningContentRegistry content;
   final Map<MiningSectorId, MiningSectorComponent> _sectors = {};
+  MiningSectorId? _selectedSectorId;
 
   void Function(MiningSectorId?)? onSelectionChanged;
   bool reducedMotion = false;
@@ -73,6 +76,28 @@ class MiningGame extends FlameGame
     }
   }
 
+  void selectSector(MiningSectorId? id) {
+    _selectedSectorId = id;
+  }
+
+  void playReward(MiningRewardEffect effect) {
+    if (!hasLoaded) return;
+
+    final selected = _selectedSectorId == null
+        ? null
+        : _sectors[_selectedSectorId];
+    switch (effect) {
+      case MiningRewardEffect.reveal:
+        selected?.playRevealReward(reducedMotion: reducedMotion);
+      case MiningRewardEffect.construction:
+        selected?.playConstructionReward(reducedMotion: reducedMotion);
+      case MiningRewardEffect.tierUpgrade:
+        selected?.playTierUpgradeReward(reducedMotion: reducedMotion);
+      case MiningRewardEffect.sale:
+        _playSaleReward(selected);
+    }
+  }
+
   void focusOnSelection({
     required MiningSectorId sectorId,
     required double bottomObscuredFraction,
@@ -109,7 +134,20 @@ class MiningGame extends FlameGame
   }
 
   void _handleSectorSelected(MiningSectorId sectorId) {
+    selectSector(sectorId);
     onSelectionChanged?.call(sectorId);
+  }
+
+  void _playSaleReward(MiningSectorComponent? selected) {
+    final source =
+        selected?.position.clone() ?? camera.viewfinder.position.clone();
+    final target = camera.viewfinder.position.clone()
+      ..add(
+        Vector2(0, -camera.viewport.size.y / camera.viewfinder.zoom * 0.45),
+      );
+    final particle = MiningSaleRewardComponent(position: source);
+    world.add(particle);
+    particle.animateTo(target, reducedMotion: reducedMotion);
   }
 
   void _clampZoom() {

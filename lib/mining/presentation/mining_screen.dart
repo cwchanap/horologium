@@ -2,12 +2,16 @@ import 'dart:async';
 
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:horologium/game/audio_manager.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_controller.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
+import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_sheet_view.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_action_sheet.dart';
+import 'package:horologium/mining/presentation/offline_return_sheet.dart';
 import 'package:horologium/mining/presentation/mining_status_bar.dart';
 import 'package:horologium/mining/world/mining_game.dart';
 
@@ -27,11 +31,13 @@ class _MiningScreenState extends State<MiningScreen>
   late final MiningContentRegistry _content;
   late final MiningController _controller;
   late final MiningGame _game;
+  final AudioManager _audioManager = AudioManager();
   late MiningSave _displayState;
   Timer? _refreshTimer;
   MiningSectorId? _selectedSectorId;
   late MiningSheetView _sheetView;
   bool _initialized = false;
+  bool _recoverySnackBarScheduled = false;
 
   @override
   void initState() {
@@ -61,6 +67,7 @@ class _MiningScreenState extends State<MiningScreen>
     if (!mounted) return;
     _initialized = true;
     _refreshPresentation();
+    _scheduleRecoverySnackBar();
     _startRefreshTimer();
   }
 
@@ -76,6 +83,8 @@ class _MiningScreenState extends State<MiningScreen>
 
   void _refreshPresentation() {
     if (!_initialized) return;
+    _game.reducedMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     _displayState = _controller.state;
     _game.applyState(_displayState);
     _sheetView = MiningSheetView.from(
@@ -93,6 +102,7 @@ class _MiningScreenState extends State<MiningScreen>
 
   void _selectSector(MiningSectorId? id) {
     _selectedSectorId = id;
+    _game.selectSector(id);
     if (!_initialized) {
       if (mounted) setState(() {});
       return;
@@ -130,6 +140,7 @@ class _MiningScreenState extends State<MiningScreen>
       final result = await operation;
       _refreshPresentation();
       if (!mounted) return;
+      _playRewardAfterSuccess(action, result);
       _showResult(_successMessage(action, result));
     } catch (_) {
       _refreshPresentation();
@@ -161,9 +172,57 @@ class _MiningScreenState extends State<MiningScreen>
   }
 
   void _showResult(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.removeCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _playRewardAfterSuccess(MiningSheetAction action, dynamic result) {
+    if (result is MiningActionResult && result.isSuccess) {
+      unawaited(HapticFeedback.lightImpact());
+      final effect = switch (action) {
+        MiningSheetAction.reveal => MiningRewardEffect.reveal,
+        MiningSheetAction.build => MiningRewardEffect.construction,
+        MiningSheetAction.upgrade => MiningRewardEffect.tierUpgrade,
+        MiningSheetAction.sell || MiningSheetAction.none => null,
+      };
+      if (effect != null) _game.playReward(effect);
+    } else if (result is MiningSaleResult && result.isSuccess) {
+      unawaited(HapticFeedback.mediumImpact());
+      _game.playReward(MiningRewardEffect.sale);
+    }
+  }
+
+  void _scheduleRecoverySnackBar() {
+    if (!_controller.recoveredFromInvalidSave || _recoverySnackBarScheduled) {
+      return;
+    }
+    _recoverySnackBarScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showResult(
+        'Mining progress could not be loaded, so a fresh mining save was '
+        'started.',
+      );
+    });
+  }
+
+  Future<void> _resumeMining() async {
+    if (!_initialized) return;
+    final summary = await _controller.resume();
+    if (!mounted) return;
+    _refreshPresentation();
+    _startRefreshTimer();
+    if (summary != null) await _showOfflineReturn(summary);
+  }
+
+  Future<void> _showOfflineReturn(OfflineProductionSummary summary) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => OfflineReturnSheet(summary: summary, content: _content),
+    );
   }
 
   int _revealedSectorCount() => _displayState.sectors.values
@@ -244,26 +303,36 @@ class _MiningScreenState extends State<MiningScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused) {
-      _refreshTimer?.cancel();
-      _refreshTimer = null;
-    } else if (state == AppLifecycleState.resumed && _initialized) {
-      _controller.refresh();
-      _refreshPresentation();
-      _startRefreshTimer();
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+        _refreshTimer?.cancel();
+        _refreshTimer = null;
+        if (_initialized) {
+          unawaited(_controller.checkpoint());
+          _refreshPresentation();
+        }
+        break;
+      case AppLifecycleState.resumed:
+        unawaited(_resumeMining());
+        break;
+      default:
+        break;
     }
+    _audioManager.handleLifecycleChange(state);
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_audioManager.dispose());
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    _game.reducedMotion = MediaQuery.of(context).disableAnimations;
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,

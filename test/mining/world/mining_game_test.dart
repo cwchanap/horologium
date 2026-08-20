@@ -70,9 +70,18 @@ void main() {
     );
 
     final sector = game.sector(MiningSectorId.landingBasin);
+    game.selectSector(MiningSectorId.landingBasin);
 
     game.applyState(withGoldLevel(1));
     await tester.pump();
+    expect(sector.children.whereType<OperationLightComponent>(), hasLength(1));
+    expect(sector.children.whereType<AdvancedPlatformComponent>(), isEmpty);
+    expect(sector.children.whereType<EliteRingComponent>(), isEmpty);
+    game.playReward(MiningRewardEffect.reveal);
+    game.playReward(MiningRewardEffect.construction);
+    game.playReward(MiningRewardEffect.tierUpgrade);
+    game.playReward(MiningRewardEffect.sale);
+    await tester.pump(const Duration(milliseconds: 50));
     expect(sector.children.whereType<OperationLightComponent>(), hasLength(1));
     expect(sector.children.whereType<AdvancedPlatformComponent>(), isEmpty);
     expect(sector.children.whereType<EliteRingComponent>(), isEmpty);
@@ -88,9 +97,30 @@ void main() {
       hasLength(1),
     );
     expect(sector.children.whereType<EliteRingComponent>(), isEmpty);
+    game.playReward(MiningRewardEffect.tierUpgrade);
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(
+      sector.children.whereType<AdvancedPlatformComponent>(),
+      hasLength(1),
+    );
+    expect(
+      sector.children.whereType<SecondaryMachineryComponent>(),
+      hasLength(1),
+    );
+    expect(sector.children.whereType<EliteRingComponent>(), isEmpty);
 
     game.applyState(withGoldLevel(5));
     await tester.pump();
+    expect(sector.children.whereType<EliteRingComponent>(), hasLength(1));
+    game.reducedMotion = true;
+    game.playReward(MiningRewardEffect.reveal);
+    game.playReward(MiningRewardEffect.construction);
+    game.playReward(MiningRewardEffect.tierUpgrade);
+    game.playReward(MiningRewardEffect.sale);
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(sector.children.whereType<OperationLightComponent>(), hasLength(1));
+    expect(sector.children.whereType<AdvancedPlatformComponent>(), isEmpty);
+    expect(sector.children.whereType<SecondaryMachineryComponent>(), isEmpty);
     expect(sector.children.whereType<EliteRingComponent>(), hasLength(1));
   });
 
