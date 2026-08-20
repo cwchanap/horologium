@@ -102,6 +102,7 @@ class MiningGame extends FlameGame
     required MiningSectorId sectorId,
     required double bottomObscuredFraction,
   }) {
+    if (!hasLoaded) return;
     final definition = content.sector(sectorId);
     final fraction = bottomObscuredFraction.clamp(0.0, 1.0).toDouble();
     final viewportHeight = camera.viewport.size.y;
@@ -169,7 +170,7 @@ class MiningGame extends FlameGame
       _clampZoom();
     } else {
       final zoom = camera.viewfinder.zoom;
-      final delta = (info.delta.global..negate()) / zoom;
+      final delta = -info.delta.global / zoom;
       camera.moveBy(delta);
     }
     _clampCameraToWorld();

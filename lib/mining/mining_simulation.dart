@@ -58,9 +58,12 @@ class MiningSimulation {
       if (!progress.revealed || mine == null) continue;
 
       final capacity = content.capacityFor(definition.id, mine.level);
-      final remaining = (capacity - mine.storedAmount).clamp(0.0, capacity);
+      final remaining = (capacity - mine.storedAmount)
+          .clamp(0.0, capacity)
+          .toDouble();
       final amount = (content.rateFor(definition.id, mine.level) * seconds)
-          .clamp(0.0, remaining);
+          .clamp(0.0, remaining)
+          .toDouble();
       final stored = mine.storedAmount + amount;
       sectors[definition.id] = progress.copyWith(
         mine: mine.copyWith(storedAmount: stored),

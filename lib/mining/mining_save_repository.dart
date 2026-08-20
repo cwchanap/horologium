@@ -111,9 +111,15 @@ class MiningSaveRepository {
       if (revealed is! bool) {
         throw FormatException('sector ${id.name} revealed must be a bool');
       }
+      final mineRaw = sectorRaw['mine'];
+      if (!revealed && mineRaw != null) {
+        throw FormatException(
+          'sector ${id.name} mine must be null while not revealed',
+        );
+      }
       sectors[id] = SectorProgress(
         revealed: revealed,
-        mine: _decodeMine(id, sectorRaw['mine']),
+        mine: _decodeMine(id, mineRaw),
       );
     }
 

@@ -139,6 +139,18 @@ void main() {
           'graniteCrater': {'revealed': false, 'mine': null},
         },
       },
+      'mine on an unrevealed sector': {
+        'cash': 100,
+        'lastAccruedAtUtc': now.toIso8601String(),
+        'sectors': {
+          'landingBasin': {'revealed': true, 'mine': null},
+          'carbonRidge': {
+            'revealed': false,
+            'mine': {'level': 1, 'storedAmount': 10.0},
+          },
+          'graniteCrater': {'revealed': false, 'mine': null},
+        },
+      },
       'mine level below 1': {
         ...mineDoc(),
         'sectors': {

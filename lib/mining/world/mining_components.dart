@@ -179,7 +179,7 @@ class MiningRewardVisualComponent extends PositionComponent
         canvas.drawCircle(
           center,
           size.x * 0.2,
-          accent..style = PaintingStyle.fill,
+          Paint.from(accent)..style = PaintingStyle.fill,
         );
         for (final offset in const [
           Offset(0.18, 0.22),
@@ -305,6 +305,7 @@ class MiningSectorComponent extends PositionComponent
     final structures = children
         .where(
           (child) =>
+              child is OperationLightComponent ||
               child is AdvancedPlatformComponent ||
               child is SecondaryMachineryComponent ||
               child is EliteRingComponent,

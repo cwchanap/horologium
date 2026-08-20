@@ -60,7 +60,10 @@ MiningSave seededSave(
     cash: cash,
     sectors: {
       for (final entry in base.sectors.entries)
-        entry.key: entry.value.copyWith(mine: mines[entry.key]),
+        entry.key: entry.value.copyWith(
+          revealed: entry.value.revealed || mines[entry.key] != null,
+          mine: mines[entry.key],
+        ),
     },
   );
 }

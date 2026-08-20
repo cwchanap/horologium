@@ -128,15 +128,19 @@ class _MiningScreenState extends State<MiningScreen>
     switch (action) {
       case MiningSheetAction.sell:
         operation = _controller.sellAllCargo();
+        break;
       case MiningSheetAction.reveal:
         if (selected == null) return;
         operation = _controller.revealSector(selected);
+        break;
       case MiningSheetAction.build:
         if (selected == null) return;
         operation = _controller.buildMine(selected);
+        break;
       case MiningSheetAction.upgrade:
         if (selected == null) return;
         operation = _controller.upgradeMine(selected);
+        break;
       case MiningSheetAction.none:
         return;
     }

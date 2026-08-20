@@ -204,17 +204,15 @@ void main() {
       }
 
       // Scheduler contention can only inflate wall-clock samples, so the
-      // minimum of repeated warm builds estimates true build cost. A genuine
-      // regression shifts the whole distribution, including its minimum,
-      // above the NFR bound.
-      final minimumBuildTime = buildTimes.reduce(
-        (minimum, time) => time < minimum ? time : minimum,
-      );
+      // median of repeated warm builds estimates true build cost without
+      // letting one fast sample mask persistently slow builds.
+      final sortedTimes = buildTimes.toList()..sort();
+      final medianBuildTime = sortedTimes[sortedTimes.length ~/ 2];
 
       // NFR-QST-003: UI must load within 500ms — test framework overhead considered
       // Test framework overhead adds ~100ms; allow 500ms as generous test-environment bound
       expect(
-        minimumBuildTime,
+        medianBuildTime,
         lessThan(500),
         reason:
             'QuestLogPage should load within 500ms even in test environment',
