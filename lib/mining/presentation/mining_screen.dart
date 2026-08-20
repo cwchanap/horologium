@@ -64,11 +64,17 @@ class _MiningScreenState extends State<MiningScreen>
 
   Future<void> _initialize() async {
     await _controller.initialize();
+    final pendingReturnSummary = _controller.takePendingReturnSummary();
     if (!mounted) return;
     _initialized = true;
     _refreshPresentation();
     _scheduleRecoverySnackBar();
     _startRefreshTimer();
+    if (pendingReturnSummary != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_showOfflineReturn(pendingReturnSummary));
+      });
+    }
   }
 
   void _startRefreshTimer() {
