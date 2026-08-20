@@ -219,6 +219,25 @@ void main() {
       _viewports.first,
       repository: repository,
       nowUtc: () => now,
+      screenKey: const Key('cold-recreated-mining-screen'),
+    );
+    expect(find.byKey(const Key('offline-return-sheet')), findsOneWidget);
+    expect(find.textContaining('Gold'), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('offline-return-dismiss')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump(const Duration(milliseconds: 500));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump(const Duration(milliseconds: 500));
+
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      repository: repository,
+      nowUtc: () => now,
+      screenKey: const Key('cold-recreated-mining-screen-again'),
     );
     expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
   });
