@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
+import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,6 +30,9 @@ Future<void> pumpMiningScreen(
   Size viewport, {
   MiningSaveRepository? repository,
   DateTime Function()? nowUtc,
+  bool disableAnimations = false,
+  int pumpCycles = 80,
+  Key? screenKey,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = viewport;
@@ -39,15 +43,19 @@ Future<void> pumpMiningScreen(
 
   await tester.pumpWidget(
     MaterialApp(
-      home: MiningScreen(
-        content: MiningContentRegistry.phaseOne(),
-        repository: repository,
-        nowUtc: nowUtc ?? () => _now,
+      home: MediaQuery(
+        data: MediaQueryData(disableAnimations: disableAnimations),
+        child: MiningScreen(
+          key: screenKey,
+          content: MiningContentRegistry.phaseOne(),
+          repository: repository,
+          nowUtc: nowUtc ?? () => _now,
+        ),
       ),
     ),
   );
 
-  for (var i = 0; i < 80; i++) {
+  for (var i = 0; i < pumpCycles; i++) {
     await tester.pump(const Duration(milliseconds: 100));
   }
   await tester.pump();
@@ -130,4 +138,168 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
   });
+
+  testWidgets('pause checkpoint persists an active gold mine for recreation', (
+    tester,
+  ) async {
+    var now = _now;
+    final repository = MiningSaveRepository(
+      content: MiningContentRegistry.phaseOne(),
+    );
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      repository: repository,
+      nowUtc: () => now,
+    );
+
+    await tester.tap(find.byKey(const Key('mining-sector-landingBasin')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('mining-primary-action')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    now = _now.add(const Duration(seconds: 6));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump(const Duration(milliseconds: 500));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump(const Duration(milliseconds: 500));
+
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      repository: repository,
+      nowUtc: () => now,
+      screenKey: const Key('recreated-mining-screen'),
+    );
+    await tester.tap(find.byKey(const Key('mining-sector-landingBasin')));
+    await tester.pump();
+
+    expect(find.textContaining('Level 1'), findsOneWidget);
+    expect(find.textContaining('stored 3.0'), findsOneWidget);
+  });
+
+  testWidgets('resume presents offline gold production once', (tester) async {
+    var now = _now;
+    final repository = MiningSaveRepository(
+      content: MiningContentRegistry.phaseOne(),
+    );
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      repository: repository,
+      nowUtc: () => now,
+    );
+
+    await tester.tap(find.byKey(const Key('mining-sector-landingBasin')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('mining-primary-action')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump(const Duration(milliseconds: 500));
+    now = _now.add(const Duration(seconds: 10));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byKey(const Key('offline-return-sheet')), findsOneWidget);
+    expect(find.textContaining('Gold'), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('offline-return-dismiss')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
+
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      repository: repository,
+      nowUtc: () => now,
+    );
+    expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
+  });
+
+  testWidgets('malformed mining save shows one non-blocking recovery message', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      MiningSaveRepository.saveKey: '{ malformed mining json',
+    });
+
+    await pumpMiningScreen(tester, _viewports.first, pumpCycles: 5);
+
+    expect(
+      find.text(
+        'Mining progress could not be loaded, so a fresh mining save was '
+        'started.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('mining-primary-action')), findsOneWidget);
+  });
+
+  testWidgets(
+    'reduced motion keeps reveal build upgrade and sale confirmations',
+    (tester) async {
+      final repository = MiningSaveRepository(
+        content: MiningContentRegistry.phaseOne(),
+      );
+      await repository.save(
+        MiningSave(
+          cash: 1000,
+          lastAccruedAtUtc: _now,
+          sectors: {
+            MiningSectorId.landingBasin: const SectorProgress(
+              revealed: true,
+              mine: MineState(level: 1, storedAmount: 10),
+            ),
+            MiningSectorId.carbonRidge: const SectorProgress(revealed: false),
+            MiningSectorId.graniteCrater: const SectorProgress(revealed: false),
+          },
+        ),
+      );
+      await pumpMiningScreen(
+        tester,
+        _viewports[1],
+        repository: repository,
+        disableAnimations: true,
+      );
+
+      Future<void> tapAction(String message) async {
+        await tester.tap(find.byKey(const Key('mining-primary-action')));
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(find.text(message), findsOneWidget);
+      }
+
+      final carbonTab = find.byKey(const Key('mining-sector-carbonRidge'));
+      await tester.ensureVisible(carbonTab);
+      await tester.tap(carbonTab);
+      await tester.pump();
+      await tapAction('Sector revealed.');
+      expect(find.text('Build for 100 cash'), findsOneWidget);
+      expect(
+        tester
+            .widget<ElevatedButton>(
+              find.descendant(
+                of: find.byKey(const Key('mining-primary-action')),
+                matching: find.byType(ElevatedButton),
+              ),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      await tapAction('Mine built.');
+      await tapAction('Mine upgraded.');
+
+      final sellTab = find.byKey(const Key('mining-sell-tab'));
+      await tester.ensureVisible(sellTab);
+      await tester.tap(sellTab);
+      await tester.pump();
+      await tapAction('Sold cargo for 40 cash.');
+    },
+  );
 }
