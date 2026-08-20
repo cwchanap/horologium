@@ -7,13 +7,117 @@ import 'package:flame/events.dart' as flame_events;
 import '../mining_content.dart';
 import '../mining_state.dart';
 
-class OperationLightComponent extends PositionComponent with HasPaint {}
+class OperationLightComponent extends PositionComponent {
+  OperationLightComponent()
+    : super(
+        size: Vector2.all(16),
+        position: Vector2(80, 20),
+        anchor: Anchor.center,
+      );
 
-class AdvancedPlatformComponent extends PositionComponent with HasPaint {}
+  @override
+  void render(Canvas canvas) {
+    final center = Offset(size.x / 2, size.y / 2);
+    canvas.drawCircle(
+      center,
+      size.x * 0.48,
+      Paint()..color = const Color(0x6653D4E8),
+    );
+    canvas.drawRect(
+      Rect.fromCenter(
+        center: center,
+        width: size.x * 0.5,
+        height: size.y * 0.7,
+      ),
+      Paint()..color = const Color(0xFFFFD54A),
+    );
+  }
+}
 
-class SecondaryMachineryComponent extends PositionComponent with HasPaint {}
+class AdvancedPlatformComponent extends PositionComponent {
+  AdvancedPlatformComponent()
+    : super(
+        size: Vector2(124, 18),
+        position: Vector2(80, 148),
+        anchor: Anchor.center,
+      );
 
-class EliteRingComponent extends PositionComponent with HasPaint {}
+  @override
+  void render(Canvas canvas) {
+    final platform = Paint()..color = const Color(0xFF53D4E8);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Offset.zero & Size(size.x, size.y * 0.58),
+        const Radius.circular(3),
+      ),
+      platform,
+    );
+    final support = Paint()..color = const Color(0xFF2B7E94);
+    canvas.drawRect(
+      Rect.fromLTWH(size.x * 0.12, size.y * 0.52, size.x * 0.1, size.y * 0.48),
+      support,
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(size.x * 0.78, size.y * 0.52, size.x * 0.1, size.y * 0.48),
+      support,
+    );
+  }
+}
+
+class SecondaryMachineryComponent extends PositionComponent {
+  SecondaryMachineryComponent()
+    : super(
+        size: Vector2(30, 44),
+        position: Vector2(15, 102),
+        anchor: Anchor.center,
+      );
+
+  @override
+  void render(Canvas canvas) {
+    final body = Paint()..color = const Color(0xFF9B7EDE);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Offset.zero & Size(size.x * 0.72, size.y * 0.72),
+        const Radius.circular(3),
+      ),
+      body,
+    );
+    final pipe = Paint()
+      ..color = const Color(0xFFE0D4FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    canvas.drawLine(
+      Offset(size.x * 0.72, size.y * 0.28),
+      Offset(size.x, size.y * 0.28),
+      pipe,
+    );
+    canvas.drawLine(
+      Offset(size.x * 0.72, size.y * 0.55),
+      Offset(size.x, size.y * 0.55),
+      pipe,
+    );
+  }
+}
+
+class EliteRingComponent extends PositionComponent {
+  EliteRingComponent()
+    : super(
+        size: Vector2.all(152),
+        position: Vector2(80, 80),
+        anchor: Anchor.center,
+      );
+
+  @override
+  void render(Canvas canvas) {
+    final center = Offset(size.x / 2, size.y / 2);
+    final ring = Paint()
+      ..color = const Color(0xFFFF6B8A)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4;
+    canvas.drawCircle(center, size.x * 0.45, ring);
+    canvas.drawCircle(center, size.x * 0.39, ring..strokeWidth = 2);
+  }
+}
 
 enum MiningRewardVisualKind { reveal, construction, upgrade, sale }
 
@@ -313,6 +417,8 @@ class MiningSectorComponent extends PositionComponent
           child is EliteRingComponent,
     );
 
+    // Tier ladder: L1 → light; L3 → +platform +machinery; L5 → +elite ring.
+    // L2 and L4 keep the set from the preceding bracket.
     switch (tier) {
       case 1:
         add(OperationLightComponent());
@@ -322,6 +428,8 @@ class MiningSectorComponent extends PositionComponent
         add(SecondaryMachineryComponent());
       case 5:
         add(OperationLightComponent());
+        add(AdvancedPlatformComponent());
+        add(SecondaryMachineryComponent());
         add(EliteRingComponent());
     }
     _structuralTier = tier;

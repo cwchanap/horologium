@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -56,6 +57,51 @@ Future<void> pumpMiningScreen(
   );
 
   for (var i = 0; i < pumpCycles; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  await tester.pump();
+}
+
+Future<void> pushMiningScreen(
+  WidgetTester tester,
+  Size viewport, {
+  required MiningSaveRepository repository,
+  required DateTime Function() nowUtc,
+}) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = viewport;
+  addTearDown(() {
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+
+  late BuildContext navigatorContext;
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Builder(
+        builder: (context) {
+          navigatorContext = context;
+          return const SizedBox.shrink();
+        },
+      ),
+    ),
+  );
+  unawaited(
+    Navigator.of(navigatorContext).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => MediaQuery(
+          data: const MediaQueryData(),
+          child: MiningScreen(
+            content: MiningContentRegistry.phaseOne(),
+            repository: repository,
+            nowUtc: nowUtc,
+          ),
+        ),
+      ),
+    ),
+  );
+
+  for (var i = 0; i < 80; i++) {
     await tester.pump(const Duration(milliseconds: 100));
   }
   await tester.pump();
@@ -137,6 +183,73 @@ void main() {
     repository.allowSave.complete();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
+  });
+
+  testWidgets('does not use context after a delayed action route is popped', (
+    tester,
+  ) async {
+    final repository = DelayedMiningSaveRepository();
+    await pushMiningScreen(
+      tester,
+      _viewports.first,
+      repository: repository,
+      nowUtc: () => _now,
+    );
+
+    await tester.tap(find.byKey(const Key('mining-sector-landingBasin')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('mining-primary-action')));
+    await repository.saveStarted.future;
+    await tester.pump();
+
+    final screenContext = tester.element(find.byType(MiningScreen));
+    expect(Navigator.of(screenContext).canPop(), isTrue);
+    Navigator.of(screenContext).pop();
+    await tester.pump();
+    repository.allowSave.complete();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('route exit checkpoints the latest published mining state', (
+    tester,
+  ) async {
+    var now = _now;
+    final repository = MiningSaveRepository(
+      content: MiningContentRegistry.phaseOne(),
+    );
+    await pushMiningScreen(
+      tester,
+      _viewports.first,
+      repository: repository,
+      nowUtc: () => now,
+    );
+
+    await tester.tap(find.byKey(const Key('mining-sector-landingBasin')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('mining-primary-action')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    now = _now.add(const Duration(seconds: 6));
+    await tester.pump(const Duration(seconds: 2));
+
+    final screenContext = tester.element(find.byType(MiningScreen));
+    expect(Navigator.of(screenContext).canPop(), isTrue);
+    Navigator.of(screenContext).pop();
+    await tester.pumpAndSettle();
+    expect(find.byType(MiningScreen), findsNothing);
+
+    final prefs = await SharedPreferences.getInstance();
+    final raw =
+        jsonDecode(prefs.getString(MiningSaveRepository.saveKey)!)
+            as Map<String, Object?>;
+    final sectors = raw['sectors']! as Map<String, Object?>;
+    final landing = sectors['landingBasin']! as Map<String, Object?>;
+    final mine = landing['mine']! as Map<String, Object?>;
+    expect(mine['storedAmount'], 3.0);
   });
 
   testWidgets('pause checkpoint persists an active gold mine for recreation', (

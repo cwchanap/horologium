@@ -1,4 +1,5 @@
 import 'package:flame/game.dart';
+import 'package:flame/components.dart';
 import 'package:flame/events.dart' as flame_events;
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -76,7 +77,16 @@ void main() {
     await tester.pump();
     expect(sector.children.whereType<OperationLightComponent>(), hasLength(1));
     expect(sector.children.whereType<AdvancedPlatformComponent>(), isEmpty);
+    expect(sector.children.whereType<SecondaryMachineryComponent>(), isEmpty);
     expect(sector.children.whereType<EliteRingComponent>(), isEmpty);
+    expect(
+      sector.children.whereType<OperationLightComponent>().single.size.x,
+      greaterThan(0),
+    );
+    expect(
+      sector.children.whereType<OperationLightComponent>().single.size.y,
+      greaterThan(0),
+    );
     game.playReward(MiningRewardEffect.reveal);
     game.playReward(MiningRewardEffect.construction);
     game.playReward(MiningRewardEffect.tierUpgrade);
@@ -111,7 +121,25 @@ void main() {
 
     game.applyState(withGoldLevel(5));
     await tester.pump();
+    expect(sector.children.whereType<OperationLightComponent>(), hasLength(1));
+    expect(
+      sector.children.whereType<AdvancedPlatformComponent>(),
+      hasLength(1),
+    );
+    expect(
+      sector.children.whereType<SecondaryMachineryComponent>(),
+      hasLength(1),
+    );
     expect(sector.children.whereType<EliteRingComponent>(), hasLength(1));
+    for (final marker in <PositionComponent>[
+      sector.children.whereType<OperationLightComponent>().single,
+      sector.children.whereType<AdvancedPlatformComponent>().single,
+      sector.children.whereType<SecondaryMachineryComponent>().single,
+      sector.children.whereType<EliteRingComponent>().single,
+    ]) {
+      expect(marker.size.x, greaterThan(0));
+      expect(marker.size.y, greaterThan(0));
+    }
     game.reducedMotion = true;
     game.playReward(MiningRewardEffect.reveal);
     game.playReward(MiningRewardEffect.construction);
@@ -119,60 +147,99 @@ void main() {
     game.playReward(MiningRewardEffect.sale);
     await tester.pump(const Duration(milliseconds: 50));
     expect(sector.children.whereType<OperationLightComponent>(), hasLength(1));
-    expect(sector.children.whereType<AdvancedPlatformComponent>(), isEmpty);
-    expect(sector.children.whereType<SecondaryMachineryComponent>(), isEmpty);
+    expect(
+      sector.children.whereType<AdvancedPlatformComponent>(),
+      hasLength(1),
+    );
+    expect(
+      sector.children.whereType<SecondaryMachineryComponent>(),
+      hasLength(1),
+    );
     expect(sector.children.whereType<EliteRingComponent>(), hasLength(1));
   });
 
-  testWidgets(
-    'selection focus shifts upward and stays clamped inside world bounds',
-    (tester) async {
-      final content = MiningContentRegistry.phaseOne();
-      final game = MiningGame(content: content)..reducedMotion = true;
-      await pumpMiningGame(tester, game);
+  for (final viewport in const [Size(360, 640), Size(430, 932)]) {
+    testWidgets(
+      'selection focus places the sector above the sheet at $viewport',
+      (tester) async {
+        final content = MiningContentRegistry.phaseOne();
+        final game = MiningGame(content: content)..reducedMotion = true;
+        await pumpMiningGame(tester, game, size: viewport);
 
-      final selections = <MiningSectorId>[];
-      game.onSelectionChanged = (id) {
-        if (id != null) selections.add(id);
-      };
-      game
-          .sector(MiningSectorId.landingBasin)
-          .onTapUp(
-            flame_events.TapUpEvent(
-              0,
-              game,
-              TapUpDetails(
-                globalPosition: Offset.zero,
-                kind: PointerDeviceKind.touch,
+        final selections = <MiningSectorId>[];
+        game.onSelectionChanged = (id) {
+          if (id != null) selections.add(id);
+        };
+        game
+            .sector(MiningSectorId.landingBasin)
+            .onTapUp(
+              flame_events.TapUpEvent(
+                0,
+                game,
+                TapUpDetails(
+                  globalPosition: Offset.zero,
+                  kind: PointerDeviceKind.touch,
+                ),
               ),
-            ),
-          );
-      expect(selections, [MiningSectorId.landingBasin]);
+            );
+        expect(selections, [MiningSectorId.landingBasin]);
 
-      game.camera.viewfinder.zoom = 0.5;
-      final viewportHeight = game.camera.viewport.size.y;
-      final halfViewHeight = viewportHeight / game.camera.viewfinder.zoom / 2;
-      final minY = -MiningContentRegistry.worldHalfExtent + halfViewHeight;
-      final maxY = MiningContentRegistry.worldHalfExtent - halfViewHeight;
+        final initialZoom = game.camera.viewfinder.zoom;
+        const obscuredFraction = 0.44;
+        game.focusOnSelection(
+          sectorId: MiningSectorId.landingBasin,
+          bottomObscuredFraction: obscuredFraction,
+        );
+        await tester.pump();
 
-      game.focusOnSelection(
-        sectorId: MiningSectorId.landingBasin,
-        bottomObscuredFraction: 0.25,
-      );
-      await tester.pump();
+        final landingY = content.sector(MiningSectorId.landingBasin).anchor.y;
+        final zoom = game.camera.viewfinder.zoom;
+        final halfViewWidth = viewport.width / zoom / 2;
+        final halfViewHeight = viewport.height / zoom / 2;
+        final minX = -MiningContentRegistry.worldHalfExtent + halfViewWidth;
+        final maxX = MiningContentRegistry.worldHalfExtent - halfViewWidth;
+        final minY = -MiningContentRegistry.worldHalfExtent + halfViewHeight;
+        final maxY = MiningContentRegistry.worldHalfExtent - halfViewHeight;
+        final projectedY =
+            viewport.height / 2 +
+            (landingY - game.camera.viewfinder.position.y) * zoom;
+        final sheetTop = viewport.height * (1 - obscuredFraction);
 
-      final landingY = content.sector(MiningSectorId.landingBasin).anchor.y;
-      expect(game.camera.viewfinder.position.y, lessThan(landingY));
-      expect(game.camera.viewfinder.position.y, inInclusiveRange(minY, maxY));
+        expect(zoom, greaterThan(initialZoom));
+        expect(game.camera.viewfinder.position.y, greaterThan(landingY));
+        expect(game.camera.viewfinder.position.x, inInclusiveRange(minX, maxX));
+        expect(
+          game.camera.viewfinder.position.y,
+          greaterThanOrEqualTo(minY - 0.1),
+        );
+        expect(
+          game.camera.viewfinder.position.y,
+          lessThanOrEqualTo(maxY + 0.1),
+        );
+        expect(projectedY, lessThanOrEqualTo(sheetTop + 0.5));
 
-      game.focusOnSelection(
-        sectorId: MiningSectorId.graniteCrater,
-        bottomObscuredFraction: 0.9,
-      );
-      await tester.pump();
-
-      expect(game.camera.viewfinder.position.y, minY);
-      expect(game.camera.viewfinder.position.y, inInclusiveRange(minY, maxY));
-    },
-  );
+        // An extreme obstruction still exercises the world-bounds clamp.
+        game.focusOnSelection(
+          sectorId: MiningSectorId.landingBasin,
+          bottomObscuredFraction: 0.9,
+        );
+        await tester.pump();
+        final clampedZoom = game.camera.viewfinder.zoom;
+        final clampedHalfHeight = viewport.height / clampedZoom / 2;
+        final clampedMaxY =
+            MiningContentRegistry.worldHalfExtent - clampedHalfHeight;
+        expect(game.camera.viewfinder.position.y, closeTo(clampedMaxY, 0.5));
+        expect(
+          game.camera.viewfinder.position.y,
+          greaterThanOrEqualTo(
+            -MiningContentRegistry.worldHalfExtent + clampedHalfHeight - 0.1,
+          ),
+        );
+        expect(
+          game.camera.viewfinder.position.y,
+          lessThanOrEqualTo(clampedMaxY + 0.1),
+        );
+      },
+    );
+  }
 }

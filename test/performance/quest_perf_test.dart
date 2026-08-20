@@ -189,12 +189,10 @@ void main() {
       await tester.pumpWidget(page());
       await tester.pump();
 
-      // Measure the synchronous frame work itself. Awaiting pumpWidget before
-      // stopping the clock also measures test-isolate scheduling jitter.
+      // Measure the awaited frame completion, not just pumpWidget scheduling.
       final sw = Stopwatch()..start();
-      final buildFuture = tester.pumpWidget(page());
+      await tester.pumpWidget(page());
       sw.stop();
-      await buildFuture;
 
       debugPrint('QuestLogPage build (warm): ${sw.elapsedMilliseconds}ms');
 

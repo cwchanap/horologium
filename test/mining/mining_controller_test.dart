@@ -32,6 +32,8 @@ class DelayedMiningSaveRepository extends MiningSaveRepository {
 }
 
 class ThrowingFirstSaveRepository extends MiningSaveRepository {
+  final secondSaveStarted = Completer<void>();
+  final allowSecondSave = Completer<void>();
   var saveCount = 0;
 
   @override
@@ -39,6 +41,10 @@ class ThrowingFirstSaveRepository extends MiningSaveRepository {
     saveCount++;
     if (saveCount == 1) {
       throw StateError('disk full');
+    }
+    if (saveCount == 2) {
+      secondSaveStarted.complete();
+      await allowSecondSave.future;
     }
     await super.save(state);
   }
@@ -397,20 +403,29 @@ void main() {
       expect(busyController.isBusy, isFalse);
     });
 
-    test('a failed save does not poison later queued operations', () async {
-      final repository = ThrowingFirstSaveRepository();
-      final stubborn = await controllerOver(repository);
+    test(
+      'a failed save does not publish state or poison later queued actions',
+      () async {
+        final repository = ThrowingFirstSaveRepository();
+        final stubborn = await controllerOver(repository);
+        final before = stubborn.state.toJson();
 
-      final first = stubborn.buildMine(MiningSectorId.landingBasin);
-      final second = stubborn.buildMine(MiningSectorId.landingBasin);
-      await expectLater(first, throwsStateError);
-      expect((await second).isSuccess, isTrue);
-      expect(stubborn.isBusy, isFalse);
-      expect(stubborn.state.cash, 50);
-      expect(
-        stubborn.state.sectors[MiningSectorId.landingBasin]!.mine,
-        isNotNull,
-      );
-    });
+        final first = stubborn.buildMine(MiningSectorId.landingBasin);
+        final second = stubborn.buildMine(MiningSectorId.landingBasin);
+        await expectLater(first, throwsStateError);
+        await repository.secondSaveStarted.future;
+        expect(stubborn.state.toJson(), before);
+        expect(stubborn.isBusy, isTrue);
+
+        repository.allowSecondSave.complete();
+        expect((await second).isSuccess, isTrue);
+        expect(stubborn.isBusy, isFalse);
+        expect(stubborn.state.cash, 50);
+        expect(
+          stubborn.state.sectors[MiningSectorId.landingBasin]!.mine,
+          isNotNull,
+        );
+      },
+    );
   });
 }
