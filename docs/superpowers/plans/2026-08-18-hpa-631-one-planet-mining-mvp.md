@@ -1556,7 +1556,7 @@ git commit -m "feat: add mining MVP screen"
 
 - [ ] **Step 10: Mandatory early real-device product gate**
 
-Before Task 8, run the committed build on one real/simulated portrait mobile target and complete:
+Before Task 8, run the committed build on at least one **physical portrait mobile device** and complete (simulator runs may supplement this evidence, never substitute for it):
 
 1. open **MINING MVP**;
 2. build Landing Basin gold;

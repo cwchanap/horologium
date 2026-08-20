@@ -14,7 +14,7 @@ class DelayedMiningSaveRepository extends MiningSaveRepository {
   final allowSave = Completer<void>();
 
   @override
-  Future<void> save(state) async {
+  Future<void> save(MiningSave state) async {
     if (!saveStarted.isCompleted) {
       saveStarted.complete();
       await allowSave.future;
