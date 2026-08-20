@@ -63,163 +63,175 @@ class HamburgerMenu extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.purple, width: 1),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.science, color: Colors.purple),
-              title: const Text(
-                'Research Tree',
-                style: TextStyle(color: Colors.white),
-              ),
-              onTap: () {
-                onClose();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ResearchTreePage(
-                      researchManager: researchManager,
-                      resources: resources,
-                      buildingLimitManager: buildingLimitManager,
-                      onResourcesChanged: onResourcesChanged,
-                    ),
-                  ),
-                );
-              },
-            ),
-            const Divider(color: Colors.grey, height: 1),
-            ListTile(
-              leading: const Icon(Icons.bar_chart, color: Colors.cyan),
-              title: const Text(
-                'Resources',
-                style: TextStyle(color: Colors.white),
-              ),
-              onTap: () {
-                onClose();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        ResourcesPage(resources: resources, grid: grid),
-                  ),
-                );
-              },
-            ),
-            const Divider(color: Colors.grey, height: 1),
-            ListTile(
-              leading: const Icon(Icons.swap_horiz, color: Colors.green),
-              title: const Text('Trade', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                onClose();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TradePage(resources: resources),
-                  ),
-                );
-              },
-            ),
-            const Divider(color: Colors.grey, height: 1),
-            if (questManager != null && achievementManager != null) ...[
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
               ListTile(
-                leading: const Icon(Icons.assignment, color: Colors.amber),
+                leading: const Icon(Icons.science, color: Colors.purple),
                 title: const Text(
-                  'Quests',
+                  'Research Tree',
                   style: TextStyle(color: Colors.white),
                 ),
-                trailing: questManager!.hasUnclaimedRewards
-                    ? Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                      )
-                    : null,
                 onTap: () {
                   onClose();
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => QuestLogPage(
-                        questManager: questManager!,
-                        achievementManager: achievementManager!,
-                        onClaimReward: onClaimQuestReward,
+                      builder: (context) => ResearchTreePage(
+                        researchManager: researchManager,
+                        resources: resources,
+                        buildingLimitManager: buildingLimitManager,
+                        onResourcesChanged: onResourcesChanged,
                       ),
                     ),
                   );
                 },
               ),
               const Divider(color: Colors.grey, height: 1),
-            ],
-            ListTile(
-              leading: const Icon(Icons.public, color: Colors.blue),
-              title: const Text(
-                'Planet Selection',
-                style: TextStyle(color: Colors.white),
-              ),
-              onTap: () {
-                onClose();
-                _showPlanetSwitcher(context);
-              },
-            ),
-            const Divider(color: Colors.grey, height: 1),
-            // Audio controls
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Row(
-                children: const [
-                  Icon(Icons.music_note, color: Colors.white70),
-                  SizedBox(width: 8),
-                  Text(
-                    'Audio',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+              ListTile(
+                leading: const Icon(Icons.bar_chart, color: Colors.cyan),
+                title: const Text(
+                  'Resources',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  onClose();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          ResourcesPage(resources: resources, grid: grid),
                     ),
+                  );
+                },
+              ),
+              const Divider(color: Colors.grey, height: 1),
+              ListTile(
+                leading: const Icon(Icons.swap_horiz, color: Colors.green),
+                title: const Text(
+                  'Trade',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  onClose();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TradePage(resources: resources),
+                    ),
+                  );
+                },
+              ),
+              const Divider(color: Colors.grey, height: 1),
+              if (questManager != null && achievementManager != null) ...[
+                ListTile(
+                  leading: const Icon(Icons.assignment, color: Colors.amber),
+                  title: const Text(
+                    'Quests',
+                    style: TextStyle(color: Colors.white),
                   ),
-                ],
+                  trailing: questManager!.hasUnclaimedRewards
+                      ? Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        )
+                      : null,
+                  onTap: () {
+                    onClose();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => QuestLogPage(
+                          questManager: questManager!,
+                          achievementManager: achievementManager!,
+                          onClaimReward: onClaimQuestReward,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(color: Colors.grey, height: 1),
+              ],
+              ListTile(
+                leading: const Icon(Icons.public, color: Colors.blue),
+                title: const Text(
+                  'Planet Selection',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  onClose();
+                  _showPlanetSwitcher(context);
+                },
               ),
-            ),
-            SwitchListTile(
-              dense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-              title: const Text(
-                'Music',
-                style: TextStyle(color: Colors.white70),
+              const Divider(color: Colors.grey, height: 1),
+              // Audio controls
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Row(
+                  children: const [
+                    Icon(Icons.music_note, color: Colors.white70),
+                    SizedBox(width: 8),
+                    Text(
+                      'Audio',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              value: musicEnabled,
-              onChanged: onMusicEnabledChanged,
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Volume', style: TextStyle(color: Colors.white70)),
-                  Text(
-                    '${(musicVolume * 100).round()}%',
-                    style: const TextStyle(color: Colors.white54),
-                  ),
-                ],
+              SwitchListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                title: const Text(
+                  'Music',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                value: musicEnabled,
+                onChanged: onMusicEnabledChanged,
               ),
-            ),
-            Slider(
-              value: musicVolume,
-              min: 0.0,
-              max: 1.0,
-              divisions: 20,
-              label: '${(musicVolume * 100).round()}%',
-              onChanged: musicEnabled ? onMusicVolumeChanged : null,
-            ),
-            const Divider(color: Colors.grey, height: 1),
-            ListTile(
-              leading: const Icon(Icons.close, color: Colors.white),
-              title: const Text('Close', style: TextStyle(color: Colors.white)),
-              onTap: onClose,
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Volume',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                    Text(
+                      '${(musicVolume * 100).round()}%',
+                      style: const TextStyle(color: Colors.white54),
+                    ),
+                  ],
+                ),
+              ),
+              Slider(
+                value: musicVolume,
+                min: 0.0,
+                max: 1.0,
+                divisions: 20,
+                label: '${(musicVolume * 100).round()}%',
+                onChanged: musicEnabled ? onMusicVolumeChanged : null,
+              ),
+              const Divider(color: Colors.grey, height: 1),
+              ListTile(
+                leading: const Icon(Icons.close, color: Colors.white),
+                title: const Text(
+                  'Close',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: onClose,
+              ),
+            ],
+          ),
         ),
       ),
     );
