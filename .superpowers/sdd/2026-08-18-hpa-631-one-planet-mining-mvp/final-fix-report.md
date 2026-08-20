@@ -75,3 +75,21 @@
 
 The pre-existing uncommitted Flutter migrator edits in
 `android/gradle.properties` were not staged.
+
+## Follow-up Finding 4 — Noise-robust QuestLogPage measurement
+
+- Flake evidence: the prior single awaited sample was reported to measure
+  68–382 ms typically, with 2 of 6 verification runs exceeding 500 ms under
+  scheduler contention. During this follow-up, two additional sustained-load
+  attempts also had all five samples inflated (minimums 872 ms and 540 ms),
+  confirming why one sample is not a reliable estimate.
+- Changed `test/performance/quest_perf_test.dart` to perform five separate
+  awaited warm builds, log every wall-clock measurement, and assert the
+  minimum remains below the unchanged 500 ms NFR bound. External scheduler
+  contention can only inflate wall-clock samples, so the minimum estimates
+  true build cost; a genuine regression shifts the whole distribution,
+  including its minimum, above the bound.
+- Required four-run sequence results: PASS min 51 ms, PASS min 51 ms, PASS
+  min 42 ms, PASS min 56 ms.
+- `dart format --output=none --set-exit-if-changed test/performance/quest_perf_test.dart`:
+  clean. `flutter analyze --fatal-infos`: `No issues found!`.
