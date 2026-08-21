@@ -4,12 +4,14 @@ import 'dart:convert';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:horologium/game/audio_manager.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_screen.dart';
 import 'package:horologium/mining/world/mining_components.dart';
 import 'package:horologium/mining/world/mining_game.dart';
+import '../../support/fake_background_music_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DelayedMiningSaveRepository extends MiningSaveRepository {
@@ -41,6 +43,7 @@ Future<void> pumpMiningScreen(
   Size viewport, {
   MiningSaveRepository? repository,
   DateTime Function()? nowUtc,
+  AudioManager? audioManager,
   bool disableAnimations = false,
   int pumpCycles = 80,
   Key? screenKey,
@@ -61,6 +64,7 @@ Future<void> pumpMiningScreen(
           content: MiningContentRegistry.phaseOne(),
           repository: repository,
           nowUtc: nowUtc ?? () => _now,
+          audioManager: audioManager,
         ),
       ),
     ),
@@ -146,6 +150,22 @@ void main() {
         find.byKey(const Key('mining-primary-action')),
       );
       expect(buttonSize.height, greaterThanOrEqualTo(56));
+
+      final settingsButton = tester.getRect(
+        find.byKey(const Key('mining-settings-button')),
+      );
+      expect(
+        settingsButton.overlaps(
+          tester.getRect(find.byKey(const Key('mining-status-bar'))),
+        ),
+        isFalse,
+      );
+      expect(
+        settingsButton.overlaps(
+          tester.getRect(find.byKey(const Key('mining-sector-tabs'))),
+        ),
+        isFalse,
+      );
     });
 
     testWidgets(
@@ -169,6 +189,165 @@ void main() {
       },
     );
   }
+
+  testWidgets('loads saved audio prefs without autoplaying at initialization', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'audio.musicEnabled': false,
+      'audio.musicVolume': 0.8,
+    });
+    final player = FakeBackgroundMusicPlayer();
+    final audioManager = AudioManager(backgroundMusicPlayer: player);
+
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      audioManager: audioManager,
+    );
+
+    expect(audioManager.musicEnabled, isFalse);
+    expect(audioManager.musicVolume, 0.8);
+    expect(player.playedAssets, isEmpty);
+  });
+
+  testWidgets('a sector gesture starts BGM through the injected manager', (
+    tester,
+  ) async {
+    final player = FakeBackgroundMusicPlayer();
+    final audioManager = AudioManager(backgroundMusicPlayer: player);
+
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      audioManager: audioManager,
+    );
+
+    await tester.tap(find.byKey(const Key('mining-sector-landingBasin')));
+    await tester.pump();
+
+    expect(player.playedAssets, <String>['audio/background.mp3']);
+  });
+
+  testWidgets('the primary action starts BGM through the injected manager', (
+    tester,
+  ) async {
+    final repository = MiningSaveRepository(
+      content: MiningContentRegistry.phaseOne(),
+    );
+    await repository.save(
+      MiningSave(
+        cash: 1000,
+        lastAccruedAtUtc: _now,
+        sectors: {
+          MiningSectorId.landingBasin: const SectorProgress(
+            revealed: true,
+            mine: MineState(level: 1, storedAmount: 10),
+          ),
+          MiningSectorId.carbonRidge: const SectorProgress(revealed: false),
+          MiningSectorId.graniteCrater: const SectorProgress(revealed: false),
+        },
+      ),
+    );
+    final player = FakeBackgroundMusicPlayer();
+    final audioManager = AudioManager(backgroundMusicPlayer: player);
+
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      repository: repository,
+      audioManager: audioManager,
+    );
+    player.playedAssets.clear();
+
+    await tester.tap(find.byKey(const Key('mining-primary-action')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(player.playedAssets, <String>['audio/background.mp3']);
+  });
+
+  testWidgets('opening Settings starts BGM through the injected manager', (
+    tester,
+  ) async {
+    final player = FakeBackgroundMusicPlayer();
+    final audioManager = AudioManager(backgroundMusicPlayer: player);
+
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      audioManager: audioManager,
+    );
+
+    await tester.tap(find.byKey(const Key('mining-settings-button')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byKey(const Key('mining-settings-sheet')), findsOneWidget);
+    expect(player.playedAssets, <String>['audio/background.mp3']);
+  });
+
+  testWidgets('settings reflect and delegate the AudioManager state', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'audio.musicEnabled': false,
+      'audio.musicVolume': 0.75,
+    });
+    final player = FakeBackgroundMusicPlayer();
+    final audioManager = AudioManager(backgroundMusicPlayer: player);
+
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      audioManager: audioManager,
+    );
+    await tester.tap(find.byKey(const Key('mining-settings-button')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final sheet = find.byKey(const Key('mining-settings-sheet'));
+    final switchTile = find.descendant(
+      of: sheet,
+      matching: find.byType(SwitchListTile),
+    );
+    final slider = find.descendant(of: sheet, matching: find.byType(Slider));
+    expect(tester.widget<SwitchListTile>(switchTile).value, isFalse);
+    expect(tester.widget<Slider>(slider).value, 0.75);
+
+    tester.widget<SwitchListTile>(switchTile).onChanged!.call(true);
+    await tester.pump();
+    expect(audioManager.musicEnabled, isTrue);
+
+    final initialVolume = audioManager.musicVolume;
+    tester.widget<Slider>(slider).onChanged!.call(initialVolume / 2);
+    await tester.pump();
+    expect(audioManager.musicVolume, lessThan(initialVolume));
+
+    Navigator.of(tester.element(sheet)).pop();
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('mining-settings-button')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final reopenedSheet = find.byKey(const Key('mining-settings-sheet'));
+    expect(
+      tester
+          .widget<SwitchListTile>(
+            find.descendant(
+              of: reopenedSheet,
+              matching: find.byType(SwitchListTile),
+            ),
+          )
+          .value,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<Slider>(
+            find.descendant(of: reopenedSheet, matching: find.byType(Slider)),
+          )
+          .value,
+      audioManager.musicVolume,
+    );
+  });
 
   testWidgets('disables the primary action while a mutation is saving', (
     tester,

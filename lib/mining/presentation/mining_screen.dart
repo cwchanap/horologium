@@ -12,16 +12,24 @@ import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_sheet_view.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_action_sheet.dart';
-import 'package:horologium/mining/presentation/offline_return_sheet.dart';
 import 'package:horologium/mining/presentation/mining_status_bar.dart';
+import 'package:horologium/mining/presentation/mining_settings_sheet.dart';
+import 'package:horologium/mining/presentation/offline_return_sheet.dart';
 import 'package:horologium/mining/world/mining_game.dart';
 
 class MiningScreen extends StatefulWidget {
-  const MiningScreen({super.key, this.content, this.repository, this.nowUtc});
+  const MiningScreen({
+    super.key,
+    this.content,
+    this.repository,
+    this.nowUtc,
+    this.audioManager,
+  });
 
   final MiningContentRegistry? content;
   final MiningSaveRepository? repository;
   final DateTime Function()? nowUtc;
+  final AudioManager? audioManager;
 
   @override
   State<MiningScreen> createState() => _MiningScreenState();
@@ -32,7 +40,7 @@ class _MiningScreenState extends State<MiningScreen>
   late final MiningContentRegistry _content;
   late final MiningController _controller;
   late final MiningGame _game;
-  final AudioManager _audioManager = AudioManager();
+  late final AudioManager _audioManager;
   late MiningSave _displayState;
   Timer? _refreshTimer;
   MiningSectorId? _selectedSectorId;
@@ -43,6 +51,7 @@ class _MiningScreenState extends State<MiningScreen>
   @override
   void initState() {
     super.initState();
+    _audioManager = widget.audioManager ?? AudioManager();
     _content = widget.content ?? MiningContentRegistry.phaseOne();
     final nowUtc = widget.nowUtc ?? () => DateTime.now().toUtc();
     _controller = MiningController(
@@ -64,6 +73,7 @@ class _MiningScreenState extends State<MiningScreen>
   }
 
   Future<void> _initialize() async {
+    await _audioManager.loadPrefs();
     await _controller.initialize();
     final pendingReturnSummary = _controller.takePendingReturnSummary();
     if (!mounted) return;
@@ -108,6 +118,7 @@ class _MiningScreenState extends State<MiningScreen>
   }
 
   void _selectSector(MiningSectorId? id) {
+    unawaited(_audioManager.maybeStartBgm());
     _selectedSectorId = id;
     _game.selectSector(id);
     if (!_initialized) {
@@ -121,6 +132,7 @@ class _MiningScreenState extends State<MiningScreen>
   }
 
   Future<void> _onPrimaryAction() async {
+    unawaited(_audioManager.maybeStartBgm());
     if (!_initialized || !_sheetView.primaryEnabled) return;
 
     final action = _sheetView.action;
@@ -254,6 +266,18 @@ class _MiningScreenState extends State<MiningScreen>
     );
   }
 
+  void _openSettings() {
+    unawaited(_audioManager.maybeStartBgm());
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => MiningSettingsSheet(audioManager: _audioManager),
+      ),
+    );
+  }
+
   int _revealedSectorCount() => _displayState.sectors.values
       .where((progress) => progress.revealed)
       .length;
@@ -271,6 +295,7 @@ class _MiningScreenState extends State<MiningScreen>
 
   Widget _buildSectorTabs() {
     return SizedBox(
+      key: const Key('mining-sector-tabs'),
       height: 42,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -291,6 +316,31 @@ class _MiningScreenState extends State<MiningScreen>
                 onPressed: () => _selectSector(definition.id),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsButton() {
+    return SizedBox(
+      height: 56,
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: IconButton(
+            key: const Key('mining-settings-button'),
+            tooltip: 'Settings',
+            onPressed: _openSettings,
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0xCC162133),
+              foregroundColor: Colors.cyanAccent,
+              side: const BorderSide(color: Colors.cyanAccent),
+              shape: const CircleBorder(),
+            ),
+            icon: const Icon(Icons.settings),
+          ),
         ),
       ),
     );
@@ -405,6 +455,7 @@ class _MiningScreenState extends State<MiningScreen>
                     ),
                   ),
                   _buildSectorTabs(),
+                  _buildSettingsButton(),
                 ],
               ),
             ),
