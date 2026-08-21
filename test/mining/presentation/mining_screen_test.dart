@@ -510,6 +510,103 @@ void main() {
   );
 
   testWidgets(
+    'sell reward originates from the camera position when tabs change '
+    'during the save',
+    (tester) async {
+      // Seed cargo so Sell All has something to sell. Use a separate
+      // delayed repository with its allowSave pre-completed so the seed
+      // write finishes immediately; then use a fresh delayed repository
+      // for the screen so the Sell All save still gates on allowSave.
+      final seed = DelayedMiningSaveRepository()..allowSave.complete();
+      await seed.save(
+        MiningSave(
+          cash: 1000,
+          lastAccruedAtUtc: _now,
+          sectors: {
+            MiningSectorId.landingBasin: const SectorProgress(
+              revealed: true,
+              mine: MineState(level: 1, storedAmount: 10),
+            ),
+            MiningSectorId.carbonRidge: const SectorProgress(revealed: false),
+            MiningSectorId.graniteCrater: const SectorProgress(revealed: false),
+          },
+        ),
+      );
+
+      final repository = DelayedMiningSaveRepository();
+      await pumpMiningScreen(
+        tester,
+        _viewports.first,
+        repository: repository,
+        disableAnimations: true,
+      );
+
+      // Start Sell All from the sell tab — the save gates on
+      // repository.allowSave. The sell tab has no sector selected, so the
+      // captured sectorId is intentionally null.
+      final sellTab = find.byKey(const Key('mining-sell-tab'));
+      await tester.ensureVisible(sellTab);
+      await tester.tap(sellTab);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('mining-primary-action')));
+      await repository.saveStarted.future;
+      await tester.pump();
+
+      // While the save is in flight, switch to Carbon Ridge. The sector
+      // tabs stay enabled during a save, so this changes _selectedSectorId
+      // before the reward plays.
+      final carbonTab = find.byKey(const Key('mining-sector-carbonRidge'));
+      await tester.ensureVisible(carbonTab);
+      await tester.tap(carbonTab);
+      await tester.pump();
+
+      // Complete the save — the sale reward should originate from the
+      // camera/global position (the sell tab had no sector), not from
+      // Carbon Ridge just because the player switched tabs.
+      repository.allowSave.complete();
+      await tester.pump();
+      await tester.pump();
+
+      final game =
+          (tester.widget(find.byWidgetPredicate((w) => w is GameWidget))
+                      as GameWidget)
+                  .game
+              as MiningGame;
+      final carbon = game.sector(MiningSectorId.carbonRidge);
+
+      // The sale particle is added to the world, whose pending additions
+      // are not always visible through world.children in the test
+      // environment. Instead, verify via lastSaleRewardSource, which
+      // records the world-space source position the particle was created
+      // at.
+      expect(
+        game.lastSaleRewardSource,
+        isNotNull,
+        reason: 'Sale reward should play after Sell All completes.',
+      );
+
+      final distanceToCamera = game.lastSaleRewardSource!.distanceTo(
+        game.camera.viewfinder.position,
+      );
+      final distanceToCarbon = game.lastSaleRewardSource!.distanceTo(
+        carbon.position,
+      );
+      expect(
+        distanceToCamera,
+        lessThan(distanceToCarbon),
+        reason:
+            'Sale reward must originate from the camera/global sale '
+            'position for actions started from the sell tab, not from '
+            'Carbon Ridge just because the player switched tabs during '
+            'the save.',
+      );
+
+      expect(find.text('Sold cargo for 40 cash.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'pause checkpoint swallows storage failure as a best-effort save',
     (tester) async {
       final repository = FailingMiningSaveRepository();

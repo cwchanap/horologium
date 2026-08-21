@@ -208,7 +208,17 @@ class _MiningScreenState extends State<MiningScreen>
       if (effect != null) _game.playReward(effect, sectorId: sectorId);
     } else if (result is MiningSaleResult && result.isSuccess) {
       unawaited(HapticFeedback.mediumImpact());
-      _game.playReward(MiningRewardEffect.sale, sectorId: sectorId);
+      // Sale actions started from the sell tab capture sectorId = null as
+      // an explicit "no sector" target — the reward originates from the
+      // camera/global position, not any sector. Pass
+      // fallbackToCurrentSelection: false so a null sectorId is respected
+      // rather than falling back to whatever sector is selected by the
+      // time the save completes.
+      _game.playReward(
+        MiningRewardEffect.sale,
+        sectorId: sectorId,
+        fallbackToCurrentSelection: false,
+      );
     }
   }
 

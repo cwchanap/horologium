@@ -80,15 +80,26 @@ class MiningGame extends FlameGame
     _selectedSectorId = id;
   }
 
-  void playReward(MiningRewardEffect effect, {MiningSectorId? sectorId}) {
+  void playReward(
+    MiningRewardEffect effect, {
+    MiningSectorId? sectorId,
+    bool fallbackToCurrentSelection = true,
+  }) {
     if (!hasLoaded) return;
 
     // Resolve the reward target from the explicit sectorId when provided
-    // (the sector that was selected when the action started), falling back
-    // to the current selection only when no target was passed. This keeps
-    // the reward tied to the action that triggered it even if the player
-    // changes tabs while the save is in flight.
-    final resolvedId = sectorId ?? _selectedSectorId;
+    // (the sector that was selected when the action started). For most
+    // actions a null sectorId means "no override supplied," so we fall back
+    // to the current selection. Sale actions started from the sell tab
+    // intentionally pass null as an explicit "no sector" target (the reward
+    // originates from the camera/global position), so callers pass
+    // fallbackToCurrentSelection: false to keep that null distinct from a
+    // missing override. This keeps the reward tied to the action that
+    // triggered it even if the player changes tabs while the save is in
+    // flight.
+    final resolvedId = fallbackToCurrentSelection
+        ? (sectorId ?? _selectedSectorId)
+        : sectorId;
     final selected = resolvedId == null ? null : _sectors[resolvedId];
     switch (effect) {
       case MiningRewardEffect.reveal:
@@ -185,9 +196,17 @@ class MiningGame extends FlameGame
     onSelectionChanged?.call(sectorId);
   }
 
+  /// The world-space source position of the most recent sale reward, or
+  /// null if no sale reward has played. Exposed for testing — the sale
+  /// particle is added directly to the world, whose pending additions
+  /// are not always visible through world.children in the test
+  /// environment.
+  Vector2? lastSaleRewardSource;
+
   void _playSaleReward(MiningSectorComponent? selected) {
     final source =
         selected?.position.clone() ?? camera.viewfinder.position.clone();
+    lastSaleRewardSource = source.clone();
     final target = camera.viewfinder.position.clone()
       ..add(
         Vector2(0, -camera.viewport.size.y / camera.viewfinder.zoom * 0.45),
