@@ -2,48 +2,112 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the validated one-planet mining MVP Horologium's only player-facing product, preserve its save/offline/recovery behavior and mining-relevant settings, and delete the obsolete city runtime instead of leaving a dormant second architecture.
+**Goal:** Make the validated one-planet mining MVP Horologium's only player-facing product, preserve its save/offline/audio/accessibility behavior, and delete the obsolete city runtime instead of leaving a dormant second architecture.
 
-**Architecture:** Keep `MainMenu` as a minimal mining-only landing shell and `lib/mining/` as the gameplay vertical slice. `MiningScreen` owns Flutter lifecycle/settings UI, `MiningController` remains the mutation/persistence boundary, and `MiningGame` remains the Flame world. Reuse only audio, resource identity, assets, and the parallax terrain files with direct mining consumers. Remove accidental terrain/grid and resource-registry dependencies before deleting the city code.
+**Architecture:** Keep `MainMenu` as a minimal mining-only landing shell and `lib/mining/` as the gameplay vertical slice. `MiningScreen` owns Flutter lifecycle/HUD/settings, `MiningController` remains the mutation/persistence boundary, and `MiningGame` remains the Flame world. Reuse only audio, resource identity, assets, and parallax terrain with concrete mining consumers. Sever the terrain→Grid dependency before deletion; slim `ResourceType` only after city consumers are removed.
 
-**Tech Stack:** Dart 3.8+, Flutter 3.32.5, Flame 1.30, SharedPreferences 2.5, existing Flutter/Flame test infrastructure.
+**Tech Stack:** Dart 3.8+, Flutter 3.32.5, Flame 1.30, SharedPreferences 2.5, audioplayers 6.x, existing Flutter/Flame test infrastructure.
 
 **Spec:** `docs/superpowers/specs/2026-08-20-hpa-636-production-mining-cutover-design.md`
 
-## Global constraints
+## Global Constraints
 
-- Deliver HPA-636 in **one PR** on `jack65786656/hpa-636-cut-over-to-the-mining-only-product`; implementation continues on the same draft PR as this plan.
-- HPA-631's final conclusion is **Proceed to cutover**, but run its requested real-device tier/reward visual pass before the first production cutover code change.
+- Deliver HPA-636 in **one PR** on `jack65786656/hpa-636-cut-over-to-the-mining-only-product`; implementation continues on this same draft PR.
+- HPA-631's final conclusion is **Proceed to cutover**, but run its requested real-device tier/reward visual pass before the first production routing change.
 - Preserve the strict unversioned `horologium.mining.save` payload. Do not add a version, migration, camera/selection field, city import, backup, or compatibility branch.
 - Legacy city keys are ignored, not migrated or eagerly deleted.
-- Do not add Provider, Riverpod, Bloc, a service locator, a new router, a settings service, a feature flag, or a compatibility facade.
-- Keep `MiningController`, `MiningSimulation`, and the existing HPA-631 first-planet rules unchanged unless a concrete HPA-636 blocker is demonstrated.
+- Do not add Provider, Riverpod, Bloc, a service locator, a new router, a settings service, a feature flag, a compatibility facade, or a second audio singleton.
+- Keep `MiningController`, `MiningSimulation`, and the validated HPA-631 economy unchanged unless a concrete HPA-636 blocker is demonstrated.
 - Reduced motion continues to use `MediaQuery.disableAnimations`; do not add a competing preference.
-- Keep unused binary city assets out of scope unless an asset declaration/build failure requires their deletion.
+- Keep `MiningStatusBar` metrics-only; Settings is a separate overlay control.
+- Keep unused binary city assets out of scope unless an asset declaration/build failure requires deletion.
 - Delete tests with retired production code instead of retaining production code solely to keep old tests green.
+- `AGENTS.md` follows `CLAUDE.md`; update `CLAUDE.md`, not a separate divergent agent file.
+- The current `.specify/memory/constitution.md` is a stale city-specific governance contract. HPA-636 explicitly amends it in Task 6; do not design around the obsolete city mandates.
 
 ---
 
-## Pre-implementation gate: close the HPA-631 real-device visual note
+## Risks and Gates
+
+| Risk | Mitigation / proof |
+| --- | --- |
+| Product cutover starts after an invalid physical-device visual | Mandatory device check before Task 2 |
+| Legacy city data affects startup | Presence-only `MiningSaveRepository.hasSave()` + legacy-only launch test |
+| Existing mining saves reset | Leave `MiningSave`/decoder schema unchanged |
+| City removal silently removes BGM | Load existing prefs in `MiningScreen`; start BGM from existing user gestures; inject real `AudioManager` backed by fake player in tests |
+| Settings crowds 360px HUD | Separate `Positioned`/`SafeArea` settings control; status bar stays unchanged |
+| `Grid` cannot be deleted | Explicit terrain cell-size constructor removes the only mining-relevant Grid dependency |
+| Resource cleanup breaks city code before deletion | No standalone ResourceType slimming task; simplify it only after all city consumers are removed |
+| Nested city tests survive path-based deletion | Treat delete lists as seeds; run analyze/search after each group |
+| Dead city packages survive | Remove `uuid` and `flame_audio` after their consumers are deleted |
+| Speckit regenerates city-first plans | Amend constitution to mining-first governance in Task 6 |
+
+---
+
+## File Map
+
+### Create
+
+```text
+lib/mining/presentation/mining_settings_sheet.dart
+test/support/fake_background_music_player.dart
+```
+
+### Modify
+
+```text
+lib/main_menu.dart
+lib/mining/mining_save_repository.dart
+lib/mining/presentation/mining_screen.dart
+lib/mining/world/mining_game.dart
+lib/game/terrain/parallax_terrain_component.dart
+lib/game/resources/resource_type.dart
+pubspec.yaml
+pubspec.lock
+
+README.md
+CLAUDE.md
+.github/copilot-instructions.md
+.windsurf/rules/project.md
+.specify/memory/constitution.md
+
+test/main_menu_test.dart
+test/widget_test.dart
+test/mining/mining_save_repository_test.dart
+test/mining/presentation/mining_screen_test.dart
+test/game/audio_manager_test.dart
+test/game/terrain/parallax_terrain_component_test.dart
+test/mining/world/mining_game_test.dart
+```
+
+### Delete
+
+Delete city production/tests in Task 5 after the mining entry/audio/terrain seams are green. Exact path lists are discovery seeds, not a whitelist; analysis/search owns the final closure.
+
+---
+
+## Task 1: Close the HPA-631 Physical-Device Gate
 
 **Files:** none.
 
-- [ ] **Step 1: Run the validated mining MVP on one supported physical phone in portrait.**
+- [ ] **Step 1: Run the merged mining MVP on one supported physical phone in portrait.**
 
 Check at minimum:
 
-- level 1, 3, and 5 mine structures remain visibly distinct;
-- reveal/build/upgrade/sale rewards remain legible;
-- 360-ish narrow portrait interaction remains usable;
-- no product-blocking visual issue appears that invalidates the HPA-631 Proceed decision.
+```text
+level 1 / 3 / 5 structures are visibly distinct
+reveal/build/upgrade/sale rewards remain legible
+narrow portrait controls remain usable
+no product-blocking visual regression invalidates Proceed to cutover
+```
 
-- [ ] **Step 2: Record the result before touching production routing.**
+- [ ] **Step 2: Record the result on HPA-636 before changing production routing.**
 
-If the result is acceptable, continue HPA-636. If it exposes a product-blocking regression, address/reconsider HPA-631 first rather than burying a redesign inside the cutover.
+If the pass is acceptable, continue. If it exposes a product-blocking issue, fix/reconsider the validated MVP instead of hiding a redesign in the cutover.
 
 ---
 
-## Task 1: Make startup mining-only and distinguish Start from Continue
+## Task 2: Make Startup Mining-Only and Distinguish Start from Continue
 
 **Files:**
 - Modify: `lib/mining/mining_save_repository.dart`
@@ -53,60 +117,101 @@ If the result is acceptable, continue HPA-636. If it exposes a product-blocking 
 - Modify: `test/widget_test.dart`
 
 **Interfaces:**
-- `MiningSaveRepository.hasSave()` answers only whether `horologium.mining.save` exists.
-- `MainMenu` depends on that query and navigates only to `MiningScreen`.
-- `MiningScreen` remains responsible for decoding/creating/recovering state.
+- Produces: `Future<bool> MiningSaveRepository.hasSave()`.
+- `hasSave()` answers only whether `MiningSaveRepository.saveKey` exists.
+- `MainMenu` navigates only to `MiningScreen`.
+- `MiningScreen` remains responsible for create/decode/recovery/offline accrual.
 
-- [ ] **Step 1: Add failing save-presence tests.**
+- [ ] **Step 1: Add RED save-presence tests.**
 
-Cover:
-
-```text
-empty prefs                         -> hasSave == false
-legacy city keys only              -> hasSave == false
-horologium.mining.save present      -> hasSave == true
-```
-
-Do not parse or validate the save in `hasSave()`; malformed-save handling remains `load()`'s responsibility.
-
-- [ ] **Step 2: Implement the smallest `hasSave()` query.**
-
-Keep the save key encapsulated by `MiningSaveRepository` and use `SharedPreferences.getInstance()` exactly as `load()`/`save()` already do.
-
-- [ ] **Step 3: Rewrite the menu tests RED for the mining-only product.**
-
-At 360×640 and 430×932, assert:
-
-- fresh/legacy-only preferences show `START MINING`;
-- a mining save shows `CONTINUE MINING`;
-- no `START EXPEDITION`, `MINING MVP`, `TRADE`, `STELLAR MAP`, or `RESEARCH LAB` action exists;
-- tapping the primary CTA opens the mining screen;
-- no overflow/uncaught exception occurs.
-
-Reuse a valid serialized save fixture from mining repository/integration tests rather than hand-inventing a second schema.
-
-- [ ] **Step 4: Rewrite `MainMenu` as the mining landing shell.**
-
-Remove:
+Add cases equivalent to:
 
 ```dart
+test('hasSave ignores legacy-only preferences', () async {
+  SharedPreferences.setMockInitialValues({
+    'cash': 999.0,
+    'active_planet_id': 'earth',
+  });
+
+  expect(await MiningSaveRepository().hasSave(), isFalse);
+});
+
+test('hasSave reports mining save presence without parsing it', () async {
+  SharedPreferences.setMockInitialValues({
+    MiningSaveRepository.saveKey: '{not-valid-json',
+  });
+
+  expect(await MiningSaveRepository().hasSave(), isTrue);
+});
+```
+
+Run:
+
+```bash
+flutter test test/mining/mining_save_repository_test.dart
+```
+
+Expected: FAIL because `hasSave()` does not exist.
+
+- [ ] **Step 2: Implement the presence-only query.**
+
+Use the existing repository key:
+
+```dart
+Future<bool> hasSave() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.containsKey(saveKey);
+}
+```
+
+Do not call `_decode`, `jsonDecode`, or any legacy save API here.
+
+- [ ] **Step 3: Rewrite menu tests RED for the mining-only product.**
+
+At both 360×640 and 430×932 prove:
+
+```text
+no mining save / legacy-only keys -> START MINING
+mining key present                -> CONTINUE MINING
+primary CTA opens MiningScreen
+START EXPEDITION absent
+MINING MVP absent
+TRADE absent
+STELLAR MAP absent
+RESEARCH LAB absent
+no overflow / uncaught exception
+```
+
+Reuse a valid mining save fixture for the valid-save case; use malformed mining JSON separately to prove label presence does not parse.
+
+- [ ] **Step 4: Replace city bootstrap in `MainMenu`.**
+
+Remove imports/state/helpers for:
+
+```text
 Planet
 ActivePlanet
 SaveService
 MainGameWidget
 TradePage
-city route helpers
+city placeholder routes
 ```
 
-Keep only product presentation with a single Start/Continue CTA. Existing starfield/theme helpers may stay if they remain simple and mining-facing; remove city-specific button/title/footer copy.
+Keep the existing simple presentation/starfield if useful. Resolve the CTA label from `MiningSaveRepository.hasSave()` and navigate with the existing pattern:
 
-Do not add a routing abstraction. Use the existing `Navigator` + `MaterialPageRoute` pattern to open `MiningScreen`.
+```dart
+Navigator.of(context).push(
+  MaterialPageRoute(builder: (_) => const MiningScreen()),
+);
+```
 
-- [ ] **Step 5: Update the app smoke test.**
+Do not add a router abstraction.
 
-Keep the global error-handler coverage in `test/widget_test.dart`, but replace city-menu assertions with mining-only landing assertions.
+- [ ] **Step 5: Update `test/widget_test.dart`.**
 
-- [ ] **Step 6: Run the focused tests.**
+Keep global error-handler assertions. Replace city-menu copy assertions with mining landing assertions.
+
+- [ ] **Step 6: Verify GREEN.**
 
 ```bash
 flutter test test/mining/mining_save_repository_test.dart
@@ -115,33 +220,155 @@ flutter test test/main_menu_test.dart test/widget_test.dart
 
 Expected: PASS.
 
+- [ ] **Step 7: Commit the startup cutover.**
+
+```bash
+git add lib/main_menu.dart lib/mining/mining_save_repository.dart \
+  test/main_menu_test.dart test/widget_test.dart \
+  test/mining/mining_save_repository_test.dart
+git commit -m "feat: make mining the primary product entry"
+```
+
 ---
 
-## Task 2: Move settings/audio reachability into the mining product
+## Task 3: Preserve Audio and Add a Mining-Owned Settings Surface
 
 **Files:**
 - Create: `lib/mining/presentation/mining_settings_sheet.dart`
+- Create: `test/support/fake_background_music_player.dart`
 - Modify: `lib/mining/presentation/mining_screen.dart`
 - Modify: `test/mining/presentation/mining_screen_test.dart`
-- Keep: `lib/game/audio_manager.dart`
+- Modify: `test/game/audio_manager_test.dart`
+- Keep unchanged unless a test proves otherwise: `lib/game/audio_manager.dart`
 - Keep: `lib/game/background_music_player.dart`
+- Keep metrics-only: `lib/mining/presentation/mining_status_bar.dart`
 
-- [ ] **Step 1: Add failing MiningScreen settings tests.**
+**Interfaces:**
+- `MiningScreen(..., AudioManager? audioManager)` is the only new production test seam.
+- Production constructs `AudioManager()` when no dependency is injected.
+- Existing `AudioManager` remains the owner of `audio.musicEnabled` and `audio.musicVolume`.
+
+- [ ] **Step 1: Extract the existing fake player without changing behavior.**
+
+Move the current `FakeBackgroundMusicPlayer implements BackgroundMusicPlayer` from `test/game/audio_manager_test.dart` into:
+
+```text
+test/support/fake_background_music_player.dart
+```
+
+Import the helper back into `audio_manager_test.dart`. This is test-fixture reuse, not a production abstraction.
+
+Run:
+
+```bash
+flutter test test/game/audio_manager_test.dart
+```
+
+Expected: PASS unchanged.
+
+- [ ] **Step 2: Add RED MiningScreen audio/settings tests.**
+
+Construct the real manager around the shared fake:
+
+```dart
+final player = FakeBackgroundMusicPlayer();
+final audio = AudioManager(backgroundMusicPlayer: player);
+await tester.pumpWidget(
+  MaterialApp(home: MiningScreen(audioManager: audio)),
+);
+```
 
 Cover:
 
-- a Settings affordance is reachable at 360×640 and 430×932;
-- opening it exposes music enabled/disabled and volume controls;
-- toggling/changing controls delegates to `AudioManager` and remains usable in portrait;
-- the accessibility section states that reduced motion follows the system setting;
-- `MediaQueryData(disableAnimations: true)` still produces the validated reduced-motion behavior;
-- closing/reopening the sheet reflects the current audio state.
+```text
+saved audio prefs are loaded during screen initialization
+no BGM starts merely from initialization
+first sector/tab selection can call maybeStartBgm once
+primary action can trigger the same first-user-gesture path
+opening Settings can trigger the same first-user-gesture path
+settings shows current Music and Volume values
+switch/slider delegate to the same AudioManager
+reopening settings reflects updated manager state
+MediaQuery.disableAnimations still controls reduced motion
+settings/status UI does not overflow at 360×640 or 430×932
+```
 
-Prefer injecting or otherwise substituting the existing audio adapter only where the current test seam already supports it. Do not create a settings repository abstraction for the test.
+Run:
 
-- [ ] **Step 2: Add one small mining-owned settings sheet.**
+```bash
+flutter test test/mining/presentation/mining_screen_test.dart
+```
 
-The sheet owns presentation only. It receives the existing `AudioManager` (or callbacks/getters from `MiningScreen`) and renders:
+Expected: FAIL because there is no injection/settings/start wiring.
+
+- [ ] **Step 3: Inject the existing AudioManager.**
+
+Change the widget seam minimally:
+
+```dart
+class MiningScreen extends StatefulWidget {
+  const MiningScreen({
+    super.key,
+    this.content,
+    this.repository,
+    this.nowUtc,
+    this.audioManager,
+  });
+
+  final AudioManager? audioManager;
+}
+```
+
+In state:
+
+```dart
+late final AudioManager _audioManager;
+
+@override
+void initState() {
+  super.initState();
+  _audioManager = widget.audioManager ?? AudioManager();
+  // existing mining setup...
+}
+```
+
+Do not create another audio singleton or settings service.
+
+- [ ] **Step 4: Load preferences as part of mining initialization.**
+
+Before the screen exposes settings state:
+
+```dart
+Future<void> _initialize() async {
+  await _audioManager.loadPrefs();
+  await _controller.initialize();
+  // existing pending-summary / refresh path...
+}
+```
+
+`AudioManager.loadPrefs()` already handles preference read errors internally; do not add a second recovery system.
+
+- [ ] **Step 5: Reuse existing gestures for web-safe BGM start.**
+
+Call:
+
+```dart
+unawaited(_audioManager.maybeStartBgm());
+```
+
+from the existing gesture paths only:
+
+```text
+_selectSector(...)
+_onPrimaryAction()
+_openSettings()
+```
+
+Do not add `onUserInteracted`, a global pointer listener, polling, or autoplay during initialization.
+
+- [ ] **Step 6: Add the small settings sheet.**
+
+`MiningSettingsSheet` renders only:
 
 ```text
 Audio
@@ -152,27 +379,53 @@ Accessibility
   Reduced motion follows system setting
 ```
 
-Do not move audio preferences into mining persistence.
+Use the same modal pattern already used for offline return:
 
-- [ ] **Step 3: Complete MiningScreen audio lifecycle.**
+```dart
+return showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  backgroundColor: Colors.transparent,
+  builder: (_) => MiningSettingsSheet(...),
+);
+```
 
-On initialization, load `AudioManager` preferences. Preserve the existing app lifecycle forwarding and dispose path.
+The sheet reads/updates the existing `AudioManager`; do not write audio settings into `MiningSave`.
 
-After a user gesture, allow `maybeStartBgm()` to run so web/mobile autoplay policies remain respected. Do not add autoplay polling or a global audio singleton.
+- [ ] **Step 7: Place Settings outside the metric row.**
 
-- [ ] **Step 4: Run the focused screen tests.**
+In `MiningScreen`'s existing root `Stack`, add a separate `Positioned` + `SafeArea` control as a sibling to the status/tabs overlay. Keep `MiningStatusBar` unchanged and metrics-only.
+
+The button should have a stable key such as:
+
+```dart
+const Key('mining-settings-button')
+```
+
+and a primary touch target of at least 48 logical px.
+
+- [ ] **Step 8: Verify GREEN.**
 
 ```bash
+flutter test test/game/audio_manager_test.dart
 flutter test test/mining/presentation/mining_screen_test.dart
 ```
 
-Expected: PASS with both normal and reduced-motion media settings.
+Expected: PASS, including first-gesture playback and both portrait sizes.
+
+- [ ] **Step 9: Commit audio/settings.**
+
+```bash
+git add lib/mining/presentation/mining_screen.dart \
+  lib/mining/presentation/mining_settings_sheet.dart \
+  test/mining/presentation/mining_screen_test.dart \
+  test/game/audio_manager_test.dart test/support/fake_background_music_player.dart
+git commit -m "feat: preserve mining audio and settings"
+```
 
 ---
 
-## Task 3: Sever the two accidental city dependencies before deletion
-
-### Task 3A: Terrain no longer imports Grid
+## Task 4: Sever the Terrain → Grid Dependency
 
 **Files:**
 - Modify: `lib/game/terrain/parallax_terrain_component.dart`
@@ -180,73 +433,112 @@ Expected: PASS with both normal and reduced-motion media settings.
 - Modify: `test/game/terrain/parallax_terrain_component_test.dart`
 - Modify if needed: `test/mining/world/mining_game_test.dart`
 
-- [ ] **Step 1: Add a failing explicit-cell-size test.**
+**Interfaces:**
+- `ParallaxTerrainComponent({required int gridSize, int? seed, double cellSize = 50})`.
+- `MiningGame` passes `MiningContentRegistry.terrainCellSize` explicitly.
+- `ParallaxTerrainLayer` remains unchanged and receives width/height from the component.
 
-Construct `ParallaxTerrainComponent` with a non-default test cell size and assert its component/layer extent derives from that value rather than a global Grid constant.
+- [ ] **Step 1: Add RED explicit-cell-size coverage.**
 
-- [ ] **Step 2: Remove `import '../grid.dart'`.**
+Add a focused test using a non-50 cell size:
 
-Add a `cellSize` (or equivalent cell width/height only if genuinely necessary) constructor value with the existing 50px behavior as the default.
+```dart
+final terrain = ParallaxTerrainComponent(
+  gridSize: 4,
+  cellSize: 32,
+  seed: 1,
+);
+```
 
-Use that value for:
+After load, assert the component/layer extent is 128×128 rather than depending on Grid constants.
 
-- component size;
-- debug cell rectangles/centers;
-- created `ParallaxTerrainLayer` sizes.
+Run:
 
-- [ ] **Step 3: Have `MiningGame` pass `MiningContentRegistry.terrainCellSize`.**
+```bash
+flutter test test/game/terrain/parallax_terrain_component_test.dart
+```
 
-This makes the validated 36×36 × 50 world contract explicit at the mining consumer without introducing a shared camera/terrain framework.
+Expected: FAIL because `cellSize` is not accepted.
 
-- [ ] **Step 4: Run focused terrain/mining-world tests.**
+- [ ] **Step 2: Remove the Grid import and use the constructor value.**
+
+Replace:
+
+```dart
+import '../grid.dart';
+```
+
+with local state:
+
+```dart
+final double cellSize;
+
+ParallaxTerrainComponent({
+  required this.gridSize,
+  int? seed,
+  this.cellSize = 50,
+}) : generator = TerrainGenerator(gridSize: gridSize, seed: seed ?? 42);
+```
+
+Use `cellSize` for:
+
+```text
+component size
+debug cell rectangles
+debug centers
+ParallaxTerrainLayer.cellWidth
+ParallaxTerrainLayer.cellHeight
+child layer size
+```
+
+Do not introduce a terrain config object/framework.
+
+- [ ] **Step 3: Make MiningGame pass its existing world contract.**
+
+```dart
+ParallaxTerrainComponent(
+  gridSize: MiningContentRegistry.terrainGridSize,
+  cellSize: MiningContentRegistry.terrainCellSize,
+  seed: 631,
+)
+```
+
+- [ ] **Step 4: Verify terrain/mining world GREEN and no Grid import.**
 
 ```bash
 flutter test test/game/terrain/parallax_terrain_component_test.dart
 flutter test test/mining/world/mining_game_test.dart
+rg "grid.dart" lib/game/terrain/parallax_terrain_component.dart
 ```
 
-Expected: PASS and no `parallax_terrain_component.dart` import of `grid.dart`.
+Expected: tests PASS; grep returns no match.
 
-### Task 3B: ResourceType becomes identity-only
-
-**Files:**
-- Modify: `lib/game/resources/resource_type.dart`
-- Modify: `test/resources/resource_type_test.dart`
-- Delete later with city cleanup: `lib/game/resources/resource_category.dart`
-- Delete later with city cleanup: `lib/game/resources/resource_cost.dart`
-- Delete later with city cleanup: `lib/game/resources/resources.dart`
-
-- [ ] **Step 1: Prove the surviving mining usage.**
+- [ ] **Step 5: Commit the deletion blocker fix.**
 
 ```bash
-rg 'ResourceType\.' lib/mining test/mining test/integration/mining_mvp_journey_test.dart
+git add lib/game/terrain/parallax_terrain_component.dart \
+  lib/mining/world/mining_game.dart \
+  test/game/terrain/parallax_terrain_component_test.dart \
+  test/mining/world/mining_game_test.dart
+git commit -m "refactor: decouple mining terrain from city grid"
 ```
-
-Expected surviving mining identities: gold, coal, stone.
-
-- [ ] **Step 2: Rewrite the resource identity test for the post-cutover contract.**
-
-Test only the enum identities the mining slice consumes. Remove registry/category/economy expectations.
-
-- [ ] **Step 3: Slim `resource_type.dart`.**
-
-Remove `Resource`, `ResourceRegistry`, and the `resource_category.dart` import. Keep only the enum surface with concrete mining consumers. Do not create `MiningResourceType` or move the file in this ticket.
-
-- [ ] **Step 4: Run the focused identity/content tests.**
-
-```bash
-flutter test test/resources/resource_type_test.dart test/mining/mining_content_test.dart
-```
-
-Expected: PASS.
 
 ---
 
-## Task 4: Delete the obsolete city production runtime and its tests
+## Task 5: Delete the City Runtime, Then Slim Resource Identity and Dependencies
 
-**Files:** delete all files below that have no retained mining consumer after Tasks 1–3.
+**Files:**
+- Delete: obsolete city production/tests discovered below.
+- Modify after city consumers are gone: `lib/game/resources/resource_type.dart`
+- Modify: `pubspec.yaml`
+- Modify generated: `pubspec.lock`
+- Keep: `lib/game/audio_manager.dart`
+- Keep: `lib/game/background_music_player.dart`
+- Keep retained parallax terrain files.
 
-### Production delete groups
+**Important ordering:** There is **no standalone ResourceType slimming task before deletion**. `ResourceRegistry`, the product enums, and extra `ResourceType` values remain temporarily because live city code still imports them. Delete those consumers first; then simplify the identity file in this same task.
+
+### Production deletion seeds
 
 ```text
 lib/game/achievements/**
@@ -276,7 +568,7 @@ lib/pages/**
 lib/widgets/**
 ```
 
-Retain only these `lib/game/` files unless an actual mining import proves another concrete consumer:
+Retain this production boundary unless a direct mining import proves another file is required:
 
 ```text
 lib/game/audio_manager.dart
@@ -290,9 +582,7 @@ lib/game/terrain/terrain_depth_manager.dart
 lib/game/terrain/terrain_generator.dart
 ```
 
-### Test delete groups
-
-Delete tests whose subjects disappear, including the current city suites under:
+### Test deletion seeds
 
 ```text
 test/achievements/**
@@ -310,6 +600,7 @@ test/game/grid_test.dart
 test/game/main_game_test.dart
 test/game/scene_widget_test.dart
 test/game/production/**
+test/game/quests/**
 
 test/integration/planet_grid_integration_test.dart
 test/integration/planet_placement_persistence_test.dart
@@ -317,88 +608,211 @@ test/integration/planet_placement_persistence_test.dart
 test/scene_test.dart
 ```
 
-For `test/resources/**`, keep only coverage for the surviving `ResourceType` identity. For `test/game/terrain/**`, keep only tests for the retained parallax terrain dependency graph.
+For `test/resources/**`, retain only the post-cutover ResourceType identity coverage. For `test/game/terrain/**`, retain only tests for the parallax terrain dependency graph. Keep `test/game/audio_manager_test.dart`.
 
-- [ ] **Step 1: Delete one coherent production group at a time.**
+- [ ] **Step 1: Delete one coherent city group and its tests at a time.**
 
-After each group, remove imports/usages rather than adding compatibility placeholders.
+Suggested groups:
 
-- [ ] **Step 2: Delete the corresponding tests immediately.**
+```text
+A. pages/widgets + main scene/menu dependencies already removed by Task 2
+B. achievements/quests/research/production
+C. building/grid/managers/planet/services/resources
+D. obsolete non-parallax terrain files
+```
 
-Do not spend time porting tests for behavior that no longer exists.
-
-- [ ] **Step 3: Run analysis after the deletion pass.**
+After each group, run:
 
 ```bash
 flutter analyze --fatal-infos
 ```
 
-Fix only real dangling imports/unused references exposed by the deletion. If a supposedly shared file has no mining consumer, delete it too.
+If analysis names another city-only consumer/test, delete it with its owning group instead of adding a compatibility stub.
 
-- [ ] **Step 4: Prove the production dependency boundary.**
+- [ ] **Step 2: Use search as closure, not only path lists.**
 
-Run targeted greps such as:
+After deletion groups, run:
 
 ```bash
-rg 'Planet|ActivePlanet|SaveService|MainGameWidget|MainGame|Building|Grid|GameStateManager|QuestManager|AchievementManager|ResearchManager|TradePage' lib --glob '*.dart'
-rg 'package:horologium/(pages|widgets)/|package:horologium/game/(building|planet|production|quests|research|services|managers)/' lib --glob '*.dart'
+rg "Planet|ActivePlanet|SaveService|MainGameWidget|MainGame|BuildingRegistry|GameStateManager|QuestManager|AchievementManager|ResearchManager|TradePage" lib test --glob '*.dart'
+rg "package:horologium/(pages|widgets)/|package:horologium/game/(building|planet|production|quests|research|services|managers)/" lib test --glob '*.dart'
 ```
 
-Expected: no production references to retired city domains. Any remaining match must be a deliberate mining-facing name/comment or should be removed.
+Investigate each remaining match. Historical planning docs are out of this production/test grep scope.
 
-- [ ] **Step 5: Run the surviving full test suite.**
+- [ ] **Step 3: Only now slim `ResourceType`.**
+
+After city consumers are absent, replace `lib/game/resources/resource_type.dart` with the identity-only surface:
+
+```dart
+enum ResourceType { gold, coal, stone }
+```
+
+Delete from that file:
+
+```text
+Resource
+ResourceRegistry
+BakeryProduct
+KitchenProduct
+CropType
+resource_category.dart import
+```
+
+Rewrite `test/resources/resource_type_test.dart` to assert only the surviving enum contract and keep `test/mining/mining_content_test.dart` as the stronger consumer proof.
+
+Run:
 
 ```bash
+flutter test test/resources/resource_type_test.dart test/mining/mining_content_test.dart
+```
+
+Expected: PASS.
+
+- [ ] **Step 4: Remove packages whose only consumers were deleted.**
+
+From `pubspec.yaml`, remove:
+
+```yaml
+flame_audio: ^2.0.6
+uuid: ^4.5.1
+```
+
+Keep:
+
+```yaml
+audioplayers: ^6.0.0
+```
+
+Then regenerate:
+
+```bash
+flutter pub get
+```
+
+Confirm no source consumer remains:
+
+```bash
+rg "package:uuid|package:flame_audio" lib test
+```
+
+Expected: no matches.
+
+- [ ] **Step 5: Run analysis and the surviving full suite.**
+
+```bash
+flutter analyze --fatal-infos
 flutter test
 ```
 
 Expected: PASS with a substantially smaller suite.
 
+- [ ] **Step 6: Commit the retirement as one coherent deletion commit.**
+
+```bash
+git add -A
+git commit -m "refactor: remove obsolete city runtime"
+```
+
 ---
 
-## Task 5: Update active product and contributor documentation
+## Task 6: Make Active Guidance and Speckit Governance Mining-First
 
 **Files:**
 - Modify: `README.md`
 - Modify: `CLAUDE.md`
 - Modify: `.github/copilot-instructions.md`
 - Modify: `.windsurf/rules/project.md`
+- Modify: `.specify/memory/constitution.md`
+- Do not separately edit: `AGENTS.md` symlink target relationship.
 
-- [ ] **Step 1: Replace city-builder product descriptions.**
+- [ ] **Step 1: Update product/architecture guidance.**
 
-Describe Horologium as the current casual stellar mining-idle game and summarize the first-planet loop.
-
-- [ ] **Step 2: Replace obsolete architecture guidance.**
-
-Document the actual surviving ownership boundary:
+Replace city-builder descriptions with the actual runtime:
 
 ```text
 MainMenu
-  -> MiningScreen (Flutter lifecycle + HUD/sheets/settings)
+  -> MiningScreen
       -> MiningController
           -> MiningSimulation
           -> MiningSaveRepository
-      -> MiningGame (Flame terrain + mine presentation)
+      -> MiningGame
+          -> ParallaxTerrainComponent
 ```
 
-Mention retained audio/parallax terrain as shared infrastructure and `horologium.mining.save` as the authoritative strict unversioned save.
+Document:
 
-- [ ] **Step 3: Replace obsolete workflow examples.**
+```text
+cash-only mining loop
+strict unversioned horologium.mining.save
+Flutter owns HUD/sheets/lifecycle
+Flame owns world/camera/effects
+audio preferences stay in AudioManager SharedPreferences keys
+ResourceType is identity only
+legacy city keys are ignored
+```
 
-Remove instructions for adding city buildings, workers, quests, production chains, old research, or planet persistence. Keep only useful Flutter commands/testing conventions and mining-focused extension points.
+Remove active instructions for adding city buildings, workers, research trees, quests, production chains, `Planet`, or `SaveService`.
 
-- [ ] **Step 4: Leave historical design docs alone.**
+- [ ] **Step 2: Amend the active Speckit constitution instead of calling it historical.**
 
-Past city design/spec documents are historical records. Do not rewrite them to pretend they were mining designs.
+This is a breaking governance change, so bump:
+
+```text
+1.0.0 -> 2.0.0
+```
+
+Replace city-specific non-negotiables with concise current principles:
+
+```text
+I. Flutter/Flame ownership separation
+II. Mining content/state separation and one mining mutation boundary
+III. Strict unversioned mining persistence until a shipped compatibility need exists
+IV. Deterministic test-first behavior for economy/persistence
+V. Asset-backed presentation with graceful development fallbacks
+```
+
+Remove mandates for:
+
+```text
+MainGameWidget / MainGame
+BuildingRegistry / ResourceRegistry / Research.availableResearch
+city SharedPreferences key layout
+one-second economy mutation timer
+50×50 placement grid
+```
+
+Retain quality gates (`format`, `analyze`, `test`, target verification) and update the constitution Sync Impact Report/date.
+
+- [ ] **Step 3: Leave historical design docs untouched.**
+
+Do not rewrite old city specs/plans under `docs/`; they are historical records, unlike the active constitution and contributor guidance.
+
+- [ ] **Step 4: Search active guidance for stale city mandates.**
+
+```bash
+rg "MainGameWidget|BuildingRegistry|ResourceRegistry|worker assignment|50x50|50×50|production chain|SaveService" \
+  README.md CLAUDE.md .github/copilot-instructions.md \
+  .windsurf/rules/project.md .specify/memory/constitution.md
+```
+
+Expected: no stale city requirement. A historical contrast sentence is acceptable only if clearly marked as removed/legacy.
+
+- [ ] **Step 5: Commit documentation/governance.**
+
+```bash
+git add README.md CLAUDE.md .github/copilot-instructions.md \
+  .windsurf/rules/project.md .specify/memory/constitution.md
+git commit -m "docs: make repository guidance mining-first"
+```
 
 ---
 
-## Task 6: Re-run the complete product contract after deletion
+## Task 7: Verify the Complete Cutover Contract
 
-**Files:**
-- Modify only tests or mining code when this verification demonstrates a real HPA-636 regression.
+**Files:** modify only if verification exposes a real HPA-636 regression.
 
-- [ ] **Step 1: Run formatting and static analysis.**
+- [ ] **Step 1: Format and analyze.**
 
 ```bash
 dart format .
@@ -408,12 +822,14 @@ flutter analyze --fatal-infos
 
 Expected: PASS.
 
-- [ ] **Step 2: Run focused entry/recovery/settings coverage.**
+- [ ] **Step 2: Run focused startup/save/audio/settings/mining coverage.**
 
 ```bash
 flutter test test/main_menu_test.dart
 flutter test test/mining/mining_save_repository_test.dart
+flutter test test/game/audio_manager_test.dart
 flutter test test/mining/presentation/mining_screen_test.dart
+flutter test test/mining/world/mining_game_test.dart
 flutter test test/integration/mining_mvp_journey_test.dart
 ```
 
@@ -427,68 +843,71 @@ flutter test
 
 Expected: PASS.
 
-- [ ] **Step 4: Build representative supported development targets.**
+- [ ] **Step 4: Prove the retired production domains are gone.**
+
+```bash
+rg "Planet|ActivePlanet|SaveService|MainGameWidget|BuildingRegistry|GameStateManager|QuestManager|AchievementManager|ResearchManager|TradePage" lib --glob '*.dart'
+rg "package:uuid|package:flame_audio" lib test
+```
+
+Expected: no retired production/package references. Review any generic word match such as "building" in asset names rather than blindly deleting valid mining assets.
+
+- [ ] **Step 5: Build representative targets.**
 
 ```bash
 flutter build apk --debug
 flutter build web
 ```
 
-Expected: both builds succeed.
+Expected: both succeed.
 
-- [ ] **Step 5: Manually verify fresh, legacy-only, and existing-mining-save launches.**
+- [ ] **Step 6: Verify three startup scenarios.**
 
-Use three clean SharedPreferences/app-data scenarios:
-
-1. no save keys → START MINING → clean Landing Basin;
-2. legacy city keys only → START MINING → same clean mining state, no conversion/error;
-3. valid mining save → CONTINUE MINING → restored cash/sectors/mines/cargo and offline return.
-
-Also verify app background/resume, malformed mining-save recovery, Settings/audio, reduced motion, and portrait layout.
-
-- [ ] **Step 6: Final deletion/dependency check.**
-
-```bash
-rg 'START EXPEDITION|MINING MVP|STELLAR MAP|RESEARCH LAB|space city-building|worker assignment|production chain' lib README.md CLAUDE.md .github/copilot-instructions.md .windsurf/rules/project.md
-```
-
-Expected: no active product/contributor wording for the retired city game.
-
-Then inspect the final diff specifically for:
-
-- no new compatibility/versioning framework;
-- no accidental mining-save schema change;
-- no city runtime retained only because a test/import was easier to keep;
-- no unrelated asset purge or product feature expansion.
-
----
-
-## Expected final file shape
-
-The production Dart surface should converge toward:
+Run the app with:
 
 ```text
-lib/
-  main.dart
-  main_menu.dart
-  constants/
-    assets_path.dart
-  mining/
-    ...validated HPA-631 slice...
-    presentation/
-      mining_settings_sheet.dart
-  game/
-    audio_manager.dart
-    background_music_player.dart
-    resources/
-      resource_type.dart
-    terrain/
-      parallax_terrain_component.dart
-      parallax_terrain_layer.dart
-      terrain_assets.dart
-      terrain_biome.dart
-      terrain_depth_manager.dart
-      terrain_generator.dart
+A. no save keys
+   -> START MINING
+   -> clean Landing Basin
+
+B. legacy city keys only
+   -> START MINING
+   -> same clean Landing Basin
+   -> legacy keys do not cause migration/recovery UI
+
+C. existing horologium.mining.save
+   -> CONTINUE MINING
+   -> persisted cash/sectors/mines/cargo restored
+   -> offline summary appears when elapsed time warrants it
 ```
 
-This is a target boundary, not a reason to move already-clean mining files or create new packages. If implementation proves one additional shared file has a real mining consumer, retain it and document that concrete dependency in the PR rather than building an abstraction around it.
+Also verify one malformed mining save still enters the existing non-blocking recovery path.
+
+- [ ] **Step 7: Verify audio/accessibility on the product path.**
+
+On a supported interactive target:
+
+```text
+launch does not violate autoplay policy
+first mining/settings gesture starts BGM when enabled
+Music switch and Volume slider work
+pause/resume lifecycle still affects active BGM
+reduced-motion system setting preserves clear action confirmation
+settings control and status metrics remain usable in narrow portrait
+```
+
+- [ ] **Step 8: Record HPA-636 closeout evidence.**
+
+Record:
+
+```text
+reviewed commit
+physical target used for pre-code gate
+fresh / legacy-only / existing-save launch results
+format/analyze/test results
+APK/web build results
+dependency grep result
+confirmation that city keys were ignored rather than migrated
+```
+
+HPA-636 is ready to merge only when all acceptance criteria are represented by this evidence.
