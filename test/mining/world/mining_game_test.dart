@@ -4,6 +4,7 @@ import 'package:flame/events.dart' as flame_events;
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:horologium/game/terrain/parallax_terrain_component.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/world/mining_components.dart';
@@ -50,6 +51,27 @@ void main() {
       expect(screenX, inInclusiveRange(0, 360));
       expect(screenY, inInclusiveRange(0, 640));
     }
+  });
+
+  testWidgets('mounted terrain uses the mining world extent contract', (
+    tester,
+  ) async {
+    final game = MiningGame(content: MiningContentRegistry.phaseOne());
+    await pumpMiningGame(tester, game);
+    await tester.pump(const Duration(milliseconds: 100));
+    game.updateTree(0);
+
+    final terrain = game.world.children
+        .whereType<ParallaxTerrainComponent>()
+        .single;
+    final expectedExtent =
+        MiningContentRegistry.terrainGridSize *
+        MiningContentRegistry.terrainCellSize;
+
+    expect(terrain.cellSize, MiningContentRegistry.terrainCellSize);
+    expect(terrain.size, Vector2.all(expectedExtent));
+    expect(terrain.size.x, MiningContentRegistry.worldExtent);
+    expect(terrain.size.y, MiningContentRegistry.worldExtent);
   });
 
   testWidgets('levels one three and five add distinct mounted structure', (

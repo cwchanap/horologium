@@ -39,6 +39,11 @@ void main() {
     final content = MiningContentRegistry.phaseOne();
     expect(MiningContentRegistry.terrainGridSize, 36);
     expect(MiningContentRegistry.terrainCellSize, 50);
+    expect(
+      MiningContentRegistry.terrainGridSize *
+          MiningContentRegistry.terrainCellSize,
+      MiningContentRegistry.worldExtent,
+    );
     expect(MiningContentRegistry.worldExtent, 1800);
     expect(MiningContentRegistry.worldHalfExtent, 900);
 

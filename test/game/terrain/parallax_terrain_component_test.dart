@@ -1,3 +1,6 @@
+import 'dart:ui' as ui;
+
+import 'package:flame/game.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/terrain/parallax_terrain_component.dart';
 import 'package:horologium/game/terrain/parallax_terrain_layer.dart';
@@ -5,9 +8,40 @@ import 'package:horologium/game/terrain/terrain_biome.dart';
 import 'package:horologium/game/terrain/terrain_depth_manager.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('ParallaxTerrainComponent', () {
+    test(
+      'uses the explicit cell size for its loaded extent and debug render',
+      () async {
+        final terrain =
+            ParallaxTerrainComponent(gridSize: 4, cellSize: 32, seed: 1)
+              ..showDebug = true
+              ..showPatchCentersDebug = true
+              ..showEdgeZonesDebug = true;
+        final game = FlameGame();
+        game.onGameResize(Vector2(800, 600));
+        await game.onLoad();
+
+        await game.add(terrain);
+        await game.ready();
+
+        expect(terrain.size, Vector2.all(128));
+        expect(terrain.getAllLayers(), isNotEmpty);
+        expect(
+          terrain.getAllLayers().every(
+            (layer) => layer.size == Vector2.all(128),
+          ),
+          isTrue,
+        );
+
+        final canvas = ui.Canvas(ui.PictureRecorder());
+        expect(() => terrain.render(canvas), returnsNormally);
+      },
+    );
+
     test('getTerrainAt and isBuildableAt reflect injected terrain state', () {
-      final component = ParallaxTerrainComponent(gridSize: 4);
+      final component = ParallaxTerrainComponent(gridSize: 4, cellSize: 50);
 
       component.replaceTerrainDataForTest(<String, TerrainCell>{
         '0,0': const TerrainCell(baseType: TerrainType.grass, elevation: 0.4),
@@ -32,7 +66,7 @@ void main() {
     test(
       'getBiomeDistribution and getTerrainStats compute injected aggregates',
       () {
-        final component = ParallaxTerrainComponent(gridSize: 4);
+        final component = ParallaxTerrainComponent(gridSize: 4, cellSize: 50);
 
         component
           ..replaceTerrainDataForTest(<String, TerrainCell>{
@@ -84,7 +118,7 @@ void main() {
     test('layer and debug toggles propagate to injected layers', () {
       final farLayer = _buildLayer(TerrainDepth.farBackground);
       final foregroundLayer = _buildLayer(TerrainDepth.foreground);
-      final component = ParallaxTerrainComponent(gridSize: 4)
+      final component = ParallaxTerrainComponent(gridSize: 4, cellSize: 50)
         ..replaceLayersForTest(<TerrainDepth, ParallaxTerrainLayer>{
           TerrainDepth.farBackground: farLayer,
           TerrainDepth.foreground: foregroundLayer,
@@ -118,7 +152,11 @@ void main() {
     test(
       'updateTerrainParams replaces generator configuration and creates layers',
       () async {
-        final component = ParallaxTerrainComponent(gridSize: 6, seed: 7);
+        final component = ParallaxTerrainComponent(
+          gridSize: 6,
+          cellSize: 50,
+          seed: 7,
+        );
 
         await component.updateTerrainParams(
           patchSizeBase: 12,
@@ -144,7 +182,11 @@ void main() {
     );
 
     test('loadRegion and shuffleSeed rebuild terrain state', () async {
-      final component = ParallaxTerrainComponent(gridSize: 6, seed: 10);
+      final component = ParallaxTerrainComponent(
+        gridSize: 6,
+        cellSize: 50,
+        seed: 10,
+      );
 
       await component.loadRegion(0, 0, 2, 3);
 

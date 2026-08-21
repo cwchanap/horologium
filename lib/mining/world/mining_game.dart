@@ -40,10 +40,10 @@ class MiningGame extends FlameGame
     final terrain =
         ParallaxTerrainComponent(
             gridSize: MiningContentRegistry.terrainGridSize,
+            cellSize: MiningContentRegistry.terrainCellSize,
             seed: 631,
           )
           ..parallaxEnabled = false
-          ..size = Vector2.all(MiningContentRegistry.worldExtent)
           ..anchor = Anchor.center
           ..position = Vector2.zero();
     world.add(terrain);
