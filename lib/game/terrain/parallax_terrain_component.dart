@@ -2,7 +2,6 @@ import 'package:flame/components.dart';
 import 'package:flame/extensions.dart';
 import 'package:flutter/material.dart';
 
-import '../grid.dart';
 import 'parallax_terrain_layer.dart';
 import 'terrain_biome.dart';
 import 'terrain_depth_manager.dart';
@@ -10,6 +9,7 @@ import 'terrain_generator.dart';
 
 class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   final int gridSize;
+  final double cellSize;
   TerrainGenerator generator;
   final Map<String, TerrainCell> _baseTerrain = {};
   final Map<TerrainDepth, ParallaxTerrainLayer> _parallaxLayers = {};
@@ -25,15 +25,18 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
   bool showPatchCentersDebug = false;
   bool showEdgeZonesDebug = false;
 
-  ParallaxTerrainComponent({required this.gridSize, int? seed})
-    : generator = TerrainGenerator(gridSize: gridSize, seed: seed ?? 42);
+  ParallaxTerrainComponent({
+    required this.gridSize,
+    required this.cellSize,
+    int? seed,
+  }) : generator = TerrainGenerator(gridSize: gridSize, seed: seed ?? 42);
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
 
     // Set component size to match the grid
-    size = Vector2(gridSize * cellWidth, gridSize * cellHeight);
+    size = Vector2.all(gridSize * cellSize);
 
     // Generate base terrain data
     _generateTerrain();
@@ -65,10 +68,10 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
           final metric = generator.computeBorderMetricAt(x, y, centers);
           if (metric < generator.edgeWidth) {
             final rect = Rect.fromLTWH(
-              x * cellWidth,
-              y * cellHeight,
-              cellWidth,
-              cellHeight,
+              x * cellSize,
+              y * cellSize,
+              cellSize,
+              cellSize,
             );
             canvas.drawRect(rect, edgePaint);
           }
@@ -82,8 +85,8 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
         ..color = Colors.pinkAccent
         ..style = PaintingStyle.fill;
       for (final c in centers) {
-        final cx = c.x * cellWidth + cellWidth / 2;
-        final cy = c.y * cellHeight + cellHeight / 2;
+        final cx = c.x * cellSize + cellSize / 2;
+        final cy = c.y * cellSize + cellSize / 2;
         canvas.drawCircle(Offset(cx, cy), 4, centerPaint);
       }
     }
@@ -143,17 +146,14 @@ class ParallaxTerrainComponent extends PositionComponent with HasGameReference {
           depth: depth,
           terrainData: layerTerrain,
           gridSize: gridSize,
-          cellWidth: cellWidth,
-          cellHeight: cellHeight,
+          cellWidth: cellSize,
+          cellHeight: cellSize,
         );
 
         // Match grid & layer rendering: draw from local top-left with Anchor.center.
         // For a center-anchored child to align its (0,0) with the parent's (0,0),
         // set the child local position to size/2 (cancels the anchor shift).
-        parallaxLayer.size = Vector2(
-          gridSize * cellWidth,
-          gridSize * cellHeight,
-        );
+        parallaxLayer.size = Vector2.all(gridSize * cellSize);
         parallaxLayer.anchor = Anchor.center;
         parallaxLayer.position = parallaxLayer.size / 2;
 
