@@ -143,6 +143,7 @@ Use `flutter run` for a native development session and `flutter run -d chrome`
 for a quick browser session. Keep formatting at two spaces with trailing commas
 for multiline Dart literals, and use focused Conventional Commit messages.
 
-Detailed architecture changes belong here. `.windsurf/rules/project.md` is an
-always-on pointer to this file, while `.github/copilot-instructions.md` is a
-thin compatibility shim for surfaces that do not resolve repository symlinks.
+Detailed architecture changes belong here. `AGENTS.md` is a symlink to this
+file for tool compatibility. Retired agent tooling (Speckit, Copilot
+instructions, Windsurf rules) has been removed; this file is the single
+authoritative guidance source.

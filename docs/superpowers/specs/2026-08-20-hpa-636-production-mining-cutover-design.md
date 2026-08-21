@@ -252,6 +252,15 @@ The constitution keeps useful general principles—Flutter/Flame ownership separ
 
 Historical design documents under `docs/` remain historical and are not rewritten.
 
+> **Cutover amendment — agent tooling retirement.** During implementation the
+> team decided to retire Speckit, Copilot instructions, and Windsurf rules
+> entirely rather than maintain thin shims. `.github/copilot-instructions.md`,
+> `.windsurf/rules/project.md`, `.specify/memory/constitution.md`, and the
+> supporting `.github/agents/`, `.github/prompts/`, `.specify/scripts/`, and
+> `.specify/templates/` directories were removed. `CLAUDE.md` (symlinked from
+> `AGENTS.md`) is now the single authoritative guidance source. Acceptance
+> item 11 is satisfied by the single-source layout rather than by thin shims.
+
 ### 7. Keep generic shared runtime under `lib/game/`
 
 Do **not** mechanically move the surviving audio/resource-identity/parallax-terrain files into `lib/mining/` in HPA-636.
@@ -305,8 +314,7 @@ Any additional `lib/game/**`, `lib/pages/**`, or `lib/widgets/**` production fil
 | Terrain still hides a wrong cell size | Require `cellSize` and remove `MiningGame`'s `..size` override |
 | Premature ResourceType slimming breaks city consumers | Slim only after deletion |
 | Future resource silently uses fallback presentation | Remove unreachable offline-return switch defaults after enum slim |
-| Agent guidance drifts again | One detailed CLAUDE source, thin tool-specific shims, separate constitution |
-| Unsupported Copilot instruction indirection | Keep `.github/copilot-instructions.md` concise/self-contained rather than depending on symlink behavior |
+| Agent guidance drifts again | One detailed CLAUDE source; retired tool-specific shims and Speckit constitution entirely (see cutover amendment in §6) |
 | Large deletion misses nested files/dependencies | Grouped deletes + analyze/search + final greps/builds |
 
 ## Non-goals
@@ -334,6 +342,6 @@ HPA-636 is complete when:
 8. terrain cell size is explicit/required and MiningGame does not override the component's computed size;
 9. ResourceType is mining-only after city deletion, offline-return switches are exhaustive, and dead packages are removed;
 10. every retained shared runtime file/package has a concrete mining consumer;
-11. README is a real mining project overview, CLAUDE is the detailed guidance source, tool-specific instruction files are thin, and Speckit governance is mining-first;
+11. README is a real mining project overview, CLAUDE is the single detailed guidance source (symlinked from AGENTS.md), and retired tool-specific shims/Speckit governance are removed rather than maintained as thin forks;
 12. obsolete city code/tests are deleted rather than hidden;
 13. format, analyze, focused mining tests, full surviving tests, debug APK/web builds, dependency greps, and fresh/legacy/existing/malformed save launches pass.
