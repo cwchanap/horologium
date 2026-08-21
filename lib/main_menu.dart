@@ -18,7 +18,7 @@ class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
   late final AnimationController _buttonController;
   late final Animation<double> _titleAnimation;
   late final Animation<double> _buttonAnimation;
-  late final Future<bool> _hasSaveFuture;
+  late Future<bool> _hasSaveFuture;
   bool _reducedMotion = false;
   bool _animationsStarted = false;
 
@@ -260,10 +260,14 @@ class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
     );
   }
 
-  void _openMiningScreen() {
-    Navigator.of(
+  Future<void> _openMiningScreen() async {
+    await Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const MiningScreen()));
+    if (!mounted) return;
+    setState(() {
+      _hasSaveFuture = MiningSaveRepository().hasSave();
+    });
   }
 }
 

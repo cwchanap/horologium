@@ -37,7 +37,9 @@ Future<void> pumpMenu(
   await tester.pumpWidget(
     MaterialApp(
       home: MediaQuery(
-        data: MediaQueryData(disableAnimations: disableAnimations),
+        data: MediaQueryData.fromView(
+          tester.view,
+        ).copyWith(disableAnimations: disableAnimations),
         child: const MainMenu(),
       ),
     ),
@@ -109,6 +111,30 @@ void main() {
     expect(find.byType(MiningScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'refreshes the mining CTA after returning from a newly saved mining route',
+    (tester) async {
+      await pumpMenu(tester, _menuViewports.first);
+
+      await tester.tap(find.text('START MINING'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(MiningScreen), findsOneWidget);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(MiningSaveRepository.saveKey, _validMiningSave);
+
+      final screenContext = tester.element(find.byType(MiningScreen));
+      Navigator.of(screenContext).pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.text('CONTINUE MINING'), findsOneWidget);
+      expect(find.text('START MINING'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('reduced motion settles the launch presentation', (tester) async {
     await pumpMenu(
