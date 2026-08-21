@@ -152,9 +152,6 @@ class OfflineReturnSheet extends StatelessWidget {
         return 'Coal';
       case ResourceType.stone:
         return 'Stone';
-      default:
-        final name = type.name;
-        return '${name[0].toUpperCase()}${name.substring(1)}';
     }
   }
 
@@ -166,8 +163,6 @@ class OfflineReturnSheet extends StatelessWidget {
         return Colors.blueGrey;
       case ResourceType.stone:
         return Colors.grey;
-      default:
-        return Colors.cyanAccent;
     }
   }
 }
