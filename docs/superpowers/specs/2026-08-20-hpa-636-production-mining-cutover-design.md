@@ -4,7 +4,7 @@
 
 Implementation design for Linear HPA-636, **Cut over to the mining-only product**.
 
-This design intentionally delivers the player-facing cutover and legacy retirement in **one PR**. The planning documents are the first commits on that PR; implementation continues on the same branch after the pre-code device gate.
+This cutover intentionally lands in **one PR**. Planning is already on PR #15; implementation continues on the same branch after the HPA-631 real-device gate.
 
 ## Source priority
 
@@ -16,13 +16,13 @@ When requirements differ, use this order:
 4. This task-specific design.
 5. Legacy city documentation only as deletion context.
 
-HPA-631 explicitly locked the first mining save to one strict **unversioned** document at `horologium.mining.save`, and HPA-630 was updated to match. HPA-636's phrase "versioned mining save" is stale wording and does **not** reopen persistence versioning or migration work.
+HPA-631 locked the first mining save to one strict **unversioned** document at `horologium.mining.save`, and HPA-630 was updated to match. HPA-636's older phrase "versioned mining save" does **not** reopen versioning or migration work.
 
 ## Start gate
 
-HPA-631 records **Proceed to cutover** for merged PR #14.
+HPA-631 records **Proceed to cutover**, with one explicit contingency: run a quick real-device portrait visual pass over representative mine tiers/reward presentation **before starting cutover**.
 
-Before changing production routing or deleting city code, run the quick real-device portrait visual pass requested by the HPA-631 conclusion, covering representative mine tiers and reward presentation. If that pass exposes a product-blocking problem, fix or reconsider HPA-631 before continuing the cutover. It does not block planning.
+That remains the production-code gate. Planning/review work can continue before the pass, but Tasks that modify routing, mining presentation, terrain ownership, or delete city code do not start until the pass is recorded. This preserves the authoritative HPA-631 closeout rather than silently weakening it in HPA-636.
 
 ## Goal
 
@@ -30,113 +30,110 @@ Make the validated one-planet mining loop the only player-facing Horologium prod
 
 > Launch → Start Mining or Continue Mining → enter the mining world → reveal, build, accrue, sell, upgrade, pause, resume, and recover without constructing or navigating any city-management system.
 
-The cutover should leave a smaller codebase whose production dependencies match the mining product rather than hiding the old product behind unused routes.
+The end state should be smaller than `main`: one mining product, one mining save, one mutation boundary, and only shared runtime files that have a concrete mining consumer.
 
 ## Current baseline
 
-`main` currently has two products wired together:
+`main` still has both products wired together:
 
-- `lib/main_menu.dart` eagerly loads `Planet` through `SaveService`, initializes `ActivePlanet`, and exposes Start Expedition, Trade, Stellar Map, Research Lab, Settings, and the temporary Mining MVP route.
-- `lib/game/scene_widget.dart` and `lib/game/main_game.dart` still own the old city runtime.
+- `lib/main_menu.dart` eagerly loads `Planet`/`SaveService`/`ActivePlanet`, exposes city routes, and also contains the temporary Mining MVP entry.
+- `MainMenu` continuously repeats the starfield animation and, outside debug mode, three floating-particle animations without consulting `MediaQuery.disableAnimations`.
+- `lib/game/scene_widget.dart` and `lib/game/main_game.dart` own the city runtime.
 - `lib/pages/` and `lib/widgets/` expose city trade/research/resource/quest/building surfaces.
 - `lib/mining/` is already an isolated vertical slice and persists only `horologium.mining.save`.
-- `MiningScreen` already owns mining lifecycle handling and reduced-motion input, and already owns an `AudioManager`, but it never calls `loadPrefs()` or `maybeStartBgm()`.
-- `ParallaxTerrainComponent` is a concrete mining dependency, but it still imports `lib/game/grid.dart` only for the legacy 50px cell constants. That accidental import is the only shared-runtime dependency that must be severed **before** city deletion.
-- `ResourceType` is a concrete mining identity dependency, but its file also contains the obsolete city `Resource`, `ResourceRegistry`, `BakeryProduct`, `KitchenProduct`, and `CropType` types and depends on `ResourceCategory`. Those types are still consumed by live city code, so the file cannot be slimmed safely until those city consumers are deleted.
-- `.specify/memory/constitution.md` still marks `MainGameWidget`, `MainGame`, `BuildingRegistry`, `ResourceRegistry`, city SharedPreferences keys, the one-second resource timer, and the 50×50 city grid as mandatory architecture. Speckit uses this as active planning governance, so it must be amended as part of cutover rather than treated as historical documentation.
+- `MiningScreen` already owns lifecycle forwarding and reduced-motion input, and constructs an `AudioManager`, but never calls `loadPrefs()` or `maybeStartBgm()`.
+- `MiningStatusBar` is a three-metric row; the top HUD also contains the horizontally scrolling mining tabs.
+- `ParallaxTerrainComponent` imports `grid.dart` only for the 50px cell constants.
+- `MiningGame` then overwrites the terrain component size with `MiningContentRegistry.worldExtent`, masking whether the terrain's own cell-size seam is correct.
+- `ResourceType` is used by mining, but the same file still contains city-only registry/product types that cannot be removed until city consumers are deleted.
+- `offline_return_sheet.dart` has fallback/default switch branches that become unreachable once `ResourceType` is reduced to gold/coal/stone.
+- `.specify/memory/constitution.md` still makes the city architecture non-negotiable and therefore must be amended as active governance, not left as history.
+- `README.md` is a stock Flutter stub rather than a city architecture document.
+- `.github/copilot-instructions.md` and `.windsurf/rules/project.md` duplicate large pieces of `CLAUDE.md` and have already drifted.
+- `lib/main.dart` still presents the product title `Horologium - Space Explorer`.
 
 ## Options considered
 
 ### Option A — Mining-owned shell + delete legacy runtime
 
-Rewrite the existing landing screen into a mining-only shell, route its single primary action into `MiningScreen`, complete the missing mining audio/settings behavior, sever the terrain/grid dependency, then delete the city runtime and slim shared resource identity in the same deletion pass.
+Rewrite startup around mining, complete the missing audio/accessibility behavior, sever the terrain/Grid dependency, then delete the city runtime and simplify the resource/dependency surface.
 
-**Pros**
+**Selected.** It deletes more code than it adds and leaves one authoritative architecture.
 
-- Produces one clear product and one dependency graph.
-- Deletes more code than it adds.
-- Keeps the already-validated mining controller/save/simulation unchanged.
-- No feature flag, compatibility layer, state adapter, or second routing system.
-- Easy to prove with imports, widget tests, and full-suite verification.
+### Option B — Route-only cutover with dormant city code
 
-**Cons**
-
-- One PR contains a large deletion diff.
-- Requires updating stale contributor/governance documentation in the same change.
-
-**Decision:** selected.
-
-### Option B — Route-only cutover and leave city code dormant
-
-Make Mining the default but keep the old pages, managers, models, tests, and menu helpers in the repository.
-
-Rejected because HPA-636 explicitly owns legacy retirement. Dormant city code would keep maintenance/test cost and make future work ambiguous about which architecture is authoritative.
+Rejected. HPA-636 explicitly owns retirement; dormant city models/tests would keep the wrong architecture authoritative.
 
 ### Option C — Feature flag / migration / compatibility facade
 
-Add a product-mode flag or startup adapter so city and mining can coexist while saves migrate.
-
-Rejected as YAGNI. There are no production users whose city progress must remain compatible, HPA-636 says legacy keys are ignored rather than converted, and the validated mining save already has its own namespace.
+Rejected as YAGNI. There are no shipped users whose city progress must migrate, and the validated mining save already has its own namespace.
 
 ## Selected design
 
 ### 1. Mining-only landing shell
 
-Keep `lib/main.dart` pointing at `MainMenu`, but rewrite `MainMenu` so it no longer imports or constructs city state.
+Keep `lib/main.dart` pointing at `MainMenu`, but remove all city bootstrap/imports from `MainMenu`.
 
 The landing screen has one primary CTA:
 
 - no `horologium.mining.save` key → **START MINING**;
 - mining save key exists → **CONTINUE MINING**.
 
-Both actions open `MiningScreen`; the controller remains responsible for creating fresh progress, restoring valid progress, applying offline accrual, and recovering malformed saves.
+Both actions open `MiningScreen`. Add `MiningSaveRepository.hasSave()` as a presence-only query using `MiningSaveRepository.saveKey`; it must not parse JSON. Therefore a malformed mining save still displays CONTINUE MINING and then enters the existing recovery path in `MiningScreen`, where decoding already belongs.
 
-Add a small `MiningSaveRepository.hasSave()` query so the landing screen does not duplicate the save key or inspect JSON. This query checks mining-save presence only. Legacy city SharedPreferences keys never influence the label or startup path.
+Legacy city SharedPreferences keys do not influence the label, do not migrate, and are not eagerly deleted.
 
-The current one-planet MVP has exactly one mining world. Revealed sectors, mines, cargo, cash, and accrual time are already persisted, so "resume the last active mining location" means re-entering that same mining world with restored location progress. Do not add camera position, selected-sector state, planet identity, or a schema field solely for this ticket.
+The current MVP has one mining world. Revealed sectors, mines, cargo, cash, and accrual time already restore the meaningful location/progress state. Do not add camera position, selected-sector state, planet identity, or save-version fields solely for this ticket.
 
-Remove Start Expedition, Trade, Stellar Map, Research Lab, the temporary Mining MVP label, and placeholder city Settings routing. Product copy becomes mining-focused. Existing starfield/theme presentation may remain when it has no city dependency.
+Remove Start Expedition, Trade, Stellar Map, Research Lab, the temporary Mining MVP label, and city Settings routing. Update the application title/copy in `lib/main.dart` and `MainMenu` to the mining product.
 
-### 2. Mining-owned settings, audio, and accessibility
+#### Launch-screen reduced motion
 
-Keep `AudioManager` and `background_music_player.dart`; mining becomes their concrete production consumer.
+`MainMenu` becomes the first screen of the only product, so the system reduced-motion contract must cover it too.
 
-The current city path loads audio preferences and starts BGM after the first user gesture. The mining path must preserve both behaviors; a settings sheet alone is insufficient because players who never open Settings would otherwise receive silence.
+Keep `MediaQuery.disableAnimations` as the single source of truth. Do not add a preference.
 
-Add one optional `AudioManager` constructor dependency to `MiningScreen`, alongside the existing optional content/repository/clock seams:
+When reduced motion is enabled:
+
+- do not repeat the starfield controller;
+- render a stable starfield frame;
+- do not render/repeat floating particles;
+- present title/CTA in their settled state instead of running entrance movement.
+
+When reduced motion is disabled, preserve the existing lightweight starfield/title/button presentation.
+
+Tests should prove the decorative state remains stable across pumps under `disableAnimations: true`, rather than merely asserting no overflow.
+
+### 2. Mining-owned settings and audio
+
+Keep the existing `AudioManager` and `BackgroundMusicPlayer` path. Mining becomes their production consumer after city deletion.
+
+Add one optional dependency to the existing `MiningScreen` test seam:
 
 ```dart
-class MiningScreen extends StatefulWidget {
-  const MiningScreen({
-    super.key,
-    this.content,
-    this.repository,
-    this.nowUtc,
-    this.audioManager,
-  });
-
-  final MiningContentRegistry? content;
-  final MiningSaveRepository? repository;
-  final DateTime Function()? nowUtc;
-  final AudioManager? audioManager;
-}
+MiningScreen(
+  content: ...,
+  repository: ...,
+  nowUtc: ...,
+  audioManager: ...,
+)
 ```
 
-`_MiningScreenState` uses the injected manager when present and otherwise constructs the existing production `AudioManager`. Do not add another singleton or a settings service.
+Production constructs `AudioManager()` when none is supplied.
 
-During `_initialize()`, call `loadPrefs()` before presenting settings state. Keep the existing lifecycle forwarding and dispose behavior.
+During `_initialize()`, call `loadPrefs()` before exposing settings state. Preserve the current lifecycle forwarding and dispose behavior.
 
 Call `maybeStartBgm()` only from existing user gestures:
 
-- sector/tab selection (`_selectSector`);
-- primary mining action (`_onPrimaryAction`);
+- sector/tab selection;
+- primary mining action;
 - opening Settings.
 
-Do not add an app-wide `onUserInteracted` callback, autoplay timer, global gesture listener, or second audio owner.
+Do not add `onUserInteracted`, a global pointer listener, polling, autoplay at initialization, another audio singleton, or a settings service.
 
-For tests, move the existing `FakeBackgroundMusicPlayer` implementation from `test/game/audio_manager_test.dart` into one shared test fixture such as `test/support/fake_background_music_player.dart`. Both `audio_manager_test.dart` and `mining_screen_test.dart` should use that same fake. `MiningScreen` tests instantiate the real `AudioManager(backgroundMusicPlayer: fake)` and inject it, proving the production wiring rather than mocking settings behavior.
+Move the existing rich `FakeBackgroundMusicPlayer` from `test/game/audio_manager_test.dart` into shared test support and reuse it from both audio-manager and mining-screen tests. Tests should inject the **real** `AudioManager(backgroundMusicPlayer: fake)`.
 
-Create one small mining presentation sheet for:
+Create one small `MiningSettingsSheet` with:
 
 ```text
 Audio
@@ -147,17 +144,29 @@ Accessibility
   Reduced motion follows system setting
 ```
 
-The sheet owns presentation only and uses the injected/owned `AudioManager`; audio preferences stay in the existing `audio.musicEnabled` / `audio.musicVolume` SharedPreferences keys and do not enter the mining save.
-
-Reduced motion remains driven by `MediaQuery.disableAnimations`, exactly as validated in HPA-631. Do not add a second reduced-motion preference.
+Lift/reuse the existing switch/slider interaction pattern from the city hamburger menu where useful; do not reuse the city-coupled widget itself. Audio prefs remain in `audio.musicEnabled` / `audio.musicVolume`, not the mining save.
 
 #### Settings placement
 
-Do **not** add the settings icon to `MiningStatusBar`. That bar is already three `Expanded` metrics, and adding another child would consume the narrow 360px width.
+Keep `MiningStatusBar` metrics-only, but do **not** place an independently positioned button on top of the existing top HUD. A sibling `Positioned` overlay can visually overlap the status bar or tab strip without causing a Flutter overflow, so an overflow-only test would not protect the layout.
 
-Add a separate `Positioned` + `SafeArea` settings control in `MiningScreen` as a sibling overlay to the status area. It opens `showModalBottomSheet`, matching the existing `OfflineReturnSheet` navigation pattern. `MiningStatusBar` remains metrics-only.
+Instead, add the settings control **below the tab strip in the same top HUD layout flow**, aligned to the right so it floats over otherwise free game-world space. Give the tab strip a stable key such as `mining-sector-tabs` and the button `mining-settings-button`.
 
-The 360×640 and 430×932 widget tests must prove the settings control and status metrics coexist without overflow.
+At both 360×640 and 430×932, assert geometry explicitly:
+
+```dart
+final button = tester.getRect(find.byKey(const Key('mining-settings-button')));
+expect(
+  button.overlaps(tester.getRect(find.byKey(const Key('mining-status-bar')))),
+  isFalse,
+);
+expect(
+  button.overlaps(tester.getRect(find.byKey(const Key('mining-sector-tabs')))),
+  isFalse,
+);
+```
+
+Also keep normal overflow/uncaught-exception checks. The geometry assertion is the proof that can actually fail if placement regresses.
 
 ### 3. Preserve the mining save contract
 
@@ -169,87 +178,89 @@ lastAccruedAtUtc
 sectors
 ```
 
-No version field, migration, legacy-city import, compensation, backup rotation, active-camera field, or speculative future keys.
+No version, migration, legacy-city import, compensation, backup rotation, active-camera field, or speculative future keys.
 
-Fresh installs and installs containing only legacy city keys both receive `MiningSave.initial(...)`. Existing mining saves continue through the HPA-631 decode/recovery behavior.
+Fresh installs and legacy-only installs both create `MiningSave.initial(...)`; existing mining saves retain the HPA-631 decode/offline/recovery behavior.
 
 ### 4. Sever the actual pre-deletion blocker: terrain → Grid
 
-`ParallaxTerrainComponent` should accept the cell size it renders instead of importing `grid.dart`.
+`ParallaxTerrainComponent` must accept the cell size it renders instead of importing `grid.dart`.
 
-Use one constructor value with the existing 50px behavior as the default, and have `MiningGame` pass `MiningContentRegistry.terrainCellSize`. `ParallaxTerrainLayer` already accepts `cellWidth` and `cellHeight`, so no new terrain abstraction is needed.
+Make the value required:
 
-Use the explicit cell size for:
+```dart
+ParallaxTerrainComponent({
+  required int gridSize,
+  required double cellSize,
+  int? seed,
+})
+```
 
-- component dimensions;
-- debug cell rectangles/centers;
-- child `ParallaxTerrainLayer` dimensions.
+There is no useful post-cutover default: mining has one production caller and already owns `MiningContentRegistry.terrainCellSize`. Requiring it avoids silently re-embedding the deleted city constant as a fallback.
 
-Retain only terrain files transitively used by mining:
+Use `cellSize` for component size, debug cell rectangles/centers, and child `ParallaxTerrainLayer` width/height.
 
-- `parallax_terrain_component.dart`
-- `parallax_terrain_layer.dart`
-- `terrain_assets.dart`
-- `terrain_biome.dart`
-- `terrain_depth_manager.dart`
-- `terrain_generator.dart`
+`MiningGame` passes both:
 
-Delete the old non-parallax grid/terrain presentation files when no mining import remains.
+```dart
+gridSize: MiningContentRegistry.terrainGridSize,
+cellSize: MiningContentRegistry.terrainCellSize,
+```
 
-Do **not** slim `ResourceType` in this pre-deletion step. Its city-side companion types are still referenced until the city consumers disappear.
+and removes the current redundant:
 
-### 5. Delete city runtime, then slim the shared resource identity in the same pass
+```dart
+..size = Vector2.all(MiningContentRegistry.worldExtent)
+```
 
-Delete production code with no concrete mining consumer, including:
+The terrain component should own its own rendered extent; `MiningGame`/content tests then verify the contract `terrainGridSize * terrainCellSize == worldExtent` instead of masking a bad cell-size seam.
 
-- city buildings, categories, free-form placement, grid, managers, and scene runtime;
-- `Planet`, `ActivePlanet`, legacy placed-building persistence, and `SaveService`;
-- city resource containers/services and buying/trade behavior;
-- research, quests, achievements, production-chain analysis, and their overlays;
-- city pages and building/resource/quest cards;
-- planet switcher and city dialogs/controls;
-- legacy terrain components/layers used only by the city grid.
+Do not introduce a terrain config object/framework.
 
-Delete the corresponding tests with each retired production group. Treat path lists as a starting set rather than an exhaustive allowlist: static analysis and searches must also catch nested city suites such as `test/game/quests/**` that do not live under `test/quests/**`.
+### 5. Delete the city runtime, then simplify resource identity/dependencies
 
-Only **after** the city consumers are gone, simplify `lib/game/resources/resource_type.dart` to the mining identity surface:
+Delete city production code and tests in coherent groups. Path lists are discovery seeds; analysis/search owns closure.
+
+Remove city buildings/grid/managers/planet/save services, pages/widgets, quests/achievements/research/production-chain code, city resource containers, and obsolete non-parallax terrain files.
+
+Only **after** those consumers are gone, simplify:
 
 ```dart
 enum ResourceType { gold, coal, stone }
 ```
 
-Delete `Resource`, `ResourceRegistry`, `BakeryProduct`, `KitchenProduct`, `CropType`, `resource_category.dart`, `resource_cost.dart`, and `resources.dart` in that same deletion pass. Do not create `MiningResourceType` or move the identity file in HPA-636.
+and remove `Resource`, `ResourceRegistry`, `BakeryProduct`, `KitchenProduct`, `CropType`, `ResourceCategory`, resource costs, and the old city resource container.
 
-After their only city consumers are deleted, remove these package dependencies from `pubspec.yaml` and regenerate `pubspec.lock`:
+In the same pass update `lib/mining/presentation/offline_return_sheet.dart`: remove the two now-unreachable `default:` branches in the resource name/color switches. With an exhaustive enum switch, a future fourth mining resource should become a compile/analyzer obligation instead of silently taking a generic fallback.
 
-- `uuid` — consumed by legacy building/placed-building identity;
-- `flame_audio` — consumed by legacy `MainGame`.
+After their only consumers disappear, remove `uuid` and `flame_audio` from `pubspec.yaml` and regenerate `pubspec.lock`. Keep `audioplayers` for mining audio.
 
-Keep `audioplayers`, which backs the retained `AudioManager`/`BackgroundMusicPlayer` path.
+Unused binary city assets remain out of scope unless a declaration/build failure requires cleanup.
 
-Do not keep compatibility shims or dead feature flags to make deleted tests compile.
+### 6. Active guidance becomes mining-first without four architecture forks
 
-Unused city image assets are **not** part of this cutover unless an asset declaration or build failure requires cleanup. They are not player-facing runtime dependencies, and a large binary-asset purge would add review noise without improving the product cutover.
+Use distinct files for distinct jobs:
 
-### 6. Active guidance and planning governance become mining-first
+- `README.md` — player/developer-facing project overview, current mining loop, basic commands, local command/symlink note. Replace the stock Flutter stub; do not turn README into a second architecture manual.
+- `CLAUDE.md` — authoritative detailed repository architecture/workflow guidance.
+- `AGENTS.md` — keep the existing link to `CLAUDE.md`; no separate copy.
+- `.windsurf/rules/project.md` — keep only its `always_on` frontmatter plus a short instruction to read/follow `../../CLAUDE.md`; remove the duplicated architecture body.
+- `.github/copilot-instructions.md` — reduce to a concise, self-contained compatibility shim with the few repository-wide rules Copilot surfaces need, and point readers to `../CLAUDE.md` for detail. Do **not** rely on an undocumented symlink behavior for this special GitHub path.
+- `.specify/memory/constitution.md` — authoritative Speckit governance; amend 1.0.0 → 2.0.0 because the non-negotiable architecture changes.
 
-Update the active repository guidance that currently describes the city architecture:
+The constitution keeps useful general principles—Flutter/Flame ownership separation, deterministic tests, asset discipline, quality gates—while replacing mandatory city registries/key layouts/grid/timers with the mining ownership boundary and strict unversioned mining save.
 
-- `README.md`
-- `CLAUDE.md`
-- `.github/copilot-instructions.md`
-- `.windsurf/rules/project.md`
-- `.specify/memory/constitution.md`
+Historical design documents under `docs/` remain historical and are not rewritten.
 
-`AGENTS.md` is a symlink to `CLAUDE.md`, so changing `CLAUDE.md` is sufficient for that pair; do not create a separate divergent copy.
+### 7. Keep generic shared runtime under `lib/game/`
 
-The Speckit constitution is active governance, not a historical design document. Amend it from the city-specific 1.0.0 contract to a mining-first contract and bump the major version because the non-negotiable architecture principles are intentionally changing. The new constitution should preserve useful general rules—Flutter/Flame separation, deterministic tests, asset discipline, quality gates—while replacing mandatory `MainGameWidget`/`MainGame`, city registries, city key patterns, one-second economy ticks, and 50×50 placement-grid rules with the current mining ownership boundary and strict mining save.
+Do **not** mechanically move the surviving audio/resource-identity/parallax-terrain files into `lib/mining/` in HPA-636.
 
-Historical design documents under `docs/` remain historical and should not be rewritten.
+`lib/game/` is a generic runtime namespace, not intrinsically a city namespace. After deletion it contains only shared game infrastructure with concrete mining consumers. Moving those files would add import churn while making reusable audio/terrain infrastructure look mining-owned.
+
+A future move should be driven by a concrete ownership problem, not by the fact that city code once lived nearby.
 
 ## Post-cutover production boundary
-
-### Keep / modify
 
 ```text
 lib/main.dart
@@ -267,63 +278,62 @@ lib/game/terrain/terrain_depth_manager.dart
 lib/game/terrain/terrain_generator.dart
 ```
 
-Any additional `lib/game/**`, `lib/pages/**`, or `lib/widgets/**` production file must justify itself with a direct mining consumer before it is retained.
+Any additional `lib/game/**`, `lib/pages/**`, or `lib/widgets/**` production file needs a direct surviving consumer or should be deleted.
 
 ## Testing strategy
 
-Use deletion-oriented tests rather than preserving city coverage:
-
-- rewrite `test/main_menu_test.dart` around START/CONTINUE mining and the absence of city actions;
-- keep the global error-handler portion of `test/widget_test.dart`, but change its product smoke assertions to mining copy;
-- extend `test/mining/mining_save_repository_test.dart` for save-presence detection and legacy-only preference isolation;
-- move the existing fake BGM adapter to a shared test fixture and use it from both retained audio-manager tests and `mining_screen_test.dart`;
-- extend `test/mining/presentation/mining_screen_test.dart` to prove preference loading, first-gesture BGM start, settings controls, lifecycle behavior, reduced motion, and the independent settings-overlay layout;
-- update parallax terrain tests for the explicit cell-size seam;
-- keep the existing mining unit/world/integration journey coverage;
-- delete tests whose only subject is retired city code;
-- run analysis and import/text searches after each deletion group so nested city tests or dependencies are not missed;
-- run final dependency checks after `uuid`/`flame_audio` removal.
-
-The full suite should get substantially smaller; retaining a city test by retaining city production code is not a goal.
+- Rewrite `test/main_menu_test.dart` around START/CONTINUE, absence of city actions, both portrait sizes, and `MediaQuery.disableAnimations` on the launch presentation.
+- Keep global error-handler coverage in `test/widget_test.dart`, but update product assertions.
+- Extend `mining_save_repository_test.dart` for presence-only detection and legacy-only isolation.
+- Move/reuse the existing fake BGM player and extend `mining_screen_test.dart` for preference load, first-gesture BGM, settings controls, lifecycle, reduced motion, and explicit non-overlap geometry.
+- Make terrain cell size required and test both the component seam and the MiningGame integration without a size override.
+- Keep mining unit/world/integration journey coverage.
+- Delete tests with retired city production code.
+- After ResourceType slimming, make offline-return switches exhaustive.
+- Run analyze/search after each deletion group and finish with dependency/import greps.
 
 ## Risks and mitigations
 
 | Risk | Mitigation / proof |
 | --- | --- |
-| Cutover starts despite a bad real-device MVP visual | Perform the HPA-631 tier/reward visual gate before code changes |
-| Legacy city data affects fresh mining startup | `hasSave()` and `load()` inspect only `horologium.mining.save`; dedicated legacy-only test |
-| Existing HPA-631 mining saves reset | Do not change the strict save payload or decoder |
-| Music silently disappears when the city scene is deleted | Inject the existing `AudioManager`, load prefs in mining initialization, and call `maybeStartBgm()` from existing mining/settings gestures |
-| Settings crowds the narrow status row | Keep `MiningStatusBar` metrics-only and use a separate Positioned/SafeArea settings control; test 360×640 |
-| Deletion is blocked by hidden Grid imports | Remove only the parallax terrain → `grid.dart` dependency before city deletion |
-| Premature ResourceType slimming breaks city consumers | Slim the identity file only inside the city deletion pass after consumers are gone |
-| Speckit regenerates city-first plans after cutover | Amend `.specify/memory/constitution.md` in the active guidance pass |
-| Unused packages remain after city deletion | Remove `uuid` and `flame_audio`, regenerate lockfile, run analyze/build |
-| Large deletion hides accidental missing imports | Delete in coherent groups, run analyze/tests/searches after each group, finish with dependency greps |
+| Cutover starts before the one unresolved HPA-631 visual acceptance item | Keep the explicit HPA-631 pre-code device gate |
+| Legacy data changes menu/startup semantics | Presence-only mining key tests; no city import/delete |
+| Existing mining saves reset | Save payload/decoder unchanged |
+| MainMenu violates the product reduced-motion promise | Gate continuous/decorative launch animation on `MediaQuery.disableAnimations` and test stability |
+| Mining loses BGM after city deletion | Load prefs and reuse existing user gestures for `maybeStartBgm()` |
+| Settings overlaps HUD while overflow tests stay green | Put the control below tabs in layout flow and assert rectangle non-overlap |
+| Terrain still hides a wrong cell size | Require `cellSize` and remove `MiningGame`'s `..size` override |
+| Premature ResourceType slimming breaks city consumers | Slim only after deletion |
+| Future resource silently uses fallback presentation | Remove unreachable offline-return switch defaults after enum slim |
+| Agent guidance drifts again | One detailed CLAUDE source, thin tool-specific shims, separate constitution |
+| Unsupported Copilot instruction indirection | Keep `.github/copilot-instructions.md` concise/self-contained rather than depending on symlink behavior |
+| Large deletion misses nested files/dependencies | Grouped deletes + analyze/search + final greps/builds |
 
 ## Non-goals
 
-- Technology or new research.
-- Stellar Map or a second planet.
-- Processing, dynamic trading, retention systems, monetization, or cloud save.
-- Legacy city save conversion or compensation.
-- Mining save versioning or migration.
-- New state-management, routing, persistence, settings, audio, or camera frameworks.
-- Asset-library cleanup that is not required by the production cutover.
-- Redesigning or rebalance-tuning the validated HPA-631 first-planet loop.
+- Technology/research or Lunar Frontier work.
+- Processing, dynamic trading, retention, monetization, or cloud save.
+- City-save migration/compensation.
+- Mining save versioning/migration.
+- New state-management, router, settings, audio, persistence, or terrain frameworks.
+- Asset-library cleanup not required for cutover.
+- Moving generic shared runtime files merely to erase the `lib/game/` directory name.
+- Rebalancing/redesigning the validated HPA-631 mining economy.
 
 ## Acceptance mapping
 
 HPA-636 is complete when:
 
-1. fresh and legacy-only installs show START MINING and enter clean mining progress;
-2. an existing mining save shows CONTINUE MINING and restores the validated state/offline behavior;
-3. no normal navigation exposes city gameplay;
-4. startup/lifecycle code does not construct `Planet`, `Resources`, `Building`, city managers, or `SaveService`;
-5. audio preferences load in mining, BGM can start on the first existing user gesture, settings are reachable without crowding the status bar, and reduced motion still follows the system setting;
-6. `ParallaxTerrainComponent` has no dependency on city `Grid`;
-7. the retained `ResourceType` surface is mining-only after city consumers are removed;
-8. every retained shared runtime file and package dependency has a concrete mining consumer;
-9. active contributor guidance **and Speckit governance** are mining-first;
-10. obsolete city code/tests are removed rather than hidden;
-11. format, analyze, mining integration coverage, full tests, debug APK/web builds, and the three save-presence launch scenarios pass.
+1. the HPA-631 physical-device visual gate is recorded before production cutover implementation begins;
+2. fresh and legacy-only installs show START MINING and enter clean mining progress;
+3. an existing mining key shows CONTINUE MINING, including malformed-save presence, with decode/recovery still owned by `MiningScreen`;
+4. no normal navigation exposes city gameplay and startup constructs no city state;
+5. MainMenu and MiningScreen both honor system reduced motion;
+6. mining audio/settings remain reachable and first-gesture BGM works without autoplay machinery;
+7. the settings control has tested non-overlap with status/tabs at 360×640 and 430×932;
+8. terrain cell size is explicit/required and MiningGame does not override the component's computed size;
+9. ResourceType is mining-only after city deletion, offline-return switches are exhaustive, and dead packages are removed;
+10. every retained shared runtime file/package has a concrete mining consumer;
+11. README is a real mining project overview, CLAUDE is the detailed guidance source, tool-specific instruction files are thin, and Speckit governance is mining-first;
+12. obsolete city code/tests are deleted rather than hidden;
+13. format, analyze, focused mining tests, full surviving tests, debug APK/web builds, dependency greps, and fresh/legacy/existing/malformed save launches pass.
