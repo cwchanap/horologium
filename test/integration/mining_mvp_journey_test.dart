@@ -350,6 +350,10 @@ Future<void> verifyOfflineAccrualIsCappedAtEightHours({
 }
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets(
     'completes the first-session loop and restores capped offline production',
     (tester) async {
@@ -359,7 +363,6 @@ void main() {
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();
       });
-      SharedPreferences.setMockInitialValues({});
 
       await pumpProductionEntryThenRetireIt(tester);
 
