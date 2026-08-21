@@ -12,13 +12,13 @@ void main() {
 
   group('ParallaxTerrainComponent', () {
     test(
-      'uses the explicit cell size for its loaded extent and debug render',
+      'uses cell size for observable debug centers and edge rectangles',
       () async {
-        final terrain =
-            ParallaxTerrainComponent(gridSize: 4, cellSize: 32, seed: 1)
-              ..showDebug = true
-              ..showPatchCentersDebug = true
-              ..showEdgeZonesDebug = true;
+        final terrain = ParallaxTerrainComponent(
+          gridSize: 4,
+          cellSize: 32,
+          seed: 1,
+        );
         final game = FlameGame();
         game.onGameResize(Vector2(800, 600));
         await game.onLoad();
@@ -35,8 +35,52 @@ void main() {
           isTrue,
         );
 
-        final canvas = ui.Canvas(ui.PictureRecorder());
-        expect(() => terrain.render(canvas), returnsNormally);
+        // Use a smaller patch size so the deterministic generator exposes
+        // edge cells as well as patch centers in this 4x32 world.
+        await terrain.updateTerrainParams(patchSizeBase: 2, patchJitter: 0);
+        final centers = terrain.generator.getPatchCentersForBounds(0, 0, 3, 3);
+        expect(centers, isNotEmpty);
+
+        terrain.showPatchCentersDebug = true;
+        final centerImage = await _renderTerrain(terrain);
+        addTearDown(centerImage.dispose);
+        const expectedCellSize = 32;
+        final center = centers.first;
+        final centerX = center.x * expectedCellSize + expectedCellSize ~/ 2;
+        final centerY = center.y * expectedCellSize + expectedCellSize ~/ 2;
+        expect(
+          await _rgbaAt(centerImage, centerX, centerY),
+          [255, 64, 129, 255],
+          reason:
+              'patch center must be drawn at cellSize spacing; fixed 50-unit '
+              'centers would miss this 4x32 pixel',
+        );
+
+        final edgeCells = [
+          for (var x = 1; x < 4; x++)
+            for (var y = 1; y < 4; y++)
+              if (terrain.generator.computeBorderMetricAt(x, y, centers) <
+                      terrain.generator.edgeWidth &&
+                  !centers.any((center) => center.x == x && center.y == y))
+                (x, y),
+        ];
+        expect(edgeCells, isNotEmpty);
+        final edgeCell = edgeCells.first;
+        terrain.showPatchCentersDebug = false;
+        final withoutEdges = await _renderTerrain(terrain);
+        addTearDown(withoutEdges.dispose);
+        terrain.showEdgeZonesDebug = true;
+        final withEdges = await _renderTerrain(terrain);
+        addTearDown(withEdges.dispose);
+        final edgeX = edgeCell.$1 * expectedCellSize + expectedCellSize ~/ 2;
+        final edgeY = edgeCell.$2 * expectedCellSize + expectedCellSize ~/ 2;
+        expect(
+          await _rgbaAt(withEdges, edgeX, edgeY),
+          isNot(await _rgbaAt(withoutEdges, edgeX, edgeY)),
+          reason:
+              'edge rectangle must cover the cell at cellSize spacing; fixed '
+              '50-unit rectangles would start past this 4x32 cell',
+        );
       },
     );
 
@@ -210,4 +254,27 @@ ParallaxTerrainLayer _buildLayer(TerrainDepth depth) {
     cellWidth: 50,
     cellHeight: 50,
   );
+}
+
+Future<ui.Image> _renderTerrain(ParallaxTerrainComponent terrain) async {
+  final recorder = ui.PictureRecorder();
+  terrain.render(ui.Canvas(recorder));
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(128, 128);
+  picture.dispose();
+  return image;
+}
+
+Future<List<int>> _rgbaAt(ui.Image image, int x, int y) async {
+  final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+  if (data == null) {
+    throw StateError('Could not read rendered debug pixel');
+  }
+  final offset = (y * image.width + x) * 4;
+  return <int>[
+    data.getUint8(offset),
+    data.getUint8(offset + 1),
+    data.getUint8(offset + 2),
+    data.getUint8(offset + 3),
+  ];
 }
