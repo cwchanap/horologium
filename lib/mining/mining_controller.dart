@@ -62,6 +62,13 @@ class MiningController {
     if (accrued.summary.totalProduced > 0) {
       _pendingReturnSummary = accrued.summary;
     }
+    // Persist the freshly constructed initial or recovered state so a quick
+    // enter-and-back does not race the menu's save-presence check against the
+    // unawaited dispose checkpoint. Existing valid saves are not rewritten
+    // here; they persist through gameplay mutations and lifecycle checkpoints.
+    if (loaded.wasMissing || loaded.recoveredFromInvalidSave) {
+      await repository.save(_state);
+    }
   }
 
   AccrualResult refresh() {

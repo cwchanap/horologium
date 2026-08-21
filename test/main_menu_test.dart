@@ -113,7 +113,7 @@ void main() {
   });
 
   testWidgets(
-    'refreshes the mining CTA after returning from a newly saved mining route',
+    'fresh start then back shows CONTINUE after init persists the save',
     (tester) async {
       await pumpMenu(tester, _menuViewports.first);
 
@@ -122,9 +122,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.byType(MiningScreen), findsOneWidget);
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(MiningSaveRepository.saveKey, _validMiningSave);
-
+      // Pop without performing any action. MiningController.initialize()
+      // persists the freshly constructed initial state, so the save key
+      // exists before the menu rechecks hasSave().
       final screenContext = tester.element(find.byType(MiningScreen));
       Navigator.of(screenContext).pop();
       await tester.pump();

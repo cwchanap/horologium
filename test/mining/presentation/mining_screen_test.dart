@@ -417,6 +417,10 @@ void main() {
     tester,
   ) async {
     final repository = DelayedMiningSaveRepository();
+    // Seed so initialize() loads an existing key and does not persist; the
+    // first repository.save() must be the build mutation, which gates on
+    // allowSave.
+    await MiningSaveRepository().save(MiningSave.initial(nowUtc: _now));
     await pumpMiningScreen(tester, _viewports.first, repository: repository);
 
     await tester.tap(find.byKey(const Key('mining-sector-landingBasin')));
@@ -442,6 +446,10 @@ void main() {
     tester,
   ) async {
     final repository = DelayedMiningSaveRepository();
+    // Seed so initialize() loads an existing key and does not persist; the
+    // first repository.save() must be the build mutation, which gates on
+    // allowSave.
+    await MiningSaveRepository().save(MiningSave.initial(nowUtc: _now));
     await pushMiningScreen(
       tester,
       _viewports.first,
@@ -693,6 +701,10 @@ void main() {
     'tabs change during the save',
     (tester) async {
       final repository = DelayedMiningSaveRepository();
+      // Seed so initialize() loads an existing key and does not persist;
+      // the first repository.save() must be the build mutation, which
+      // gates on allowSave.
+      await MiningSaveRepository().save(MiningSave.initial(nowUtc: _now));
       await pumpMiningScreen(
         tester,
         _viewports.first,
@@ -853,6 +865,10 @@ void main() {
     'pause checkpoint swallows storage failure as a best-effort save',
     (tester) async {
       final repository = FailingMiningSaveRepository();
+      // Seed so initialize() loads an existing key and does not persist
+      // through the failing repository; only the lifecycle checkpoint
+      // exercises the failing save path.
+      await MiningSaveRepository().save(MiningSave.initial(nowUtc: _now));
       await pumpMiningScreen(tester, _viewports.first, repository: repository);
 
       // Trigger a lifecycle pause — checkpoint() calls save(), which the
@@ -869,6 +885,10 @@ void main() {
     'dispose checkpoint swallows storage failure as a best-effort save',
     (tester) async {
       final repository = FailingMiningSaveRepository();
+      // Seed so initialize() loads an existing key and does not persist
+      // through the failing repository; only the dispose checkpoint
+      // exercises the failing save path.
+      await MiningSaveRepository().save(MiningSave.initial(nowUtc: _now));
       await pumpMiningScreen(tester, _viewports.first, repository: repository);
 
       // Unmount the MiningScreen to trigger dispose(), which checkpoints
