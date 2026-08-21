@@ -55,6 +55,7 @@ void main() {
       final result = await MiningSaveRepository().load(nowUtc: now);
       expect(result.state.cash, 100);
       expect(result.recoveredFromInvalidSave, isFalse);
+      expect(result.wasMissing, isTrue);
     });
 
     test('round trips the exact first-planet document', () async {
@@ -63,6 +64,7 @@ void main() {
       await repository.save(state);
       final loaded = await repository.load(nowUtc: now);
       expect(loaded.state.toJson(), state.toJson());
+      expect(loaded.wasMissing, isFalse);
     });
 
     test('malformed JSON resets and reports recovery', () async {
@@ -70,6 +72,7 @@ void main() {
       final result = await MiningSaveRepository().load(nowUtc: now);
       expect(result.state.cash, 100);
       expect(result.recoveredFromInvalidSave, isTrue);
+      expect(result.wasMissing, isFalse);
     });
 
     test('legacy city keys are ignored', () async {
@@ -81,6 +84,7 @@ void main() {
       final result = await MiningSaveRepository().load(nowUtc: now);
       expect(result.state.cash, 100);
       expect(result.state.sectors[MiningSectorId.landingBasin]!.mine, isNull);
+      expect(result.wasMissing, isTrue);
     });
 
     test(

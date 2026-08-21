@@ -9,9 +9,16 @@ class MiningLoadResult {
   const MiningLoadResult({
     required this.state,
     required this.recoveredFromInvalidSave,
+    required this.wasMissing,
   });
   final MiningSave state;
   final bool recoveredFromInvalidSave;
+
+  /// True when no mining save key existed in preferences. The controller uses
+  /// this to persist the freshly constructed initial state during
+  /// initialization so a quick enter-and-back does not race the menu's
+  /// save-presence check against the unawaited dispose checkpoint.
+  final bool wasMissing;
 }
 
 bool hasExactKeys(Map<String, Object?> map, Set<String> expected) =>
@@ -38,6 +45,7 @@ class MiningSaveRepository {
       return MiningLoadResult(
         state: MiningSave.initial(nowUtc: nowUtc),
         recoveredFromInvalidSave: false,
+        wasMissing: true,
       );
     }
 
@@ -45,11 +53,13 @@ class MiningSaveRepository {
       return MiningLoadResult(
         state: _decode(jsonDecode(raw)),
         recoveredFromInvalidSave: false,
+        wasMissing: false,
       );
     } catch (_) {
       return MiningLoadResult(
         state: MiningSave.initial(nowUtc: nowUtc),
         recoveredFromInvalidSave: true,
+        wasMissing: false,
       );
     }
   }

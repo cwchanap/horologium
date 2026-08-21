@@ -87,9 +87,12 @@ void main() {
     MiningSaveRepository repository, {
     MiningSave? seed,
   }) async {
-    if (seed != null) {
-      await MiningSaveRepository().save(seed);
-    }
+    // Always seed so initialize() loads an existing key and does not persist.
+    // Tests that use delayed/failing repos rely on the first repository.save()
+    // being the first mutation, not the init persistence.
+    await MiningSaveRepository().save(
+      seed ?? MiningSave.initial(nowUtc: clock.now),
+    );
     final seededController = MiningController(
       content: MiningContentRegistry.phaseOne(),
       repository: repository,
@@ -342,6 +345,12 @@ void main() {
       () async {
         SharedPreferences.setMockInitialValues({});
         final repository = DelayedMiningSaveRepository();
+        // Seed so initialize() loads an existing key and does not persist;
+        // the first repository.save() must be the build mutation, which
+        // gates on allowFirstSave.
+        await MiningSaveRepository().save(
+          MiningSave.initial(nowUtc: clock.now),
+        );
         final controller = MiningController(
           content: MiningContentRegistry.phaseOne(),
           repository: repository,
