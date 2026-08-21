@@ -1,277 +1,148 @@
-# CLAUDE.md
+# Horologium repository guidance
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file is the authoritative architecture and workflow reference for the
+post-cutover Horologium Flutter/Flame mining idle game. `AGENTS.md` resolves to
+this file; keep that entrypoint as a symlink and maintain guidance here.
 
-## Project Overview
+## Product and ownership boundary
 
-Horologium is a Flutter/Flame-based space city-building game with a 50x50 grid system, real-time resource management, worker assignment mechanics, and research-gated progression.
+Horologium is a casual stellar mining idle game. The playable loop is reveal a
+sector, build its mine, accrue resources, sell cargo, and upgrade the mine.
+The current ownership boundary is:
 
-## Core Architecture
-
-### Dual-Layer Architecture
-The game uses a clear separation between Flutter UI and Flame game logic:
-
-- **Flutter UI Layer** (`MainGameWidget`): Manages dialogs, overlays, and state updates via StatefulWidget
-- **Flame Game Layer** (`MainGame`): Handles grid rendering, camera controls, and game objects
-- **Communication Bridge**: Callbacks connect Flame events to Flutter state updates
-
-```dart
-// Pattern: Flame → Flutter via callbacks
-_game.onGridCellTapped = _onGridCellTapped;
-_game.onPlanetChanged = _onPlanetChanged;
+```text
+MainMenu
+  -> MiningScreen
+      -> MiningController
+          -> MiningSimulation
+          -> MiningSaveRepository
+      -> MiningGame
+          -> ParallaxTerrainComponent
 ```
 
-### Manager Pattern
-Game logic is organized into specialized managers in `lib/game/managers/`:
-- `GameStateManager`: Coordinates building limits, research state, and game tick logic
-- `BuildingPlacementManager`: Handles building placement validation and execution
-- `InputHandler`: Processes grid interactions and user input
-- `GameManagerContext`: Abstract interface passed to managers for shared grid/placement state
+- `MainMenu` is the landing screen. It checks mining-save presence and enters
+  `MiningScreen`; it does not interpret or migrate the save document.
+- `MiningScreen` is the Flutter owner of initialization, presentation state,
+  action sheets, lifecycle checkpoints, the one-second presentation refresh,
+  accessibility propagation, and the `MiningGame` widget bridge.
+- `MiningController` is the one mutation boundary for mining actions. Reveal,
+  build, upgrade, sale, checkpoint, and resume operations are queued so each
+  action accrues current state and updates the in-memory state in order;
+  committing actions and lifecycle checkpoints persist through the repository.
+- `MiningSimulation` is deterministic economy logic. It accrues from a supplied
+  UTC clock, fills mine storage, reports production, and applies the eight-hour
+  offline cap without reading Flutter or device state.
+- `MiningSaveRepository` exclusively owns the mining save document's
+  SharedPreferences read, write, strict decode, and invalid-save recovery.
+- `MiningGame` is the Flame world. It owns terrain, sector components, camera
+  movement, selection, and action feedback; it does not own persistence,
+  SharedPreferences, or Flutter presentation state.
+- `ParallaxTerrainComponent` and its terrain helpers are shared Flame rendering
+  consumers under `lib/game/terrain/`. Keep them independent of mining state
+  and UI concerns.
 
-### State Persistence
-All game state persists via SharedPreferences using specific key patterns:
-- Resources: Individual keys like `'cash'`, `'gold'`, `'coal'`
-- Buildings: StringList `'buildings'` with format `'x,y,BuildingName'`
-- Research: StringList `'completed_research'` with research IDs
-- Planet data: Nested keys like `'planet_<id>_buildings'`
-- Save writes are debounced via `PlanetSaveDebouncer` to avoid excessive I/O
+Do not add a second state owner, a parallel mutation path, or a speculative
+framework around this boundary. When behavior crosses Flutter and Flame, pass
+small callbacks or values at the `MiningScreen`/`MiningGame` boundary.
 
-### Resource System
-Resources use a Map-based system with string keys matching ResourceType enum names:
+## Mining state and persistence
 
-```dart
-// Buildings define production/consumption with string keys
-building.baseGeneration = {'wood': 1, 'cash': 0.5};
-building.baseConsumption = {'electricity': 0.5};
+`MiningSaveRepository.saveKey` is the single mining key:
+`horologium.mining.save`. Its JSON document is intentionally strict and
+unversioned. The root keys are exactly `cash`, `lastAccruedAtUtc`, and
+`sectors`; each authored sector has exactly `revealed` and `mine`, and a mine
+has `level` and `storedAmount`.
 
-// Resource updates happen via Map operations
-resources.update(resourceType, (v) => v + value, ifAbsent: () => value);
-```
+There is intentionally no version field, migration table, or compatibility
+reader. Until a shipped compatibility need exists, preserve this contract:
 
-Update cycle runs every second:
-1. Check if building has required consumption resources
-2. Consume required resources
-3. Generate output resources (only if building has workers assigned)
+- Missing data creates the initial save.
+- Malformed or incompatible mining data creates a fresh initial save and marks
+  the load as recovered so the UI can explain what happened.
+- Legacy preference keys are ignored and must not be interpreted as mining
+  state.
+- Gameplay mutations and lifecycle checkpoints save through
+  `MiningController` and `MiningSaveRepository`; do not write the mining
+  document directly from widgets or Flame components.
 
-### Quest & Achievement Systems
-- `QuestManager` (`lib/game/quests/`): Tracks quest state, prerequisites, and progress. Fires callbacks (`onQuestCompleted`, `onQuestsRefreshed`) consumed by Flutter UI.
-- `DailyQuestGenerator` + `QuestSeedParser`: Generates rotating daily quests from a seed.
-- `AchievementManager` (`lib/game/achievements/`): Checks progress against `Resources`, `Building` list, and `ResearchManager` each tick.
+Audio preferences are separate from mining state. `AudioManager` owns the
+`audio.musicEnabled` and `audio.musicVolume` preference keys.
 
-### Production Chain System
-`lib/game/production/` provides read-only analysis of resource flows:
-- `ProductionGraph`: Builds a directed graph of resource producers/consumers
-- `FlowAnalyzer`: Calculates net rates and bottlenecks
-- `ChainHighlighter`: Maps buildings to their chain role for UI highlighting
+## Economy and resource identity
 
-## Key File Locations
+`lib/game/resources/resource_type.dart` defines the complete current resource
+identity: `ResourceType.gold`, `ResourceType.coal`, and `ResourceType.stone`.
+`MiningContentRegistry` maps each authored sector to one of these enum values.
+Use the enum in maps and exhaustive switches; do not introduce string resource
+IDs or a generic resource registry without an approved contract change.
 
-### Core Game Files
-- `lib/main.dart` - App entry point with MaterialApp setup
-- `lib/main_menu.dart` - Main menu screen and planet selection
-- `lib/game/main_game.dart` - FlameGame implementation with grid and camera
-- `lib/game/scene_widget.dart` - MainGameWidget that bridges Flutter ↔ Flame
-- `lib/game/grid.dart` - Grid rendering and building placement visualization
+The simulation is clock-based, not a device-time economy loop. The one-second
+timer in `MiningScreen` refreshes displayed state while the screen is active;
+`MiningSimulation.accrue` remains the source of production, including offline
+accrual and storage caps. All cash, cargo, sector, and mine transitions pass
+through `MiningController`.
 
-### Game Systems
-- `lib/game/building/building.dart` - BuildingType enum, Building class, BuildingRegistry
-- `lib/game/resources/resources.dart` - Resources class with update logic
-- `lib/game/resources/resource_type.dart` - ResourceType enum
-- `lib/game/research/research.dart` - Research system with unlock trees
-- `lib/game/planet/planet.dart` - Planet data model with multi-planet support
-- `lib/game/services/save_service.dart` - SaveService for planet persistence
-- `lib/game/services/planet_save_debouncer.dart` - Debounced save writes
-- `lib/game/services/resource_service.dart` - ResourceService for resource calculations
-- `lib/game/services/building_service.dart` - BuildingService for building operations
-- `lib/game/terrain/` - Procedural terrain generation with biomes and parallax
+## Audio and accessibility ownership
 
-### Pages
-- `lib/pages/quest_log_page.dart` - Quest log UI
-- `lib/pages/research_tree_page.dart` - Research tree UI
-- `lib/pages/resources_page.dart` - Resource detail page
-- `lib/pages/trade_page.dart` - Trade/market UI
+`MiningScreen` constructs or receives the `AudioManager`, loads its preferences
+during initialization, forwards user gestures to `maybeStartBgm`, supplies the
+settings sheet with the same instance, forwards app lifecycle changes, and
+disposes it. This keeps browser autoplay gating, music settings, and lifecycle
+pause/resume in one owner. `MiningGame` and mining components must not create or
+control audio players.
 
-### UI Components
-- `lib/widgets/game/building_selection_panel.dart` - Building menu with BuildingCard widgets
-- `lib/widgets/game/resource_display.dart` - Resource overlay showing amounts and rates
-- `lib/widgets/game/game_controls.dart` - Camera zoom and delete mode controls
-- `lib/widgets/game/hamburger_menu.dart` - Settings and audio preferences
-- `lib/widgets/planet_switcher.dart` - Planet switching UI
+The Flutter platform setting `MediaQuery.of(context).disableAnimations` is the
+source of truth for reduced motion. `MainMenu` uses it for its launch
+presentation; `MiningScreen` propagates it to `MiningGame.reducedMotion`, and
+Flame reward/camera feedback consumes that value. Do not query platform
+accessibility state independently from Flame components. Tests set
+`MediaQueryData(disableAnimations: true)` when proving the settled path.
 
-### Assets
-- `lib/constants/assets_path.dart` - Assets helper with sprite path constants
-- `assets/images/building/` - Building sprites (must match Assets constant names)
-- `assets/images/terrain/` - Terrain and parallax layer assets
-- `assets/audio/` - Music and sound effects
+## Assets and presentation
 
-## Commands
+Use the existing `Assets` and `TerrainAssets` constants for Flame asset paths.
+Mining sector art uses the authored mine sprites under
+`assets/images/building/`; terrain layers use the configured terrain asset
+directories in `pubspec.yaml`. Add or update the asset before wiring a new
+visual, and preserve development fallback rendering in terrain/presentation
+components where an asset is unavailable.
 
-```bash
-# Install dependencies
-flutter pub get
+Keep gameplay content data in `lib/mining/mining_content.dart`, state models in
+`lib/mining/mining_state.dart`, simulation and persistence in their dedicated
+files, Flutter surfaces under `lib/mining/presentation/`, and Flame world code
+under `lib/mining/world/`.
 
-# Run the game (native)
-flutter run
+## Test, format, and build workflow
 
-# Run for web (quick testing)
-flutter run -d chrome
+Install dependencies with `flutter pub get`. Before handing off a change, run
+the narrowest relevant tests first, then the repository gates as appropriate:
 
-# Run all tests
-flutter test
+```sh
+# Focused examples
+flutter test test/mining/mining_controller_test.dart
+flutter test test/mining/presentation/mining_screen_test.dart
+flutter test test/integration/mining_mvp_journey_test.dart
 
-# Run specific test file
-flutter test test/resources/resources_test.dart
-
-# Static analysis (CI uses --fatal-infos)
+# Repository quality gates
 flutter analyze --fatal-infos
-
-# Format code (CI enforces this)
 dart format --output=none --set-exit-if-changed .
+flutter test
+flutter test --coverage
+flutter test --platform chrome
 
-# Build release APK
-flutter build apk
+# CI build targets
+flutter build apk --debug
+flutter build web
 ```
 
-## Common Development Workflows
+Tests use `SharedPreferences.setMockInitialValues()` and injected clocks or
+repositories where persistence or time matters. Keep tests deterministic and
+independent of a real device, wall clock, network, or existing preference data.
 
-### Adding New Buildings
-1. Add enum value to `BuildingType` in `lib/game/building/building.dart`
-2. Add category to `BuildingCategory` enum if needed
-3. Create building definition in `BuildingRegistry.availableBuildings`:
-   ```dart
-   Building(
-     type: BuildingType.myBuilding,
-     name: 'My Building',
-     description: 'Does something',
-     icon: Icons.factory,
-     assetPath: Assets.myBuilding,
-     color: Colors.blue,
-     baseCost: 100,
-     baseGeneration: {'wood': 1},
-     baseConsumption: {'electricity': 0.5},
-     requiredWorkers: 2,
-     category: BuildingCategory.production,
-   )
-   ```
-4. Add sprite constant to `lib/constants/assets_path.dart`
-5. Place sprite at `assets/images/building/my_building.png`
-6. Optionally gate behind research in `Research.availableResearch`
+Use `flutter run` for a native development session and `flutter run -d chrome`
+for a quick browser session. Keep formatting at two spaces with trailing commas
+for multiline Dart literals, and use focused Conventional Commit messages.
 
-### Adding New Resources
-1. Add to `ResourceType` enum in `lib/game/resources/resource_type.dart`
-2. Add to `ResourceCategory` enum if it's a new category
-3. Initialize in `Resources.resources` map with default value
-4. Update UI in `resource_display.dart` if needed for display
-5. Update relevant building generation/consumption maps
-6. Add persistence handling in `SaveService` if needed
-7. Add tests in `test/resources/resources_test.dart`
-
-### Adding New Research
-1. Create `Research` instance in `Research.availableResearch` list with `id`, `name`, `cost`, `unlocksBuildings`, and `prerequisites`
-2. Reference research ID in building unlock conditions
-
-### Writing Tests
-Use `SharedPreferences.setMockInitialValues()` in test setUp:
-
-```dart
-setUp(() {
-  SharedPreferences.setMockInitialValues({
-    'cash': 1000.0,
-    'population': 20,
-    'buildings': ['5,5,House', '10,10,Power Plant'],
-  });
-});
-```
-
-Test files mirror lib structure and use `*_test.dart` naming.
-
-### Adding Terrain Features
-1. Add sprite assets to `assets/images/terrain/` subdirectory
-2. Update `TerrainAssets` class with asset paths
-3. Configure in `TerrainGenerator` for procedural placement
-4. Adjust `TerrainBiome` if adding biome-specific features
-5. Use `ParallaxTerrainComponent` for multi-layer parallax effects
-
-## Architecture Patterns
-
-### Worker Assignment Flow
-```dart
-// Check if workers available
-if (resources.canAssignWorkerTo(building)) {
-  resources.assignWorkerTo(building);
-  building.assignWorker();
-}
-// Buildings only produce when they have required workers
-if (building.hasWorkers) { /* generate resources */ }
-```
-
-### Building Placement Flow
-```
-1. Check grid availability (no overlap)
-2. Validate sufficient resources
-3. Check building limits (research-gated)
-4. Place building on grid
-5. Deduct resources
-6. Save to SharedPreferences
-```
-
-### Camera Controls
-- Pinch-to-zoom: 1.0x to 4.0x zoom range
-- Pan/drag to navigate grid
-- Zoom clamping in `MainGame.onScaleUpdate()`
-
-## UI Conventions
-
-### Dark Space Theme
-- Primary accent: `Colors.cyanAccent` with glowing shadows
-- Background: Dark with starfield CustomPainter
-- Card backgrounds: `Colors.withAlpha((255 * 0.8).round())`
-- Consistent spacing: padding 16, margins 8-20
-
-### Common UI Patterns
-- **BuildingCard**: Shows building icon, name, cost, and count limits
-- **ResourceCard**: Displays resource amount with +/- production rate
-- **Delete mode**: Toggle via GameControls, highlights buildings red on tap
-- **Dialogs**: Custom styled with dark theme and cyan accents
-
-## Project-Specific Notes
-
-### Multi-Planet System
-Active planet tracked via `ActivePlanet.instance.currentPlanet`. Each planet has independent resources, buildings, research, and grid state. Save/load is planet-scoped using planet ID in SharedPreferences keys.
-
-### Audio System
-Background music controlled via `AudioManager` with web-safe autoplay handling (starts on first user interaction). Preferences stored in SharedPreferences.
-
-### Terrain System
-Procedural terrain generation with biome support. Parallax layers create depth. See `docs/` for detailed terrain implementation guides.
-
-### Coding Style
-- Follow Flutter defaults: 2-space indentation, trailing commas for multi-line literals, `lowerCamelCase` for members
-- Keep Flame components in dedicated files named `<Feature>Component`
-- Centralize constants in the relevant manager or `Assets` class
-
-### Commit Guidelines
-- Conventional Commits: `feat:`, `fix:`, `chore:`, `ci:`
-- Keep commits focused — gameplay, UI tweaks, and tooling should land separately
-- Call out migrations that require data wipes or saved-game resets
-
-### Local Agent Commands
-Custom slash commands live in `.claude/commands/`. The repo also has `.opencode/command` as a symlink to `.claude/commands` for tooling compatibility. To recreate the symlink from repo root: `ln -s ../.claude/commands .opencode/command`
-
-## CI/CD
-
-GitHub Actions runs on push/PR to main:
-- `flutter analyze --fatal-infos`
-- `dart format --output=none --set-exit-if-changed .`
-- `flutter test --coverage`
-- Builds debug APK and web artifacts
-
-## Utility Scripts
-
-- `scripts/resize_images.py` - Batch resize sprite assets
-- `scripts/process_terrain_assets.py` - Process terrain sprite sheets
-- Requirements: `pip install -r scripts/requirements.txt`
-
-## Active Technologies
-- **Language/Framework**: Dart 3.x (null safety), Flutter 3.x, Flame (latest stable)
-- **Persistence**: In-memory state with SharedPreferences for game saves
+Detailed architecture changes belong here. `.windsurf/rules/project.md` is an
+always-on pointer to this file, while `.github/copilot-instructions.md` is a
+thin compatibility shim for surfaces that do not resolve repository symlinks.
