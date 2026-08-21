@@ -110,13 +110,13 @@ void expectStatus(
   );
 }
 
-/// Boots the real app entry into MINING MVP, then retires that production
+/// Boots the real app entry into START MINING, then retires that production
 /// session and awaits its dispose checkpoint so its real-clock timestamp
 /// cannot race the injected session's TestClock under the shared save key.
 Future<void> pumpProductionEntryThenRetireIt(WidgetTester tester) async {
   await tester.pumpWidget(const HorologiumApp());
   await tester.pump(const Duration(seconds: 3));
-  await tester.tap(find.text('MINING MVP'));
+  await tester.tap(find.text('START MINING'));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 500));
   expect(find.byType(MiningScreen), findsOneWidget);
