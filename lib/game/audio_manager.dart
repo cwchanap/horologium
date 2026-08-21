@@ -15,6 +15,7 @@ class AudioManager {
   bool _bgmInitializing = false;
   bool _musicEnabled = true;
   double _musicVolume = 0.5;
+  AppLifecycleState? _lifecycleState;
 
   bool get bgmStarted => _bgmStarted;
   bool get musicEnabled => _musicEnabled;
@@ -66,6 +67,9 @@ class AudioManager {
       final success = await _initAudio();
       if (success && _musicEnabled) {
         _bgmStarted = true;
+        if (_lifecycleBlocksPlayback) {
+          _pauseForLifecycle();
+        }
       } else if (success) {
         try {
           await _bgm?.stop();
@@ -90,7 +94,7 @@ class AudioManager {
       } catch (e) {
         debugPrint('Failed to pause BGM: $e');
       }
-    } else if (_bgmStarted && value) {
+    } else if (_bgmStarted && value && !_lifecycleBlocksPlayback) {
       try {
         await _bgm?.resume();
         debugPrint('BGM resumed by user.');
@@ -120,25 +124,15 @@ class AudioManager {
   }
 
   void handleLifecycleChange(AppLifecycleState state) {
-    if (!_bgmStarted) return;
     switch (state) {
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
-        final pauseFuture = _bgm?.pause();
-        if (pauseFuture != null) {
-          unawaited(
-            pauseFuture
-                .then((_) {
-                  debugPrint('BGM paused due to lifecycle.');
-                })
-                .catchError((Object e) {
-                  debugPrint('Failed to pause BGM due to lifecycle: $e');
-                }),
-          );
-        }
+        _lifecycleState = state;
+        if (_bgmStarted) _pauseForLifecycle();
         break;
       case AppLifecycleState.resumed:
-        if (_musicEnabled) {
+        _lifecycleState = state;
+        if (_bgmStarted && _musicEnabled) {
           final resumeFuture = _bgm?.resume();
           if (resumeFuture != null) {
             unawaited(
@@ -154,6 +148,7 @@ class AudioManager {
         }
         break;
       case AppLifecycleState.detached:
+        if (!_bgmStarted) return;
         final stopFuture = _bgm?.stop();
         if (stopFuture != null) {
           unawaited(
@@ -189,6 +184,26 @@ class AudioManager {
       _bgm = null;
       _bgmStarted = false;
       _bgmInitializing = false;
+      _lifecycleState = null;
+    }
+  }
+
+  bool get _lifecycleBlocksPlayback =>
+      _lifecycleState == AppLifecycleState.paused ||
+      _lifecycleState == AppLifecycleState.inactive;
+
+  void _pauseForLifecycle() {
+    final pauseFuture = _bgm?.pause();
+    if (pauseFuture != null) {
+      unawaited(
+        pauseFuture
+            .then((_) {
+              debugPrint('BGM paused due to lifecycle.');
+            })
+            .catchError((Object e) {
+              debugPrint('Failed to pause BGM due to lifecycle: $e');
+            }),
+      );
     }
   }
 }

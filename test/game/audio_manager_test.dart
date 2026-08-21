@@ -100,6 +100,31 @@ void main() {
 
       expect(player.playedAssets, <String>['audio/background.mp3']);
     });
+
+    test(
+      'pauses immediately when lifecycle pauses during initialization',
+      () async {
+        final playCompleter = Completer<void>();
+        final player = FakeBackgroundMusicPlayer(playCompleter: playCompleter);
+        final manager = AudioManager(backgroundMusicPlayer: player);
+
+        final start = manager.maybeStartBgm();
+        await Future<void>.delayed(Duration.zero);
+        manager.handleLifecycleChange(AppLifecycleState.paused);
+
+        expect(player.pauseCalls, 0);
+
+        playCompleter.complete();
+        await start;
+
+        expect(manager.bgmStarted, isTrue);
+        expect(player.pauseCalls, 1);
+
+        manager.handleLifecycleChange(AppLifecycleState.resumed);
+
+        expect(player.resumeCalls, 1);
+      },
+    );
   });
 
   group('AudioManager music controls', () {
