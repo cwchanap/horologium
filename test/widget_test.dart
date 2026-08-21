@@ -22,14 +22,17 @@ void main() {
 
     // Verify that our main menu elements are present.
     expect(find.text('HOROLOGIUM'), findsOneWidget);
-    expect(find.text('STELLAR EXPLORER'), findsOneWidget);
-    expect(find.text('START EXPEDITION'), findsOneWidget);
-    expect(find.text('STELLAR MAP'), findsOneWidget);
-    expect(find.text('RESEARCH LAB'), findsOneWidget);
-    expect(find.text('SETTINGS'), findsOneWidget);
+    expect(find.text('MINING FRONTIER'), findsOneWidget);
+    expect(find.text('START MINING'), findsOneWidget);
+    expect(find.text('START EXPEDITION'), findsNothing);
+    expect(find.text('MINING MVP'), findsNothing);
+    expect(find.text('TRADE'), findsNothing);
+    expect(find.text('STELLAR MAP'), findsNothing);
+    expect(find.text('RESEARCH LAB'), findsNothing);
+    expect(find.text('SETTINGS'), findsNothing);
 
     // Test that the buttons are tappable
-    final startButton = find.text('START EXPEDITION');
+    final startButton = find.text('START MINING');
     expect(startButton, findsOneWidget);
 
     // Just verify the button exists and is tappable (without actually navigating)

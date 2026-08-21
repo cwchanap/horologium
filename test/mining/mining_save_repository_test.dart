@@ -9,8 +9,46 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   const key = 'horologium.mining.save';
   final now = DateTime.utc(2026, 8, 18, 12);
+  const validMiningSave =
+      '{"cash":100,"lastAccruedAtUtc":"2026-08-18T12:00:00.000Z",'
+      '"sectors":{"landingBasin":{"revealed":true,"mine":null},'
+      '"carbonRidge":{"revealed":false,"mine":null},'
+      '"graniteCrater":{"revealed":false,"mine":null}}}';
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  group('hasSave presence', () {
+    test('empty preferences report no mining save', () async {
+      expect(await MiningSaveRepository().hasSave(), isFalse);
+    });
+
+    test('legacy city keys do not count as a mining save', () async {
+      SharedPreferences.setMockInitialValues({
+        'cash': 999999.0,
+        'planet.earth.resources.cash': 888888.0,
+        'buildings': <String>['1,1,Gold Mine'],
+      });
+
+      expect(await MiningSaveRepository().hasSave(), isFalse);
+    });
+
+    test('presence of a valid mining document reports a save', () async {
+      SharedPreferences.setMockInitialValues({key: validMiningSave});
+
+      expect(await MiningSaveRepository().hasSave(), isTrue);
+    });
+
+    test(
+      'presence of a malformed mining document still reports a save',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          key: '{ malformed mining json',
+        });
+
+        expect(await MiningSaveRepository().hasSave(), isTrue);
+      },
+    );
+  });
 
   group('load', () {
     test('missing save returns clean state without recovery warning', () async {

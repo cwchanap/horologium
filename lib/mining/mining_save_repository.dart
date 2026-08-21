@@ -26,6 +26,11 @@ class MiningSaveRepository {
 
   final MiningContentRegistry content;
 
+  Future<bool> hasSave() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.containsKey(saveKey);
+  }
+
   Future<MiningLoadResult> load({required DateTime nowUtc}) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(saveKey);

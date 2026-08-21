@@ -1,11 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
-import 'package:horologium/game/planet/index.dart';
-import 'package:horologium/game/services/save_service.dart';
+import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/presentation/mining_screen.dart';
-import 'package:horologium/pages/trade_page.dart';
-import 'game/scene_widget.dart';
 
 class MainMenu extends StatefulWidget {
   const MainMenu({super.key});
@@ -15,28 +13,28 @@ class MainMenu extends StatefulWidget {
 }
 
 class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
-  late AnimationController _starsController;
-  late AnimationController _titleController;
-  late AnimationController _buttonController;
-  late Animation<double> _titleAnimation;
-  late Animation<double> _buttonAnimation;
-  Planet? _activePlanet;
+  late final AnimationController _starsController;
+  late final AnimationController _titleController;
+  late final AnimationController _buttonController;
+  late final Animation<double> _titleAnimation;
+  late final Animation<double> _buttonAnimation;
+  late final Future<bool> _hasSaveFuture;
+  bool _reducedMotion = false;
+  bool _animationsStarted = false;
 
   @override
   void initState() {
     super.initState();
-    _initializePlanet();
+    _hasSaveFuture = MiningSaveRepository().hasSave();
 
     _starsController = AnimationController(
       duration: const Duration(seconds: 20),
       vsync: this,
-    )..repeat();
-
+    );
     _titleController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     );
-
     _buttonController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -45,31 +43,39 @@ class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
     _titleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _titleController, curve: Curves.easeOutBack),
     );
-
     _buttonAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _buttonController, curve: Curves.easeOutCubic),
     );
-
-    // Start animations
-    _titleController.forward().then((_) {
-      _buttonController.forward();
-    });
   }
 
-  Future<void> _initializePlanet() async {
-    // Load or create the active planet
-    final activePlanetId = await SaveService.loadActivePlanetId() ?? 'earth';
-    final planet = await SaveService.loadOrCreatePlanet(
-      activePlanetId,
-      name: 'Earth',
-    );
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reducedMotion = MediaQuery.of(context).disableAnimations;
+    if (_animationsStarted && reducedMotion == _reducedMotion) return;
 
-    // Initialize the global active planet
-    ActivePlanet().initialize(planet);
-
-    setState(() {
-      _activePlanet = planet;
-    });
+    _reducedMotion = reducedMotion;
+    if (reducedMotion) {
+      _starsController
+        ..stop()
+        ..value = 0;
+      _titleController
+        ..stop()
+        ..value = 1;
+      _buttonController
+        ..stop()
+        ..value = 1;
+    } else {
+      _starsController.repeat();
+      if (!_animationsStarted) {
+        _titleController.forward().then((_) {
+          if (mounted && !_reducedMotion) {
+            _buttonController.forward();
+          }
+        });
+      }
+    }
+    _animationsStarted = true;
   }
 
   @override
@@ -93,18 +99,16 @@ class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
         ),
         child: Stack(
           children: [
-            // Animated Starfield Background
             AnimatedBuilder(
               animation: _starsController,
               builder: (context, child) {
                 return CustomPaint(
+                  key: const ValueKey('main-menu-starfield'),
                   painter: StarfieldPainter(_starsController.value),
                   size: MediaQuery.of(context).size,
                 );
               },
             ),
-
-            // Main Content
             Center(
               child: SafeArea(
                 child: Padding(
@@ -114,14 +118,14 @@ class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       const Spacer(flex: 2),
-
-                      // Title Section
                       AnimatedBuilder(
                         animation: _titleAnimation,
                         builder: (context, child) {
                           return Transform.scale(
+                            key: const ValueKey('main-menu-title-transform'),
                             scale: _titleAnimation.value,
                             child: Opacity(
+                              key: const ValueKey('main-menu-title-opacity'),
                               opacity: _titleAnimation.value.clamp(0.0, 1.0),
                               child: Column(
                                 children: [
@@ -138,7 +142,7 @@ class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
                                   ),
                                   const SizedBox(height: 10),
                                   Text(
-                                    'STELLAR EXPLORER',
+                                    'MINING FRONTIER',
                                     textAlign: TextAlign.center,
                                     style: Theme.of(context)
                                         .textTheme
@@ -156,76 +160,41 @@ class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
                           );
                         },
                       ),
-
                       const Spacer(flex: 3),
-
-                      // Menu Buttons
                       AnimatedBuilder(
                         animation: _buttonAnimation,
                         builder: (context, child) {
                           return Transform.translate(
+                            key: const ValueKey('main-menu-button-transform'),
                             offset: Offset(
                               0,
                               50 * (1 - _buttonAnimation.value),
                             ),
                             child: Opacity(
+                              key: const ValueKey('main-menu-button-opacity'),
                               opacity: _buttonAnimation.value.clamp(0.0, 1.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  _buildMenuButton(
-                                    'START EXPEDITION',
-                                    Icons.rocket_launch,
-                                    () => _startGame(),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  _buildMenuButton(
-                                    'MINING MVP',
+                              child: FutureBuilder<bool>(
+                                future: _hasSaveFuture,
+                                builder: (context, snapshot) {
+                                  final label = snapshot.data == true
+                                      ? 'CONTINUE MINING'
+                                      : 'START MINING';
+                                  return _buildMenuButton(
+                                    label,
                                     Icons.precision_manufacturing,
-                                    () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const MiningScreen(),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  _buildMenuButton(
-                                    'TRADE',
-                                    Icons.swap_horiz,
-                                    () => _openTradePage(),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  _buildMenuButton(
-                                    'STELLAR MAP',
-                                    Icons.public,
-                                    () => _openStellarMap(),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  _buildMenuButton(
-                                    'RESEARCH LAB',
-                                    Icons.science,
-                                    () => _openResearchLab(),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  _buildMenuButton(
-                                    'SETTINGS',
-                                    Icons.settings,
-                                    () => _openSettings(),
-                                  ),
-                                ],
+                                    _openMiningScreen,
+                                  );
+                                },
                               ),
                             ),
                           );
                         },
                       ),
-
                       const Spacer(flex: 2),
-
-                      // Footer
                       Padding(
                         padding: const EdgeInsets.only(bottom: 20),
                         child: Text(
-                          'v1.0.0 | Explore • Discover • Evolve',
+                          'v1.0.0 | Mine • Upgrade • Prosper',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withAlpha((255 * 0.3).round()),
@@ -239,12 +208,11 @@ class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
                 ),
               ),
             ),
-
-            // Floating Particles
-            ...List.generate(
-              3,
-              (index) => FloatingParticle(delay: index * 2.0),
-            ),
+            if (!_reducedMotion)
+              ...List.generate(
+                3,
+                (index) => FloatingParticle(delay: index * 2.0),
+              ),
           ],
         ),
       ),
@@ -292,39 +260,10 @@ class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
     );
   }
 
-  void _startGame() {
-    if (_activePlanet == null) return;
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => MainGameWidget(planet: _activePlanet!),
-      ),
-    );
-  }
-
-  void _openTradePage() {
-    if (_activePlanet == null) return;
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => TradePage(resources: _activePlanet!.resources),
-      ),
-    );
-  }
-
-  void _openStellarMap() {
-    // TODO: Navigate to stellar map
-    if (kDebugMode) debugPrint('Opening stellar map...');
-  }
-
-  void _openResearchLab() {
-    // TODO: Navigate to research lab
-    if (kDebugMode) debugPrint('Opening research lab...');
-  }
-
-  void _openSettings() {
-    // TODO: Navigate to settings
-    if (kDebugMode) debugPrint('Opening settings...');
+  void _openMiningScreen() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const MiningScreen()));
   }
 }
 
@@ -336,7 +275,7 @@ class StarfieldPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = Colors.white;
-    final random = math.Random(42); // Fixed seed for consistent stars
+    final random = math.Random(42);
 
     for (int i = 0; i < 150; i++) {
       final x = random.nextDouble() * size.width;
@@ -348,7 +287,6 @@ class StarfieldPainter extends CustomPainter {
       canvas.drawCircle(Offset(x, y), starSize, paint);
     }
 
-    // Add some larger, more prominent stars
     for (int i = 0; i < 20; i++) {
       final x = random.nextDouble() * size.width;
       final y = random.nextDouble() * size.height;
@@ -362,7 +300,8 @@ class StarfieldPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant StarfieldPainter oldDelegate) =>
+      oldDelegate.animationValue != animationValue;
 }
 
 class FloatingParticle extends StatefulWidget {

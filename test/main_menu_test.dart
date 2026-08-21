@@ -1,11 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:horologium/main.dart';
+import 'package:horologium/main_menu.dart';
+import 'package:horologium/mining/mining_save_repository.dart';
+import 'package:horologium/mining/presentation/mining_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _menuViewports = [Size(360, 640), Size(430, 932)];
+const _validMiningSave =
+    '{"cash":100,"lastAccruedAtUtc":"2026-08-18T12:00:00.000Z",'
+    '"sectors":{"landingBasin":{"revealed":true,"mine":null},'
+    '"carbonRidge":{"revealed":false,"mine":null},'
+    '"graniteCrater":{"revealed":false,"mine":null}}}';
+const _cityActions = [
+  'START EXPEDITION',
+  'MINING MVP',
+  'TRADE',
+  'STELLAR MAP',
+  'RESEARCH LAB',
+];
 
-Future<void> pumpMenu(WidgetTester tester, Size viewport) async {
+Future<void> pumpMenu(
+  WidgetTester tester,
+  Size viewport, {
+  Map<String, Object> preferences = const {},
+  bool disableAnimations = false,
+  Duration settle = const Duration(seconds: 3),
+}) async {
+  SharedPreferences.setMockInitialValues(preferences);
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = viewport;
   addTearDown(() {
@@ -13,43 +34,130 @@ Future<void> pumpMenu(WidgetTester tester, Size viewport) async {
     tester.view.resetDevicePixelRatio();
   });
 
-  await tester.pumpWidget(const HorologiumApp());
-  await tester.pump(const Duration(seconds: 3));
+  await tester.pumpWidget(
+    MaterialApp(
+      home: MediaQuery(
+        data: MediaQueryData(disableAnimations: disableAnimations),
+        child: const MainMenu(),
+      ),
+    ),
+  );
+  if (settle > Duration.zero) {
+    await tester.pump(settle);
+  }
+}
+
+void expectMiningOnlyLanding(WidgetTester tester, String primaryLabel) {
+  expect(find.text(primaryLabel), findsOneWidget);
+  expect(
+    find.text(
+      primaryLabel == 'START MINING' ? 'CONTINUE MINING' : 'START MINING',
+    ),
+    findsNothing,
+  );
+  for (final action in _cityActions) {
+    expect(find.text(action), findsNothing);
+  }
+  expect(find.text('SETTINGS'), findsNothing);
+  expect(tester.takeException(), isNull);
 }
 
 void main() {
   for (final viewport in _menuViewports) {
-    testWidgets('menu remains usable at $viewport', (tester) async {
-      SharedPreferences.setMockInitialValues({});
+    testWidgets('fresh landing is mining-only at $viewport', (tester) async {
       await pumpMenu(tester, viewport);
 
-      expect(find.text('START EXPEDITION'), findsOneWidget);
-      expect(find.text('MINING MVP'), findsOneWidget);
-      expect(find.text('SETTINGS'), findsOneWidget);
-      expect(tester.takeException(), isNull);
+      expectMiningOnlyLanding(tester, 'START MINING');
+    });
+
+    testWidgets('legacy city data still starts mining at $viewport', (
+      tester,
+    ) async {
+      await pumpMenu(
+        tester,
+        viewport,
+        preferences: {
+          'cash': 999999.0,
+          'planet.earth.resources.cash': 888888.0,
+          'buildings': <String>['1,1,Gold Mine'],
+        },
+      );
+
+      expectMiningOnlyLanding(tester, 'START MINING');
+    });
+
+    testWidgets('existing mining data continues mining at $viewport', (
+      tester,
+    ) async {
+      await pumpMenu(
+        tester,
+        viewport,
+        preferences: {MiningSaveRepository.saveKey: _validMiningSave},
+      );
+
+      expectMiningOnlyLanding(tester, 'CONTINUE MINING');
     });
   }
 
-  testWidgets('MINING MVP opens the mining screen without changing start', (
-    tester,
-  ) async {
-    SharedPreferences.setMockInitialValues({});
+  testWidgets('the primary mining CTA opens MiningScreen', (tester) async {
     await pumpMenu(tester, _menuViewports.first);
 
-    final startButton = tester.widget<ElevatedButton>(
-      find.ancestor(
-        of: find.text('START EXPEDITION'),
-        matching: find.byType(ElevatedButton),
-      ),
-    );
-    expect(startButton.onPressed, isNotNull);
-
-    await tester.tap(find.text('MINING MVP'));
+    await tester.tap(find.text('START MINING'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('Landing Basin'), findsWidgets);
-    expect(find.text('SELL ALL CARGO'), findsOneWidget);
+    expect(find.byType(MiningScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('reduced motion settles the launch presentation', (tester) async {
+    await pumpMenu(
+      tester,
+      _menuViewports.first,
+      disableAnimations: true,
+      settle: Duration.zero,
+    );
+
+    expect(find.byType(FloatingParticle), findsNothing);
+    final starfieldBefore =
+        tester
+                .widget<CustomPaint>(
+                  find.byKey(const ValueKey('main-menu-starfield')),
+                )
+                .painter!
+            as StarfieldPainter;
+    final titleOpacity = tester.widget<Opacity>(
+      find.byKey(const ValueKey('main-menu-title-opacity')),
+    );
+    final titleTransform = tester.widget<Transform>(
+      find.byKey(const ValueKey('main-menu-title-transform')),
+    );
+    final buttonOpacity = tester.widget<Opacity>(
+      find.byKey(const ValueKey('main-menu-button-opacity')),
+    );
+    final buttonTransform = tester.widget<Transform>(
+      find.byKey(const ValueKey('main-menu-button-transform')),
+    );
+
+    expect(starfieldBefore.animationValue, equals(0));
+    expect(titleOpacity.opacity, equals(1));
+    expect(titleTransform.transform.storage[0], equals(1));
+    expect(buttonOpacity.opacity, equals(1));
+    expect(buttonTransform.transform.storage[13], equals(0));
+
+    await tester.pump(const Duration(seconds: 1));
+
+    final starfieldAfter =
+        tester
+                .widget<CustomPaint>(
+                  find.byKey(const ValueKey('main-menu-starfield')),
+                )
+                .painter!
+            as StarfieldPainter;
+    expect(
+      starfieldAfter.animationValue,
+      equals(starfieldBefore.animationValue),
+    );
     expect(tester.takeException(), isNull);
   });
 }
