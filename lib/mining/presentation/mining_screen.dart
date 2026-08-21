@@ -118,13 +118,10 @@ class _MiningScreenState extends State<MiningScreen>
   }
 
   void _selectSector(MiningSectorId? id) {
+    if (!_initialized) return;
     unawaited(_audioManager.maybeStartBgm());
     _selectedSectorId = id;
     _game.selectSector(id);
-    if (!_initialized) {
-      if (mounted) setState(() {});
-      return;
-    }
     if (id != null && _game.hasLoaded) {
       _game.focusOnSelection(sectorId: id, bottomObscuredFraction: 0.44);
     }
@@ -132,8 +129,9 @@ class _MiningScreenState extends State<MiningScreen>
   }
 
   Future<void> _onPrimaryAction() async {
+    if (!_initialized) return;
     unawaited(_audioManager.maybeStartBgm());
-    if (!_initialized || !_sheetView.primaryEnabled) return;
+    if (!_sheetView.primaryEnabled) return;
 
     final action = _sheetView.action;
     final selected = _selectedSectorId;
@@ -267,6 +265,7 @@ class _MiningScreenState extends State<MiningScreen>
   }
 
   void _openSettings() {
+    if (!_initialized) return;
     unawaited(_audioManager.maybeStartBgm());
     unawaited(
       showModalBottomSheet<void>(

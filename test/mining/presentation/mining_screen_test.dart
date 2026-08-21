@@ -28,6 +28,20 @@ class DelayedMiningSaveRepository extends MiningSaveRepository {
   }
 }
 
+class DelayedAudioPrefsManager extends AudioManager {
+  DelayedAudioPrefsManager({required super.backgroundMusicPlayer});
+
+  final loadStarted = Completer<void>();
+  final allowLoad = Completer<void>();
+
+  @override
+  Future<void> loadPrefs() async {
+    loadStarted.complete();
+    await allowLoad.future;
+    await super.loadPrefs();
+  }
+}
+
 class FailingMiningSaveRepository extends MiningSaveRepository {
   @override
   Future<void> save(MiningSave state) async {
@@ -210,6 +224,56 @@ void main() {
     expect(audioManager.musicVolume, 0.8);
     expect(player.playedAssets, isEmpty);
   });
+
+  testWidgets(
+    'gates sector and Settings gestures until saved audio prefs finish loading',
+    (tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'audio.musicEnabled': false,
+      });
+      final player = FakeBackgroundMusicPlayer();
+      final audioManager = DelayedAudioPrefsManager(
+        backgroundMusicPlayer: player,
+      );
+
+      await pumpMiningScreen(
+        tester,
+        _viewports.first,
+        audioManager: audioManager,
+        pumpCycles: 1,
+      );
+      await audioManager.loadStarted.future;
+
+      await tester.tap(find.byKey(const Key('mining-sector-landingBasin')));
+      await tester.pump();
+      expect(player.playedAssets, isEmpty);
+
+      await tester.tap(find.byKey(const Key('mining-settings-button')));
+      await tester.pump();
+      expect(find.byKey(const Key('mining-settings-sheet')), findsNothing);
+
+      audioManager.allowLoad.complete();
+      await tester.pump();
+      await tester.pump();
+      expect(audioManager.musicEnabled, isFalse);
+
+      await tester.tap(find.byKey(const Key('mining-settings-button')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(const Key('mining-settings-sheet')), findsOneWidget);
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.descendant(
+                of: find.byKey(const Key('mining-settings-sheet')),
+                matching: find.byType(SwitchListTile),
+              ),
+            )
+            .value,
+        isFalse,
+      );
+      expect(player.playedAssets, isEmpty);
+    },
+  );
 
   testWidgets('a sector gesture starts BGM through the injected manager', (
     tester,
