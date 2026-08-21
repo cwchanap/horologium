@@ -1,29 +1,43 @@
-# horologium
+# Horologium
 
-A new Flutter project.
+Horologium is a casual stellar mining idle game built with Flutter and Flame.
+The core loop is:
 
-## Getting Started
+```text
+reveal -> build -> mine -> sell -> upgrade
+```
 
-This project is a starting point for a Flutter application.
+## Run, test, and build
 
-### Local agent commands
+From the repository root:
 
-The repo ships with `.opencode/command` as a repository-relative symlink to
-`.claude/commands`. Note that this is intentionally asymmetric: `.opencode/command`
-(singular) is a single entry point that points to the `.claude/commands` (plural)
-directory. When adding or inspecting commands, use the `.claude/commands` path
-for the actual command definitions; the `.opencode/command` symlink exists for
-tooling compatibility. If the symlink is missing, recreate it from the repo root:
+```sh
+flutter pub get
+flutter run
+flutter test
+flutter analyze --fatal-infos
+dart format --output=none --set-exit-if-changed .
+flutter build apk --debug
+flutter build web
+```
+
+Use `flutter run -d chrome` for a quick browser run and
+`flutter test --platform chrome` for the browser test pass.
+
+## Mining slice
+
+The playable mining vertical slice lives in `lib/mining/`. `MainMenu` enters
+`MiningScreen`, which presents the authored sectors, mine actions, offline
+progress, and upgrades. Mining unit, widget, world, and journey tests live
+under `test/mining/` and `test/integration/`.
+
+## Local agent commands
+
+`.opencode/command` (singular) is a repository-relative symlink to
+`.claude/commands` (plural). Inspect the command definitions in
+`.claude/commands`; if the symlink is missing, recreate it from the repository
+root with:
 
 ```sh
 ln -s ../.claude/commands .opencode/command
 ```
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
