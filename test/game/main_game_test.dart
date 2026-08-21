@@ -57,10 +57,13 @@ void main() {
       () {
         final game = MainGame();
         final grid = _configuredGrid();
-        final terrain = ParallaxTerrainComponent(gridSize: grid.gridSize)
-          ..replaceTerrainDataForTest(<String, TerrainCell>{
-            '3,3': const TerrainCell(baseType: TerrainType.water),
-          });
+        final terrain =
+            ParallaxTerrainComponent(
+              gridSize: grid.gridSize,
+              cellSize: cellWidth,
+            )..replaceTerrainDataForTest(<String, TerrainCell>{
+              '3,3': const TerrainCell(baseType: TerrainType.water),
+            });
         final building = _createBuilding(BuildingType.house);
 
         game

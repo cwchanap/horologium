@@ -72,6 +72,7 @@ class MainGame extends FlameGame
       // Create terrain first (renders beneath everything)
       _terrain = ParallaxTerrainComponent(
         gridSize: 50, // Match grid size
+        cellSize: cellWidth,
         seed:
             _planet?.id.hashCode ??
             42, // Use planet ID as seed for consistent terrain

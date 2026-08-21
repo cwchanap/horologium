@@ -205,7 +205,7 @@ class FakeMainGame extends MainGame {
 }
 
 class FakeTerrainComponent extends ParallaxTerrainComponent {
-  FakeTerrainComponent() : super(gridSize: 50) {
+  FakeTerrainComponent() : super(gridSize: 50, cellSize: cellWidth) {
     generator = TerrainGenerator(gridSize: 50);
   }
 
