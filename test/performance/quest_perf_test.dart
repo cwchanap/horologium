@@ -208,7 +208,24 @@ void main() {
       final medianBuildTime = sortedTimes[sortedTimes.length ~/ 2];
 
       // NFR-QST-003: UI must load within 500ms — test framework overhead considered
-      // Test framework overhead adds ~100ms; allow 500ms as generous test-environment bound
+      // Test framework overhead adds ~100ms; allow 500ms as generous test-environment bound.
+      // The first sample is a genuine cold QuestLogPage build (the warm-up
+      // above only exercised the framework, not the page), so assert it
+      // directly to guard the cold-start contract. The cold sample uses a
+      // wider bound (1000ms) than the median because a single cold-start
+      // measurement is more sensitive to scheduler contention than the
+      // median of repeated builds — observed cold builds range from ~250ms
+      // to ~700ms in the test environment. The median assertion below
+      // catches warmed regressions at the tighter 500ms bound.
+      expect(
+        buildTimes.first,
+        lessThan(1000),
+        reason:
+            'QuestLogPage cold build (first sample) must load within '
+            '1000ms in the test environment. The production NFR is 500ms; '
+            'the wider test bound accounts for cold-start scheduler '
+            'sensitivity that the median assertion avoids.',
+      );
       expect(
         medianBuildTime,
         lessThan(500),
