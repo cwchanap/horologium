@@ -29,7 +29,7 @@ class HorologiumApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Horologium - Space Explorer',
+      title: 'Horologium - Mining Frontier',
       theme: ThemeData(
         brightness: Brightness.dark,
         primarySwatch: Colors.blue,
