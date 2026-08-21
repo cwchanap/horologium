@@ -18,7 +18,7 @@
 - `MediaQuery.disableAnimations` remains the only reduced-motion source.
 - Do not purge binary city assets unless a build/declaration failure requires it.
 - Delete tests with retired production code instead of preserving dead behavior.
-- `README.md` is a product README, `CLAUDE.md` is detailed repository guidance, and `.specify/memory/constitution.md` is governance; do not make them hand-maintained copies of one another.
+- `README.md` is a product README and `CLAUDE.md` is the single detailed repository guidance source (symlinked from `AGENTS.md`); retired tool-specific shims (Copilot, Windsurf) and Speckit governance are removed entirely rather than maintained as thin forks.
 - Do not move surviving generic `lib/game/**` infrastructure merely to erase the directory name.
 
 ## File map
@@ -46,9 +46,6 @@ pubspec.lock
 
 README.md
 CLAUDE.md
-.github/copilot-instructions.md
-.windsurf/rules/project.md
-.specify/memory/constitution.md
 
 test/main_menu_test.dart
 test/widget_test.dart
@@ -61,7 +58,7 @@ test/mining/world/mining_game_test.dart
 
 ### Delete
 
-Delete city production/tests in Task 5. The lists below are discovery seeds, not an allowlist; static analysis/search owns final closure.
+Delete city production/tests in Task 5. Retired agent tooling is deleted in Task 6 (see cutover amendment). The lists below are discovery seeds, not an allowlist; static analysis/search owns final closure.
 
 ---
 
@@ -654,15 +651,26 @@ Commit the retirement as one coherent deletion/resource/dependency commit; stage
 
 ---
 
-## Task 6: Make product guidance/governance mining-first without maintaining four copies
+## Task 6: Make product guidance mining-first and retire agent tooling
 
 **Files:**
 - Modify: `README.md`
 - Modify: `CLAUDE.md`
-- Modify: `.github/copilot-instructions.md`
-- Modify: `.windsurf/rules/project.md`
-- Modify: `.specify/memory/constitution.md`
+- Delete: `.github/copilot-instructions.md`
+- Delete: `.windsurf/rules/project.md`
+- Delete: `.specify/memory/constitution.md`
+- Delete: `.github/agents/speckit.*.agent.md`
+- Delete: `.github/prompts/speckit.*.prompt.md`
+- Delete: `.specify/scripts/`
+- Delete: `.specify/templates/`
 - Do not separately fork: `AGENTS.md`
+
+> **Cutover amendment.** The original plan called for slimming the
+> tool-specific shims and amending the Speckit constitution to 2.0.0. During
+> implementation the team decided to retire Speckit, Copilot instructions,
+> and Windsurf rules entirely. `CLAUDE.md` (symlinked from `AGENTS.md`) is
+> now the single authoritative guidance source. Steps 3–5 below reflect
+> the retirement rather than the original slim/amend approach.
 
 ### Step 1 — replace the stock README with a real product README
 
@@ -698,75 +706,25 @@ Document strict unversioned save, audio ownership, reduced-motion source, resour
 
 `AGENTS.md` already follows `CLAUDE.md`; do not create another maintained body.
 
-### Step 3 — collapse Windsurf duplication
+### Step 3 — retire Windsurf rules
 
-Reduce `.windsurf/rules/project.md` to its required frontmatter plus a concise instruction to read/follow the authoritative `../../CLAUDE.md`.
+Delete `.windsurf/rules/project.md` and the `.windsurf/workflows` symlink. `CLAUDE.md` is the single authoritative source; no Windsurf-specific pointer is maintained.
 
-Example shape:
+### Step 4 — retire Copilot instructions
 
-```markdown
----
-trigger: always_on
----
+Delete `.github/copilot-instructions.md`. The original plan kept a thin self-contained shim, but the team decided to retire it entirely. `CLAUDE.md` (symlinked from `AGENTS.md`) is the single guidance source.
 
-Follow the repository guidance in `../../CLAUDE.md` as the authoritative architecture and workflow source.
-```
+Also delete the Speckit agent and prompt files under `.github/agents/` and `.github/prompts/`.
 
-### Step 4 — keep Copilot instructions thin and self-contained
+### Step 5 — retire Speckit governance and tooling
 
-Do **not** turn `.github/copilot-instructions.md` into another full architecture copy.
-
-Also do not rely on a symlink for this special GitHub instruction path unless implementation-time tool verification proves all targeted Copilot surfaces resolve it. GitHub documents `.github/copilot-instructions.md` as the repository-wide instruction file, while support for agent instruction files varies by surface.
-
-Keep a concise compatibility shim containing only the critical repo-wide rules, for example:
-
-```text
-Horologium is a Flutter/Flame mining-idle game.
-Use lib/mining as the gameplay vertical slice.
-Preserve strict unversioned horologium.mining.save unless a shipped compatibility need exists.
-Do not reintroduce city domains or speculative frameworks.
-Run format/analyze/tests for changes.
-Detailed architecture/workflow guidance lives in ../CLAUDE.md.
-```
-
-This removes the hand-maintained fork while keeping the documented Copilot entrypoint meaningful.
-
-### Step 5 — amend the active Speckit constitution
-
-This is a breaking governance change:
-
-```text
-1.0.0 -> 2.0.0
-```
-
-Replace city-specific mandates with concise current principles:
-
-```text
-I. Flutter/Flame ownership separation
-II. Mining content/state separation and one mutation boundary
-III. Strict unversioned mining persistence until a shipped compatibility need exists
-IV. Deterministic test-first economy/persistence behavior
-V. Asset-backed presentation with development fallbacks
-```
-
-Remove mandatory references to:
-
-```text
-MainGameWidget / MainGame
-BuildingRegistry / ResourceRegistry / Research.availableResearch
-city SharedPreferences key layout
-one-second city economy mutation timer
-50×50 placement grid
-```
-
-Retain format/analyze/test/target-verification quality gates and update the constitution Sync Impact Report/date.
+Delete `.specify/memory/constitution.md` and the supporting `.specify/scripts/` and `.specify/templates/` directories. The constitution's useful general principles (Flutter/Flame ownership separation, deterministic tests, asset discipline, quality gates) are already captured in `CLAUDE.md`.
 
 ### Step 6 — search active guidance
 
 ```bash
 rg "MainGameWidget|BuildingRegistry|ResourceRegistry|worker assignment|50x50|50×50|production chain|SaveService" \
-  README.md CLAUDE.md .github/copilot-instructions.md \
-  .windsurf/rules/project.md .specify/memory/constitution.md
+  README.md CLAUDE.md
 ```
 
 Expected: no stale city requirement. A clearly marked historical/removal sentence is acceptable.
