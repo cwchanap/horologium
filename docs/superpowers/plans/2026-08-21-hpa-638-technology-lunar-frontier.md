@@ -596,12 +596,36 @@ for (final planetId in state.unlockedPlanetIds) {
       mine.level,
       extraction,
     );
-    // clamp production to remaining capacity and update withSector(...)
+    final remaining = (capacity - mine.storedAmount)
+        .clamp(0.0, capacity)
+        .toDouble();
+    final amount = (rate * seconds).clamp(0.0, remaining).toDouble();
+    final stored = mine.storedAmount + amount;
+
+    next = next.withSector(
+      content,
+      definition.id,
+      progress.copyWith(mine: mine.copyWith(storedAmount: stored)),
+    );
+
+    productionByPlanet
+        .putIfAbsent(planetId, () => <ResourceType, double>{})
+        .update(
+          definition.resource,
+          (value) => value + amount,
+          ifAbsent: () => amount,
+        );
+    if (stored >= capacity) {
+      fullSectorsByPlanet
+          .putIfAbsent(planetId, () => <MiningSectorId>{})
+          .add(definition.id);
+    }
   }
 }
+next = next.copyWith(lastAccruedAtUtc: now);
 ```
 
-Advance the timestamp once at the end; never per planet.
+Compute `seconds` once from `elapsed`; initialize `productionByPlanet` and `fullSectorsByPlanet` before the loop. Advance the timestamp once at the end; never per planet.
 
 - [ ] **Step 5: Run GREEN and commit**
 
