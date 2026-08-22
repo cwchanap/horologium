@@ -447,7 +447,7 @@ if (hasExactKeys(root, _currentRootKeys)) {
 throw const FormatException('unknown mining save shape');
 ```
 
-Decode current state in the required order: cash/timestamp → technology → unlocked/active IDs → planets/mines → cross-field invariants. Pass decoded Logistics into mine decoding:
+Decode current state in the required order: cash/timestamp → technology → unlocked/active IDs → planets/mines → cross-field invariants. Pass decoded Logistics into mine decoding. Reuse the current strict mine validation explicitly:
 
 ```dart
 MineState? _decodeMine(
@@ -455,7 +455,25 @@ MineState? _decodeMine(
   Object? raw,
   int logisticsLevel,
 ) {
-  // existing strict level/stored validation
+  if (raw == null) return null;
+  if (raw is! Map<String, Object?>) {
+    throw const FormatException('mine must be null or an object');
+  }
+  if (!hasExactKeys(raw, const {'level', 'storedAmount'})) {
+    throw const FormatException(
+      'mine keys must be exactly level, storedAmount',
+    );
+  }
+
+  final level = raw['level'];
+  if (level is! int || level < 1 || level > 5) {
+    throw const FormatException('mine level must be between 1 and 5');
+  }
+  final storedAmount = raw['storedAmount'];
+  if (storedAmount is! num || storedAmount < 0) {
+    throw const FormatException('storedAmount must be a non-negative number');
+  }
+
   final capacity = content.effectiveCapacity(
     sectorId,
     level,
@@ -468,7 +486,7 @@ MineState? _decodeMine(
 }
 ```
 
-Legacy v1 uses Logistics 0 during its direct conversion.
+Legacy v1 calls the same decoder with Logistics 0 during direct conversion.
 
 - [ ] **Step 6: Rewrite converted v1 once during controller initialization**
 
@@ -577,6 +595,9 @@ final extraction = state.technology.extraction;
 final logistics = state.technology.logistics;
 final cap = content.offlineCapFor(logistics);
 final elapsed = rawElapsed > cap ? cap : rawElapsed;
+final seconds = elapsed.inMicroseconds / Duration.microsecondsPerSecond;
+final productionByPlanet = <MiningPlanetId, Map<ResourceType, double>>{};
+final fullSectorsByPlanet = <MiningPlanetId, Set<MiningSectorId>>{};
 
 var next = state;
 for (final planetId in state.unlockedPlanetIds) {
@@ -625,7 +646,7 @@ for (final planetId in state.unlockedPlanetIds) {
 next = next.copyWith(lastAccruedAtUtc: now);
 ```
 
-Compute `seconds` once from `elapsed`; initialize `productionByPlanet` and `fullSectorsByPlanet` before the loop. Advance the timestamp once at the end; never per planet.
+Advance the timestamp once at the end; never per planet.
 
 - [ ] **Step 5: Run GREEN and commit**
 
@@ -688,17 +709,43 @@ flutter test test/mining/mining_controller_test.dart
 
 Use the existing `_enqueueMutation`. Add `TechnologyLevels.levelFor(track)` / `copyWithTrack(track, level)` if that keeps controller switches exhaustive and small; do not introduce commands.
 
-Active sell must start with:
+Implement active-planet selling as:
 
 ```dart
 final candidate = simulation.accrue(_state, _nowUtc().toUtc());
 final activePlanet = content.planet(candidate.state.activePlanetId);
 var next = candidate.state;
+var totalCargo = 0.0;
+var grossValue = 0.0;
+final sold = <ResourceType, double>{};
 
 for (final definition in activePlanet.sectors) {
   final progress = next.progressFor(content, definition.id);
-  // accumulate, clear with next.withSector(...)
+  final mine = progress.mine;
+  if (mine == null || mine.storedAmount <= 0) continue;
+
+  totalCargo += mine.storedAmount;
+  grossValue += mine.storedAmount * definition.saleValuePerUnit;
+  sold.update(
+    definition.resource,
+    (value) => value + mine.storedAmount,
+    ifAbsent: () => mine.storedAmount,
+  );
+  next = next.withSector(
+    content,
+    definition.id,
+    progress.copyWith(mine: mine.copyWith(storedAmount: 0)),
+  );
 }
+
+if (totalCargo <= 0) {
+  return const MiningSaleResult.failure('No cargo to sell.');
+}
+final revenue = grossValue.floor();
+next = next.copyWith(cash: next.cash + revenue);
+await repository.save(next);
+_state = next;
+return MiningSaleResult.success(revenue: revenue, sold: sold);
 ```
 
 `revealSector` must additionally reject:
@@ -783,13 +830,17 @@ flutter test test/mining/mining_sheet_view_test.dart test/mining/mining_progress
 
 - [ ] **Step 5: Implement pure models only**
 
-`MiningSheetView._sellView` iterates:
+`MiningSheetView._sellView` computes active-planet cargo exactly as the controller does:
 
 ```dart
 final active = content.planet(state.activePlanetId);
+var totalCargo = 0.0;
+var grossValue = 0.0;
 for (final definition in active.sectors) {
   final mine = state.progressFor(content, definition.id).mine;
-  // derive total and value
+  if (mine == null) continue;
+  totalCargo += mine.storedAmount;
+  grossValue += mine.storedAmount * definition.saleValuePerUnit;
 }
 ```
 
