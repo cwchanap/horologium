@@ -89,7 +89,7 @@ Flame MiningGame(active planet definition)
 
 `MiningController`, `MiningSimulation`, and `MiningSaveRepository` remain singletons per `MiningScreen` session. Planet switching changes only the active projection.
 
-`MiningGame.applyState(...)` accepts the active `MiningPlanetProgress`, not the complete `MiningSave`. Flame does not receive technology, inactive planets, or persistence state.
+`MiningGame` receives one active `MiningPlanetProgress` snapshot at construction and `applyState(...)` accepts later active-planet snapshots. Flame does not receive technology, inactive planets, or persistence state. The constructor snapshot is applied from `onLoad()` after sector components exist so a newly replaced game cannot lose state because Flutter refreshed before Flame finished loading.
 
 ## Identity and content catalog
 
@@ -698,7 +698,10 @@ Required shape:
 late MiningGame _game;
 
 MiningGame _createGame(MiningPlanetId planetId) {
-  final game = MiningGame(planet: _content.planet(planetId));
+  final game = MiningGame(
+    planet: _content.planet(planetId),
+    initialProgress: _controller.state.planets[planetId]!,
+  );
   game.onSelectionChanged = _handleSelectionChanged;
   game.reducedMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
   return game;
@@ -711,14 +714,15 @@ After a successful `switchPlanet` or Lunar unlock:
 2. reset selected sector to Sell (`null`);
 3. replace `_game` with `_createGame(newActivePlanetId)`;
 4. rebuild `GameWidget` with `ValueKey(newActivePlanetId)`;
-5. after the new game is loaded, apply only `state.activePlanetProgress`;
-6. all later rewards/selections target the new game instance only.
+5. `MiningGame.onLoad()` creates the new planet’s terrain/sectors and applies its constructor `initialProgress` after those components exist;
+6. later presentation refreshes call `applyState(state.activePlanetProgress)` on the new loaded projection;
+7. all later rewards/selections target the new game instance only.
 
 The old `GameWidget` is unmounted through Flutter/Flame lifecycle when the key changes. Do not add a speculative second game-disposal subsystem; tests must prove the old game is no longer the mounted projection and cannot receive later selection/reward callbacks.
 
 The controller, repository, `AudioManager`, lifecycle observer, and refresh timer are reused across the replacement. Do not preserve per-planet camera or sector selection in HPA-638.
 
-For deterministic widget tests, `MiningScreen` may accept one optional `MiningGame Function(MiningPlanetDefinition)` factory seam, consistent with its existing injected repository/clock/audio seams. Do not add a general dependency-injection container.
+For deterministic widget tests, `MiningScreen` may accept one optional `MiningGame Function(MiningPlanetDefinition, MiningPlanetProgress)` factory seam, consistent with its existing injected repository/clock/audio seams. Do not add a general dependency-injection container.
 
 ## Lunar visual identity
 
@@ -823,6 +827,7 @@ Prove:
 - Homeworld and Lunar `MiningGame` instances mount only their own sectors;
 - Lunar seed/tint differs from Homeworld;
 - switch/unlock creates a new `MiningGame` + `ValueKey` while controller/audio/timer remain reused;
+- constructor progress is applied after `onLoad()` component creation;
 - old game is not the mounted target for later selection/reward callbacks;
 - all Lunar sectors reuse existing reveal/build/upgrade presentation.
 
