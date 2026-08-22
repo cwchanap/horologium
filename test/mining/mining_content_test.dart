@@ -5,10 +5,77 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
 
 void main() {
-  test('phase one reuses existing resource and mine identities', () {
-    final content = MiningContentRegistry.phaseOne();
+  test('stellar mining exposes the Homeworld and Lunar Frontier catalogs', () {
+    final content = MiningContentRegistry.stellarMining();
 
-    expect(content.sectors.map((s) => s.id), MiningSectorId.values);
+    expect(content.planets.keys.toSet(), {
+      MiningPlanetId.homeworld,
+      MiningPlanetId.lunarFrontier,
+    });
+    expect(content.planet(MiningPlanetId.homeworld).sectors.map((s) => s.id), [
+      MiningSectorId.landingBasin,
+      MiningSectorId.carbonRidge,
+      MiningSectorId.graniteCrater,
+    ]);
+    expect(
+      content.planet(MiningPlanetId.lunarFrontier).sectors.map((s) => s.id),
+      [
+        MiningSectorId.frozenBasin,
+        MiningSectorId.titaniumHighlands,
+        MiningSectorId.heliumMare,
+      ],
+    );
+  });
+
+  test('Lunar balance and terrain seeds are authored explicitly', () {
+    final content = MiningContentRegistry.stellarMining();
+
+    expect(content.planet(MiningPlanetId.homeworld).terrainSeed, 631);
+    expect(content.planet(MiningPlanetId.lunarFrontier).terrainSeed, 638);
+
+    final frozen = content.sector(MiningSectorId.frozenBasin);
+    expect(frozen.resource, ResourceType.waterIce);
+    expect(frozen.mineAsset, Assets.waterTreatmentPlant);
+    expect(frozen.requiredSurveyingLevel, 3);
+    expect(frozen.revealCost, 0);
+    expect(frozen.buildCost, 500);
+    expect(frozen.baseRatePerSecond, 1.00);
+    expect(frozen.baseCapacity, 150);
+    expect(frozen.saleValuePerUnit, 6);
+    expect(frozen.upgradeCosts, [700, 1400, 2800, 5600]);
+
+    final titanium = content.sector(MiningSectorId.titaniumHighlands);
+    expect(titanium.resource, ResourceType.titaniumOre);
+    expect(titanium.mineAsset, Assets.grinderMill);
+    expect(titanium.requiredSurveyingLevel, 4);
+    expect(titanium.revealCost, 3000);
+    expect(titanium.buildCost, 1200);
+    expect(titanium.baseRatePerSecond, 0.80);
+    expect(titanium.baseCapacity, 140);
+    expect(titanium.saleValuePerUnit, 12);
+    expect(titanium.upgradeCosts, [1600, 3200, 6400, 12800]);
+
+    final helium = content.sector(MiningSectorId.heliumMare);
+    expect(helium.resource, ResourceType.helium3);
+    expect(helium.mineAsset, Assets.researchLab);
+    expect(helium.requiredSurveyingLevel, 5);
+    expect(helium.revealCost, 8000);
+    expect(helium.buildCost, 3000);
+    expect(helium.baseRatePerSecond, 0.55);
+    expect(helium.baseCapacity, 120);
+    expect(helium.saleValuePerUnit, 30);
+    expect(helium.upgradeCosts, [4000, 8000, 16000, 32000]);
+  });
+
+  test('Homeworld reuses existing resource and mine identities', () {
+    final content = MiningContentRegistry.stellarMining();
+    final homeworld = content.planet(MiningPlanetId.homeworld).sectors;
+
+    expect(homeworld.map((s) => s.id), [
+      MiningSectorId.landingBasin,
+      MiningSectorId.carbonRidge,
+      MiningSectorId.graniteCrater,
+    ]);
     expect(
       content.sector(MiningSectorId.landingBasin).resource,
       ResourceType.gold,
@@ -33,10 +100,26 @@ void main() {
       content.sector(MiningSectorId.graniteCrater).mineAsset,
       Assets.quarry,
     );
+    for (final sector in homeworld) {
+      expect(sector.requiredSurveyingLevel, 0);
+    }
+  });
+
+  test('sector and planet lookups resolve globally unique sector ids', () {
+    final content = MiningContentRegistry.stellarMining();
+
+    expect(
+      content.planetForSector(MiningSectorId.frozenBasin),
+      MiningPlanetId.lunarFrontier,
+    );
+    expect(
+      content.planetForSector(MiningSectorId.landingBasin),
+      MiningPlanetId.homeworld,
+    );
   });
 
   test('world units are explicit and every authored anchor is in bounds', () {
-    final content = MiningContentRegistry.phaseOne();
+    final content = MiningContentRegistry.stellarMining();
     expect(MiningContentRegistry.terrainGridSize, 36);
     expect(MiningContentRegistry.terrainCellSize, 50);
     expect(
@@ -47,7 +130,9 @@ void main() {
     expect(MiningContentRegistry.worldExtent, 1800);
     expect(MiningContentRegistry.worldHalfExtent, 900);
 
-    for (final sector in content.sectors) {
+    for (final sector in content.planets.values.expand(
+      (planet) => planet.sectors,
+    )) {
       expect(sector.anchor.x, inInclusiveRange(-900, 900));
       expect(sector.anchor.y, inInclusiveRange(-900, 900));
     }

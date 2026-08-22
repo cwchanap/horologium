@@ -29,7 +29,7 @@ class MiningSaveRepository {
   static const saveKey = 'horologium.mining.save';
 
   MiningSaveRepository({MiningContentRegistry? content})
-    : content = content ?? MiningContentRegistry.phaseOne();
+    : content = content ?? MiningContentRegistry.stellarMining();
 
   final MiningContentRegistry content;
 
@@ -85,10 +85,18 @@ class MiningSaveRepository {
     if (raw is! Map<String, Object?>) {
       throw const FormatException('root must be an object');
     }
-    if (!hasExactKeys(raw, const {'cash', 'lastAccruedAtUtc', 'sectors'})) {
+    if (!hasExactKeys(raw, const {
+      'cash',
+      'lastAccruedAtUtc',
+      'technology',
+      'unlockedPlanetIds',
+      'activePlanetId',
+      'sectors',
+    })) {
       throw const FormatException(
         'root keys must be exactly '
-        'cash, lastAccruedAtUtc, sectors',
+        'cash, lastAccruedAtUtc, technology, unlockedPlanetIds, '
+        'activePlanetId, sectors',
       );
     }
 
@@ -106,23 +114,111 @@ class MiningSaveRepository {
       throw const FormatException('lastAccruedAtUtc must be a UTC timestamp');
     }
 
-    final sectorsRaw = raw['sectors'];
-    if (sectorsRaw is! Map<String, Object?>) {
+    final technology = _decodeTechnology(raw['technology']);
+
+    final unlockedPlanetIds = _decodeUnlockedPlanets(raw['unlockedPlanetIds']);
+    final activePlanetId = _decodePlanetId(raw['activePlanetId']);
+
+    final logistics = technology.levelFor(TechnologyTrack.logistics);
+    final sectors = _decodeSectors(raw['sectors'], logistics);
+
+    if (!unlockedPlanetIds.contains(activePlanetId)) {
+      throw const FormatException(
+        'activePlanetId must be one of unlockedPlanetIds',
+      );
+    }
+
+    return MiningSave(
+      cash: cash,
+      lastAccruedAtUtc: timestamp,
+      technology: technology,
+      unlockedPlanetIds: unlockedPlanetIds,
+      activePlanetId: activePlanetId,
+      sectors: Map.unmodifiable(sectors),
+    );
+  }
+
+  TechnologyLevels _decodeTechnology(Object? raw) {
+    if (raw is! Map<String, Object?>) {
+      throw const FormatException('technology must be an object');
+    }
+    if (!hasExactKeys(raw, const {'extraction', 'logistics', 'surveying'})) {
+      throw const FormatException(
+        'technology keys must be exactly extraction, logistics, surveying',
+      );
+    }
+    var extraction = 0;
+    var logistics = 0;
+    var surveying = 0;
+    for (final entry in raw.entries) {
+      final value = entry.value;
+      if (value is! int || value < 0) {
+        throw FormatException(
+          'technology ${entry.key} must be a non-negative integer',
+        );
+      }
+      switch (entry.key) {
+        case 'extraction':
+          extraction = value;
+        case 'logistics':
+          logistics = value;
+        case 'surveying':
+          surveying = value;
+      }
+    }
+    return TechnologyLevels(
+      extraction: extraction,
+      logistics: logistics,
+      surveying: surveying,
+    );
+  }
+
+  Set<MiningPlanetId> _decodeUnlockedPlanets(Object? raw) {
+    if (raw is! List<Object?> || raw.isEmpty) {
+      throw const FormatException('unlockedPlanetIds must be a non-empty list');
+    }
+    final ids = <MiningPlanetId>{};
+    for (final item in raw) {
+      final id = _decodePlanetId(item);
+      if (!ids.add(id)) {
+        throw const FormatException(
+          'unlockedPlanetIds must not contain duplicates',
+        );
+      }
+    }
+    return ids;
+  }
+
+  MiningPlanetId _decodePlanetId(Object? raw) {
+    if (raw is! String) {
+      throw const FormatException('planet id must be a string');
+    }
+    final id = MiningPlanetId.values.asNameMap()[raw];
+    if (id == null) {
+      throw FormatException('unknown planet id $raw');
+    }
+    return id;
+  }
+
+  Map<MiningSectorId, SectorProgress> _decodeSectors(
+    Object? raw,
+    int logistics,
+  ) {
+    if (raw is! Map<String, Object?>) {
       throw const FormatException('sectors must be an object');
     }
     final expectedSectorKeys = MiningSectorId.values
         .map((id) => id.name)
         .toSet();
-    if (!hasExactKeys(sectorsRaw, expectedSectorKeys)) {
+    if (!hasExactKeys(raw, expectedSectorKeys)) {
       throw const FormatException(
-        'sector keys must be exactly '
-        'landingBasin, carbonRidge, graniteCrater',
+        'sector keys must be exactly the six authored sectors',
       );
     }
 
     final sectors = <MiningSectorId, SectorProgress>{};
     for (final id in MiningSectorId.values) {
-      final sectorRaw = sectorsRaw[id.name];
+      final sectorRaw = raw[id.name];
       if (sectorRaw is! Map<String, Object?>) {
         throw FormatException('sector ${id.name} must be an object');
       }
@@ -143,18 +239,13 @@ class MiningSaveRepository {
       }
       sectors[id] = SectorProgress(
         revealed: revealed,
-        mine: _decodeMine(id, mineRaw),
+        mine: _decodeMine(id, mineRaw, logistics),
       );
     }
-
-    return MiningSave(
-      cash: cash,
-      lastAccruedAtUtc: timestamp,
-      sectors: Map.unmodifiable(sectors),
-    );
+    return sectors;
   }
 
-  MineState? _decodeMine(MiningSectorId sectorId, Object? raw) {
+  MineState? _decodeMine(MiningSectorId sectorId, Object? raw, int logistics) {
     if (raw == null) {
       return null;
     }
@@ -177,7 +268,7 @@ class MiningSaveRepository {
       throw const FormatException('storedAmount must be a non-negative number');
     }
 
-    final capacity = content.capacityFor(sectorId, level);
+    final capacity = content.effectiveCapacity(sectorId, level, logistics);
     return MineState(
       level: level,
       storedAmount: math.min(storedAmount.toDouble(), capacity),

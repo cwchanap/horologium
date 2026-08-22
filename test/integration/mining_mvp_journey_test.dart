@@ -31,7 +31,7 @@ Future<void> pumpInjectedMiningScreen(
         data: const MediaQueryData(),
         child: MiningScreen(
           key: screenKey,
-          content: MiningContentRegistry.phaseOne(),
+          content: MiningContentRegistry.stellarMining(),
           repository: repository,
           nowUtc: nowUtc,
         ),
@@ -243,7 +243,11 @@ Future<void> verifyMultiSectorStoredCargoAndSellRemainder(
   );
   expectStatus(tester, cash: 9, cargoValue: '0', sectors: '3/3');
 
-  for (final id in MiningSectorId.values) {
+  final homeworldSectors = MiningContentRegistry.stellarMining()
+      .planet(MiningPlanetId.homeworld)
+      .sectors
+      .map((definition) => definition.id);
+  for (final id in homeworldSectors) {
     await selectSector(tester, id);
     expect(find.textContaining('stored 0.0'), findsOneWidget);
   }
@@ -366,7 +370,7 @@ void main() {
 
       await pumpProductionEntryThenRetireIt(tester);
 
-      final content = MiningContentRegistry.phaseOne();
+      final content = MiningContentRegistry.stellarMining();
       final repository = MiningSaveRepository(content: content);
       final clock = TestClock(DateTime.utc(2026, 8, 18, 12));
 

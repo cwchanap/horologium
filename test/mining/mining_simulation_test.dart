@@ -17,7 +17,7 @@ MiningSave goldState(DateTime now, {double stored = 0, int level = 1}) {
 }
 
 void main() {
-  final content = MiningContentRegistry.phaseOne();
+  final content = MiningContentRegistry.stellarMining();
   final simulation = MiningSimulation(content);
   final start = DateTime.utc(2026, 8, 18, 12);
 

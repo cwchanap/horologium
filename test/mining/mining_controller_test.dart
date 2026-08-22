@@ -86,7 +86,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     clock = TestClock(DateTime.utc(2026, 8, 18, 12));
     controller = MiningController(
-      content: MiningContentRegistry.phaseOne(),
+      content: MiningContentRegistry.stellarMining(),
       repository: MiningSaveRepository(),
       nowUtc: clock.call,
     );
@@ -104,7 +104,7 @@ void main() {
       seed ?? MiningSave.initial(nowUtc: clock.now),
     );
     final seededController = MiningController(
-      content: MiningContentRegistry.phaseOne(),
+      content: MiningContentRegistry.stellarMining(),
       repository: repository,
       nowUtc: clock.call,
     );
@@ -119,7 +119,7 @@ void main() {
         SharedPreferences.setMockInitialValues({});
         final repository = AlwaysFailingSaveRepository();
         final fresh = MiningController(
-          content: MiningContentRegistry.phaseOne(),
+          content: MiningContentRegistry.stellarMining(),
           repository: repository,
           nowUtc: clock.call,
         );
@@ -142,7 +142,7 @@ void main() {
         });
         final repository = AlwaysFailingSaveRepository();
         final recovered = MiningController(
-          content: MiningContentRegistry.phaseOne(),
+          content: MiningContentRegistry.stellarMining(),
           repository: repository,
           nowUtc: clock.call,
         );
@@ -406,7 +406,7 @@ void main() {
           MiningSave.initial(nowUtc: clock.now),
         );
         final controller = MiningController(
-          content: MiningContentRegistry.phaseOne(),
+          content: MiningContentRegistry.stellarMining(),
           repository: repository,
           nowUtc: clock.call,
         );
@@ -437,7 +437,7 @@ void main() {
       await MiningSaveRepository().save(seeded);
       final repository = DelayedMiningSaveRepository();
       final controller = MiningController(
-        content: MiningContentRegistry.phaseOne(),
+        content: MiningContentRegistry.stellarMining(),
         repository: repository,
         nowUtc: clock.call,
       );

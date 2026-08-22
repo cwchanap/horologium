@@ -13,9 +13,11 @@ enum MiningRewardEffect { reveal, construction, tierUpgrade, sale }
 
 class MiningGame extends FlameGame
     with flame_events.TapCallbacks, flame_events.ScaleDetector {
-  MiningGame({required this.content});
+  MiningGame({required this.planet});
 
-  final MiningContentRegistry content;
+  /// The single projected planet for this world instance. Task 5 adds the
+  /// replacement lifecycle when the active planet can change at runtime.
+  final MiningPlanetDefinition planet;
   final Map<MiningSectorId, MiningSectorComponent> _sectors = {};
   MiningSectorId? _selectedSectorId;
 
@@ -41,14 +43,14 @@ class MiningGame extends FlameGame
         ParallaxTerrainComponent(
             gridSize: MiningContentRegistry.terrainGridSize,
             cellSize: MiningContentRegistry.terrainCellSize,
-            seed: 631,
+            seed: planet.terrainSeed,
           )
           ..parallaxEnabled = false
           ..anchor = Anchor.center
           ..position = Vector2.zero();
     world.add(terrain);
 
-    for (final definition in content.sectors) {
+    for (final definition in planet.sectors) {
       final component = MiningSectorComponent(definition: definition)
         ..position = Vector2(definition.anchor.x, definition.anchor.y)
         ..onSelected = _handleSectorSelected;
@@ -69,7 +71,7 @@ class MiningGame extends FlameGame
   }
 
   void applyState(MiningSave state) {
-    for (final definition in content.sectors) {
+    for (final definition in planet.sectors) {
       final progress =
           state.sectors[definition.id] ?? const SectorProgress(revealed: false);
       _sectors[definition.id]?.updateState(progress);
@@ -118,7 +120,9 @@ class MiningGame extends FlameGame
     required double bottomObscuredFraction,
   }) {
     if (!hasLoaded) return;
-    final definition = content.sector(sectorId);
+    final definition = planet.sectors.singleWhere(
+      (sector) => sector.id == sectorId,
+    );
     final fraction = bottomObscuredFraction.clamp(0.0, 1.0).toDouble();
     final viewportHeight = camera.viewport.size.y;
     final sheetTop = viewportHeight * (1 - fraction);

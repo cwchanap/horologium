@@ -93,7 +93,8 @@ class OfflineReturnSheet extends StatelessWidget {
               if (summary.fullSectors.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 for (final id
-                    in content.sectors
+                    in content.planets.values
+                        .expand((planet) => planet.sectors)
                         .map((definition) => definition.id)
                         .where(summary.fullSectors.contains))
                   Text(
@@ -152,6 +153,12 @@ class OfflineReturnSheet extends StatelessWidget {
         return 'Coal';
       case ResourceType.stone:
         return 'Stone';
+      case ResourceType.waterIce:
+        return 'Water Ice';
+      case ResourceType.titaniumOre:
+        return 'Titanium Ore';
+      case ResourceType.helium3:
+        return 'Helium-3';
     }
   }
 
@@ -163,6 +170,12 @@ class OfflineReturnSheet extends StatelessWidget {
         return Colors.blueGrey;
       case ResourceType.stone:
         return Colors.grey;
+      case ResourceType.waterIce:
+        return Colors.lightBlueAccent;
+      case ResourceType.titaniumOre:
+        return Colors.deepOrangeAccent;
+      case ResourceType.helium3:
+        return Colors.cyanAccent;
     }
   }
 }

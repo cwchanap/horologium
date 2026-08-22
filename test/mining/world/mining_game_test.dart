@@ -37,15 +37,15 @@ void main() {
   testWidgets('all authored anchors are visible at initial 360x640 fit', (
     tester,
   ) async {
-    final content = MiningContentRegistry.phaseOne();
-    final game = MiningGame(content: content);
+    final content = MiningContentRegistry.stellarMining();
+    final game = MiningGame(planet: content.planet(MiningPlanetId.homeworld));
     await pumpMiningGame(tester, game);
 
     expect(game.worldSize.x, 1800);
     expect(game.worldSize.y, 1800);
     expect(game.camera.viewfinder.zoom, closeTo(0.2, 0.0001));
 
-    for (final definition in content.sectors) {
+    for (final definition in content.planet(MiningPlanetId.homeworld).sectors) {
       final screenX = 180 + definition.anchor.x * game.camera.viewfinder.zoom;
       final screenY = 320 + definition.anchor.y * game.camera.viewfinder.zoom;
       expect(screenX, inInclusiveRange(0, 360));
@@ -56,7 +56,11 @@ void main() {
   testWidgets('mounted terrain uses the mining world extent contract', (
     tester,
   ) async {
-    final game = MiningGame(content: MiningContentRegistry.phaseOne());
+    final game = MiningGame(
+      planet: MiningContentRegistry.stellarMining().planet(
+        MiningPlanetId.homeworld,
+      ),
+    );
     await pumpMiningGame(tester, game);
     await tester.pump(const Duration(milliseconds: 100));
     game.updateTree(0);
@@ -77,8 +81,8 @@ void main() {
   testWidgets('levels one three and five add distinct mounted structure', (
     tester,
   ) async {
-    final content = MiningContentRegistry.phaseOne();
-    final game = MiningGame(content: content);
+    final content = MiningContentRegistry.stellarMining();
+    final game = MiningGame(planet: content.planet(MiningPlanetId.homeworld));
     await pumpMiningGame(tester, game);
     final base = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 18, 12));
 
@@ -184,8 +188,10 @@ void main() {
     testWidgets(
       'selection focus places the sector above the sheet at $viewport',
       (tester) async {
-        final content = MiningContentRegistry.phaseOne();
-        final game = MiningGame(content: content)..reducedMotion = true;
+        final content = MiningContentRegistry.stellarMining();
+        final game = MiningGame(
+          planet: content.planet(MiningPlanetId.homeworld),
+        )..reducedMotion = true;
         await pumpMiningGame(tester, game, size: viewport);
 
         final selections = <MiningSectorId>[];
