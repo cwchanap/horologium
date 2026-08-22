@@ -39,6 +39,17 @@ class MiningController {
        simulation = MiningSimulation(content);
 
   static const int _maxMineLevel = 5;
+  static const int _maxTechnologyLevel = 5;
+  static const List<int> _technologyCosts = [300, 700, 1500, 4000, 9000];
+  static const List<MiningSectorId> _technologyMineGates = [
+    MiningSectorId.landingBasin,
+    MiningSectorId.carbonRidge,
+    MiningSectorId.graniteCrater,
+    MiningSectorId.frozenBasin,
+    MiningSectorId.titaniumHighlands,
+  ];
+  static const int _lunarUnlockCost = 2500;
+  static const int _lunarUnlockSurveying = 3;
 
   final MiningContentRegistry content;
   final MiningSaveRepository repository;
@@ -127,6 +138,12 @@ class MiningController {
             'Reveal the previous sector first.',
           );
         }
+        if (candidate.state.technology.surveying <
+            definition.requiredSurveyingLevel) {
+          return MiningActionResult.failure(
+            'Requires Surveying ${definition.requiredSurveyingLevel}.',
+          );
+        }
         if (candidate.state.cash < definition.revealCost) {
           return const MiningActionResult.failure('Not enough cash.');
         }
@@ -203,6 +220,88 @@ class MiningController {
           cash: candidate.state.cash - cost,
           sectors: sectors,
         );
+        await repository.save(next);
+        _state = next;
+        return const MiningActionResult.success();
+      });
+
+  Future<MiningActionResult> purchaseTechnology(
+    TechnologyTrack track,
+  ) => _enqueueMutation(() async {
+    final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+    final currentLevel = candidate.state.technology.levelFor(track);
+
+    if (currentLevel >= _maxTechnologyLevel) {
+      return const MiningActionResult.failure('Technology is at max level.');
+    }
+    final gateSector = _technologyMineGates[currentLevel];
+    if (candidate.state.sectors[gateSector]!.mine == null) {
+      return MiningActionResult.failure(
+        'Build the ${content.sector(gateSector).name} mine first.',
+      );
+    }
+    final cost = _technologyCosts[currentLevel];
+    if (candidate.state.cash < cost) {
+      return const MiningActionResult.failure('Not enough cash.');
+    }
+
+    final next = candidate.state.copyWith(
+      cash: candidate.state.cash - cost,
+      technology: candidate.state.technology.withLevel(track, currentLevel + 1),
+    );
+    await repository.save(next);
+    _state = next;
+    return const MiningActionResult.success();
+  });
+
+  Future<MiningActionResult> unlockPlanet(MiningPlanetId id) =>
+      _enqueueMutation(() async {
+        final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+
+        if (candidate.state.unlockedPlanetIds.contains(id)) {
+          return const MiningActionResult.failure('Planet already unlocked.');
+        }
+        final mastered = content
+            .planet(MiningPlanetId.homeworld)
+            .sectors
+            .every(
+              (sector) => candidate.state.sectors[sector.id]!.mine != null,
+            );
+        if (!mastered) {
+          return const MiningActionResult.failure(
+            'Build every Homeworld mine first.',
+          );
+        }
+        if (candidate.state.technology.surveying < _lunarUnlockSurveying) {
+          return MiningActionResult.failure(
+            'Requires Surveying $_lunarUnlockSurveying.',
+          );
+        }
+        if (candidate.state.cash < _lunarUnlockCost) {
+          return const MiningActionResult.failure('Not enough cash.');
+        }
+
+        final next = candidate.state.copyWith(
+          cash: candidate.state.cash - _lunarUnlockCost,
+          unlockedPlanetIds: {...candidate.state.unlockedPlanetIds, id},
+          activePlanetId: id,
+        );
+        await repository.save(next);
+        _state = next;
+        return const MiningActionResult.success();
+      });
+
+  Future<MiningActionResult> switchPlanet(MiningPlanetId id) =>
+      _enqueueMutation(() async {
+        if (!_state.unlockedPlanetIds.contains(id)) {
+          return const MiningActionResult.failure('Planet is locked.');
+        }
+        final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+        if (candidate.state.activePlanetId == id) {
+          return const MiningActionResult.failure('Planet is already active.');
+        }
+
+        final next = candidate.state.copyWith(activePlanetId: id);
         await repository.save(next);
         _state = next;
         return const MiningActionResult.success();
