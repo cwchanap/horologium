@@ -74,9 +74,24 @@ class MiningContentRegistry {
   static const double terrainCellSize = 50;
   static const double worldExtent = terrainGridSize * terrainCellSize;
   static const double worldHalfExtent = worldExtent / 2;
-  static const offlineCap = Duration(hours: 8);
+  static const offlineCapsByLogistics = <Duration>[
+    Duration(hours: 8),
+    Duration(hours: 10),
+    Duration(hours: 12),
+    Duration(hours: 16),
+    Duration(hours: 20),
+    Duration(hours: 24),
+  ];
   static const rateMultipliers = <double>[1.0, 1.5, 2.25, 3.25, 4.5];
   static const capacityMultipliers = <double>[1.0, 1.5, 2.0, 3.0, 4.0];
+  static const extractionRateMultipliers = <double>[
+    1.0,
+    1.1,
+    1.25,
+    1.45,
+    1.7,
+    2.0,
+  ];
   static const logisticsCapacityMultipliers = <double>[
     1.0,
     1.15,
@@ -214,6 +229,11 @@ class MiningContentRegistry {
   double capacityFor(MiningSectorId id, int level) =>
       sector(id).baseCapacity * capacityMultipliers[level - 1];
 
+  double effectiveRate(MiningSectorId id, int level, int extraction) =>
+      rateFor(id, level) * extractionRateMultipliers[extraction];
+
   double effectiveCapacity(MiningSectorId id, int level, int logistics) =>
       capacityFor(id, level) * logisticsCapacityMultipliers[logistics];
+
+  Duration offlineCapFor(int logistics) => offlineCapsByLogistics[logistics];
 }
