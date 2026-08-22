@@ -239,6 +239,12 @@ void main() {
       'non-int technology level': currentDoc(
         technology: {'extraction': 'one', 'logistics': 0, 'surveying': 0},
       ),
+      'extraction technology level above 5': currentDoc(
+        technology: {'extraction': 6, 'logistics': 0, 'surveying': 0},
+      ),
+      'logistics technology level above 5': currentDoc(
+        technology: {'extraction': 0, 'logistics': 6, 'surveying': 0},
+      ),
       'unknown planet id in unlocked list': currentDoc(
         unlockedPlanetIds: ['homeworld', 'bogus'],
       ),
