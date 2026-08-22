@@ -536,7 +536,7 @@ expect(
 
 - [ ] **Step 2: Write RED Logistics cap/capacity tests**
 
-With Logistics 2, assert offline elapsed of 20 hours uses 12 hours. Assert capacity uses the `1.30` storage multiplier and independently clamps each mine. Add a locked-Lunar test where a populated but locked Lunar record produces zero.
+With Logistics 2, assert offline elapsed of 20 hours uses 12 hours. Assert capacity uses the `1.30` storage multiplier and independently clamps each mine. For locked Lunar, keep its required pristine state and assert it contributes no summary entry while only Homeworld accrues.
 
 - [ ] **Step 3: Run RED**
 
