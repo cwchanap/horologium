@@ -400,7 +400,7 @@ activePlanetId
 planets
 ```
 
-Representative JSON:
+Representative valid initial JSON:
 
 ```json
 {
@@ -414,8 +414,20 @@ Representative JSON:
   "unlockedPlanetIds": ["homeworld"],
   "activePlanetId": "homeworld",
   "planets": {
-    "homeworld": { "sectors": {} },
-    "lunarFrontier": { "sectors": {} }
+    "homeworld": {
+      "sectors": {
+        "landingBasin": {"revealed": true, "mine": null},
+        "carbonRidge": {"revealed": false, "mine": null},
+        "graniteCrater": {"revealed": false, "mine": null}
+      }
+    },
+    "lunarFrontier": {
+      "sectors": {
+        "frozenBasin": {"revealed": false, "mine": null},
+        "titaniumHighlands": {"revealed": false, "mine": null},
+        "heliumMare": {"revealed": false, "mine": null}
+      }
+    }
   }
 }
 ```
