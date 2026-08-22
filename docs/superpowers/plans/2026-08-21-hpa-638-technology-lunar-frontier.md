@@ -1045,11 +1045,17 @@ git commit -m "feat(mining): launch the Lunar Frontier world"
 - Create: `test/integration/mining_multi_planet_journey_test.dart`
 - Modify: `CLAUDE.md`
 - Modify: `README.md`
-- Modify: any focused test fixture still referencing removed `phaseOne()` / flat `state.sectors` APIs.
+- Modify: `test/mining/mining_content_test.dart`
+- Modify: `test/mining/mining_save_repository_test.dart`
+- Modify: `test/mining/mining_simulation_test.dart`
+- Modify: `test/mining/mining_controller_test.dart`
+- Modify: `test/mining/mining_sheet_view_test.dart`
+- Modify: `test/mining/presentation/mining_screen_test.dart`
+- Modify: `test/mining/world/mining_game_test.dart`
 
 **Interfaces:**
 - Consumes: all HPA-638 behavior.
-- Produces: end-to-end evidence and updated repository guidance.
+- Produces: end-to-end evidence, fully retargeted legacy fixtures, and updated repository guidance.
 
 - [ ] **Step 1: Write the progression journey**
 
@@ -1074,7 +1080,24 @@ flutter test test/integration/mining_multi_planet_journey_test.dart
 
 Expected final result: PASS.
 
-- [ ] **Step 4: Update repository guidance**
+- [ ] **Step 4: Retarget every remaining first-planet fixture to explicit planet APIs**
+
+Search the changed test/runtime tree:
+
+```sh
+rg 'phaseOne\(|content\.sectors|state\.sectors|\.sectors\[' lib/mining test/mining test/integration
+```
+
+Expected after cleanup:
+
+- no `MiningContentRegistry.phaseOne()`;
+- no `content.sectors`;
+- no `state.sectors`;
+- `.sectors[...]` appears only when the code has already selected a concrete `MiningPlanetProgress` or authored `MiningPlanetDefinition`.
+
+Convert remaining fixtures to `MiningContentRegistry.stellarMining()`, `state.progressFor(...)`, `state.withSector(...)`, `state.activePlanetProgress`, or explicit `content.planet(id).sectors` as appropriate. Do not add compatibility aliases just to keep old tests compiling.
+
+- [ ] **Step 5: Update repository guidance**
 
 Update `CLAUDE.md` ownership boundary to describe:
 
@@ -1096,7 +1119,7 @@ reveal -> build -> mine -> sell -> upgrade -> technology -> unlock planet
 
 Keep README short; do not duplicate the full spec.
 
-- [ ] **Step 5: Run all focused HPA-638 suites**
+- [ ] **Step 6: Run all focused HPA-638 suites**
 
 ```sh
 flutter test test/mining/mining_content_test.dart
@@ -1113,7 +1136,7 @@ flutter test test/integration/mining_multi_planet_journey_test.dart
 
 Expected: all PASS.
 
-- [ ] **Step 6: Run repository quality/build gates**
+- [ ] **Step 7: Run repository quality/build gates**
 
 ```sh
 flutter analyze --fatal-infos
@@ -1127,7 +1150,7 @@ flutter build web
 
 Expected: all commands exit 0.
 
-- [ ] **Step 7: Perform the representative portrait smoke**
+- [ ] **Step 8: Perform the representative portrait smoke**
 
 On a representative portrait build, verify in order:
 
@@ -1142,7 +1165,7 @@ On a representative portrait build, verify in order:
 
 Record any balance-only tuning by changing authored numbers/tests in this same PR; do not add dynamic balance infrastructure.
 
-- [ ] **Step 8: Final diff review and commit**
+- [ ] **Step 9: Final diff review and commit**
 
 Confirm the final diff contains no `schemaVersion`, `MiningPlanetVisualTheme`, `content.sectors`, `state.sectors`, new state-management dependency, or generic planet/modifier framework.
 
