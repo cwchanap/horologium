@@ -116,6 +116,10 @@ class MiningSheetView {
       if (prereq != null && !(state.sectors[prereq]?.revealed ?? false)) {
         enabled = false;
         reason = 'Reveal ${content.sector(prereq).name} first.';
+      } else if (state.technology.surveying <
+          definition.requiredSurveyingLevel) {
+        enabled = false;
+        reason = 'Requires Surveying ${definition.requiredSurveyingLevel}.';
       } else if (state.cash < definition.revealCost) {
         enabled = false;
         reason = 'Need ${definition.revealCost} cash to reveal.';
@@ -125,7 +129,7 @@ class MiningSheetView {
         body:
             'Reveal cost ${definition.revealCost} cash, build cost '
             '${definition.buildCost} cash. Produces '
-            '${_rate(content, id, 1)}/s.',
+            '${_rate(state, content, id, 1)}/s.',
         primaryLabel: 'Reveal for ${definition.revealCost} cash',
         action: MiningSheetAction.reveal,
         primaryEnabled: enabled,
@@ -139,8 +143,8 @@ class MiningSheetView {
         title: definition.name,
         body:
             'Build cost ${definition.buildCost} cash. Produces '
-            '${_rate(content, id, 1)}/s, capacity '
-            '${_capacity(content, id, 1)}.',
+            '${_rate(state, content, id, 1)}/s, capacity '
+            '${_capacity(state, content, id, 1)}.',
         primaryLabel: 'Build for ${definition.buildCost} cash',
         action: MiningSheetAction.build,
         primaryEnabled: enabled,
@@ -154,8 +158,8 @@ class MiningSheetView {
       return MiningSheetView(
         title: definition.name,
         body:
-            'Level 5 mine. Produces ${_rate(content, id, 5)}/s, capacity '
-            '${_capacity(content, id, 5)}, stored '
+            'Level 5 mine. Produces ${_rate(state, content, id, 5)}/s, '
+            'capacity ${_capacity(state, content, id, 5)}, stored '
             '${mine.storedAmount.toStringAsFixed(1)}.',
         primaryLabel: 'Max Level',
         action: MiningSheetAction.none,
@@ -170,8 +174,8 @@ class MiningSheetView {
       title: definition.name,
       body:
           'Level ${mine.level} mine. Produces '
-          '${_rate(content, id, mine.level)}/s, capacity '
-          '${_capacity(content, id, mine.level)}, stored '
+          '${_rate(state, content, id, mine.level)}/s, capacity '
+          '${_capacity(state, content, id, mine.level)}, stored '
           '${mine.storedAmount.toStringAsFixed(1)}.',
       primaryLabel: 'Upgrade for $cost cash',
       action: MiningSheetAction.upgrade,
@@ -181,14 +185,20 @@ class MiningSheetView {
   }
 
   static String _rate(
+    MiningSave state,
     MiningContentRegistry content,
     MiningSectorId id,
     int level,
-  ) => content.rateFor(id, level).toStringAsFixed(1);
+  ) => content
+      .effectiveRate(id, level, state.technology.extraction)
+      .toStringAsFixed(2);
 
   static String _capacity(
+    MiningSave state,
     MiningContentRegistry content,
     MiningSectorId id,
     int level,
-  ) => content.capacityFor(id, level).toStringAsFixed(1);
+  ) => content
+      .effectiveCapacity(id, level, state.technology.logistics)
+      .toStringAsFixed(1);
 }
