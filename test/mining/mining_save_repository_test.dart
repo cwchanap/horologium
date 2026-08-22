@@ -75,6 +75,19 @@ void main() {
       expect(result.wasMissing, isFalse);
     });
 
+    test('non-String preference value resets and reports recovery', () async {
+      // SharedPreferences.getString throws a runtime cast error when the
+      // stored value is not a String. hasSave() still reports presence, so
+      // load() must route this case through the recovery boundary instead of
+      // letting the cast escape and brick the screen.
+      SharedPreferences.setMockInitialValues({key: 123});
+      expect(await MiningSaveRepository().hasSave(), isTrue);
+      final result = await MiningSaveRepository().load(nowUtc: now);
+      expect(result.state.cash, 100);
+      expect(result.recoveredFromInvalidSave, isTrue);
+      expect(result.wasMissing, isFalse);
+    });
+
     test('legacy city keys are ignored', () async {
       SharedPreferences.setMockInitialValues({
         'cash': 999999.0,
