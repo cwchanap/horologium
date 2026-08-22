@@ -22,7 +22,7 @@ HPA-638 creates the first real mining-save compatibility obligation. The HPA-631
 
 Ship one complete long-term progression step on top of the validated mining-only product:
 
-> Mine and sell on the Homeworld → buy simple permanent technology with cash → reach Surveying 3 → unlock the Stellar Map destination → land on Lunar Frontier → reveal and mine Water Ice → progress through Titanium Ore and Helium-3 → leave → return to production from both planets.
+> Mine and sell on the Homeworld → buy simple permanent technology with cash → reach Surveying 3 → unlock the Lunar Frontier destination → land there → reveal and mine Water Ice → progress through Titanium Ore and Helium-3 → leave → return to production from both planets.
 
 The task must prove that permanent technology and a second planet can extend the current idle loop without turning Horologium back into a simulation-heavy game.
 
@@ -84,11 +84,13 @@ Flutter MiningScreen
     -> existing MiningActionSheet / OfflineReturnSheet
 
 Flame MiningGame(active planet definition)
-    <- read-only active-planet state snapshot
+    <- read-only MiningPlanetProgress snapshot
     -> typed sector selection callback
 ```
 
 `MiningController`, `MiningSimulation`, and `MiningSaveRepository` remain singletons per `MiningScreen` session. Planet switching changes which planet is projected by Flutter/Flame; it does not create a second controller, repository, save, or simulation.
+
+`MiningGame.applyState(...)` should evolve to accept the active `MiningPlanetProgress`, not the complete `MiningSave`. Flame does not need technology, unlocked-planet, or inactive-planet state; effective display values are supplied through content helpers and the active snapshot. This keeps the world renderer narrower than the persistence model.
 
 ## Identity and content model
 
@@ -152,7 +154,7 @@ Extend `MiningSectorDefinition` only with the concrete progression information H
 final int requiredSurveyingLevel;
 ```
 
-Keep the existing `requiredSector` field. Do not replace these two simple fields with a generic requirement object, expression tree, predicate registry, or DSL.
+Keep the existing `requiredSector` field. Homeworld sectors use `requiredSurveyingLevel = 0`. Do not replace these two simple fields with a generic requirement object, expression tree, predicate registry, or DSL.
 
 ### Resource identity
 
@@ -245,14 +247,18 @@ The storage multiplier is applied after the existing mine-level capacity multipl
 
 ### Surveying effects
 
-Surveying has no generic numeric modifier. It is an integer progression requirement consumed directly by authored unlock checks:
+Surveying has no generic numeric modifier. It is an integer progression requirement consumed directly by authored unlock checks.
 
-- Surveying 1: Stellar Map becomes meaningfully actionable and shows the Lunar Frontier requirement.
-- Surveying 3: satisfies the technology portion of the Lunar Frontier planet unlock.
+The **Stellar Map button and sheet are always visible after `MiningScreen` initializes**, including at Surveying 0, so the player can see what future progression is for. Surveying changes eligibility, not visibility.
+
+- Surveying 0: Stellar Map shows Lunar Frontier and the unmet Surveying 3 requirement.
+- Surveying 1: first purchased step toward the Lunar requirement.
+- Surveying 2: second visible step toward the Lunar requirement.
+- Surveying 3: satisfies the technology portion of the Lunar Frontier planet unlock and Frozen Basin reveal.
 - Surveying 4: satisfies the Surveying requirement for Titanium Highlands.
 - Surveying 5: satisfies the Surveying requirement for Helium Mare.
 
-Surveying 2 intentionally has no separate subsystem reward; it is a visible step toward the Surveying 3 planet-unlock threshold.
+Surveying levels 1 and 2 intentionally do not unlock separate subsystems.
 
 ## Homeworld mastery and Lunar Frontier unlock
 
@@ -385,6 +391,8 @@ Strictly require:
 - Lunar Frontier has no revealed sectors or mines while the planet is locked;
 - stored cargo is normalized down to the current effective capacity using the decoded Logistics level, preserving the existing safe capacity-clamp behavior.
 
+Serialize `unlockedPlanetIds` in `MiningPlanetId.values` order for deterministic JSON output. The decoder may accept either valid known-ID order; ordering is not a semantic requirement.
+
 Unknown keys, unknown IDs, missing data, bad types, malformed timestamps, invalid technology levels, invalid mine levels/cargo, negative cash, or broken cross-field invariants use the existing clean-reset recovery boundary.
 
 ### Legacy v1 recognition
@@ -410,9 +418,9 @@ Decode it with the same strict rules already used on main. Convert it directly t
 - setting Homeworld active;
 - creating pristine Lunar Frontier progress.
 
-Expose one `migratedLegacyV1`/`needsRewrite` signal in `MiningLoadResult`. During controller initialization, accrue the converted state normally and rewrite it once as v2. Do not add a migration registry, ordered migration list, generic migrator interface, or old-version writer.
+Add exactly one `migratedLegacyV1` boolean to `MiningLoadResult`. During controller initialization, accrue the converted state normally and rewrite it once as v2 when `migratedLegacyV1` is true. Existing `wasMissing` and `recoveredFromInvalidSave` behavior remains unchanged; initialization persists when any of those three conditions requires a fresh/current-format document.
 
-Invalid v1 data still resets cleanly; do not partially salvage malformed legacy mining documents.
+Do not add a migration registry, ordered migration list, generic migrator interface, or old-version writer. Invalid v1 data still resets cleanly; do not partially salvage malformed legacy mining documents.
 
 ## Deterministic multi-planet simulation
 
@@ -545,7 +553,7 @@ sector tabs for active planet
 
 Use compact 48+ logical-pixel touch targets and verify that the row does not overlap the status bar, sector tabs, or bottom action sheet at 360×640 and 430×932.
 
-The status bar should identify the active planet while preserving cash, active-planet sector progress, and active-planet cargo value. “Sell All Cargo” continues to refer only to the active planet.
+The status bar identifies the active planet while preserving cash, active-planet sector progress, and active-planet cargo value. “Sell All Cargo” refers only to the active planet.
 
 ### Technology sheet
 
@@ -573,7 +581,7 @@ The widget renders values derived from the domain/content helpers; it does not i
 
 ### Stellar Map sheet
 
-Add one portrait-friendly modal bottom sheet with exactly two planet cards.
+Add one portrait-friendly modal bottom sheet with exactly two planet cards. The sheet is reachable at Surveying 0; locked-state copy teaches the future requirement.
 
 Homeworld card shows:
 
@@ -598,12 +606,12 @@ When the active planet changes:
 
 1. controller switch/unlock completes and persists;
 2. `MiningScreen` replaces its `MiningGame` instance using the new `MiningPlanetDefinition`;
-3. the new game receives the active planet state snapshot;
-4. selection resets to the Sell tab (`null`) unless a later concrete UX issue justifies preserving per-planet selection.
+3. the new game receives only that planet’s `MiningPlanetProgress` snapshot;
+4. selection resets to the Sell tab (`null`).
 
 Use a `ValueKey(activePlanetId)` or equivalent widget identity so Flutter mounts the replacement `GameWidget` cleanly.
 
-The controller, repository, audio manager, lifecycle observer, and refresh timer stay in place.
+The controller, repository, audio manager, lifecycle observer, and refresh timer stay in place. Do not preserve per-planet camera/selection state in HPA-638.
 
 ## Lunar visual identity
 
@@ -612,10 +620,12 @@ Lunar Frontier must look materially different without adding a general biome sys
 Use the concrete `MiningPlanetVisualTheme.lunar` switch to provide:
 
 - a distinct deterministic terrain seed;
-- cooler/desaturated terrain atmosphere/tint versus Homeworld;
+- cooler/desaturated atmosphere/tint versus Homeworld;
 - three concrete lunar resource/facility assets;
 - distinct resource silhouettes/icons for Water Ice, Titanium Ore, and Helium-3;
 - the existing level 1/3/5 structural mine-tier language, with the new lunar facility art as its base identity.
+
+Prefer applying the small planet-specific atmosphere/tint in `MiningGame` rather than adding generic theme plumbing to `ParallaxTerrainComponent`. Only modify the shared terrain component if the concrete visual cannot be achieved cleanly at the mining-world layer.
 
 Keep visual fallback behavior so missing optional effects do not break gameplay. Do not build procedural theme configuration or generalized art packs before HPA-641 proves the need.
 
@@ -697,10 +707,12 @@ Prove:
 Prove:
 
 - Technology sheet exact current/next/cost/requirement states;
-- Stellar Map exact unmet requirements, unlock, and travel behavior;
+- Stellar Map is visible before Surveying 1 and shows exact unmet requirements;
+- Stellar Map unlock and travel behavior;
 - 360×640 and 430×932 top controls remain reachable and non-overlapping;
 - reduced-motion unlock confirmation;
 - Homeworld and Lunar games mount the correct sector set;
+- `MiningGame` consumes only active-planet progress;
 - Lunar visual theme/terrain seed differs from Homeworld;
 - active planet switch recreates the game without recreating controller state;
 - all three Lunar sectors reuse the existing selection/reveal/build/upgrade presentation path.
