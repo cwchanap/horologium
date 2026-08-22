@@ -7,7 +7,8 @@ this file; keep that entrypoint as a symlink and maintain guidance here.
 ## Product and ownership boundary
 
 Horologium is a casual stellar mining idle game. The playable loop is reveal a
-sector, build its mine, accrue resources, sell cargo, and upgrade the mine.
+sector, build its mine, accrue resources across unlocked planets, sell active-
+planet cargo, upgrade mines, and research technology to unlock new progression.
 The current ownership boundary is:
 
 ```text
@@ -26,17 +27,23 @@ MainMenu
   action sheets, lifecycle checkpoints, the one-second presentation refresh,
   accessibility propagation, and the `MiningGame` widget bridge.
 - `MiningController` is the one mutation boundary for mining actions. Reveal,
-  build, upgrade, sale, checkpoint, and resume operations are queued so each
-  action accrues current state and updates the in-memory state in order;
-  committing actions and lifecycle checkpoints persist through the repository.
-- `MiningSimulation` is deterministic economy logic. It accrues from a supplied
-  UTC clock, fills mine storage, reports production, and applies the eight-hour
-  offline cap without reading Flutter or device state.
+  build, upgrade, sale, technology purchase, planet unlock/travel, checkpoint,
+  and resume operations are queued so each action accrues current state and
+  updates the in-memory state in order; committing actions and lifecycle
+  checkpoints persist through the repository. Selling only empties cargo on the
+  active planet.
+- `MiningSimulation` is deterministic economy logic. It accrues one supplied
+  UTC window across every unlocked planet, applies technology effects, fills
+  mine storage, reports aggregate and per-planet production, reports a flat set
+  of full sector IDs, and applies the logistics-aware offline cap without
+  reading Flutter or device state.
 - `MiningSaveRepository` exclusively owns the mining save document's
   SharedPreferences read, write, strict decode, and invalid-save recovery.
-- `MiningGame` is the Flame world. It owns terrain, sector components, camera
-  movement, selection, and action feedback; it does not own persistence,
-  SharedPreferences, or Flutter presentation state.
+- `MiningGame` is the Flame world for one projected planet. It owns terrain,
+  sector components, camera movement, selection, and action feedback; it does
+  not own persistence, SharedPreferences, or Flutter presentation state. The
+  screen replaces the game and keys the `GameWidget` by active planet when
+  travel or an unlock changes the projected world.
 - `ParallaxTerrainComponent` and its terrain helpers are shared Flame rendering
   consumers under `lib/game/terrain/`. Keep them independent of mining state
   and UI concerns.
@@ -48,17 +55,23 @@ small callbacks or values at the `MiningScreen`/`MiningGame` boundary.
 ## Mining state and persistence
 
 `MiningSaveRepository.saveKey` is the single mining key:
-`horologium.mining.save`. Its JSON document is intentionally strict and
-unversioned. The root keys are exactly `cash`, `lastAccruedAtUtc`, and
-`sectors`; each authored sector has exactly `revealed` and `mine`, and a mine
-has `level` and `storedAmount`.
+`horologium.mining.save`. Its current JSON document is intentionally strict and
+unversioned. The root keys are exactly `cash`, `lastAccruedAtUtc`, `technology`,
+`unlockedPlanetIds`, `activePlanetId`, and `sectors`. `technology` has exactly
+`extraction`, `logistics`, and `surveying`; `sectors` is one flat map containing
+the six authored sector IDs, and each sector has exactly `revealed` and `mine`,
+while a mine has `level` and `storedAmount`. `activePlanetId` must be one of the
+unlocked planets; sector progress is not nested under planet objects.
 
 There is intentionally no version field, migration table, or compatibility
 reader. Until a shipped compatibility need exists, preserve this contract:
 
 - Missing data creates the initial save.
-- Malformed or incompatible mining data creates a fresh initial save and marks
-  the load as recovered so the UI can explain what happened.
+- Malformed or incompatible, including pre-release, mining data creates a
+  fresh initial save and marks the load as recovered so the UI can explain what
+  happened; it is clean-reset rather than migrated.
+- Valid current saves clamp stored cargo to the mine capacity after applying
+  the saved Logistics level during decode.
 - Legacy preference keys are ignored and must not be interpreted as mining
   state.
 - Gameplay mutations and lifecycle checkpoints save through
@@ -71,16 +84,26 @@ Audio preferences are separate from mining state. `AudioManager` owns the
 ## Economy and resource identity
 
 `lib/game/resources/resource_type.dart` defines the complete current resource
-identity: `ResourceType.gold`, `ResourceType.coal`, and `ResourceType.stone`.
-`MiningContentRegistry` maps each authored sector to one of these enum values.
+identity: `ResourceType.gold`, `ResourceType.coal`, `ResourceType.stone`,
+`ResourceType.waterIce`, `ResourceType.titaniumOre`, and
+`ResourceType.helium3`. `MiningContentRegistry` maps three sectors on each of
+the Homeworld and Lunar Frontier planets to these enum values.
 Use the enum in maps and exhaustive switches; do not introduce string resource
 IDs or a generic resource registry without an approved contract change.
 
+`TechnologyLevels` has level 0–5 tracks for Extraction, Logistics, and
+Surveying. Extraction scales mining rate; Logistics scales mine capacity and
+the offline accrual cap; Surveying gates sector reveals and Lunar progression.
+Technology purchases are controller mutations with mine-progression gates and
+cash costs.
+
 The simulation is clock-based, not a device-time economy loop. The one-second
 timer in `MiningScreen` refreshes displayed state while the screen is active;
-`MiningSimulation.accrue` remains the source of production, including offline
-accrual and storage caps. All cash, cargo, sector, and mine transitions pass
-through `MiningController`.
+`MiningSimulation.accrue` remains the source of production, including one-window
+multi-planet offline accrual and storage caps. Its return summary keeps
+`productionByPlanet` per planet and `fullSectors` flat by sector ID. All cash,
+cargo, sector, mine, technology, and planet transitions pass through
+`MiningController`.
 
 ## Audio and accessibility ownership
 
@@ -102,10 +125,12 @@ accessibility state independently from Flame components. Tests set
 
 Use the existing `Assets` and `TerrainAssets` constants for Flame asset paths.
 Mining sector art uses the authored mine sprites under
-`assets/images/building/`; terrain layers use the configured terrain asset
-directories in `pubspec.yaml`. Add or update the asset before wiring a new
-visual, and preserve development fallback rendering in terrain/presentation
-components where an asset is unavailable.
+`assets/images/building/`; Lunar facilities reuse those existing facility PNGs
+and Lunar resource silhouettes use Material icons, so no new PNG resource path
+is required. Terrain layers use the configured terrain asset directories in
+`pubspec.yaml`. Add or update the asset before wiring a new visual, and preserve
+development fallback rendering in terrain/presentation components where an
+asset is unavailable.
 
 Keep gameplay content data in `lib/mining/mining_content.dart`, state models in
 `lib/mining/mining_state.dart`, simulation and persistence in their dedicated
@@ -124,8 +149,8 @@ flutter test test/mining/presentation/mining_screen_test.dart
 flutter test test/integration/mining_mvp_journey_test.dart
 
 # Repository quality gates
-flutter analyze --fatal-infos
 dart format --output=none --set-exit-if-changed .
+flutter analyze --fatal-infos
 flutter test
 flutter test --coverage
 flutter test --platform chrome
