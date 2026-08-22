@@ -102,6 +102,43 @@ void main() {
     });
 
     test(
+      'applies volume changes made while playAsset is still starting',
+      () async {
+        // Regression: _initAudio applies the current volume before awaiting
+        // playAsset, and setMusicVolume only pushes to the player once
+        // _bgmStarted is true. A slider move during that await must still
+        // reach the player once startup completes.
+        final playCompleter = Completer<void>();
+        final player = FakeBackgroundMusicPlayer(playCompleter: playCompleter);
+        final manager = AudioManager(backgroundMusicPlayer: player);
+
+        final start = manager.maybeStartBgm();
+        // Let _initAudio run up to the awaited playAsset call.
+        await Future<void>.delayed(Duration.zero);
+
+        manager.setMusicVolume(0.8);
+
+        expect(
+          manager.bgmStarted,
+          isFalse,
+          reason: 'BGM startup should still be in flight.',
+        );
+
+        playCompleter.complete();
+        await start;
+
+        expect(manager.bgmStarted, isTrue);
+        expect(manager.musicVolume, 0.8);
+        expect(
+          player.volumeCalls,
+          contains(0.8),
+          reason: 'Volume change during startup must reach the player.',
+        );
+        expect(player.volumeCalls.last, 0.8);
+      },
+    );
+
+    test(
       'pauses immediately when lifecycle pauses during initialization',
       () async {
         final playCompleter = Completer<void>();
