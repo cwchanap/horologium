@@ -8,6 +8,19 @@ HPA-636 is complete and PR #15 has merged the mining-only cutover, so the HPA-63
 
 This revision incorporates the second planning review. The goal is the same product outcome with less state ceremony and no compatibility work before a real release exists.
 
+## Review disposition
+
+The second review findings are accepted with one narrow adjustment:
+
+1. **Flat mutable sector state — accepted.** Globally unique `MiningSectorId` plus catalog-scoped iteration is sufficient to enforce planet boundaries. Keep `MiningSave.sectors` flat; do not add `MiningPlanetProgress`, `progressFor`, or `withSector`.
+2. **Rate precision — accepted.** `MiningSheetView` renders production with two decimals and pins Landing Basin L1 values across Extraction 0...5 so adjacent upgrades never look unchanged.
+3. **Cold-start game construction — accepted.** Initial `MiningGame` construction uses `_displayState.sectors`; controller state is only read after initialization for post-unlock/travel replacement.
+4. **Incremental-green plan — accepted.** The catalog/save task owns the mechanical retarget needed to restore the whole repository. Every implementation task finishes with `flutter analyze --fatal-infos` and `flutter test` green. Flame replacement lands before travel UI is exposed.
+5. **Asset reduction — accepted with presentation adjustment.** Add no new PNGs. Reuse existing unused facility sprites, but retain distinct Lunar resource silhouettes through built-in Material icons rather than color-only dots.
+6. **Technology accessors — accepted.** `TechnologyLevels.levelFor()` and `withLevel()` are required and centralize the exhaustive track switch.
+7. **Flat full-sector summary — accepted.** Keep `productionByPlanet` grouped for return-sheet sections and `fullSectors` flat because sector IDs are globally unique.
+8. **Legacy conversion premise — accepted.** HPA-630 says not to add compatibility machinery before a released mining save exists, and the repository only builds test/debug artifacts with no distribution workflow. Therefore HPA-638 does not add a v1 converter; the prior development save uses the existing clean-reset recovery path.
+
 ## Source priority
 
 When requirements differ, use this order:
