@@ -28,6 +28,20 @@ class DelayedMiningSaveRepository extends MiningSaveRepository {
   }
 }
 
+class LoadGatedMiningSaveRepository extends MiningSaveRepository {
+  final loadStarted = Completer<void>();
+  final allowLoad = Completer<void>();
+
+  @override
+  Future<MiningLoadResult> load({required DateTime nowUtc}) async {
+    if (!loadStarted.isCompleted) {
+      loadStarted.complete();
+      await allowLoad.future;
+    }
+    return super.load(nowUtc: nowUtc);
+  }
+}
+
 class DelayedAudioPrefsManager extends AudioManager {
   DelayedAudioPrefsManager({required super.backgroundMusicPlayer});
 
@@ -51,6 +65,31 @@ class FailingMiningSaveRepository extends MiningSaveRepository {
 
 const _viewports = [Size(360, 640), Size(430, 932)];
 final _now = DateTime.utc(2026, 8, 18, 12);
+
+MiningSave _seededLunarActiveSave() => MiningSave(
+  cash: 5000,
+  lastAccruedAtUtc: _now,
+  technology: const TechnologyLevels(surveying: 3),
+  unlockedPlanetIds: const {
+    MiningPlanetId.homeworld,
+    MiningPlanetId.lunarFrontier,
+  },
+  activePlanetId: MiningPlanetId.lunarFrontier,
+  sectors: {
+    MiningSectorId.landingBasin: const SectorProgress(
+      revealed: true,
+      mine: MineState(level: 1, storedAmount: 0),
+    ),
+    MiningSectorId.carbonRidge: const SectorProgress(revealed: false),
+    MiningSectorId.graniteCrater: const SectorProgress(revealed: false),
+    MiningSectorId.frozenBasin: const SectorProgress(
+      revealed: true,
+      mine: MineState(level: 2, storedAmount: 12),
+    ),
+    MiningSectorId.titaniumHighlands: const SectorProgress(revealed: false),
+    MiningSectorId.heliumMare: const SectorProgress(revealed: false),
+  },
+);
 
 Future<void> pumpMiningScreen(
   WidgetTester tester,
@@ -940,6 +979,151 @@ void main() {
         findsOneWidget,
         reason: 'Sector tabs must render after a failed initial save.',
       );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'initState builds the initial game before controller initialization',
+    (tester) async {
+      // Seed so initialize() loads an existing save; gate that load so the
+      // controller state cannot exist while the first frames build.
+      await MiningSaveRepository().save(MiningSave.initial(nowUtc: _now));
+      final repository = LoadGatedMiningSaveRepository();
+
+      await pumpMiningScreen(
+        tester,
+        _viewports.first,
+        repository: repository,
+        pumpCycles: 2,
+      );
+      await repository.loadStarted.future;
+      await tester.pump();
+
+      final handles =
+          tester.state(find.byType(MiningScreen)) as MiningScreenHandles;
+      final initialGame = handles.game;
+      expect(initialGame.planet.id, MiningPlanetId.homeworld);
+      expect(
+        initialGame.initialProgress,
+        MiningSave.initial(nowUtc: _now).sectors,
+        reason:
+            'Cold start must project the initial display sectors; '
+            'controller state does not exist yet.',
+      );
+      expect(
+        find.byKey(const ValueKey(MiningPlanetId.homeworld)),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+
+      // Releasing the load finishes initialization on the same Homeworld
+      // projection; no replacement happens when the planet did not change.
+      repository.allowLoad.complete();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(handles.game, same(initialGame));
+    },
+  );
+
+  testWidgets(
+    'switching the active planet replaces the projected game safely',
+    (tester) async {
+      // Seed an unlocked save that is already active on Lunar Frontier, then
+      // gate the load so the cold-start Homeworld projection can be captured
+      // before the controller state arrives.
+      final seed = MiningSaveRepository(
+        content: MiningContentRegistry.stellarMining(),
+      );
+      await seed.save(_seededLunarActiveSave());
+
+      final repository = LoadGatedMiningSaveRepository();
+      var now = _now;
+      final player = FakeBackgroundMusicPlayer();
+      final audioManager = AudioManager(backgroundMusicPlayer: player);
+
+      await pumpMiningScreen(
+        tester,
+        _viewports.first,
+        repository: repository,
+        nowUtc: () => now,
+        audioManager: audioManager,
+        disableAnimations: true,
+        pumpCycles: 2,
+      );
+      await repository.loadStarted.future;
+      await tester.pump();
+
+      MiningGame currentGame() =>
+          (tester.widget(find.byWidgetPredicate((w) => w is GameWidget))
+                      as GameWidget)
+                  .game
+              as MiningGame;
+      final handles =
+          tester.state(find.byType(MiningScreen)) as MiningScreenHandles;
+      final originalController = handles.controller;
+      final oldGame = currentGame();
+      expect(oldGame.planet.id, MiningPlanetId.homeworld);
+      final oldSelections = <MiningSectorId>[];
+      oldGame.onSelectionChanged = (id) =>
+          oldSelections.add(id as MiningSectorId);
+
+      // Deliver the Lunar-active controller state.
+      repository.allowLoad.complete();
+      for (var i = 0; i < 80; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      final newGame = currentGame();
+      expect(
+        find.byKey(const ValueKey(MiningPlanetId.lunarFrontier)),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey(MiningPlanetId.homeworld)),
+        findsNothing,
+      );
+      expect(newGame, isNot(same(oldGame)));
+      expect(newGame.planet.id, MiningPlanetId.lunarFrontier);
+      expect(handles.controller, same(originalController));
+      expect(handles.audioManager, same(audioManager));
+
+      // The replacement projects the controller's Lunar sectors.
+      expect(newGame.hasLoaded, isTrue);
+      expect(
+        newGame.sector(MiningSectorId.frozenBasin).mine,
+        const MineState(level: 2, storedAmount: 12),
+      );
+
+      // Later selection and reward actions route to the new game only.
+      await tester.tap(find.byKey(const Key('mining-sector-frozenBasin')));
+      await tester.pump();
+      expect(oldSelections, isEmpty);
+
+      // Selection reset to Sell: the primary action sells Lunar cargo
+      // straight from the replacement.
+      await tester.ensureVisible(find.byKey(const Key('mining-sell-tab')));
+      await tester.tap(find.byKey(const Key('mining-sell-tab')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('mining-primary-action')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('Sold cargo for 72 cash.'), findsOneWidget);
+      expect(newGame.lastSaleRewardSource, isNotNull);
+      expect(oldGame.lastSaleRewardSource, isNull);
+      expect(oldSelections, isEmpty);
+
+      // The single refresh timer and lifecycle observer survive the swap:
+      // a pause checkpoint plus offline resume still flows through the
+      // original controller exactly once.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(const Duration(milliseconds: 500));
+      now = _now.add(const Duration(seconds: 10));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byKey(const Key('offline-return-sheet')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
