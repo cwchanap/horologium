@@ -152,9 +152,9 @@ class MiningSaveRepository {
     var surveying = 0;
     for (final entry in raw.entries) {
       final value = entry.value;
-      if (value is! int || value < 0) {
+      if (value is! int || value < 0 || value > 5) {
         throw FormatException(
-          'technology ${entry.key} must be a non-negative integer',
+          'technology ${entry.key} must be an integer in 0..5',
         );
       }
       switch (entry.key) {
