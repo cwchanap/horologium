@@ -6,10 +6,18 @@ import 'package:horologium/mining/mining_state.dart';
 MiningSave stateWith({
   required DateTime now,
   int? cash,
+  TechnologyLevels? technology,
+  MiningPlanetId? activePlanet,
   Map<MiningSectorId, SectorProgress>? sectors,
 }) {
-  final base = MiningSave.initial(nowUtc: now);
-  return base.copyWith(cash: cash, sectors: sectors);
+  var base = MiningSave.initial(nowUtc: now);
+  if (activePlanet != null) {
+    base = base.copyWith(
+      unlockedPlanetIds: {...base.unlockedPlanetIds, activePlanet},
+      activePlanetId: activePlanet,
+    );
+  }
+  return base.copyWith(cash: cash, technology: technology, sectors: sectors);
 }
 
 SectorProgress mined({int level = 1, double stored = 0}) => SectorProgress(
@@ -220,5 +228,96 @@ void main() {
     expect(view.primaryEnabled, isTrue);
     expect(view.disabledReason, isNull);
     expect(view.primaryLabel, 'Sell All for 4 cash');
+  });
+
+  const pinnedL1ExtractionRates = [
+    '0.50',
+    '0.55',
+    '0.63',
+    '0.72',
+    '0.85',
+    '1.00',
+  ];
+  for (var extraction = 0; extraction <= 5; extraction++) {
+    test('pins Landing Basin L1 rate at Extraction Lv$extraction', () {
+      final view = MiningSheetView.from(
+        state: stateWith(
+          now: now,
+          technology: TechnologyLevels(extraction: extraction),
+          sectors: {MiningSectorId.landingBasin: mined()},
+        ),
+        content: content,
+        selectedSectorId: MiningSectorId.landingBasin,
+        isBusy: false,
+      );
+      expect(
+        view.body,
+        contains('Produces ${pinnedL1ExtractionRates[extraction]}/s'),
+      );
+    });
+  }
+
+  test('Frozen Basin reveal is gated by Surveying despite free reveal', () {
+    final view = MiningSheetView.from(
+      state: stateWith(
+        now: now,
+        cash: 10000,
+        technology: const TechnologyLevels(surveying: 2),
+      ),
+      content: content,
+      selectedSectorId: MiningSectorId.frozenBasin,
+      isBusy: false,
+    );
+    expect(view.action, MiningSheetAction.reveal);
+    expect(view.primaryEnabled, isFalse);
+    expect(view.disabledReason, 'Requires Surveying 3.');
+  });
+
+  test('Frozen Basin reveal enabled at Surveying 3', () {
+    final view = MiningSheetView.from(
+      state: stateWith(
+        now: now,
+        cash: 10000,
+        technology: const TechnologyLevels(surveying: 3),
+      ),
+      content: content,
+      selectedSectorId: MiningSectorId.frozenBasin,
+      isBusy: false,
+    );
+    expect(view.action, MiningSheetAction.reveal);
+    expect(view.primaryEnabled, isTrue);
+    expect(view.disabledReason, isNull);
+  });
+
+  test('sell totals include only the active planet cargo', () {
+    final view = MiningSheetView.from(
+      state: stateWith(
+        now: now,
+        activePlanet: MiningPlanetId.lunarFrontier,
+        sectors: {
+          MiningSectorId.landingBasin: mined(stored: 10),
+          MiningSectorId.frozenBasin: mined(stored: 10),
+        },
+      ),
+      content: content,
+      selectedSectorId: null,
+      isBusy: false,
+    );
+    expect(view.primaryLabel, 'Sell All for 60 cash');
+    expect(view.body, '10.0 units of cargo, worth 60 cash.');
+  });
+
+  test('logistics technology raises displayed capacity', () {
+    final view = MiningSheetView.from(
+      state: stateWith(
+        now: now,
+        technology: const TechnologyLevels(logistics: 3),
+        sectors: {MiningSectorId.landingBasin: mined()},
+      ),
+      content: content,
+      selectedSectorId: MiningSectorId.landingBasin,
+      isBusy: false,
+    );
+    expect(view.body, contains('capacity 135.0'));
   });
 }
