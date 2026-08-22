@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
@@ -66,8 +67,17 @@ class MiningController {
     // enter-and-back does not race the menu's save-presence check against the
     // unawaited dispose checkpoint. Existing valid saves are not rewritten
     // here; they persist through gameplay mutations and lifecycle checkpoints.
+    // This convenience write is best-effort: the in-memory state is already
+    // constructed and playable, so a transient storage failure must not brick
+    // the screen. The next mutation or lifecycle checkpoint retries the save.
     if (loaded.wasMissing || loaded.recoveredFromInvalidSave) {
-      await repository.save(_state);
+      try {
+        await repository.save(_state);
+      } catch (e, stackTrace) {
+        if (kDebugMode) {
+          debugPrint('Initial mining save persistence failed: $e\n$stackTrace');
+        }
+      }
     }
   }
 

@@ -50,6 +50,16 @@ class ThrowingFirstSaveRepository extends MiningSaveRepository {
   }
 }
 
+class AlwaysFailingSaveRepository extends MiningSaveRepository {
+  var saveCount = 0;
+
+  @override
+  Future<void> save(MiningSave state) async {
+    saveCount++;
+    throw StateError('Mining save was rejected by SharedPreferences.');
+  }
+}
+
 MiningSave seededSave(
   DateTime now, {
   int cash = 100,
@@ -101,6 +111,50 @@ void main() {
     await seededController.initialize();
     return seededController;
   }
+
+  group('initialization persistence', () {
+    test(
+      'survives a failed initial-save on a missing save and retains state',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final repository = AlwaysFailingSaveRepository();
+        final fresh = MiningController(
+          content: MiningContentRegistry.phaseOne(),
+          repository: repository,
+          nowUtc: clock.call,
+        );
+
+        await fresh.initialize();
+
+        expect(fresh.state.cash, 100);
+        expect(fresh.recoveredFromInvalidSave, isFalse);
+        expect(repository.saveCount, 1);
+      },
+    );
+
+    test(
+      'survives a failed initial-save on a recovered save and retains state',
+      () async {
+        // Seed a malformed save so load() recovers with a fresh initial state
+        // and initialize() attempts the best-effort persistence.
+        SharedPreferences.setMockInitialValues({
+          MiningSaveRepository.saveKey: '{not valid json',
+        });
+        final repository = AlwaysFailingSaveRepository();
+        final recovered = MiningController(
+          content: MiningContentRegistry.phaseOne(),
+          repository: repository,
+          nowUtc: clock.call,
+        );
+
+        await recovered.initialize();
+
+        expect(recovered.state.cash, 100);
+        expect(recovered.recoveredFromInvalidSave, isTrue);
+        expect(repository.saveCount, 1);
+      },
+    );
+  });
 
   group('actions', () {
     test('build validates before changing state', () async {
