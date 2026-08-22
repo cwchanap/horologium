@@ -13,11 +13,18 @@ enum MiningRewardEffect { reveal, construction, tierUpgrade, sale }
 
 class MiningGame extends FlameGame
     with flame_events.TapCallbacks, flame_events.ScaleDetector {
-  MiningGame({required this.planet});
+  MiningGame({required this.planet, required this.initialProgress});
 
-  /// The single projected planet for this world instance. Task 5 adds the
-  /// replacement lifecycle when the active planet can change at runtime.
+  /// The single projected planet for this world instance. The screen
+  /// replaces this whole game when the active planet changes; the game is
+  /// never re-pointed at another planet.
   final MiningPlanetDefinition planet;
+
+  /// Sector state supplied at construction and applied once the sector
+  /// components exist in [onLoad]. The screen passes the cold-start display
+  /// sectors at initialization and the controller state on replacement.
+  final Map<MiningSectorId, SectorProgress> initialProgress;
+
   final Map<MiningSectorId, MiningSectorComponent> _sectors = {};
   MiningSectorId? _selectedSectorId;
 
@@ -58,6 +65,8 @@ class MiningGame extends FlameGame
       world.add(component);
     }
 
+    _applyProgress(initialProgress);
+
     final viewport = camera.viewport.size;
     _fitZoom = math.min(
       viewport.x / MiningContentRegistry.worldExtent,
@@ -70,10 +79,12 @@ class MiningGame extends FlameGame
     hasLoaded = true;
   }
 
-  void applyState(MiningSave state) {
+  void applyState(MiningSave state) => _applyProgress(state.sectors);
+
+  void _applyProgress(Map<MiningSectorId, SectorProgress> sectors) {
     for (final definition in planet.sectors) {
       final progress =
-          state.sectors[definition.id] ?? const SectorProgress(revealed: false);
+          sectors[definition.id] ?? const SectorProgress(revealed: false);
       _sectors[definition.id]?.updateState(progress);
     }
   }

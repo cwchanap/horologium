@@ -34,11 +34,55 @@ Future<void> pumpMiningGame(
 }
 
 void main() {
+  testWidgets('constructor initial progress is applied once sectors exist', (
+    tester,
+  ) async {
+    final content = MiningContentRegistry.stellarMining();
+    final game = MiningGame(
+      planet: content.planet(MiningPlanetId.lunarFrontier),
+      initialProgress: const {
+        MiningSectorId.frozenBasin: SectorProgress(
+          revealed: true,
+          mine: MineState(level: 3, storedAmount: 5),
+        ),
+        MiningSectorId.titaniumHighlands: SectorProgress(revealed: false),
+        MiningSectorId.heliumMare: SectorProgress(revealed: true),
+      },
+    );
+    await pumpMiningGame(tester, game);
+    await tester.pump(const Duration(milliseconds: 100));
+    game.updateTree(0);
+
+    final frozen = game.sector(MiningSectorId.frozenBasin);
+    expect(frozen.revealed, isTrue);
+    expect(frozen.mine, const MineState(level: 3, storedAmount: 5));
+    expect(frozen.children.whereType<OperationLightComponent>(), hasLength(1));
+    expect(
+      frozen.children.whereType<AdvancedPlatformComponent>(),
+      hasLength(1),
+    );
+    expect(
+      frozen.children.whereType<SecondaryMachineryComponent>(),
+      hasLength(1),
+    );
+
+    final titanium = game.sector(MiningSectorId.titaniumHighlands);
+    expect(titanium.revealed, isFalse);
+    expect(titanium.mine, isNull);
+
+    final helium = game.sector(MiningSectorId.heliumMare);
+    expect(helium.revealed, isTrue);
+    expect(helium.mine, isNull);
+  });
+
   testWidgets('all authored anchors are visible at initial 360x640 fit', (
     tester,
   ) async {
     final content = MiningContentRegistry.stellarMining();
-    final game = MiningGame(planet: content.planet(MiningPlanetId.homeworld));
+    final game = MiningGame(
+      planet: content.planet(MiningPlanetId.homeworld),
+      initialProgress: const {},
+    );
     await pumpMiningGame(tester, game);
 
     expect(game.worldSize.x, 1800);
@@ -60,6 +104,7 @@ void main() {
       planet: MiningContentRegistry.stellarMining().planet(
         MiningPlanetId.homeworld,
       ),
+      initialProgress: const {},
     );
     await pumpMiningGame(tester, game);
     await tester.pump(const Duration(milliseconds: 100));
@@ -82,7 +127,10 @@ void main() {
     tester,
   ) async {
     final content = MiningContentRegistry.stellarMining();
-    final game = MiningGame(planet: content.planet(MiningPlanetId.homeworld));
+    final game = MiningGame(
+      planet: content.planet(MiningPlanetId.homeworld),
+      initialProgress: const {},
+    );
     await pumpMiningGame(tester, game);
     final base = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 18, 12));
 
@@ -191,6 +239,7 @@ void main() {
         final content = MiningContentRegistry.stellarMining();
         final game = MiningGame(
           planet: content.planet(MiningPlanetId.homeworld),
+          initialProgress: const {},
         )..reducedMotion = true;
         await pumpMiningGame(tester, game, size: viewport);
 

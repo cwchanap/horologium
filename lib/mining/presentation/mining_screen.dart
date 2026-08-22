@@ -35,12 +35,25 @@ class MiningScreen extends StatefulWidget {
   State<MiningScreen> createState() => _MiningScreenState();
 }
 
+/// Read-only identity handles into the mounted [MiningScreen] state.
+///
+/// The screen stays the single owner of the controller, audio manager, and
+/// projected game; these getters exist so tests can assert that replacing
+/// the game on an active-planet switch keeps the long-lived infrastructure
+/// (one controller, one audio manager, one lifecycle observer) intact.
+abstract class MiningScreenHandles implements State<MiningScreen> {
+  MiningController get controller;
+  AudioManager get audioManager;
+  MiningGame get game;
+}
+
 class _MiningScreenState extends State<MiningScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver
+    implements MiningScreenHandles {
   late final MiningContentRegistry _content;
   late final MiningController _controller;
-  late final MiningGame _game;
   late final AudioManager _audioManager;
+  late MiningGame _game;
   late MiningSave _displayState;
   Timer? _refreshTimer;
   MiningSectorId? _selectedSectorId;
@@ -60,8 +73,10 @@ class _MiningScreenState extends State<MiningScreen>
       nowUtc: nowUtc,
     );
     _displayState = MiningSave.initial(nowUtc: nowUtc());
-    _game = MiningGame(planet: _content.planet(_displayState.activePlanetId))
-      ..onSelectionChanged = _handleSelectionChanged;
+    _game = _gameFor(
+      planetId: _displayState.activePlanetId,
+      initialProgress: _displayState.sectors,
+    );
     _sheetView = MiningSheetView.from(
       state: _displayState,
       content: _content,
@@ -70,6 +85,16 @@ class _MiningScreenState extends State<MiningScreen>
     );
     WidgetsBinding.instance.addObserver(this);
     unawaited(_initialize());
+  }
+
+  MiningGame _gameFor({
+    required MiningPlanetId planetId,
+    required Map<MiningSectorId, SectorProgress> initialProgress,
+  }) {
+    return MiningGame(
+      planet: _content.planet(planetId),
+      initialProgress: initialProgress,
+    )..onSelectionChanged = _handleSelectionChanged;
   }
 
   Future<void> _initialize() async {
@@ -98,11 +123,21 @@ class _MiningScreenState extends State<MiningScreen>
     });
   }
 
+  @override
+  MiningController get controller => _controller;
+
+  @override
+  AudioManager get audioManager => _audioManager;
+
+  @override
+  MiningGame get game => _game;
+
   void _refreshPresentation() {
     if (!_initialized) return;
+    _displayState = _controller.state;
+    _replaceGameIfPlanetChanged();
     _game.reducedMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    _displayState = _controller.state;
     _game.applyState(_displayState);
     _sheetView = MiningSheetView.from(
       state: _displayState,
@@ -111,6 +146,21 @@ class _MiningScreenState extends State<MiningScreen>
       isBusy: _controller.isBusy,
     );
     if (mounted) setState(() {});
+  }
+
+  /// Swap the projected game when the active planet changed (a loaded save
+  /// that starts elsewhere, a planet unlock, or travel). The replacement is
+  /// keyed by planet id in [build] so the old world unmounts entirely, and
+  /// selection resets to the sell tab.
+  void _replaceGameIfPlanetChanged() {
+    final activePlanetId = _displayState.activePlanetId;
+    if (_game.planet.id == activePlanetId) return;
+    _game.onSelectionChanged = null;
+    _game = _gameFor(
+      planetId: activePlanetId,
+      initialProgress: _controller.state.sectors,
+    );
+    _selectedSectorId = null;
   }
 
   void _handleSelectionChanged(MiningSectorId? id) {
@@ -438,7 +488,10 @@ class _MiningScreenState extends State<MiningScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          GameWidget(game: _game),
+          GameWidget(
+            key: ValueKey<MiningPlanetId>(_displayState.activePlanetId),
+            game: _game,
+          ),
           Positioned(
             top: 0,
             left: 0,
