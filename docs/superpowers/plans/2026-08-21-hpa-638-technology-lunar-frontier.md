@@ -49,7 +49,7 @@
 
 **Flame/assets**
 - `lib/mining/world/mining_game.dart` — one planet definition/progress at a time, authored seed, planet-ID tint, no dynamic teardown framework.
-- `lib/mining/world/mining_components.dart` — small mining-world atmosphere component if needed for Lunar tint.
+- `lib/mining/world/mining_components.dart` — concrete mining-world atmosphere overlay used for the Lunar tint.
 - `lib/constants/assets_path.dart` — concrete Lunar mine/resource paths.
 - `assets/images/building/water_ice_mine.png`
 - `assets/images/building/titanium_mine.png`
