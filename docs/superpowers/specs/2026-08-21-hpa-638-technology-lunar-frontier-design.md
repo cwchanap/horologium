@@ -545,7 +545,7 @@ Rules:
 
 - clock rollback produces nothing and never moves the timestamp backward;
 - elapsed above the Logistics cap uses only the cap, then advances timestamp to `nowUtc`;
-- locked planets never accrue;
+- simulation iterates `unlockedPlanetIds` only, so a valid locked Lunar record remains pristine and contributes no production or summary entry;
 - every unlocked planet uses the same elapsed window;
 - storage never exceeds effective capacity;
 - equal state + equal `nowUtc` produces equal results for foreground, resume, and cold launch;
@@ -790,7 +790,7 @@ Prove:
 - Extraction applies once to all unlocked planets;
 - Logistics capacity/offline cap applies once;
 - two planets accrue over one elapsed window;
-- locked Lunar never accrues;
+- a valid locked Lunar record remains pristine and absent from the production summary;
 - independent storage clamps;
 - rollback/cap determinism;
 - grouped summary correctness.
