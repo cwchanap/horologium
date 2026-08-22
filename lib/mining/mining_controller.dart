@@ -218,7 +218,8 @@ class MiningController {
       ...candidate.state.sectors,
     };
 
-    for (final definition in content.sectors) {
+    for (final definition
+        in content.planet(candidate.state.activePlanetId).sectors) {
       final progress = sectors[definition.id]!;
       final mine = progress.mine;
       if (mine == null || mine.storedAmount <= 0) continue;

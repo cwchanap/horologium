@@ -18,7 +18,7 @@ SectorProgress mined({int level = 1, double stored = 0}) => SectorProgress(
 );
 
 void main() {
-  final content = MiningContentRegistry.phaseOne();
+  final content = MiningContentRegistry.stellarMining();
   final now = DateTime.utc(2026, 8, 18, 12);
 
   test('no cargo disables Sell All', () {

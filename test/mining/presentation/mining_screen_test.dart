@@ -75,7 +75,7 @@ Future<void> pumpMiningScreen(
         data: MediaQueryData(disableAnimations: disableAnimations),
         child: MiningScreen(
           key: screenKey,
-          content: MiningContentRegistry.phaseOne(),
+          content: MiningContentRegistry.stellarMining(),
           repository: repository,
           nowUtc: nowUtc ?? () => _now,
           audioManager: audioManager,
@@ -120,7 +120,7 @@ Future<void> pushMiningScreen(
         builder: (_) => MediaQuery(
           data: const MediaQueryData(),
           child: MiningScreen(
-            content: MiningContentRegistry.phaseOne(),
+            content: MiningContentRegistry.stellarMining(),
             repository: repository,
             nowUtc: nowUtc,
           ),
@@ -297,12 +297,15 @@ void main() {
     tester,
   ) async {
     final repository = MiningSaveRepository(
-      content: MiningContentRegistry.phaseOne(),
+      content: MiningContentRegistry.stellarMining(),
     );
     await repository.save(
       MiningSave(
         cash: 1000,
         lastAccruedAtUtc: _now,
+        technology: const TechnologyLevels(),
+        unlockedPlanetIds: const {MiningPlanetId.homeworld},
+        activePlanetId: MiningPlanetId.homeworld,
         sectors: {
           MiningSectorId.landingBasin: const SectorProgress(
             revealed: true,
@@ -310,6 +313,11 @@ void main() {
           ),
           MiningSectorId.carbonRidge: const SectorProgress(revealed: false),
           MiningSectorId.graniteCrater: const SectorProgress(revealed: false),
+          MiningSectorId.frozenBasin: const SectorProgress(revealed: false),
+          MiningSectorId.titaniumHighlands: const SectorProgress(
+            revealed: false,
+          ),
+          MiningSectorId.heliumMare: const SectorProgress(revealed: false),
         },
       ),
     );
@@ -479,7 +487,7 @@ void main() {
   ) async {
     var now = _now;
     final repository = MiningSaveRepository(
-      content: MiningContentRegistry.phaseOne(),
+      content: MiningContentRegistry.stellarMining(),
     );
     await pushMiningScreen(
       tester,
@@ -518,7 +526,7 @@ void main() {
   ) async {
     var now = _now;
     final repository = MiningSaveRepository(
-      content: MiningContentRegistry.phaseOne(),
+      content: MiningContentRegistry.stellarMining(),
     );
     await pumpMiningScreen(
       tester,
@@ -556,7 +564,7 @@ void main() {
   testWidgets('resume presents offline gold production once', (tester) async {
     var now = _now;
     final repository = MiningSaveRepository(
-      content: MiningContentRegistry.phaseOne(),
+      content: MiningContentRegistry.stellarMining(),
     );
     await pumpMiningScreen(
       tester,
@@ -639,12 +647,15 @@ void main() {
     'reduced motion keeps reveal build upgrade and sale confirmations',
     (tester) async {
       final repository = MiningSaveRepository(
-        content: MiningContentRegistry.phaseOne(),
+        content: MiningContentRegistry.stellarMining(),
       );
       await repository.save(
         MiningSave(
           cash: 1000,
           lastAccruedAtUtc: _now,
+          technology: const TechnologyLevels(),
+          unlockedPlanetIds: const {MiningPlanetId.homeworld},
+          activePlanetId: MiningPlanetId.homeworld,
           sectors: {
             MiningSectorId.landingBasin: const SectorProgress(
               revealed: true,
@@ -652,6 +663,11 @@ void main() {
             ),
             MiningSectorId.carbonRidge: const SectorProgress(revealed: false),
             MiningSectorId.graniteCrater: const SectorProgress(revealed: false),
+            MiningSectorId.frozenBasin: const SectorProgress(revealed: false),
+            MiningSectorId.titaniumHighlands: const SectorProgress(
+              revealed: false,
+            ),
+            MiningSectorId.heliumMare: const SectorProgress(revealed: false),
           },
         ),
       );
@@ -777,6 +793,9 @@ void main() {
         MiningSave(
           cash: 1000,
           lastAccruedAtUtc: _now,
+          technology: const TechnologyLevels(),
+          unlockedPlanetIds: const {MiningPlanetId.homeworld},
+          activePlanetId: MiningPlanetId.homeworld,
           sectors: {
             MiningSectorId.landingBasin: const SectorProgress(
               revealed: true,
@@ -784,6 +803,11 @@ void main() {
             ),
             MiningSectorId.carbonRidge: const SectorProgress(revealed: false),
             MiningSectorId.graniteCrater: const SectorProgress(revealed: false),
+            MiningSectorId.frozenBasin: const SectorProgress(revealed: false),
+            MiningSectorId.titaniumHighlands: const SectorProgress(
+              revealed: false,
+            ),
+            MiningSectorId.heliumMare: const SectorProgress(revealed: false),
           },
         ),
       );

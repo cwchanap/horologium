@@ -52,28 +52,30 @@ class MiningSimulation {
     final full = <MiningSectorId>{};
     final sectors = <MiningSectorId, SectorProgress>{...state.sectors};
 
-    for (final definition in content.sectors) {
-      final progress = sectors[definition.id]!;
-      final mine = progress.mine;
-      if (!progress.revealed || mine == null) continue;
+    for (final planetId in state.unlockedPlanetIds) {
+      for (final definition in content.planet(planetId).sectors) {
+        final progress = sectors[definition.id]!;
+        final mine = progress.mine;
+        if (!progress.revealed || mine == null) continue;
 
-      final capacity = content.capacityFor(definition.id, mine.level);
-      final remaining = (capacity - mine.storedAmount)
-          .clamp(0.0, capacity)
-          .toDouble();
-      final amount = (content.rateFor(definition.id, mine.level) * seconds)
-          .clamp(0.0, remaining)
-          .toDouble();
-      final stored = mine.storedAmount + amount;
-      sectors[definition.id] = progress.copyWith(
-        mine: mine.copyWith(storedAmount: stored),
-      );
-      produced.update(
-        definition.resource,
-        (value) => value + amount,
-        ifAbsent: () => amount,
-      );
-      if (stored >= capacity) full.add(definition.id);
+        final capacity = content.capacityFor(definition.id, mine.level);
+        final remaining = (capacity - mine.storedAmount)
+            .clamp(0.0, capacity)
+            .toDouble();
+        final amount = (content.rateFor(definition.id, mine.level) * seconds)
+            .clamp(0.0, remaining)
+            .toDouble();
+        final stored = mine.storedAmount + amount;
+        sectors[definition.id] = progress.copyWith(
+          mine: mine.copyWith(storedAmount: stored),
+        );
+        produced.update(
+          definition.resource,
+          (value) => value + amount,
+          ifAbsent: () => amount,
+        );
+        if (stored >= capacity) full.add(definition.id);
+      }
     }
 
     return AccrualResult(

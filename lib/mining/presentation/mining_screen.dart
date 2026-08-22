@@ -52,7 +52,7 @@ class _MiningScreenState extends State<MiningScreen>
   void initState() {
     super.initState();
     _audioManager = widget.audioManager ?? AudioManager();
-    _content = widget.content ?? MiningContentRegistry.phaseOne();
+    _content = widget.content ?? MiningContentRegistry.stellarMining();
     final nowUtc = widget.nowUtc ?? () => DateTime.now().toUtc();
     _controller = MiningController(
       content: _content,
@@ -60,7 +60,7 @@ class _MiningScreenState extends State<MiningScreen>
       nowUtc: nowUtc,
     );
     _displayState = MiningSave.initial(nowUtc: nowUtc());
-    _game = MiningGame(content: _content)
+    _game = MiningGame(planet: _content.planet(_displayState.activePlanetId))
       ..onSelectionChanged = _handleSelectionChanged;
     _sheetView = MiningSheetView.from(
       state: _displayState,
@@ -277,13 +277,16 @@ class _MiningScreenState extends State<MiningScreen>
     );
   }
 
+  MiningPlanetDefinition get _activePlanet =>
+      _content.planet(_displayState.activePlanetId);
+
   int _revealedSectorCount() => _displayState.sectors.values
       .where((progress) => progress.revealed)
       .length;
 
   int _cargoValue() {
     var value = 0.0;
-    for (final definition in _content.sectors) {
+    for (final definition in _activePlanet.sectors) {
       final mine = _displayState.sectors[definition.id]?.mine;
       if (mine != null) {
         value += mine.storedAmount * definition.saleValuePerUnit;
@@ -307,7 +310,7 @@ class _MiningScreenState extends State<MiningScreen>
               selected: _selectedSectorId == null,
               onPressed: () => _selectSector(null),
             ),
-            for (final definition in _content.sectors)
+            for (final definition in _activePlanet.sectors)
               _buildTab(
                 key: Key('mining-sector-${definition.id.name}'),
                 label: definition.name,
@@ -449,7 +452,7 @@ class _MiningScreenState extends State<MiningScreen>
                     child: MiningStatusBar(
                       cash: _displayState.cash,
                       revealedSectors: _revealedSectorCount(),
-                      totalSectors: _content.sectors.length,
+                      totalSectors: _activePlanet.sectors.length,
                       cargoValue: _cargoValue(),
                     ),
                   ),

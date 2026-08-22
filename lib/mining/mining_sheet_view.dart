@@ -59,7 +59,7 @@ class MiningSheetView {
   ) {
     var totalCargo = 0.0;
     var grossValue = 0.0;
-    for (final definition in content.sectors) {
+    for (final definition in content.planet(state.activePlanetId).sectors) {
       final mine = state.sectors[definition.id]?.mine;
       if (mine == null) continue;
       totalCargo += mine.storedAmount;
