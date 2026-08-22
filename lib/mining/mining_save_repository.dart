@@ -40,7 +40,13 @@ class MiningSaveRepository {
 
   Future<MiningLoadResult> load({required DateTime nowUtc}) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(saveKey);
+    // Read the raw preference generically. SharedPreferences.getString casts
+    // the cached value to String? and throws when a non-String (e.g. an int
+    // left by a corrupted or migrated preference) is stored under the key.
+    // hasSave() reports presence for any value type, so load() must route a
+    // type mismatch through the recovery boundary rather than letting the cast
+    // escape and brick initialization.
+    final raw = prefs.get(saveKey);
     if (raw == null) {
       return MiningLoadResult(
         state: MiningSave.initial(nowUtc: nowUtc),
@@ -50,6 +56,9 @@ class MiningSaveRepository {
     }
 
     try {
+      if (raw is! String) {
+        throw const FormatException('mining save must be a JSON string');
+      }
       return MiningLoadResult(
         state: _decode(jsonDecode(raw)),
         recoveredFromInvalidSave: false,
