@@ -51,6 +51,11 @@ class AudioManager {
       await _backgroundMusicPlayer.setReleaseMode(ReleaseMode.loop);
       await _backgroundMusicPlayer.setVolume(_musicVolume);
       await _backgroundMusicPlayer.playAsset('audio/background.mp3');
+      // Reapply the latest volume after playAsset completes. A slider move
+      // during the awaited play call updates _musicVolume but cannot reach
+      // the player until _bgmStarted flips, which happens only after this
+      // returns. Without this, the player keeps the pre-startup volume.
+      await _backgroundMusicPlayer.setVolume(_musicVolume);
       debugPrint('BGM started (volume=$_musicVolume).');
       return true;
     } catch (e) {
