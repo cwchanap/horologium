@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/main.dart';
@@ -23,12 +25,13 @@ Future<void> pumpInjectedMiningScreen(
   required MiningSaveRepository repository,
   required DateTime Function() nowUtc,
   Key? screenKey,
+  bool disableAnimations = false,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
       key: const Key('injected-mining-app'),
       home: MediaQuery(
-        data: const MediaQueryData(),
+        data: MediaQueryData(disableAnimations: disableAnimations),
         child: MiningScreen(
           key: screenKey,
           content: MiningContentRegistry.stellarMining(),
@@ -43,6 +46,89 @@ Future<void> pumpInjectedMiningScreen(
     await tester.pump(const Duration(milliseconds: 100));
   }
   await tester.pump();
+}
+
+Map<String, Object?> _mineDocument({double storedAmount = 0}) =>
+    <String, Object?>{'level': 1, 'storedAmount': storedAmount};
+
+Map<String, Object?> _sectorDocument({
+  bool revealed = false,
+  Map<String, Object?>? mine,
+}) => <String, Object?>{'revealed': revealed, 'mine': mine};
+
+Map<String, Object?> _sixSectorDocuments({
+  Map<String, Object?>? landingBasin,
+  Map<String, Object?>? carbonRidge,
+  Map<String, Object?>? graniteCrater,
+  Map<String, Object?>? frozenBasin,
+  Map<String, Object?>? titaniumHighlands,
+  Map<String, Object?>? heliumMare,
+}) => <String, Object?>{
+  'landingBasin': landingBasin ?? _sectorDocument(),
+  'carbonRidge': carbonRidge ?? _sectorDocument(),
+  'graniteCrater': graniteCrater ?? _sectorDocument(),
+  'frozenBasin': frozenBasin ?? _sectorDocument(),
+  'titaniumHighlands': titaniumHighlands ?? _sectorDocument(),
+  'heliumMare': heliumMare ?? _sectorDocument(),
+};
+
+/// Seeds only the current six-key mining document; legacy save shapes are not
+/// part of either product journey.
+void seedCurrentMiningSave({
+  required int cash,
+  required DateTime lastAccruedAtUtc,
+  required int surveying,
+  required List<String> unlockedPlanetIds,
+  required String activePlanetId,
+  required Map<String, Object?> sectors,
+}) {
+  SharedPreferences.setMockInitialValues({
+    MiningSaveRepository.saveKey: jsonEncode(<String, Object?>{
+      'cash': cash,
+      'lastAccruedAtUtc': lastAccruedAtUtc.toUtc().toIso8601String(),
+      'technology': <String, Object?>{
+        'extraction': 0,
+        'logistics': 0,
+        'surveying': surveying,
+      },
+      'unlockedPlanetIds': unlockedPlanetIds,
+      'activePlanetId': activePlanetId,
+      'sectors': sectors,
+    }),
+  });
+}
+
+Future<void> purchaseSurveyingLevel(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('mining-technology-button')));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+  expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+
+  final purchase = find.byKey(const Key('mining-technology-buy-surveying'));
+  await tester.ensureVisible(purchase);
+  await tester.tap(purchase);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+  expect(find.text('Technology upgraded.'), findsOneWidget);
+}
+
+Future<void> openStellarMap(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('mining-stellar-map-button')));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+  expect(find.byKey(const Key('mining-stellar-map-sheet')), findsOneWidget);
+}
+
+MiningSave stateFromScreen(WidgetTester tester) =>
+    (tester.state(find.byType(MiningScreen)) as MiningScreenHandles)
+        .controller
+        .state;
+
+Future<void> waitForSnackBarToClear(WidgetTester tester) async {
+  for (var i = 0; i < 6; i++) {
+    if (find.byType(SnackBar).evaluate().isEmpty) return;
+    await tester.pump(const Duration(seconds: 1));
+  }
 }
 
 Future<void> selectSector(WidgetTester tester, MiningSectorId id) async {
@@ -64,6 +150,7 @@ Future<void> tapPrimary(
   String expectedLabel, {
   String? successMessage,
 }) async {
+  await waitForSnackBarToClear(tester);
   expect(find.text(expectedLabel), findsOneWidget);
   final primary = find.byKey(const Key('mining-primary-action'));
   await tester.ensureVisible(primary);
@@ -399,6 +486,252 @@ void main() {
         offlineStart: offlineStart,
       );
 
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('progresses from Homeworld mastery to Lunar Frontier and back', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = _viewport;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final start = DateTime.utc(2026, 8, 19, 12);
+    final clock = TestClock(start);
+    final content = MiningContentRegistry.stellarMining();
+    final repository = MiningSaveRepository(content: content);
+    seedCurrentMiningSave(
+      cash: 8000,
+      lastAccruedAtUtc: start,
+      surveying: 0,
+      unlockedPlanetIds: ['homeworld'],
+      activePlanetId: 'homeworld',
+      sectors: _sixSectorDocuments(
+        landingBasin: _sectorDocument(revealed: true, mine: _mineDocument()),
+        carbonRidge: _sectorDocument(revealed: true, mine: _mineDocument()),
+        graniteCrater: _sectorDocument(revealed: true, mine: _mineDocument()),
+      ),
+    );
+
+    await pumpInjectedMiningScreen(
+      tester,
+      repository: repository,
+      nowUtc: clock.call,
+      disableAnimations: true,
+    );
+
+    await purchaseSurveyingLevel(tester);
+    await purchaseSurveyingLevel(tester);
+    await purchaseSurveyingLevel(tester);
+
+    var state = stateFromScreen(tester);
+    expect(state.technology.surveying, 3);
+    expect(state.cash, 5500);
+
+    await openStellarMap(tester);
+    await tester.tap(find.byKey(const Key('mining-stellar-map-unlock')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    state = stateFromScreen(tester);
+    expect(state.unlockedPlanetIds, {
+      MiningPlanetId.homeworld,
+      MiningPlanetId.lunarFrontier,
+    });
+    expect(state.activePlanetId, MiningPlanetId.lunarFrontier);
+    expect(state.cash, 3000);
+
+    await selectSector(tester, MiningSectorId.frozenBasin);
+    await tapPrimary(
+      tester,
+      'Reveal for 0 cash',
+      successMessage: 'Sector revealed.',
+    );
+    await tapPrimary(
+      tester,
+      'Build for 500 cash',
+      successMessage: 'Mine built.',
+    );
+
+    await openStellarMap(tester);
+    final homeworldTravel = find.byKey(
+      const Key('mining-stellar-map-travel-homeworld'),
+    );
+    await tester.ensureVisible(homeworldTravel);
+    await tester.tap(homeworldTravel);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    state = stateFromScreen(tester);
+    expect(state.activePlanetId, MiningPlanetId.homeworld);
+    expect(state.cash, 2500);
+    expect(
+      state.sectors[MiningSectorId.landingBasin]!.mine,
+      const MineState(level: 1, storedAmount: 0),
+    );
+    expect(
+      state.sectors[MiningSectorId.carbonRidge]!.mine,
+      const MineState(level: 1, storedAmount: 0),
+    );
+    expect(
+      state.sectors[MiningSectorId.graniteCrater]!.mine,
+      const MineState(level: 1, storedAmount: 0),
+    );
+    expect(state.sectors[MiningSectorId.frozenBasin]!.revealed, isTrue);
+    expect(
+      state.sectors[MiningSectorId.frozenBasin]!.mine,
+      const MineState(level: 1, storedAmount: 0),
+    );
+    expect(state.sectors[MiningSectorId.titaniumHighlands]!.revealed, isFalse);
+    expect(state.sectors[MiningSectorId.heliumMare]!.revealed, isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'groups two-planet offline production and sells each active cargo hold',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = _viewport;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final start = DateTime.utc(2026, 8, 20, 12);
+      final clock = TestClock(start.add(const Duration(seconds: 10)));
+      final content = MiningContentRegistry.stellarMining();
+      final repository = MiningSaveRepository(content: content);
+      seedCurrentMiningSave(
+        cash: 1000,
+        lastAccruedAtUtc: start,
+        surveying: 3,
+        unlockedPlanetIds: ['homeworld', 'lunarFrontier'],
+        activePlanetId: 'lunarFrontier',
+        sectors: _sixSectorDocuments(
+          landingBasin: _sectorDocument(revealed: true, mine: _mineDocument()),
+          carbonRidge: _sectorDocument(revealed: true, mine: _mineDocument()),
+          graniteCrater: _sectorDocument(revealed: true, mine: _mineDocument()),
+          frozenBasin: _sectorDocument(revealed: true, mine: _mineDocument()),
+        ),
+      );
+
+      await pumpInjectedMiningScreen(
+        tester,
+        repository: repository,
+        nowUtc: clock.call,
+        disableAnimations: true,
+      );
+
+      final offlineSheet = find.byKey(const Key('offline-return-sheet'));
+      expect(offlineSheet, findsOneWidget);
+      final homeworldSummary = find.byKey(
+        const Key('offline-return-planet-homeworld'),
+      );
+      final lunarSummary = find.byKey(
+        const Key('offline-return-planet-lunarFrontier'),
+      );
+      expect(homeworldSummary, findsOneWidget);
+      expect(lunarSummary, findsOneWidget);
+      expect(
+        find.descendant(of: homeworldSummary, matching: find.text('+5.0')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: homeworldSummary, matching: find.text('+7.5')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: homeworldSummary, matching: find.text('+6.0')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: lunarSummary, matching: find.text('+10.0')),
+        findsOneWidget,
+      );
+
+      final dismissOfflineReturn = find.byKey(
+        const Key('offline-return-dismiss'),
+      );
+      await tester.ensureVisible(dismissOfflineReturn);
+      await tester.tap(dismissOfflineReturn);
+      await tester.pump();
+
+      await selectSellTab(tester);
+      await tapPrimary(
+        tester,
+        'Sell All for 60 cash',
+        successMessage: 'Sold cargo for 60 cash.',
+      );
+
+      var state = stateFromScreen(tester);
+      expect(state.cash, 1060);
+      expect(state.sectors[MiningSectorId.frozenBasin]!.mine!.storedAmount, 0);
+      expect(
+        state.sectors[MiningSectorId.landingBasin]!.mine!.storedAmount,
+        closeTo(5, 0.0001),
+      );
+      expect(
+        state.sectors[MiningSectorId.carbonRidge]!.mine!.storedAmount,
+        closeTo(7.5, 0.0001),
+      );
+      expect(
+        state.sectors[MiningSectorId.graniteCrater]!.mine!.storedAmount,
+        closeTo(6, 0.0001),
+      );
+
+      await openStellarMap(tester);
+      final homeworldTravel = find.byKey(
+        const Key('mining-stellar-map-travel-homeworld'),
+      );
+      await tester.ensureVisible(homeworldTravel);
+      await tester.tap(homeworldTravel);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      await selectSellTab(tester);
+      await tapPrimary(
+        tester,
+        'Sell All for 72 cash',
+        successMessage: 'Sold cargo for 72 cash.',
+      );
+
+      state = stateFromScreen(tester);
+      expect(state.cash, 1132);
+      expect(state.activePlanetId, MiningPlanetId.homeworld);
+      for (final id in const [
+        MiningSectorId.landingBasin,
+        MiningSectorId.carbonRidge,
+        MiningSectorId.graniteCrater,
+        MiningSectorId.frozenBasin,
+      ]) {
+        expect(state.sectors[id]!.mine!.storedAmount, 0);
+      }
+
+      final persisted = (await repository.load(nowUtc: clock.now)).state;
+      expect(persisted.cash, 1132);
+      expect(persisted.activePlanetId, MiningPlanetId.homeworld);
+      expect(persisted.unlockedPlanetIds, {
+        MiningPlanetId.homeworld,
+        MiningPlanetId.lunarFrontier,
+      });
+      expect(
+        persisted.sectors[MiningSectorId.frozenBasin]!.mine!.storedAmount,
+        0,
+      );
+      expect(
+        persisted.sectors[MiningSectorId.landingBasin]!.mine!.storedAmount,
+        0,
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 100));
       expect(tester.takeException(), isNull);
     },
   );
