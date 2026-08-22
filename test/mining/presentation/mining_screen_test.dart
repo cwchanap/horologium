@@ -901,4 +901,22 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'initializes even when the initial-save write fails on a fresh install',
+    (tester) async {
+      final repository = FailingMiningSaveRepository();
+      // No seed — initialize() must persist the freshly constructed initial
+      // state, and that write fails. The screen must still initialize so the
+      // playable surface is not permanently gated.
+      await pumpMiningScreen(tester, _viewports.first, repository: repository);
+
+      expect(
+        find.byKey(const Key('mining-sector-landingBasin')),
+        findsOneWidget,
+        reason: 'Sector tabs must render after a failed initial save.',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
