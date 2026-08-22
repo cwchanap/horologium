@@ -16,6 +16,7 @@ class AudioManager {
   bool _musicEnabled = true;
   double _musicVolume = 0.5;
   AppLifecycleState? _lifecycleState;
+  bool _disposed = false;
 
   bool get bgmStarted => _bgmStarted;
   bool get musicEnabled => _musicEnabled;
@@ -47,15 +48,19 @@ class AudioManager {
       _bgm ??= AudioPlayerBackgroundMusicPlayer();
 
   Future<bool> _initAudio() async {
+    // Capture the player once so a dispose() between awaits cannot cause the
+    // _backgroundMusicPlayer getter to lazily create a second, unowned player
+    // after the first has been disposed.
+    final player = _backgroundMusicPlayer;
     try {
-      await _backgroundMusicPlayer.setReleaseMode(ReleaseMode.loop);
-      await _backgroundMusicPlayer.setVolume(_musicVolume);
-      await _backgroundMusicPlayer.playAsset('audio/background.mp3');
+      await player.setReleaseMode(ReleaseMode.loop);
+      await player.setVolume(_musicVolume);
+      await player.playAsset('audio/background.mp3');
       // Reapply the latest volume after playAsset completes. A slider move
       // during the awaited play call updates _musicVolume but cannot reach
       // the player until _bgmStarted flips, which happens only after this
       // returns. Without this, the player keeps the pre-startup volume.
-      await _backgroundMusicPlayer.setVolume(_musicVolume);
+      await player.setVolume(_musicVolume);
       debugPrint('BGM started (volume=$_musicVolume).');
       return true;
     } catch (e) {
@@ -65,11 +70,14 @@ class AudioManager {
   }
 
   Future<void> maybeStartBgm() async {
-    if (_bgmStarted || !_musicEnabled || _bgmInitializing) return;
+    if (_bgmStarted || !_musicEnabled || _bgmInitializing || _disposed) return;
     _bgmInitializing = true;
 
     try {
       final success = await _initAudio();
+      // A dispose() during the awaited startup must not mark this manager
+      // started or operate on a recreated player.
+      if (_disposed) return;
       if (success && _musicEnabled) {
         _bgmStarted = true;
         if (_lifecycleBlocksPlayback) {
@@ -190,6 +198,7 @@ class AudioManager {
       _bgmStarted = false;
       _bgmInitializing = false;
       _lifecycleState = null;
+      _disposed = true;
     }
   }
 

@@ -293,6 +293,34 @@ void main() {
       expect(player.disposeCalls, 1);
     });
 
+    test('dispose during pending playAsset does not recreate the player or '
+        'mark started', () async {
+      // Regression: _initAudio() awaited playAsset() across multiple
+      // _backgroundMusicPlayer getter calls. A dispose() between awaits
+      // nulled _bgm, so the post-await getter lazily created a second,
+      // unowned player, and maybeStartBgm() then marked the disposed
+      // manager started.
+      final playCompleter = Completer<void>();
+      final player = FakeBackgroundMusicPlayer(playCompleter: playCompleter);
+      final manager = AudioManager(backgroundMusicPlayer: player);
+
+      final start = manager.maybeStartBgm();
+      // Let _initAudio run up to the awaited playAsset call.
+      await Future<void>.delayed(Duration.zero);
+
+      await manager.dispose();
+      expect(player.disposeCalls, 1);
+
+      playCompleter.complete();
+      await start;
+
+      expect(
+        manager.bgmStarted,
+        isFalse,
+        reason: 'A disposed manager must not be marked started.',
+      );
+    });
+
     test('dispose waits for stop before disposing the player', () async {
       final player = FakeBackgroundMusicPlayer();
       final manager = AudioManager(backgroundMusicPlayer: player);
