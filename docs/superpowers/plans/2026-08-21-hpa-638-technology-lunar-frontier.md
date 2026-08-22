@@ -10,6 +10,10 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-21-hpa-638-technology-lunar-frontier-design.md`
 
+## Review disposition
+
+The second planning review was accepted with one narrow adjustment: the proposed removal of new resource PNGs is correct, but Lunar resources still need visibly distinct silhouettes, so use built-in Material icons rather than color-only circles. The remaining findings are incorporated directly below: flat sector state, two-decimal rates, cold-start `_displayState`, full-green task boundaries, required technology accessors, flat `fullSectors`, reused facility sprites, and no pre-release legacy conversion.
+
 ## Global Constraints
 
 - One PR for HPA-638; continue on draft PR #16.
