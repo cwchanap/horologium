@@ -39,17 +39,6 @@ class MiningController {
        simulation = MiningSimulation(content);
 
   static const int _maxMineLevel = 5;
-  static const int _maxTechnologyLevel = 5;
-  static const List<int> _technologyCosts = [300, 700, 1500, 4000, 9000];
-  static const List<MiningSectorId> _technologyMineGates = [
-    MiningSectorId.landingBasin,
-    MiningSectorId.carbonRidge,
-    MiningSectorId.graniteCrater,
-    MiningSectorId.frozenBasin,
-    MiningSectorId.titaniumHighlands,
-  ];
-  static const int _lunarUnlockCost = 2500;
-  static const int _lunarUnlockSurveying = 3;
 
   final MiningContentRegistry content;
   final MiningSaveRepository repository;
@@ -231,16 +220,16 @@ class MiningController {
     final candidate = simulation.accrue(_state, _nowUtc().toUtc());
     final currentLevel = candidate.state.technology.levelFor(track);
 
-    if (currentLevel >= _maxTechnologyLevel) {
+    if (currentLevel >= MiningContentRegistry.maxTechnologyLevel) {
       return const MiningActionResult.failure('Technology is at max level.');
     }
-    final gateSector = _technologyMineGates[currentLevel];
+    final gateSector = MiningContentRegistry.technologyMineGates[currentLevel];
     if (candidate.state.sectors[gateSector]!.mine == null) {
       return MiningActionResult.failure(
         'Build the ${content.sector(gateSector).name} mine first.',
       );
     }
-    final cost = _technologyCosts[currentLevel];
+    final cost = MiningContentRegistry.technologyCosts[currentLevel];
     if (candidate.state.cash < cost) {
       return const MiningActionResult.failure('Not enough cash.');
     }
@@ -261,28 +250,28 @@ class MiningController {
         if (candidate.state.unlockedPlanetIds.contains(id)) {
           return const MiningActionResult.failure('Planet already unlocked.');
         }
-        final mastered = content
-            .planet(MiningPlanetId.homeworld)
-            .sectors
-            .every(
-              (sector) => candidate.state.sectors[sector.id]!.mine != null,
-            );
-        if (!mastered) {
+        final minedSectorIds = candidate.state.sectors.entries
+            .where((entry) => entry.value.mine != null)
+            .map((entry) => entry.key);
+        if (!content.isHomeworldMastered(minedSectorIds)) {
           return const MiningActionResult.failure(
             'Build every Homeworld mine first.',
           );
         }
-        if (candidate.state.technology.surveying < _lunarUnlockSurveying) {
+        if (candidate.state.technology.surveying <
+            MiningContentRegistry.lunarUnlockSurveyingLevel) {
           return MiningActionResult.failure(
-            'Requires Surveying $_lunarUnlockSurveying.',
+            'Requires Surveying '
+            '${MiningContentRegistry.lunarUnlockSurveyingLevel}.',
           );
         }
-        if (candidate.state.cash < _lunarUnlockCost) {
+        if (candidate.state.cash < MiningContentRegistry.lunarUnlockCashCost) {
           return const MiningActionResult.failure('Not enough cash.');
         }
 
         final next = candidate.state.copyWith(
-          cash: candidate.state.cash - _lunarUnlockCost,
+          cash:
+              candidate.state.cash - MiningContentRegistry.lunarUnlockCashCost,
           unlockedPlanetIds: {...candidate.state.unlockedPlanetIds, id},
           activePlanetId: id,
         );

@@ -152,9 +152,12 @@ class MiningSaveRepository {
     var surveying = 0;
     for (final entry in raw.entries) {
       final value = entry.value;
-      if (value is! int || value < 0 || value > 5) {
+      if (value is! int ||
+          value < 0 ||
+          value > MiningContentRegistry.maxTechnologyLevel) {
         throw FormatException(
-          'technology ${entry.key} must be an integer in 0..5',
+          'technology ${entry.key} must be an integer in '
+          '0..${MiningContentRegistry.maxTechnologyLevel}',
         );
       }
       switch (entry.key) {

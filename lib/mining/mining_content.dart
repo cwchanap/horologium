@@ -74,6 +74,17 @@ class MiningContentRegistry {
   static const double terrainCellSize = 50;
   static const double worldExtent = terrainGridSize * terrainCellSize;
   static const double worldHalfExtent = worldExtent / 2;
+  static const int maxTechnologyLevel = 5;
+  static const technologyCosts = <int>[300, 700, 1500, 4000, 9000];
+  static const technologyMineGates = <MiningSectorId>[
+    MiningSectorId.landingBasin,
+    MiningSectorId.carbonRidge,
+    MiningSectorId.graniteCrater,
+    MiningSectorId.frozenBasin,
+    MiningSectorId.titaniumHighlands,
+  ];
+  static const int lunarUnlockCashCost = 2500;
+  static const int lunarUnlockSurveyingLevel = 3;
   static const offlineCapsByLogistics = <Duration>[
     Duration(hours: 8),
     Duration(hours: 10),
@@ -236,4 +247,13 @@ class MiningContentRegistry {
       capacityFor(id, level) * logisticsCapacityMultipliers[logistics];
 
   Duration offlineCapFor(int logistics) => offlineCapsByLogistics[logistics];
+
+  /// Homeworld mastery: every Homeworld mine exists. Takes only sector ids so
+  /// content never imports mining state.
+  bool isHomeworldMastered(Iterable<MiningSectorId> minedSectorIds) {
+    final mined = minedSectorIds.toSet();
+    return planet(
+      MiningPlanetId.homeworld,
+    ).sectors.every((sector) => mined.contains(sector.id));
+  }
 }
