@@ -64,10 +64,16 @@ MiningSave seededSave(
   DateTime now, {
   int cash = 100,
   Map<MiningSectorId, MineState> mines = const {},
+  TechnologyLevels technology = const TechnologyLevels(),
+  Set<MiningPlanetId> unlockedPlanets = const {MiningPlanetId.homeworld},
+  MiningPlanetId activePlanet = MiningPlanetId.homeworld,
 }) {
   final base = MiningSave.initial(nowUtc: now);
   return base.copyWith(
     cash: cash,
+    technology: technology,
+    unlockedPlanetIds: unlockedPlanets,
+    activePlanetId: activePlanet,
     sectors: {
       for (final entry in base.sectors.entries)
         entry.key: entry.value.copyWith(
@@ -77,6 +83,17 @@ MiningSave seededSave(
     },
   );
 }
+
+const Map<MiningSectorId, MineState> masteryMines = {
+  MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
+  MiningSectorId.carbonRidge: MineState(level: 1, storedAmount: 0),
+  MiningSectorId.graniteCrater: MineState(level: 1, storedAmount: 0),
+};
+
+const Set<MiningPlanetId> bothPlanets = {
+  MiningPlanetId.homeworld,
+  MiningPlanetId.lunarFrontier,
+};
 
 void main() {
   late TestClock clock;
@@ -352,6 +369,292 @@ void main() {
     });
   });
 
+  group('technology purchase', () {
+    test('purchase increments only the purchased track', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 1000,
+          mines: {
+            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
+          },
+        ),
+      );
+      final result = await controller.purchaseTechnology(
+        TechnologyTrack.extraction,
+      );
+      expect(result.isSuccess, isTrue);
+      expect(controller.state.technology.extraction, 1);
+      expect(controller.state.technology.logistics, 0);
+      expect(controller.state.technology.surveying, 0);
+      expect(controller.state.cash, 700);
+    });
+
+    test('purchase fails when cash is insufficient', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 299,
+          mines: {
+            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
+          },
+        ),
+      );
+      final before = controller.state.toJson();
+      final result = await controller.purchaseTechnology(
+        TechnologyTrack.extraction,
+      );
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Not enough cash.');
+      expect(controller.state.toJson(), before);
+    });
+
+    test('purchase fails when the tier mine gate is unmet', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 5000,
+          technology: const TechnologyLevels(extraction: 1),
+          mines: {
+            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
+          },
+        ),
+      );
+      final result = await controller.purchaseTechnology(
+        TechnologyTrack.extraction,
+      );
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Build the Carbon Ridge mine first.');
+      expect(controller.state.technology.extraction, 1);
+      expect(controller.state.cash, 5000);
+    });
+
+    test('purchase fails at max level', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 99999,
+          technology: const TechnologyLevels(surveying: 5),
+          mines: {
+            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
+          },
+        ),
+      );
+      final result = await controller.purchaseTechnology(
+        TechnologyTrack.surveying,
+      );
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Technology is at max level.');
+      expect(controller.state.cash, 99999);
+      expect(controller.state.technology.surveying, 5);
+    });
+  });
+
+  group('planet unlock and travel', () {
+    test('unlock fails without Homeworld mastery', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 5000,
+          technology: const TechnologyLevels(surveying: 3),
+          mines: {
+            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
+            MiningSectorId.carbonRidge: MineState(level: 1, storedAmount: 0),
+          },
+        ),
+      );
+      final before = controller.state.toJson();
+      final result = await controller.unlockPlanet(
+        MiningPlanetId.lunarFrontier,
+      );
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Build every Homeworld mine first.');
+      expect(controller.state.toJson(), before);
+    });
+
+    test('unlock fails at Surveying 2', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 5000,
+          technology: const TechnologyLevels(surveying: 2),
+          mines: masteryMines,
+        ),
+      );
+      final before = controller.state.toJson();
+      final result = await controller.unlockPlanet(
+        MiningPlanetId.lunarFrontier,
+      );
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Requires Surveying 3.');
+      expect(controller.state.toJson(), before);
+    });
+
+    test('unlock fails at 2,499 cash', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 2499,
+          technology: const TechnologyLevels(surveying: 3),
+          mines: masteryMines,
+        ),
+      );
+      final before = controller.state.toJson();
+      final result = await controller.unlockPlanet(
+        MiningPlanetId.lunarFrontier,
+      );
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Not enough cash.');
+      expect(controller.state.toJson(), before);
+    });
+
+    test('unlock deducts cash, unlocks, and activates atomically', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 5000,
+          technology: const TechnologyLevels(surveying: 3),
+          mines: masteryMines,
+        ),
+      );
+      final result = await controller.unlockPlanet(
+        MiningPlanetId.lunarFrontier,
+      );
+      expect(result.isSuccess, isTrue);
+      expect(controller.state.cash, 2500);
+      expect(controller.state.unlockedPlanetIds, bothPlanets);
+      expect(controller.state.activePlanetId, MiningPlanetId.lunarFrontier);
+    });
+
+    test('switch accrues before changing the active planet', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 1000,
+          unlockedPlanets: bothPlanets,
+          mines: {
+            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
+          },
+        ),
+      );
+      clock.now = clock.now.add(const Duration(seconds: 10));
+      final result = await controller.switchPlanet(
+        MiningPlanetId.lunarFrontier,
+      );
+      expect(result.isSuccess, isTrue);
+      expect(controller.state.activePlanetId, MiningPlanetId.lunarFrontier);
+      expect(
+        controller
+            .state
+            .sectors[MiningSectorId.landingBasin]!
+            .mine!
+            .storedAmount,
+        5.0,
+      );
+      expect(controller.state.lastAccruedAtUtc, clock.now);
+    });
+
+    test('switch rejects a locked planet without mutation', () async {
+      final before = controller.state.toJson();
+      final result = await controller.switchPlanet(
+        MiningPlanetId.lunarFrontier,
+      );
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Planet is locked.');
+      expect(controller.state.toJson(), before);
+    });
+
+    test('switch rejects the already active planet', () async {
+      final result = await controller.switchPlanet(MiningPlanetId.homeworld);
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Planet is already active.');
+    });
+  });
+
+  group('active-planet selling and surveying gates', () {
+    test('sell clears and credits only the active planet cargo', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 1000,
+          unlockedPlanets: bothPlanets,
+          mines: {
+            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 10),
+            MiningSectorId.frozenBasin: MineState(level: 1, storedAmount: 10),
+          },
+        ),
+      );
+      final result = await controller.sellAllCargo();
+      expect(result.isSuccess, isTrue);
+      expect(result.revenue, 40);
+      expect(result.sold, {ResourceType.gold: 10.0});
+      expect(controller.state.cash, 1040);
+      expect(
+        controller
+            .state
+            .sectors[MiningSectorId.landingBasin]!
+            .mine!
+            .storedAmount,
+        0,
+      );
+      expect(
+        controller
+            .state
+            .sectors[MiningSectorId.frozenBasin]!
+            .mine!
+            .storedAmount,
+        10.0,
+      );
+    });
+
+    test('reveal rejects an insufficient Surveying level', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 5000,
+          unlockedPlanets: bothPlanets,
+          activePlanet: MiningPlanetId.lunarFrontier,
+        ),
+      );
+      final before = controller.state.toJson();
+      final result = await controller.revealSector(MiningSectorId.frozenBasin);
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Requires Surveying 3.');
+      expect(controller.state.toJson(), before);
+    });
+
+    test('reveal succeeds once Surveying meets the requirement', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 5000,
+          technology: const TechnologyLevels(surveying: 3),
+          unlockedPlanets: bothPlanets,
+          activePlanet: MiningPlanetId.lunarFrontier,
+        ),
+      );
+      final result = await controller.revealSector(MiningSectorId.frozenBasin);
+      expect(result.isSuccess, isTrue);
+      expect(
+        controller.state.sectors[MiningSectorId.frozenBasin]!.revealed,
+        isTrue,
+      );
+      expect(controller.state.cash, 5000);
+    });
+  });
+
   group('passive refresh', () {
     test('accrues in memory without persisting', () async {
       await controller.buildMine(MiningSectorId.landingBasin);
@@ -491,6 +794,88 @@ void main() {
           stubborn.state.sectors[MiningSectorId.landingBasin]!.mine,
           isNotNull,
         );
+      },
+    );
+
+    test('a queued sell starts from the committed switch state', () async {
+      final repository = DelayedMiningSaveRepository();
+      final controller = await controllerOver(
+        repository,
+        seed: seededSave(
+          clock.now,
+          cash: 1000,
+          unlockedPlanets: bothPlanets,
+          activePlanet: MiningPlanetId.lunarFrontier,
+          mines: {
+            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 10),
+            MiningSectorId.frozenBasin: MineState(level: 1, storedAmount: 10),
+          },
+        ),
+      );
+
+      final switchFuture = controller.switchPlanet(MiningPlanetId.homeworld);
+      await repository.saveStarted.future;
+      final sellFuture = controller.sellAllCargo();
+      expect(controller.isBusy, isTrue);
+      repository.allowFirstSave.complete();
+
+      expect((await switchFuture).isSuccess, isTrue);
+      final sale = await sellFuture;
+      expect(sale.isSuccess, isTrue);
+      // The sell saw the committed switch: Homeworld cargo sold, Lunar kept.
+      expect(sale.revenue, 40);
+      expect(sale.sold, {ResourceType.gold: 10.0});
+      expect(controller.state.activePlanetId, MiningPlanetId.homeworld);
+      expect(controller.state.cash, 1040);
+      expect(
+        controller
+            .state
+            .sectors[MiningSectorId.landingBasin]!
+            .mine!
+            .storedAmount,
+        0,
+      );
+      expect(
+        controller
+            .state
+            .sectors[MiningSectorId.frozenBasin]!
+            .mine!
+            .storedAmount,
+        10.0,
+      );
+    });
+
+    test(
+      'a queued technology purchase starts from the committed switch state',
+      () async {
+        final repository = DelayedMiningSaveRepository();
+        final controller = await controllerOver(
+          repository,
+          seed: seededSave(
+            clock.now,
+            cash: 1000,
+            unlockedPlanets: bothPlanets,
+            activePlanet: MiningPlanetId.lunarFrontier,
+            mines: {
+              MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
+            },
+          ),
+        );
+
+        final switchFuture = controller.switchPlanet(MiningPlanetId.homeworld);
+        await repository.saveStarted.future;
+        final purchaseFuture = controller.purchaseTechnology(
+          TechnologyTrack.extraction,
+        );
+        expect(controller.isBusy, isTrue);
+        repository.allowFirstSave.complete();
+
+        expect((await switchFuture).isSuccess, isTrue);
+        expect((await purchaseFuture).isSuccess, isTrue);
+        // The purchase saw the committed switch: Homeworld is active again.
+        expect(controller.state.activePlanetId, MiningPlanetId.homeworld);
+        expect(controller.state.technology.extraction, 1);
+        expect(controller.state.cash, 700);
       },
     );
   });
