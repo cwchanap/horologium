@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_state.dart';
@@ -11,6 +12,34 @@ MiningSave goldState(DateTime now, {double stored = 0, int level = 1}) {
       MiningSectorId.landingBasin: SectorProgress(
         revealed: true,
         mine: MineState(level: level, storedAmount: stored),
+      ),
+    },
+  );
+}
+
+MiningSave stellarState(
+  DateTime now, {
+  TechnologyLevels technology = const TechnologyLevels(),
+  double homeworldStored = 0,
+  double lunarStored = 0,
+}) {
+  final base = MiningSave.initial(nowUtc: now);
+  return base.copyWith(
+    technology: technology,
+    unlockedPlanetIds: const {
+      MiningPlanetId.homeworld,
+      MiningPlanetId.lunarFrontier,
+    },
+    activePlanetId: MiningPlanetId.lunarFrontier,
+    sectors: {
+      ...base.sectors,
+      MiningSectorId.landingBasin: SectorProgress(
+        revealed: true,
+        mine: MineState(level: 1, storedAmount: homeworldStored),
+      ),
+      MiningSectorId.frozenBasin: SectorProgress(
+        revealed: true,
+        mine: MineState(level: 1, storedAmount: lunarStored),
       ),
     },
   );
@@ -73,5 +102,106 @@ void main() {
     expect(first.summary.fullSectors, second.summary.fullSectors);
     expect(first.summary.wasOfflineCapped, second.summary.wasOfflineCapped);
     expect(first.summary.produced, second.summary.produced);
+    expect(first.summary.productionByPlanet, second.summary.productionByPlanet);
+  });
+
+  test('both unlocked planets accrue in one window with technology once', () {
+    final state = stellarState(
+      start,
+      technology: const TechnologyLevels(extraction: 1, logistics: 2),
+    );
+    final result = simulation.accrue(
+      state,
+      start.add(const Duration(seconds: 10)),
+    );
+
+    expect(result.summary.elapsedUsed, const Duration(seconds: 10));
+    expect(
+      result.state.sectors[MiningSectorId.landingBasin]!.mine!.storedAmount,
+      closeTo(5.5, 0.0001),
+    );
+    expect(
+      result.state.sectors[MiningSectorId.frozenBasin]!.mine!.storedAmount,
+      closeTo(11, 0.0001),
+    );
+    expect(result.summary.produced[ResourceType.gold], closeTo(5.5, 0.0001));
+    expect(result.summary.produced[ResourceType.waterIce], closeTo(11, 0.0001));
+  });
+
+  test('summary groups production by planet with flat full sectors', () {
+    final state = stellarState(
+      start,
+      technology: const TechnologyLevels(logistics: 2),
+      lunarStored: 194.9,
+    );
+    final summary = simulation
+        .accrue(state, start.add(const Duration(seconds: 10)))
+        .summary;
+
+    expect(
+      summary.productionByPlanet[MiningPlanetId.homeworld]![ResourceType.gold],
+      greaterThan(0),
+    );
+    expect(
+      summary.productionByPlanet[MiningPlanetId.lunarFrontier]![ResourceType
+          .waterIce],
+      greaterThan(0),
+    );
+    expect(summary.fullSectors, contains(MiningSectorId.frozenBasin));
+    expect(summary.fullSectors, isNot(contains(MiningSectorId.landingBasin)));
+  });
+
+  test('locked Lunar Frontier does not accrue', () {
+    final base = MiningSave.initial(nowUtc: start);
+    final state = base.copyWith(
+      sectors: {
+        ...base.sectors,
+        MiningSectorId.landingBasin: const SectorProgress(
+          revealed: true,
+          mine: MineState(level: 1, storedAmount: 0),
+        ),
+        MiningSectorId.frozenBasin: const SectorProgress(
+          revealed: true,
+          mine: MineState(level: 1, storedAmount: 42),
+        ),
+      },
+    );
+    final result = simulation.accrue(
+      state,
+      start.add(const Duration(hours: 1)),
+    );
+
+    expect(
+      result.state.sectors[MiningSectorId.frozenBasin]!.mine!.storedAmount,
+      42,
+    );
+    expect(
+      result.summary.productionByPlanet,
+      isNot(contains(MiningPlanetId.lunarFrontier)),
+    );
+    expect(
+      result.summary.fullSectors,
+      isNot(contains(MiningSectorId.frozenBasin)),
+    );
+  });
+
+  test('offline cap grows with logistics', () {
+    final cappedAt12 = simulation.accrue(
+      goldState(
+        start,
+      ).copyWith(technology: const TechnologyLevels(logistics: 2)),
+      start.add(const Duration(hours: 13)),
+    );
+    expect(cappedAt12.summary.elapsedUsed, const Duration(hours: 12));
+    expect(cappedAt12.summary.wasOfflineCapped, isTrue);
+
+    final cappedAt24 = simulation.accrue(
+      goldState(
+        start,
+      ).copyWith(technology: const TechnologyLevels(logistics: 5)),
+      start.add(const Duration(hours: 30)),
+    );
+    expect(cappedAt24.summary.elapsedUsed, const Duration(hours: 24));
+    expect(cappedAt24.summary.wasOfflineCapped, isTrue);
   });
 }

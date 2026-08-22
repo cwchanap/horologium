@@ -118,6 +118,54 @@ void main() {
     );
   });
 
+  test(
+    'technology economy helpers pin exact extraction, logistics, and cap values',
+    () {
+      final content = MiningContentRegistry.stellarMining();
+
+      expect(content.effectiveRate(MiningSectorId.landingBasin, 1, 1), 0.55);
+      expect(
+        content.effectiveCapacity(MiningSectorId.landingBasin, 1, 2),
+        117.0,
+      );
+      expect(content.offlineCapFor(5), const Duration(hours: 24));
+
+      expect(content.effectiveRate(MiningSectorId.landingBasin, 1, 0), 0.50);
+      expect(content.effectiveRate(MiningSectorId.landingBasin, 1, 2), 0.625);
+      expect(content.effectiveRate(MiningSectorId.landingBasin, 1, 3), 0.725);
+      expect(content.effectiveRate(MiningSectorId.landingBasin, 1, 4), 0.85);
+      expect(content.effectiveRate(MiningSectorId.landingBasin, 1, 5), 1.00);
+      expect(content.effectiveRate(MiningSectorId.landingBasin, 2, 2), 0.9375);
+
+      expect(
+        content.effectiveCapacity(MiningSectorId.landingBasin, 1, 0),
+        90.0,
+      );
+      expect(
+        content.effectiveCapacity(MiningSectorId.landingBasin, 1, 1),
+        closeTo(103.5, 1e-9),
+      );
+      expect(
+        content.effectiveCapacity(MiningSectorId.landingBasin, 1, 3),
+        135.0,
+      );
+      expect(
+        content.effectiveCapacity(MiningSectorId.landingBasin, 1, 4),
+        157.5,
+      );
+      expect(
+        content.effectiveCapacity(MiningSectorId.landingBasin, 1, 5),
+        180.0,
+      );
+
+      expect(content.offlineCapFor(0), const Duration(hours: 8));
+      expect(content.offlineCapFor(1), const Duration(hours: 10));
+      expect(content.offlineCapFor(2), const Duration(hours: 12));
+      expect(content.offlineCapFor(3), const Duration(hours: 16));
+      expect(content.offlineCapFor(4), const Duration(hours: 20));
+    },
+  );
+
   test('world units are explicit and every authored anchor is in bounds', () {
     final content = MiningContentRegistry.stellarMining();
     expect(MiningContentRegistry.terrainGridSize, 36);

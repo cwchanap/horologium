@@ -6,12 +6,14 @@ class OfflineProductionSummary {
   const OfflineProductionSummary({
     required this.elapsedUsed,
     required this.produced,
+    required this.productionByPlanet,
     required this.fullSectors,
     required this.wasOfflineCapped,
   });
 
   final Duration elapsedUsed;
   final Map<ResourceType, double> produced;
+  final Map<MiningPlanetId, Map<ResourceType, double>> productionByPlanet;
   final Set<MiningSectorId> fullSectors;
   final bool wasOfflineCapped;
 
@@ -38,17 +40,18 @@ class MiningSimulation {
         summary: const OfflineProductionSummary(
           elapsedUsed: Duration.zero,
           produced: {},
+          productionByPlanet: {},
           fullSectors: {},
           wasOfflineCapped: false,
         ),
       );
     }
 
-    final elapsed = rawElapsed > MiningContentRegistry.offlineCap
-        ? MiningContentRegistry.offlineCap
-        : rawElapsed;
+    final offlineCap = content.offlineCapFor(state.technology.logistics);
+    final elapsed = rawElapsed > offlineCap ? offlineCap : rawElapsed;
     final seconds = elapsed.inMicroseconds / Duration.microsecondsPerSecond;
     final produced = <ResourceType, double>{};
+    final producedByPlanet = <MiningPlanetId, Map<ResourceType, double>>{};
     final full = <MiningSectorId>{};
     final sectors = <MiningSectorId, SectorProgress>{...state.sectors};
 
@@ -58,13 +61,20 @@ class MiningSimulation {
         final mine = progress.mine;
         if (!progress.revealed || mine == null) continue;
 
-        final capacity = content.capacityFor(definition.id, mine.level);
+        final rate = content.effectiveRate(
+          definition.id,
+          mine.level,
+          state.technology.extraction,
+        );
+        final capacity = content.effectiveCapacity(
+          definition.id,
+          mine.level,
+          state.technology.logistics,
+        );
         final remaining = (capacity - mine.storedAmount)
             .clamp(0.0, capacity)
             .toDouble();
-        final amount = (content.rateFor(definition.id, mine.level) * seconds)
-            .clamp(0.0, remaining)
-            .toDouble();
+        final amount = (rate * seconds).clamp(0.0, remaining).toDouble();
         final stored = mine.storedAmount + amount;
         sectors[definition.id] = progress.copyWith(
           mine: mine.copyWith(storedAmount: stored),
@@ -74,6 +84,13 @@ class MiningSimulation {
           (value) => value + amount,
           ifAbsent: () => amount,
         );
+        producedByPlanet
+            .putIfAbsent(planetId, () => <ResourceType, double>{})
+            .update(
+              definition.resource,
+              (value) => value + amount,
+              ifAbsent: () => amount,
+            );
         if (stored >= capacity) full.add(definition.id);
       }
     }
@@ -83,8 +100,13 @@ class MiningSimulation {
       summary: OfflineProductionSummary(
         elapsedUsed: elapsed,
         produced: Map.unmodifiable(produced),
+        productionByPlanet:
+            Map.unmodifiable(<MiningPlanetId, Map<ResourceType, double>>{
+              for (final entry in producedByPlanet.entries)
+                entry.key: Map.unmodifiable(entry.value),
+            }),
         fullSectors: Set.unmodifiable(full),
-        wasOfflineCapped: rawElapsed > MiningContentRegistry.offlineCap,
+        wasOfflineCapped: rawElapsed > offlineCap,
       ),
     );
   }
