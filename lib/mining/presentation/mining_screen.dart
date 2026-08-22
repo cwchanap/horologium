@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:horologium/game/audio_manager.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_controller.dart';
+import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_sheet_view.dart';
@@ -15,6 +16,8 @@ import 'package:horologium/mining/presentation/mining_action_sheet.dart';
 import 'package:horologium/mining/presentation/mining_status_bar.dart';
 import 'package:horologium/mining/presentation/mining_settings_sheet.dart';
 import 'package:horologium/mining/presentation/offline_return_sheet.dart';
+import 'package:horologium/mining/presentation/stellar_map_sheet.dart';
+import 'package:horologium/mining/presentation/technology_sheet.dart';
 import 'package:horologium/mining/world/mining_game.dart';
 
 class MiningScreen extends StatefulWidget {
@@ -327,11 +330,105 @@ class _MiningScreenState extends State<MiningScreen>
     );
   }
 
+  void _openTechnology() {
+    if (!_initialized) return;
+    unawaited(_audioManager.maybeStartBgm());
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => TechnologySheet(
+          view: TechnologySheetView.from(
+            state: _controller.state,
+            content: _content,
+          ),
+          onPurchase: _purchaseTechnology,
+        ),
+      ),
+    );
+  }
+
+  void _openStellarMap() {
+    if (!_initialized) return;
+    unawaited(_audioManager.maybeStartBgm());
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => StellarMapSheet(
+          view: StellarMapView.from(
+            state: _controller.state,
+            content: _content,
+          ),
+          activePlanetId: _controller.state.activePlanetId,
+          homeworldName: _content.planet(MiningPlanetId.homeworld).name,
+          lunarName: _content.planet(MiningPlanetId.lunarFrontier).name,
+          onUnlockLunar: _unlockLunar,
+          onTravel: _travelTo,
+        ),
+      ),
+    );
+  }
+
+  void _purchaseTechnology(TechnologyTrack track) {
+    _runSheetAction(
+      () => _controller.purchaseTechnology(track),
+      successMessage: 'Technology upgraded.',
+    );
+  }
+
+  void _unlockLunar() {
+    _runSheetAction(
+      () => _controller.unlockPlanet(MiningPlanetId.lunarFrontier),
+      successMessage:
+          '${_content.planet(MiningPlanetId.lunarFrontier).name} unlocked.',
+    );
+  }
+
+  void _travelTo(MiningPlanetId id) {
+    _runSheetAction(
+      () => _controller.switchPlanet(id),
+      successMessage: 'Traveled to ${_content.planet(id).name}.',
+    );
+  }
+
+  /// Await a sheet-triggered mutation, then refresh presentation. On success
+  /// the keyed [MiningGame] replacement runs for unlock/travel; on failure
+  /// the current game stays mounted. Haptic feedback and the settled
+  /// snackbar confirmation accompany the state change without nonessential
+  /// animation.
+  Future<void> _runSheetAction(
+    Future<MiningActionResult> Function() operation, {
+    required String successMessage,
+  }) async {
+    if (!_initialized) return;
+    try {
+      final result = await operation();
+      if (!mounted) return;
+      _refreshPresentation();
+      if (result.isSuccess) {
+        unawaited(HapticFeedback.lightImpact());
+        _showResult(successMessage);
+      } else {
+        _showResult(result.message ?? 'Action failed.');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      _refreshPresentation();
+      _showResult('Action failed.');
+    }
+  }
+
   MiningPlanetDefinition get _activePlanet =>
       _content.planet(_displayState.activePlanetId);
 
-  int _revealedSectorCount() => _displayState.sectors.values
-      .where((progress) => progress.revealed)
+  /// HUD totals cover the active planet only.
+  int _revealedSectorCount() => _activePlanet.sectors
+      .where(
+        (definition) => _displayState.sectors[definition.id]?.revealed ?? false,
+      )
       .length;
 
   int _cargoValue() {
@@ -373,28 +470,61 @@ class _MiningScreenState extends State<MiningScreen>
     );
   }
 
-  Widget _buildSettingsButton() {
+  Widget _buildChromeButtons() {
     return SizedBox(
       height: 56,
       child: Align(
         alignment: Alignment.centerRight,
         child: Padding(
           padding: const EdgeInsets.only(right: 8),
-          child: IconButton(
-            key: const Key('mining-settings-button'),
-            tooltip: 'Settings',
-            onPressed: _openSettings,
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            style: IconButton.styleFrom(
-              backgroundColor: const Color(0xCC162133),
-              foregroundColor: Colors.cyanAccent,
-              side: const BorderSide(color: Colors.cyanAccent),
-              shape: const CircleBorder(),
-            ),
-            icon: const Icon(Icons.settings),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _chromeIconButton(
+                key: const Key('mining-technology-button'),
+                tooltip: 'Technology',
+                icon: Icons.science,
+                onPressed: _openTechnology,
+              ),
+              const SizedBox(width: 8),
+              _chromeIconButton(
+                key: const Key('mining-stellar-map-button'),
+                tooltip: 'Stellar Map',
+                icon: Icons.map_outlined,
+                onPressed: _openStellarMap,
+              ),
+              const SizedBox(width: 8),
+              _chromeIconButton(
+                key: const Key('mining-settings-button'),
+                tooltip: 'Settings',
+                icon: Icons.settings,
+                onPressed: _openSettings,
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _chromeIconButton({
+    required Key key,
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return IconButton(
+      key: key,
+      tooltip: tooltip,
+      onPressed: onPressed,
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+      style: IconButton.styleFrom(
+        backgroundColor: const Color(0xCC162133),
+        foregroundColor: Colors.cyanAccent,
+        side: const BorderSide(color: Colors.cyanAccent),
+        shape: const CircleBorder(),
+      ),
+      icon: Icon(icon),
     );
   }
 
@@ -503,6 +633,7 @@ class _MiningScreenState extends State<MiningScreen>
                   Padding(
                     padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
                     child: MiningStatusBar(
+                      planetName: _activePlanet.name,
                       cash: _displayState.cash,
                       revealedSectors: _revealedSectorCount(),
                       totalSectors: _activePlanet.sectors.length,
@@ -510,7 +641,7 @@ class _MiningScreenState extends State<MiningScreen>
                     ),
                   ),
                   _buildSectorTabs(),
-                  _buildSettingsButton(),
+                  _buildChromeButtons(),
                 ],
               ),
             ),

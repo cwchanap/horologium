@@ -232,6 +232,30 @@ void main() {
     expect(sector.children.whereType<EliteRingComponent>(), hasLength(1));
   });
 
+  testWidgets('the world background uses the planet mining-world tint', (
+    tester,
+  ) async {
+    final content = MiningContentRegistry.stellarMining();
+    final homeworld = MiningGame(
+      planet: content.planet(MiningPlanetId.homeworld),
+      initialProgress: const {},
+    );
+    final lunar = MiningGame(
+      planet: content.planet(MiningPlanetId.lunarFrontier),
+      initialProgress: const {},
+    );
+
+    expect(
+      homeworld.backgroundColor(),
+      content.planet(MiningPlanetId.homeworld).tint,
+    );
+    expect(
+      lunar.backgroundColor(),
+      content.planet(MiningPlanetId.lunarFrontier).tint,
+    );
+    expect(homeworld.backgroundColor(), isNot(equals(lunar.backgroundColor())));
+  });
+
   for (final viewport in const [Size(360, 640), Size(430, 932)]) {
     testWidgets(
       'selection focus places the sector above the sheet at $viewport',

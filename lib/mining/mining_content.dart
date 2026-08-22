@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:horologium/constants/assets_path.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 
@@ -53,18 +54,37 @@ class MiningSectorDefinition {
   final MiningWorldAnchor anchor;
 }
 
+/// Built-in Material-icon silhouette for a resource: distinct icon, display
+/// name, and color per [ResourceType], so no PNG assets are needed.
+class ResourceSilhouette {
+  const ResourceSilhouette({
+    required this.icon,
+    required this.name,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String name;
+  final Color color;
+}
+
 class MiningPlanetDefinition {
   const MiningPlanetDefinition({
     required this.id,
     required this.name,
     required this.sectors,
     required this.terrainSeed,
+    required this.tint,
   });
 
   final MiningPlanetId id;
   final String name;
   final List<MiningSectorDefinition> sectors;
   final int terrainSeed;
+
+  /// Mining-world tint. The world renders this as its atmosphere/background
+  /// so each planet keeps a distinct visual identity.
+  final Color tint;
 }
 
 class MiningContentRegistry {
@@ -114,12 +134,46 @@ class MiningContentRegistry {
 
   final Map<MiningPlanetId, MiningPlanetDefinition> planets;
 
+  static const Map<ResourceType, ResourceSilhouette> resourceSilhouettes = {
+    ResourceType.gold: ResourceSilhouette(
+      icon: Icons.monetization_on,
+      name: 'Gold',
+      color: Colors.amberAccent,
+    ),
+    ResourceType.coal: ResourceSilhouette(
+      icon: Icons.local_fire_department,
+      name: 'Coal',
+      color: Colors.blueGrey,
+    ),
+    ResourceType.stone: ResourceSilhouette(
+      icon: Icons.landscape,
+      name: 'Stone',
+      color: Colors.grey,
+    ),
+    ResourceType.waterIce: ResourceSilhouette(
+      icon: Icons.ac_unit,
+      name: 'Water Ice',
+      color: Colors.lightBlueAccent,
+    ),
+    ResourceType.titaniumOre: ResourceSilhouette(
+      icon: Icons.diamond,
+      name: 'Titanium Ore',
+      color: Colors.deepOrangeAccent,
+    ),
+    ResourceType.helium3: ResourceSilhouette(
+      icon: Icons.blur_on,
+      name: 'Helium-3',
+      color: Colors.cyanAccent,
+    ),
+  };
+
   factory MiningContentRegistry.stellarMining() =>
       const MiningContentRegistry._({
         MiningPlanetId.homeworld: MiningPlanetDefinition(
           id: MiningPlanetId.homeworld,
           name: 'Homeworld',
           terrainSeed: 631,
+          tint: Color(0xFF0A1218),
           sectors: [
             MiningSectorDefinition(
               id: MiningSectorId.landingBasin,
@@ -172,6 +226,7 @@ class MiningContentRegistry {
           id: MiningPlanetId.lunarFrontier,
           name: 'Lunar Frontier',
           terrainSeed: 638,
+          tint: Color(0xFF151324),
           sectors: [
             MiningSectorDefinition(
               id: MiningSectorId.frozenBasin,
