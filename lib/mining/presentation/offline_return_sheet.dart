@@ -15,10 +15,6 @@ class OfflineReturnSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final production = summary.produced.entries
-        .where((entry) => entry.value > 0)
-        .toList();
-
     return SafeArea(
       child: Material(
         key: const Key('offline-return-sheet'),
@@ -52,56 +48,8 @@ class OfflineReturnSheet extends StatelessWidget {
                 'Mining continued for ${_formatDuration(summary.elapsedUsed)}.',
                 style: const TextStyle(color: Colors.white70),
               ),
-              if (production.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                const Text(
-                  'Cargo added',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                for (final entry in production)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.circle,
-                          size: 8,
-                          color: _resourceColor(entry.key),
-                        ),
-                        const SizedBox(width: 9),
-                        Expanded(
-                          child: Text(
-                            _resourceName(entry.key),
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        Text(
-                          '+${entry.value.toStringAsFixed(1)}',
-                          style: const TextStyle(
-                            color: Colors.cyanAccent,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-              if (summary.fullSectors.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                for (final id
-                    in content.planets.values
-                        .expand((planet) => planet.sectors)
-                        .map((definition) => definition.id)
-                        .where(summary.fullSectors.contains))
-                  Text(
-                    'Storage full: ${content.sector(id).name}.',
-                    style: const TextStyle(color: Colors.orangeAccent),
-                  ),
-              ],
+              for (final planetEntry in summary.productionByPlanet.entries)
+                _planetSection(planetEntry.key, planetEntry.value),
               if (summary.wasOfflineCapped) ...[
                 const SizedBox(height: 8),
                 const Text(
@@ -136,6 +84,84 @@ class OfflineReturnSheet extends StatelessWidget {
     );
   }
 
+  /// One section per producing planet. The flat [OfflineProductionSummary
+  /// .fullSectors] set resolves to per-planet names by filtering the catalog.
+  Widget _planetSection(
+    MiningPlanetId planetId,
+    Map<ResourceType, double> production,
+  ) {
+    final planet = content.planet(planetId);
+    final fullSectorNames = planet.sectors
+        .map((definition) => definition.id)
+        .where(summary.fullSectors.contains)
+        .map((id) => content.sector(id).name);
+
+    return Container(
+      key: Key('offline-return-planet-${planetId.name}'),
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.white24),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            planet.name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          for (final entry in production.entries.where(
+            (entry) => entry.value > 0,
+          ))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  Icon(
+                    MiningContentRegistry.resourceSilhouettes[entry.key]!.icon,
+                    size: 14,
+                    color: MiningContentRegistry
+                        .resourceSilhouettes[entry.key]!
+                        .color,
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      MiningContentRegistry
+                          .resourceSilhouettes[entry.key]!
+                          .name,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  Text(
+                    '+${entry.value.toStringAsFixed(1)}',
+                    style: const TextStyle(
+                      color: Colors.cyanAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          for (final name in fullSectorNames)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Storage full: $name.',
+                style: const TextStyle(color: Colors.orangeAccent),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   static String _formatDuration(Duration duration) {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
@@ -143,39 +169,5 @@ class OfflineReturnSheet extends StatelessWidget {
     if (hours > 0) return '${hours}h ${minutes}m';
     if (minutes > 0) return '${minutes}m ${seconds}s';
     return '${seconds}s';
-  }
-
-  static String _resourceName(ResourceType type) {
-    switch (type) {
-      case ResourceType.gold:
-        return 'Gold';
-      case ResourceType.coal:
-        return 'Coal';
-      case ResourceType.stone:
-        return 'Stone';
-      case ResourceType.waterIce:
-        return 'Water Ice';
-      case ResourceType.titaniumOre:
-        return 'Titanium Ore';
-      case ResourceType.helium3:
-        return 'Helium-3';
-    }
-  }
-
-  static Color _resourceColor(ResourceType type) {
-    switch (type) {
-      case ResourceType.gold:
-        return Colors.amberAccent;
-      case ResourceType.coal:
-        return Colors.blueGrey;
-      case ResourceType.stone:
-        return Colors.grey;
-      case ResourceType.waterIce:
-        return Colors.lightBlueAccent;
-      case ResourceType.titaniumOre:
-        return Colors.deepOrangeAccent;
-      case ResourceType.helium3:
-        return Colors.cyanAccent;
-    }
   }
 }

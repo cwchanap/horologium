@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 class MiningStatusBar extends StatelessWidget {
   const MiningStatusBar({
     super.key,
+    required this.planetName,
     required this.cash,
     required this.revealedSectors,
     required this.totalSectors,
     required this.cargoValue,
   });
 
+  final String planetName;
   final int cash;
   final int revealedSectors;
   final int totalSectors;
@@ -26,8 +28,8 @@ class MiningStatusBar extends StatelessWidget {
       ),
       child: Row(
         children: [
+          _Metric(label: planetName, value: '$revealedSectors/$totalSectors'),
           _Metric(label: 'CASH', value: '$cash'),
-          _Metric(label: 'SECTORS', value: '$revealedSectors/$totalSectors'),
           _Metric(label: 'CARGO VALUE', value: '$cargoValue'),
         ],
       ),

@@ -185,6 +185,50 @@ void expectMiningStatusToStayFocused(WidgetTester tester) {
   }
 }
 
+MiningSave _unlockableLunarSave() => MiningSave(
+  cash: 5000,
+  lastAccruedAtUtc: _now,
+  technology: const TechnologyLevels(surveying: 3),
+  unlockedPlanetIds: const {MiningPlanetId.homeworld},
+  activePlanetId: MiningPlanetId.homeworld,
+  sectors: {
+    MiningSectorId.landingBasin: const SectorProgress(
+      revealed: true,
+      mine: MineState(level: 1, storedAmount: 0),
+    ),
+    MiningSectorId.carbonRidge: const SectorProgress(
+      revealed: true,
+      mine: MineState(level: 1, storedAmount: 0),
+    ),
+    MiningSectorId.graniteCrater: const SectorProgress(
+      revealed: true,
+      mine: MineState(level: 1, storedAmount: 0),
+    ),
+    MiningSectorId.frozenBasin: const SectorProgress(revealed: false),
+    MiningSectorId.titaniumHighlands: const SectorProgress(revealed: false),
+    MiningSectorId.heliumMare: const SectorProgress(revealed: false),
+  },
+);
+
+MiningSave _techPurchaseSave() => MiningSave(
+  cash: 1000,
+  lastAccruedAtUtc: _now,
+  technology: const TechnologyLevels(),
+  unlockedPlanetIds: const {MiningPlanetId.homeworld},
+  activePlanetId: MiningPlanetId.homeworld,
+  sectors: {
+    MiningSectorId.landingBasin: const SectorProgress(
+      revealed: true,
+      mine: MineState(level: 1, storedAmount: 0),
+    ),
+    MiningSectorId.carbonRidge: const SectorProgress(revealed: false),
+    MiningSectorId.graniteCrater: const SectorProgress(revealed: false),
+    MiningSectorId.frozenBasin: const SectorProgress(revealed: false),
+    MiningSectorId.titaniumHighlands: const SectorProgress(revealed: false),
+    MiningSectorId.heliumMare: const SectorProgress(revealed: false),
+  },
+);
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -204,21 +248,27 @@ void main() {
       );
       expect(buttonSize.height, greaterThanOrEqualTo(56));
 
-      final settingsButton = tester.getRect(
-        find.byKey(const Key('mining-settings-button')),
+      final statusRect = tester.getRect(
+        find.byKey(const Key('mining-status-bar')),
       );
-      expect(
-        settingsButton.overlaps(
-          tester.getRect(find.byKey(const Key('mining-status-bar'))),
-        ),
-        isFalse,
+      final tabsRect = tester.getRect(
+        find.byKey(const Key('mining-sector-tabs')),
       );
-      expect(
-        settingsButton.overlaps(
-          tester.getRect(find.byKey(const Key('mining-sector-tabs'))),
-        ),
-        isFalse,
+      final sheetRect = tester.getRect(
+        find.byKey(const Key('mining-primary-action')),
       );
+      for (final key in const [
+        'mining-settings-button',
+        'mining-technology-button',
+        'mining-stellar-map-button',
+      ]) {
+        final rect = tester.getRect(find.byKey(Key(key)));
+        expect(rect.height, greaterThanOrEqualTo(48));
+        expect(rect.width, greaterThanOrEqualTo(48));
+        expect(rect.overlaps(statusRect), isFalse);
+        expect(rect.overlaps(tabsRect), isFalse);
+        expect(rect.overlaps(sheetRect), isFalse);
+      }
     });
 
     testWidgets(
@@ -1127,4 +1177,241 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Stellar Map is reachable at Surveying 0 with exact unmet '
+      'Lunar requirements', (tester) async {
+    await pumpMiningScreen(tester, _viewports.first, disableAnimations: true);
+
+    await tester.tap(find.byKey(const Key('mining-stellar-map-button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      find.byKey(const Key('mining-stellar-map-sheet')),
+      findsOneWidget,
+      reason: 'The Stellar Map must be openable before any technology.',
+    );
+    expect(find.text('Homeworld mines 0/3'), findsOneWidget);
+    expect(find.text('Surveying 3'), findsOneWidget);
+    expect(find.text('2500 cash'), findsOneWidget);
+
+    final unlock = tester.widget<ElevatedButton>(
+      find.descendant(
+        of: find.byKey(const Key('mining-stellar-map-unlock')),
+        matching: find.byType(ElevatedButton),
+      ),
+    );
+    expect(unlock.onPressed, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a technology purchase flows through the controller', (
+    tester,
+  ) async {
+    final repository = MiningSaveRepository(
+      content: MiningContentRegistry.stellarMining(),
+    );
+    await repository.save(_techPurchaseSave());
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      repository: repository,
+      disableAnimations: true,
+    );
+
+    await tester.tap(find.byKey(const Key('mining-technology-button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('mining-technology-buy-extraction')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byKey(const Key('mining-technology-sheet')), findsNothing);
+    expect(find.text('Technology upgraded.'), findsOneWidget);
+    final handles =
+        tester.state(find.byType(MiningScreen)) as MiningScreenHandles;
+    expect(handles.controller.state.technology.extraction, 1);
+    expect(handles.controller.state.cash, 700);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'unlocking Lunar awaits the mutation and replaces the projected game',
+    (tester) async {
+      final repository = MiningSaveRepository(
+        content: MiningContentRegistry.stellarMining(),
+      );
+      await repository.save(_unlockableLunarSave());
+      await pumpMiningScreen(
+        tester,
+        _viewports.first,
+        repository: repository,
+        disableAnimations: true,
+      );
+      expect(
+        find.byKey(const ValueKey(MiningPlanetId.homeworld)),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('mining-stellar-map-button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const Key('mining-stellar-map-unlock')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.byKey(const Key('mining-stellar-map-sheet')), findsNothing);
+      expect(
+        find.byKey(const ValueKey(MiningPlanetId.lunarFrontier)),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey(MiningPlanetId.homeworld)),
+        findsNothing,
+      );
+      expect(find.text('Lunar Frontier unlocked.'), findsOneWidget);
+
+      final handles =
+          tester.state(find.byType(MiningScreen)) as MiningScreenHandles;
+      expect(
+        handles.controller.state.unlockedPlanetIds,
+        contains(MiningPlanetId.lunarFrontier),
+      );
+      expect(
+        handles.controller.state.activePlanetId,
+        MiningPlanetId.lunarFrontier,
+      );
+
+      // HUD switched to the active planet and totals Lunar sectors only.
+      final bar = find.byKey(const Key('mining-status-bar'));
+      expect(
+        find.descendant(of: bar, matching: find.text('Lunar Frontier')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: bar, matching: find.text('0/3')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('a failed unlock keeps the current game mounted', (tester) async {
+    // Seed with a plain repository so initialize() loads an existing save;
+    // the failing repository then rejects the unlock mutation's save.
+    await MiningSaveRepository().save(_unlockableLunarSave());
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      repository: FailingMiningSaveRepository(),
+      disableAnimations: true,
+    );
+
+    await tester.tap(find.byKey(const Key('mining-stellar-map-button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byKey(const Key('mining-stellar-map-unlock')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(
+      find.byKey(const ValueKey(MiningPlanetId.homeworld)),
+      findsOneWidget,
+      reason: 'A failed unlock must leave the current game mounted.',
+    );
+    expect(
+      find.byKey(const ValueKey(MiningPlanetId.lunarFrontier)),
+      findsNothing,
+    );
+    expect(find.text('Action failed.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('travel swaps the projected game through the controller', (
+    tester,
+  ) async {
+    final repository = MiningSaveRepository(
+      content: MiningContentRegistry.stellarMining(),
+    );
+    await repository.save(_seededLunarActiveSave());
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      repository: repository,
+      disableAnimations: true,
+    );
+    expect(
+      find.byKey(const ValueKey(MiningPlanetId.lunarFrontier)),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('mining-stellar-map-button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Travel to the already-active planet is inert; Homeworld travel is live.
+    final lunarTravel = tester.widget<ElevatedButton>(
+      find.descendant(
+        of: find.byKey(const Key('mining-stellar-map-travel-lunarFrontier')),
+        matching: find.byType(ElevatedButton),
+      ),
+    );
+    expect(lunarTravel.onPressed, isNull);
+
+    await tester.tap(
+      find.byKey(const Key('mining-stellar-map-travel-homeworld')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(
+      find.byKey(const ValueKey(MiningPlanetId.homeworld)),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey(MiningPlanetId.lunarFrontier)),
+      findsNothing,
+    );
+    expect(find.text('Traveled to Homeworld.'), findsOneWidget);
+
+    final bar = find.byKey(const Key('mining-status-bar'));
+    expect(
+      find.descendant(of: bar, matching: find.text('Homeworld')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: bar, matching: find.text('1/3')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the HUD totals only active-planet sectors', (tester) async {
+    final repository = MiningSaveRepository(
+      content: MiningContentRegistry.stellarMining(),
+    );
+    await repository.save(_seededLunarActiveSave());
+    await pumpMiningScreen(
+      tester,
+      _viewports.first,
+      repository: repository,
+      disableAnimations: true,
+    );
+
+    final bar = find.byKey(const Key('mining-status-bar'));
+    expect(
+      find.descendant(of: bar, matching: find.text('Lunar Frontier')),
+      findsOneWidget,
+    );
+    // Frozen Basin is the only revealed Lunar sector; the revealed Homeworld
+    // Landing Basin must not count toward the active-planet total.
+    expect(
+      find.descendant(of: bar, matching: find.text('1/3')),
+      findsOneWidget,
+    );
+    expect(find.descendant(of: bar, matching: find.text('72')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/constants/assets_path.dart';
 import 'package:horologium/game/resources/resource_type.dart';
@@ -184,6 +185,29 @@ void main() {
       expect(sector.anchor.x, inInclusiveRange(-900, 900));
       expect(sector.anchor.y, inInclusiveRange(-900, 900));
     }
+  });
+
+  test('planet seeds and tints distinguish Homeworld from Lunar', () {
+    final content = MiningContentRegistry.stellarMining();
+    final homeworld = content.planet(MiningPlanetId.homeworld);
+    final lunar = content.planet(MiningPlanetId.lunarFrontier);
+
+    expect(homeworld.terrainSeed, 631);
+    expect(lunar.terrainSeed, 638);
+    expect(homeworld.tint, isNot(equals(lunar.tint)));
+  });
+
+  test('resource silhouettes give Lunar resources distinct identities', () {
+    final silhouettes = MiningContentRegistry.resourceSilhouettes;
+
+    expect(silhouettes.keys.toSet(), ResourceType.values.toSet());
+    final water = silhouettes[ResourceType.waterIce]!;
+    final titanium = silhouettes[ResourceType.titaniumOre]!;
+    final helium = silhouettes[ResourceType.helium3]!;
+    expect({water.icon, titanium.icon, helium.icon}.length, 3);
+    expect({water.name, titanium.name, helium.name}.length, 3);
+    expect({water.color, titanium.color, helium.color}.length, 3);
+    expect(water.icon, isA<IconData>());
   });
 
   test('clean mining state reveals only Landing Basin', () {

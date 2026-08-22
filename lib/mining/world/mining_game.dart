@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show Color;
 
 import 'package:flame/components.dart';
 import 'package:flame/events.dart' as flame_events;
@@ -38,6 +39,11 @@ class MiningGame extends FlameGame
   late double _scaleStartZoom;
 
   Vector2 get worldSize => Vector2.all(MiningContentRegistry.worldExtent);
+
+  /// Planet atmosphere: each projected world carries its planet's tint so
+  /// Homeworld and Lunar Frontier keep distinct visual identities.
+  @override
+  Color backgroundColor() => planet.tint;
 
   MiningSectorComponent sector(MiningSectorId id) => _sectors[id]!;
 
