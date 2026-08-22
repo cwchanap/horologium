@@ -925,7 +925,7 @@ Trigger a sector selection/reward after switch and assert the new game’s selec
 
 - [ ] **Step 3: Add RED pre-onLoad state test**
 
-Prevent the new game from losing the active snapshot when replacement occurs before `onLoad` completes. The clean contract is to give `MiningGame` an `initialProgress` constructor value and apply it after sector components are created:
+Prevent the new game from losing the active snapshot when replacement occurs before `onLoad` completes. Give `MiningGame` an `initialProgress` constructor value and apply it after sector components are created:
 
 ```dart
 MiningGame({
