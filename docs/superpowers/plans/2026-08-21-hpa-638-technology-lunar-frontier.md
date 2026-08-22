@@ -789,7 +789,7 @@ git commit -m "feat(mining): add technology and planet mutations"
 
 - [ ] **Step 1: Add RED `MiningSheetView` tests for wrong-planet prevention and effective values**
 
-With Homeworld active and Lunar cargo present, sell view must report only Homeworld cargo. With Extraction 2, a level-1 Landing Basin mine must show `0.6/s` (`0.50 * 1.25` formatted to one decimal). With Logistics 2, its capacity must show `117.0`. Frozen Basin at Surveying 2 must show disabled reason `Requires Surveying 3.` even though reveal cost is zero.
+With Homeworld active and Lunar cargo present, sell view must report only Homeworld cargo. With Extraction 2, a level-1 Landing Basin mine must show the formatter’s value for `0.50 * 1.25 = 0.625/s` (for example `0.63/s` if the existing formatter uses two decimals; do not round it to a contradictory hard-coded `0.6/s`). With Logistics 2, its capacity must show `117.0`. Frozen Basin at Surveying 2 must show disabled reason `Requires Surveying 3.` even though reveal cost is zero.
 
 - [ ] **Step 2: Add RED technology view tests**
 
