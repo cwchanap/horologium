@@ -43,4 +43,15 @@ void main() {
       'sectors',
     });
   });
+
+  test('initial save sectors cannot be mutated', () {
+    final state = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 18, 12));
+
+    expect(
+      () => state.sectors[MiningSectorId.landingBasin] = const SectorProgress(
+        revealed: false,
+      ),
+      throwsUnsupportedError,
+    );
+  });
 }

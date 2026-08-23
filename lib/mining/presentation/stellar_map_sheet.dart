@@ -110,8 +110,10 @@ class StellarMapSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          _progressRow(planet),
-          const SizedBox(height: 8),
+          if (planet.isUnlocked) ...[
+            _progressRow(planet),
+            const SizedBox(height: 8),
+          ],
           if (planet.isUnlocked)
             _travelButton(context: context, planet: planet)
           else

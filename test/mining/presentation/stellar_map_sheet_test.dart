@@ -160,6 +160,13 @@ void main() {
         expect(find.text('Lunar Frontier mines 1/3'), findsOneWidget);
         expect(find.text('Surveying 5'), findsOneWidget);
         expect(find.text('20000 cash'), findsOneWidget);
+        final marsCard = find.byKey(
+          const Key('stellar-map-planet-marsFrontier'),
+        );
+        expect(
+          find.descendant(of: marsCard, matching: find.text('Mines 0/3')),
+          findsNothing,
+        );
         expect(
           find.byKey(const Key('mining-stellar-map-unlock-marsFrontier')),
           findsOneWidget,

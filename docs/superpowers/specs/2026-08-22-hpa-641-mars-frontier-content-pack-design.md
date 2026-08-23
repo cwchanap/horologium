@@ -229,12 +229,12 @@ No `schemaVersion`, migration registry, compatibility reader, or legacy conversi
 `MiningSave.initial()` derives its flat map from the closed enum rather than hand-listing all authored sectors:
 
 ```dart
-sectors: {
+sectors: Map.unmodifiable({
   for (final id in MiningSectorId.values)
     id: SectorProgress(
       revealed: id == MiningSectorId.landingBasin,
     ),
-},
+}),
 ```
 
 Landing Basin remains the only initially revealed sector.
