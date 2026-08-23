@@ -7,8 +7,13 @@ import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_state.dart';
 
+String _formatCash(int amount) => amount.toString().replaceAllMapped(
+  RegExp(r'\B(?=(\d{3})+(?!\d))'),
+  (_) => ',',
+);
+
 class MiningActionResult {
-  const MiningActionResult.success() : isSuccess = true, message = null;
+  const MiningActionResult.success({this.message}) : isSuccess = true;
   const MiningActionResult.failure(this.message) : isSuccess = false;
 
   final bool isSuccess;
@@ -176,7 +181,13 @@ class MiningController {
     if (activePlanetFailure != null) return activePlanetFailure;
 
     final definition = content.sector(id);
+    final planetId = content.planetForSector(id);
+    final planet = content.planet(planetId);
     final progress = candidate.state.sectors[id]!;
+    final minedSectorIds = candidate.state.sectors.entries
+        .where((entry) => entry.value.mine != null)
+        .map((entry) => entry.key);
+    final wasMastered = content.isPlanetMastered(planetId, minedSectorIds);
 
     if (!progress.revealed) {
       return const MiningActionResult.failure('Sector is not revealed.');
@@ -192,13 +203,29 @@ class MiningController {
       ...candidate.state.sectors,
     };
     sectors[id] = progress.copyWith(mine: MineState(level: 1, storedAmount: 0));
+    final isMastered = content.isPlanetMastered(
+      planetId,
+      sectors.entries
+          .where((entry) => entry.value.mine != null)
+          .map((entry) => entry.key),
+    );
+    final masteryReward =
+        !wasMastered && isMastered && planet.masteryRewardCash > 0;
     final next = candidate.state.copyWith(
-      cash: candidate.state.cash - definition.buildCost,
+      cash:
+          candidate.state.cash -
+          definition.buildCost +
+          (masteryReward ? planet.masteryRewardCash : 0),
       sectors: sectors,
     );
     await repository.save(next);
     _state = next;
-    return const MiningActionResult.success();
+    return MiningActionResult.success(
+      message: masteryReward
+          ? '${planet.name.split(' ').first} mastered — '
+                '+${_formatCash(planet.masteryRewardCash)} cash.'
+          : null,
+    );
   });
 
   Future<MiningActionResult> upgradeMine(
@@ -265,47 +292,47 @@ class MiningController {
     return const MiningActionResult.success();
   });
 
-  Future<MiningActionResult> unlockPlanet(MiningPlanetId id) =>
-      _enqueueMutation(() async {
-        final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+  Future<MiningActionResult> unlockPlanet(
+    MiningPlanetId id,
+  ) => _enqueueMutation(() async {
+    final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+    final definition = content.planet(id);
 
-        if (id != MiningPlanetId.lunarFrontier) {
-          return const MiningActionResult.failure(
-            'Only Lunar Frontier can be unlocked.',
-          );
-        }
-        if (candidate.state.unlockedPlanetIds.contains(id)) {
-          return const MiningActionResult.failure('Planet already unlocked.');
-        }
-        final minedSectorIds = candidate.state.sectors.entries
-            .where((entry) => entry.value.mine != null)
-            .map((entry) => entry.key);
-        if (!content.isHomeworldMastered(minedSectorIds)) {
-          return const MiningActionResult.failure(
-            'Build every Homeworld mine first.',
-          );
-        }
-        if (candidate.state.technology.surveying <
-            MiningContentRegistry.lunarUnlockSurveyingLevel) {
-          return MiningActionResult.failure(
-            'Requires Surveying '
-            '${MiningContentRegistry.lunarUnlockSurveyingLevel}.',
-          );
-        }
-        if (candidate.state.cash < MiningContentRegistry.lunarUnlockCashCost) {
-          return const MiningActionResult.failure('Not enough cash.');
-        }
+    if (candidate.state.unlockedPlanetIds.contains(id)) {
+      return const MiningActionResult.failure('Planet already unlocked.');
+    }
+    final requiredMasteryPlanetId = definition.unlockRequiredMasteryPlanetId;
+    if (requiredMasteryPlanetId == null) {
+      return const MiningActionResult.failure('Planet cannot be unlocked.');
+    }
+    final minedSectorIds = candidate.state.sectors.entries
+        .where((entry) => entry.value.mine != null)
+        .map((entry) => entry.key);
+    if (!content.isPlanetMastered(requiredMasteryPlanetId, minedSectorIds)) {
+      return MiningActionResult.failure(
+        'Build every ${content.planet(requiredMasteryPlanetId).name} '
+        'mine first.',
+      );
+    }
+    if (candidate.state.technology.surveying <
+        definition.unlockRequiredSurveyingLevel) {
+      return MiningActionResult.failure(
+        'Requires Surveying ${definition.unlockRequiredSurveyingLevel}.',
+      );
+    }
+    if (candidate.state.cash < definition.unlockCashCost) {
+      return const MiningActionResult.failure('Not enough cash.');
+    }
 
-        final next = candidate.state.copyWith(
-          cash:
-              candidate.state.cash - MiningContentRegistry.lunarUnlockCashCost,
-          unlockedPlanetIds: {...candidate.state.unlockedPlanetIds, id},
-          activePlanetId: id,
-        );
-        await repository.save(next);
-        _state = next;
-        return const MiningActionResult.success();
-      });
+    final next = candidate.state.copyWith(
+      cash: candidate.state.cash - definition.unlockCashCost,
+      unlockedPlanetIds: {...candidate.state.unlockedPlanetIds, id},
+      activePlanetId: id,
+    );
+    await repository.save(next);
+    _state = next;
+    return const MiningActionResult.success();
+  });
 
   Future<MiningActionResult> switchPlanet(MiningPlanetId id) =>
       _enqueueMutation(() async {
