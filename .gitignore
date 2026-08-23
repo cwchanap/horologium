@@ -58,3 +58,6 @@ web/flutter_bootstrap.js
 
 # Claude AI local settings
 .claude/settings.local.json
+
+# Superpowers local working data
+.superpowers/
