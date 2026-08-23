@@ -132,14 +132,16 @@ class MiningSaveRepository {
     if (!unlockedPlanetIds.contains(MiningPlanetId.homeworld)) {
       throw const FormatException('Homeworld must always be unlocked');
     }
-    if (!unlockedPlanetIds.contains(MiningPlanetId.lunarFrontier) &&
-        content.planet(MiningPlanetId.lunarFrontier).sectors.any((definition) {
-          final progress = sectors[definition.id]!;
-          return progress.revealed || progress.mine != null;
-        })) {
-      throw const FormatException(
-        'Lunar sectors must be pristine while Lunar is locked',
-      );
+    for (final planet in content.planets.values) {
+      if (!unlockedPlanetIds.contains(planet.id) &&
+          planet.sectors.any((definition) {
+            final progress = sectors[definition.id]!;
+            return progress.revealed || progress.mine != null;
+          })) {
+        throw FormatException(
+          '${planet.name} sectors must be pristine while the planet is locked',
+        );
+      }
     }
 
     return MiningSave(
@@ -229,7 +231,7 @@ class MiningSaveRepository {
         .toSet();
     if (!hasExactKeys(raw, expectedSectorKeys)) {
       throw const FormatException(
-        'sector keys must be exactly the six authored sectors',
+        'sector keys must be exactly the authored sector set',
       );
     }
 

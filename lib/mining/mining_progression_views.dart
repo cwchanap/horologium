@@ -62,7 +62,7 @@ class TechnologySheetView {
         track: track,
         name: name,
         level: level,
-        currentEffect: _effect(content, track, level),
+        currentEffect: _effect(state, content, track, level),
         nextEffect: null,
         cost: null,
         gateSectorName: null,
@@ -82,8 +82,8 @@ class TechnologySheetView {
       track: track,
       name: name,
       level: level,
-      currentEffect: _effect(content, track, level),
-      nextEffect: _effect(content, track, level + 1),
+      currentEffect: _effect(state, content, track, level),
+      nextEffect: _effect(state, content, track, level + 1),
       cost: cost,
       gateSectorName: content.sector(gateSector).name,
       isGateSatisfied: gateSatisfied,
@@ -101,6 +101,7 @@ class TechnologySheetView {
       '${track.name[0].toUpperCase()}${track.name.substring(1)}';
 
   static String _effect(
+    MiningSave state,
     MiningContentRegistry content,
     TechnologyTrack track,
     int level,
@@ -114,10 +115,11 @@ class TechnologySheetView {
             '${MiningContentRegistry.logisticsCapacityMultipliers[level].toStringAsFixed(2)}'
             ', offline cap ${content.offlineCapFor(level).inHours}h';
       case TechnologyTrack.surveying:
-        final total = content.planets.values
-            .expand((planet) => planet.sectors)
-            .length;
-        final revealable = content.planets.values
+        final unlockedPlanets = content.planets.values.where(
+          (planet) => state.unlockedPlanetIds.contains(planet.id),
+        );
+        final total = unlockedPlanets.expand((planet) => planet.sectors).length;
+        final revealable = unlockedPlanets
             .expand((planet) => planet.sectors)
             .where((sector) => sector.requiredSurveyingLevel <= level)
             .length;

@@ -18,19 +18,36 @@ void main() {
       '"graniteCrater":{"revealed":false,"mine":null},'
       '"frozenBasin":{"revealed":false,"mine":null},'
       '"titaniumHighlands":{"revealed":false,"mine":null},'
+      '"heliumMare":{"revealed":false,"mine":null},'
+      '"ochreBasin":{"revealed":false,"mine":null},'
+      '"silicaDunes":{"revealed":false,"mine":null},'
+      '"cobaltChasm":{"revealed":false,"mine":null}}}';
+
+  const oldSixSectorSave =
+      '{"cash":100,"lastAccruedAtUtc":"2026-08-18T12:00:00.000Z",'
+      '"technology":{"extraction":0,"logistics":0,"surveying":0},'
+      '"unlockedPlanetIds":["homeworld"],"activePlanetId":"homeworld",'
+      '"sectors":{"landingBasin":{"revealed":true,"mine":null},'
+      '"carbonRidge":{"revealed":false,"mine":null},'
+      '"graniteCrater":{"revealed":false,"mine":null},'
+      '"frozenBasin":{"revealed":false,"mine":null},'
+      '"titaniumHighlands":{"revealed":false,"mine":null},'
       '"heliumMare":{"revealed":false,"mine":null}}}';
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   const pristineSector = <String, Object?>{'revealed': false, 'mine': null};
 
-  Map<String, Object?> sixSectors({
+  Map<String, Object?> currentSectors({
     Map<String, Object?>? landingBasin,
     Map<String, Object?>? carbonRidge,
     Map<String, Object?>? graniteCrater,
     Map<String, Object?>? frozenBasin,
     Map<String, Object?>? titaniumHighlands,
     Map<String, Object?>? heliumMare,
+    Map<String, Object?>? ochreBasin,
+    Map<String, Object?>? silicaDunes,
+    Map<String, Object?>? cobaltChasm,
   }) => <String, Object?>{
     'landingBasin': landingBasin ?? pristineSector,
     'carbonRidge': carbonRidge ?? pristineSector,
@@ -38,6 +55,9 @@ void main() {
     'frozenBasin': frozenBasin ?? pristineSector,
     'titaniumHighlands': titaniumHighlands ?? pristineSector,
     'heliumMare': heliumMare ?? pristineSector,
+    'ochreBasin': ochreBasin ?? pristineSector,
+    'silicaDunes': silicaDunes ?? pristineSector,
+    'cobaltChasm': cobaltChasm ?? pristineSector,
   };
 
   Map<String, Object?> currentDoc({
@@ -54,7 +74,7 @@ void main() {
         technology ?? {'extraction': 0, 'logistics': 0, 'surveying': 0},
     'unlockedPlanetIds': unlockedPlanetIds ?? ['homeworld'],
     'activePlanetId': activePlanetId ?? 'homeworld',
-    'sectors': sectors ?? sixSectors(),
+    'sectors': sectors ?? currentSectors(),
   };
 
   group('hasSave presence', () {
@@ -107,7 +127,7 @@ void main() {
       expect(loaded.wasMissing, isFalse);
     });
 
-    test('current save root has exactly the six current keys', () async {
+    test('current save root has exactly the current keys', () async {
       final repository = MiningSaveRepository();
       await repository.save(MiningSave.initial(nowUtc: now));
 
@@ -124,24 +144,15 @@ void main() {
       });
     });
 
-    test(
-      'old three-key development document resets through recovery',
-      () async {
-        SharedPreferences.setMockInitialValues({
-          key:
-              '{"cash":100,"lastAccruedAtUtc":"2026-08-18T12:00:00.000Z",'
-              '"sectors":{"landingBasin":{"revealed":true,"mine":null},'
-              '"carbonRidge":{"revealed":false,"mine":null},'
-              '"graniteCrater":{"revealed":false,"mine":null}}}',
-        });
+    test('old six-sector HPA-638 document resets through recovery', () async {
+      SharedPreferences.setMockInitialValues({key: oldSixSectorSave});
 
-        final result = await MiningSaveRepository().load(nowUtc: now);
+      final result = await MiningSaveRepository().load(nowUtc: now);
 
-        expect(result.recoveredFromInvalidSave, isTrue);
-        expect(result.wasMissing, isFalse);
-        expect(result.state, MiningSave.initial(nowUtc: now));
-      },
-    );
+      expect(result.recoveredFromInvalidSave, isTrue);
+      expect(result.wasMissing, isFalse);
+      expect(result.state, MiningSave.initial(nowUtc: now));
+    });
 
     test('malformed JSON resets and reports recovery', () async {
       SharedPreferences.setMockInitialValues({key: '{not-json'});
@@ -180,7 +191,7 @@ void main() {
       'positive cargo above newly tuned capacity clamps without recovery',
       () async {
         final raw = currentDoc(
-          sectors: sixSectors(
+          sectors: currentSectors(
             landingBasin: {
               'revealed': true,
               'mine': {'level': 1, 'storedAmount': 120.0},
@@ -204,7 +215,7 @@ void main() {
       () async {
         final raw = currentDoc(
           technology: {'extraction': 0, 'logistics': 1, 'surveying': 0},
-          sectors: sixSectors(
+          sectors: currentSectors(
             landingBasin: {
               'revealed': true,
               'mine': {'level': 1, 'storedAmount': 120.0},
@@ -269,11 +280,22 @@ void main() {
         activePlanetId: 'lunarFrontier',
       ),
       'locked Lunar sector is revealed': currentDoc(
-        sectors: sixSectors(frozenBasin: {'revealed': true, 'mine': null}),
+        sectors: currentSectors(frozenBasin: {'revealed': true, 'mine': null}),
       ),
       'locked Lunar sector has a mine': currentDoc(
-        sectors: sixSectors(
+        sectors: currentSectors(
           frozenBasin: {
+            'revealed': true,
+            'mine': {'level': 1, 'storedAmount': 10.0},
+          },
+        ),
+      ),
+      'locked Mars sector is revealed': currentDoc(
+        sectors: currentSectors(ochreBasin: {'revealed': true, 'mine': null}),
+      ),
+      'locked Mars sector has a mine': currentDoc(
+        sectors: currentSectors(
+          ochreBasin: {
             'revealed': true,
             'mine': {'level': 1, 'storedAmount': 10.0},
           },
@@ -281,18 +303,21 @@ void main() {
       ),
       'unknown active planet': currentDoc(activePlanetId: 'mars'),
       'unknown sector key': currentDoc(
-        sectors: sixSectors()..['bogus'] = {'revealed': false, 'mine': null},
+        sectors: currentSectors()
+          ..['bogus'] = {'revealed': false, 'mine': null},
       ),
       'missing sector key': currentDoc(
-        sectors: sixSectors()..remove('graniteCrater'),
+        sectors: currentSectors()..remove('graniteCrater'),
       ),
       'malformed timestamp': currentDoc(lastAccruedAtUtc: 'not-a-date'),
       'non-UTC timestamp': currentDoc(lastAccruedAtUtc: '2026-08-18T12:00:00'),
       'non-bool revealed': currentDoc(
-        sectors: sixSectors(landingBasin: {'revealed': 'yes', 'mine': null}),
+        sectors: currentSectors(
+          landingBasin: {'revealed': 'yes', 'mine': null},
+        ),
       ),
       'mine on an unrevealed sector': currentDoc(
-        sectors: sixSectors(
+        sectors: currentSectors(
           carbonRidge: {
             'revealed': false,
             'mine': {'level': 1, 'storedAmount': 10.0},
@@ -300,7 +325,7 @@ void main() {
         ),
       ),
       'mine level below 1': currentDoc(
-        sectors: sixSectors(
+        sectors: currentSectors(
           landingBasin: {
             'revealed': true,
             'mine': {'level': 0, 'storedAmount': 10.0},
@@ -308,7 +333,7 @@ void main() {
         ),
       ),
       'mine level above 5': currentDoc(
-        sectors: sixSectors(
+        sectors: currentSectors(
           landingBasin: {
             'revealed': true,
             'mine': {'level': 6, 'storedAmount': 10.0},
@@ -316,7 +341,7 @@ void main() {
         ),
       ),
       'negative cargo': currentDoc(
-        sectors: sixSectors(
+        sectors: currentSectors(
           landingBasin: {
             'revealed': true,
             'mine': {'level': 1, 'storedAmount': -10.0},
@@ -324,7 +349,7 @@ void main() {
         ),
       ),
       'non-numeric cargo': currentDoc(
-        sectors: sixSectors(
+        sectors: currentSectors(
           landingBasin: {
             'revealed': true,
             'mine': {'level': 1, 'storedAmount': 'abc'},
@@ -333,7 +358,7 @@ void main() {
       ),
       'extra root key': currentDoc()..['zzz'] = 1,
       'extra sector key': currentDoc(
-        sectors: sixSectors(
+        sectors: currentSectors(
           landingBasin: {'revealed': true, 'mine': null, 'note': 'hi'},
         ),
       ),

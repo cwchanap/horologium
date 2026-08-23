@@ -56,13 +56,16 @@ Map<String, Object?> _sectorDocument({
   Map<String, Object?>? mine,
 }) => <String, Object?>{'revealed': revealed, 'mine': mine};
 
-Map<String, Object?> _sixSectorDocuments({
+Map<String, Object?> _currentSectorDocuments({
   Map<String, Object?>? landingBasin,
   Map<String, Object?>? carbonRidge,
   Map<String, Object?>? graniteCrater,
   Map<String, Object?>? frozenBasin,
   Map<String, Object?>? titaniumHighlands,
   Map<String, Object?>? heliumMare,
+  Map<String, Object?>? ochreBasin,
+  Map<String, Object?>? silicaDunes,
+  Map<String, Object?>? cobaltChasm,
 }) => <String, Object?>{
   'landingBasin': landingBasin ?? _sectorDocument(),
   'carbonRidge': carbonRidge ?? _sectorDocument(),
@@ -70,9 +73,12 @@ Map<String, Object?> _sixSectorDocuments({
   'frozenBasin': frozenBasin ?? _sectorDocument(),
   'titaniumHighlands': titaniumHighlands ?? _sectorDocument(),
   'heliumMare': heliumMare ?? _sectorDocument(),
+  'ochreBasin': ochreBasin ?? _sectorDocument(),
+  'silicaDunes': silicaDunes ?? _sectorDocument(),
+  'cobaltChasm': cobaltChasm ?? _sectorDocument(),
 };
 
-/// Seeds only the current six-key mining document; legacy save shapes are not
+/// Seeds only the current nine-sector mining document; legacy save shapes are not
 /// part of either product journey.
 void seedCurrentMiningSave({
   required int cash,
@@ -510,7 +516,7 @@ void main() {
       surveying: 0,
       unlockedPlanetIds: ['homeworld'],
       activePlanetId: 'homeworld',
-      sectors: _sixSectorDocuments(
+      sectors: _currentSectorDocuments(
         landingBasin: _sectorDocument(revealed: true, mine: _mineDocument()),
         carbonRidge: _sectorDocument(revealed: true, mine: _mineDocument()),
         graniteCrater: _sectorDocument(revealed: true, mine: _mineDocument()),
@@ -614,7 +620,7 @@ void main() {
         surveying: 3,
         unlockedPlanetIds: ['homeworld', 'lunarFrontier'],
         activePlanetId: 'lunarFrontier',
-        sectors: _sixSectorDocuments(
+        sectors: _currentSectorDocuments(
           landingBasin: _sectorDocument(revealed: true, mine: _mineDocument()),
           carbonRidge: _sectorDocument(revealed: true, mine: _mineDocument()),
           graniteCrater: _sectorDocument(revealed: true, mine: _mineDocument()),

@@ -8,9 +8,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 const _menuViewports = [Size(360, 640), Size(430, 932)];
 const _validMiningSave =
     '{"cash":100,"lastAccruedAtUtc":"2026-08-18T12:00:00.000Z",'
+    '"technology":{"extraction":0,"logistics":0,"surveying":0},'
+    '"unlockedPlanetIds":["homeworld"],"activePlanetId":"homeworld",'
     '"sectors":{"landingBasin":{"revealed":true,"mine":null},'
     '"carbonRidge":{"revealed":false,"mine":null},'
-    '"graniteCrater":{"revealed":false,"mine":null}}}';
+    '"graniteCrater":{"revealed":false,"mine":null},'
+    '"frozenBasin":{"revealed":false,"mine":null},'
+    '"titaniumHighlands":{"revealed":false,"mine":null},'
+    '"heliumMare":{"revealed":false,"mine":null},'
+    '"ochreBasin":{"revealed":false,"mine":null},'
+    '"silicaDunes":{"revealed":false,"mine":null},'
+    '"cobaltChasm":{"revealed":false,"mine":null}}}';
 const _cityActions = [
   'START EXPEDITION',
   'MINING MVP',

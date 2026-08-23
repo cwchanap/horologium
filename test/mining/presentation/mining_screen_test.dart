@@ -89,6 +89,9 @@ MiningSave _seededLunarActiveSave() => MiningSave(
     ),
     MiningSectorId.titaniumHighlands: const SectorProgress(revealed: false),
     MiningSectorId.heliumMare: const SectorProgress(revealed: false),
+    MiningSectorId.ochreBasin: const SectorProgress(revealed: false),
+    MiningSectorId.silicaDunes: const SectorProgress(revealed: false),
+    MiningSectorId.cobaltChasm: const SectorProgress(revealed: false),
   },
 );
 
@@ -208,6 +211,9 @@ MiningSave _unlockableLunarSave() => MiningSave(
     MiningSectorId.frozenBasin: const SectorProgress(revealed: false),
     MiningSectorId.titaniumHighlands: const SectorProgress(revealed: false),
     MiningSectorId.heliumMare: const SectorProgress(revealed: false),
+    MiningSectorId.ochreBasin: const SectorProgress(revealed: false),
+    MiningSectorId.silicaDunes: const SectorProgress(revealed: false),
+    MiningSectorId.cobaltChasm: const SectorProgress(revealed: false),
   },
 );
 
@@ -230,6 +236,9 @@ MiningSave _techPurchaseSave() => MiningSave(
     MiningSectorId.frozenBasin: const SectorProgress(revealed: false),
     MiningSectorId.titaniumHighlands: const SectorProgress(revealed: false),
     MiningSectorId.heliumMare: const SectorProgress(revealed: false),
+    MiningSectorId.ochreBasin: const SectorProgress(revealed: false),
+    MiningSectorId.silicaDunes: const SectorProgress(revealed: false),
+    MiningSectorId.cobaltChasm: const SectorProgress(revealed: false),
   },
 );
 
@@ -411,6 +420,9 @@ void main() {
             revealed: false,
           ),
           MiningSectorId.heliumMare: const SectorProgress(revealed: false),
+          MiningSectorId.ochreBasin: const SectorProgress(revealed: false),
+          MiningSectorId.silicaDunes: const SectorProgress(revealed: false),
+          MiningSectorId.cobaltChasm: const SectorProgress(revealed: false),
         },
       ),
     );
@@ -761,6 +773,9 @@ void main() {
               revealed: false,
             ),
             MiningSectorId.heliumMare: const SectorProgress(revealed: false),
+            MiningSectorId.ochreBasin: const SectorProgress(revealed: false),
+            MiningSectorId.silicaDunes: const SectorProgress(revealed: false),
+            MiningSectorId.cobaltChasm: const SectorProgress(revealed: false),
           },
         ),
       );
@@ -901,6 +916,9 @@ void main() {
               revealed: false,
             ),
             MiningSectorId.heliumMare: const SectorProgress(revealed: false),
+            MiningSectorId.ochreBasin: const SectorProgress(revealed: false),
+            MiningSectorId.silicaDunes: const SectorProgress(revealed: false),
+            MiningSectorId.cobaltChasm: const SectorProgress(revealed: false),
           },
         ),
       );
