@@ -116,7 +116,9 @@ class MiningSaveRepository {
 
     final technology = _decodeTechnology(raw['technology']);
 
-    final unlockedPlanetIds = _decodeUnlockedPlanets(raw['unlockedPlanetIds']);
+    final unlockedPlanetIds = Set.unmodifiable(
+      _decodeUnlockedPlanets(raw['unlockedPlanetIds']),
+    );
     final activePlanetId = _decodePlanetId(raw['activePlanetId']);
 
     final logistics = technology.levelFor(TechnologyTrack.logistics);
@@ -125,6 +127,18 @@ class MiningSaveRepository {
     if (!unlockedPlanetIds.contains(activePlanetId)) {
       throw const FormatException(
         'activePlanetId must be one of unlockedPlanetIds',
+      );
+    }
+    if (!unlockedPlanetIds.contains(MiningPlanetId.homeworld)) {
+      throw const FormatException('Homeworld must always be unlocked');
+    }
+    if (!unlockedPlanetIds.contains(MiningPlanetId.lunarFrontier) &&
+        content.planet(MiningPlanetId.lunarFrontier).sectors.any((definition) {
+          final progress = sectors[definition.id]!;
+          return progress.revealed || progress.mine != null;
+        })) {
+      throw const FormatException(
+        'Lunar sectors must be pristine while Lunar is locked',
       );
     }
 

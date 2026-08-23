@@ -111,10 +111,28 @@ class MiningController {
     return completer.future;
   }
 
+  MiningActionResult? _activePlanetSectorFailure(
+    MiningSectorId id,
+    MiningSave state,
+  ) {
+    if (content.planetForSector(id) != state.activePlanetId) {
+      return const MiningActionResult.failure(
+        'Sector is not on the active planet.',
+      );
+    }
+    return null;
+  }
+
   Future<MiningActionResult> revealSector(MiningSectorId id) =>
       _enqueueMutation(() async {
-        final definition = content.sector(id);
         final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+        final activePlanetFailure = _activePlanetSectorFailure(
+          id,
+          candidate.state,
+        );
+        if (activePlanetFailure != null) return activePlanetFailure;
+
+        final definition = content.sector(id);
         final progress = candidate.state.sectors[id]!;
 
         if (progress.revealed) {
@@ -150,69 +168,73 @@ class MiningController {
         return const MiningActionResult.success();
       });
 
-  Future<MiningActionResult> buildMine(MiningSectorId id) =>
-      _enqueueMutation(() async {
-        final definition = content.sector(id);
-        final candidate = simulation.accrue(_state, _nowUtc().toUtc());
-        final progress = candidate.state.sectors[id]!;
+  Future<MiningActionResult> buildMine(
+    MiningSectorId id,
+  ) => _enqueueMutation(() async {
+    final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+    final activePlanetFailure = _activePlanetSectorFailure(id, candidate.state);
+    if (activePlanetFailure != null) return activePlanetFailure;
 
-        if (!progress.revealed) {
-          return const MiningActionResult.failure('Sector is not revealed.');
-        }
-        if (progress.mine != null) {
-          return const MiningActionResult.failure('Mine already built.');
-        }
-        if (candidate.state.cash < definition.buildCost) {
-          return const MiningActionResult.failure('Not enough cash.');
-        }
+    final definition = content.sector(id);
+    final progress = candidate.state.sectors[id]!;
 
-        final sectors = <MiningSectorId, SectorProgress>{
-          ...candidate.state.sectors,
-        };
-        sectors[id] = progress.copyWith(
-          mine: MineState(level: 1, storedAmount: 0),
-        );
-        final next = candidate.state.copyWith(
-          cash: candidate.state.cash - definition.buildCost,
-          sectors: sectors,
-        );
-        await repository.save(next);
-        _state = next;
-        return const MiningActionResult.success();
-      });
+    if (!progress.revealed) {
+      return const MiningActionResult.failure('Sector is not revealed.');
+    }
+    if (progress.mine != null) {
+      return const MiningActionResult.failure('Mine already built.');
+    }
+    if (candidate.state.cash < definition.buildCost) {
+      return const MiningActionResult.failure('Not enough cash.');
+    }
 
-  Future<MiningActionResult> upgradeMine(MiningSectorId id) =>
-      _enqueueMutation(() async {
-        final definition = content.sector(id);
-        final candidate = simulation.accrue(_state, _nowUtc().toUtc());
-        final progress = candidate.state.sectors[id]!;
-        final mine = progress.mine;
+    final sectors = <MiningSectorId, SectorProgress>{
+      ...candidate.state.sectors,
+    };
+    sectors[id] = progress.copyWith(mine: MineState(level: 1, storedAmount: 0));
+    final next = candidate.state.copyWith(
+      cash: candidate.state.cash - definition.buildCost,
+      sectors: sectors,
+    );
+    await repository.save(next);
+    _state = next;
+    return const MiningActionResult.success();
+  });
 
-        if (mine == null) {
-          return const MiningActionResult.failure('Build the mine first.');
-        }
-        if (mine.level >= _maxMineLevel) {
-          return const MiningActionResult.failure('Mine is at max level.');
-        }
-        final cost = definition.upgradeCosts[mine.level - 1];
-        if (candidate.state.cash < cost) {
-          return const MiningActionResult.failure('Not enough cash.');
-        }
+  Future<MiningActionResult> upgradeMine(
+    MiningSectorId id,
+  ) => _enqueueMutation(() async {
+    final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+    final activePlanetFailure = _activePlanetSectorFailure(id, candidate.state);
+    if (activePlanetFailure != null) return activePlanetFailure;
 
-        final sectors = <MiningSectorId, SectorProgress>{
-          ...candidate.state.sectors,
-        };
-        sectors[id] = progress.copyWith(
-          mine: mine.copyWith(level: mine.level + 1),
-        );
-        final next = candidate.state.copyWith(
-          cash: candidate.state.cash - cost,
-          sectors: sectors,
-        );
-        await repository.save(next);
-        _state = next;
-        return const MiningActionResult.success();
-      });
+    final definition = content.sector(id);
+    final progress = candidate.state.sectors[id]!;
+    final mine = progress.mine;
+
+    if (mine == null) {
+      return const MiningActionResult.failure('Build the mine first.');
+    }
+    if (mine.level >= _maxMineLevel) {
+      return const MiningActionResult.failure('Mine is at max level.');
+    }
+    final cost = definition.upgradeCosts[mine.level - 1];
+    if (candidate.state.cash < cost) {
+      return const MiningActionResult.failure('Not enough cash.');
+    }
+
+    final sectors = <MiningSectorId, SectorProgress>{
+      ...candidate.state.sectors,
+    };
+    sectors[id] = progress.copyWith(mine: mine.copyWith(level: mine.level + 1));
+    final next = candidate.state.copyWith(
+      cash: candidate.state.cash - cost,
+      sectors: sectors,
+    );
+    await repository.save(next);
+    _state = next;
+    return const MiningActionResult.success();
+  });
 
   Future<MiningActionResult> purchaseTechnology(
     TechnologyTrack track,

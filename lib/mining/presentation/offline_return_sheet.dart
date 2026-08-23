@@ -52,8 +52,9 @@ class OfflineReturnSheet extends StatelessWidget {
                 _planetSection(planetEntry.key, planetEntry.value),
               if (summary.wasOfflineCapped) ...[
                 const SizedBox(height: 8),
-                const Text(
-                  'Offline production was capped at 8 hours.',
+                Text(
+                  'Offline production was capped at '
+                  '${_formatDuration(summary.elapsedUsed)}.',
                   style: TextStyle(color: Colors.orangeAccent),
                 ),
               ],
