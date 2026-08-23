@@ -581,6 +581,24 @@ void main() {
   });
 
   group('active-planet selling and surveying gates', () {
+    test('reveal rejects a sector on a locked inactive planet', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 5000,
+          technology: const TechnologyLevels(surveying: 3),
+        ),
+      );
+      final before = controller.state.toJson();
+
+      final result = await controller.revealSector(MiningSectorId.frozenBasin);
+
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Sector is not on the active planet.');
+      expect(controller.state.toJson(), before);
+    });
+
     test('sell clears and credits only the active planet cargo', () async {
       final controller = await controllerOver(
         MiningSaveRepository(),
@@ -844,6 +862,36 @@ void main() {
         10.0,
       );
     });
+
+    test(
+      'a queued sector action rejects the old planet after a committed switch',
+      () async {
+        final repository = DelayedMiningSaveRepository();
+        final controller = await controllerOver(
+          repository,
+          seed: seededSave(clock.now, cash: 1000, unlockedPlanets: bothPlanets),
+        );
+
+        final switchFuture = controller.switchPlanet(
+          MiningPlanetId.lunarFrontier,
+        );
+        await repository.saveStarted.future;
+        final revealFuture = controller.revealSector(
+          MiningSectorId.carbonRidge,
+        );
+        repository.allowFirstSave.complete();
+
+        expect((await switchFuture).isSuccess, isTrue);
+        final reveal = await revealFuture;
+        expect(reveal.isSuccess, isFalse);
+        expect(reveal.message, 'Sector is not on the active planet.');
+        expect(controller.state.activePlanetId, MiningPlanetId.lunarFrontier);
+        expect(
+          controller.state.sectors[MiningSectorId.carbonRidge]!.revealed,
+          isFalse,
+        );
+      },
+    );
 
     test(
       'a queued technology purchase starts from the committed switch state',

@@ -223,6 +223,17 @@ void main() {
         expect(result.state.technology.logistics, 1);
       },
     );
+
+    test('decoded unlocked planet ids are unmodifiable', () async {
+      SharedPreferences.setMockInitialValues({key: jsonEncode(currentDoc())});
+
+      final result = await MiningSaveRepository().load(nowUtc: now);
+
+      expect(
+        () => result.state.unlockedPlanetIds.add(MiningPlanetId.lunarFrontier),
+        throwsUnsupportedError,
+      );
+    });
   });
 
   group('invalid saves reset to initial with recovery flag', () {
@@ -252,6 +263,21 @@ void main() {
       'active planet not unlocked': currentDoc(
         unlockedPlanetIds: ['lunarFrontier'],
         activePlanetId: 'homeworld',
+      ),
+      'Homeworld is not unlocked': currentDoc(
+        unlockedPlanetIds: ['lunarFrontier'],
+        activePlanetId: 'lunarFrontier',
+      ),
+      'locked Lunar sector is revealed': currentDoc(
+        sectors: sixSectors(frozenBasin: {'revealed': true, 'mine': null}),
+      ),
+      'locked Lunar sector has a mine': currentDoc(
+        sectors: sixSectors(
+          frozenBasin: {
+            'revealed': true,
+            'mine': {'level': 1, 'storedAmount': 10.0},
+          },
+        ),
       ),
       'unknown active planet': currentDoc(activePlanetId: 'mars'),
       'unknown sector key': currentDoc(

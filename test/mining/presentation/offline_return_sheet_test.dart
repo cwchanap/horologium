@@ -100,4 +100,37 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('renders the Logistics 2 offline cap in the capped message', (
+    tester,
+  ) async {
+    final content = MiningContentRegistry.stellarMining();
+    final summary = OfflineProductionSummary(
+      elapsedUsed: content.offlineCapFor(2),
+      produced: const {ResourceType.gold: 1.0},
+      productionByPlanet: const {
+        MiningPlanetId.homeworld: {ResourceType.gold: 1.0},
+      },
+      fullSectors: const {},
+      wasOfflineCapped: true,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: OfflineReturnSheet(summary: summary, content: content),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.text('Offline production was capped at 12h 0m.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Offline production was capped at 8 hours.'),
+      findsNothing,
+    );
+  });
 }
