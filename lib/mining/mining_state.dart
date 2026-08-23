@@ -205,8 +205,8 @@ class MiningSave {
     lastAccruedAtUtc,
     technology,
     activePlanetId,
-    Object.hashAll(unlockedPlanetIds),
-    Object.hashAll(
+    Object.hashAllUnordered(unlockedPlanetIds),
+    Object.hashAllUnordered(
       sectors.entries.map((entry) => Object.hash(entry.key, entry.value)),
     ),
   );

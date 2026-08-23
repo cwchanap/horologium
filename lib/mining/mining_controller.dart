@@ -269,6 +269,11 @@ class MiningController {
       _enqueueMutation(() async {
         final candidate = simulation.accrue(_state, _nowUtc().toUtc());
 
+        if (id != MiningPlanetId.lunarFrontier) {
+          return const MiningActionResult.failure(
+            'Only Lunar Frontier can be unlocked.',
+          );
+        }
         if (candidate.state.unlockedPlanetIds.contains(id)) {
           return const MiningActionResult.failure('Planet already unlocked.');
         }
