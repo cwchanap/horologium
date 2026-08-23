@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship Mars Frontier as one complete third-planet content pack using the existing Reveal → Build → Mine → Sell → Upgrade loop, with Lunar mastery + Surveying 5 + cash unlock, deterministic three-planet accrual, and a simple Mars mastery cash reward.
+**Goal:** Ship Mars Frontier as one complete third-planet content pack using the existing Reveal → Build → Mine → Sell → Upgrade loop, with Lunar mastery + Surveying 5 + cash unlock, deterministic three-planet accrual, distinct rust-toned world presentation, and a modest one-time Mars mastery cash flourish.
 
-**Architecture:** Preserve the HPA-638 single-controller/simulation/repository architecture and flat globally unique sector state. Add Mars as authored catalog data. Widen only seams that now have a second real consumer: planet unlock metadata, planet mastery, Stellar Map planet cards/counts, locked-planet validation, enum-derived initial sector state, and optional content copy/success messaging. There is deliberately **no six-to-nine save converter**; incompatible pre-release HPA-638 saves use the existing clean-reset recovery path.
+**Architecture:** Preserve the HPA-638 single-controller/simulation/repository architecture and flat globally unique sector state. Add Mars as authored catalog data. Widen only proven seams: planet unlock metadata, planet mastery, enum-derived initial state, generic locked-planet validation, honest unlocked-planet Surveying counts, a list-based Stellar Map, and one renderer-owned tint overlay derived from the existing `planet.tint`. There is deliberately no save converter.
 
 **Tech Stack:** Dart 3.8, Flutter, Flame 1.30, SharedPreferences 2.5, existing `flutter_test` suites.
 
@@ -12,30 +12,31 @@
 
 ## Review disposition
 
-The planning review is incorporated as follows:
+This revision incorporates the second planning review as follows:
 
-- Drop the proposed HPA-638 six-sector → HPA-641 nine-sector compatibility reader.
-- Keep exact current decode keyed from `MiningSectorId.values`; old six-key documents recover to a fresh initial save.
-- Generate `MiningSave.initial().sectors` from `MiningSectorId.values`; only Landing Basin starts revealed.
-- Give `StellarMapPlanetView` separate own-planet and prerequisite-mastery counts.
-- Task 1 owns the full enum/save-fixture mechanical retarget and `CLAUDE.md` update so the repository returns to green immediately.
-- Task 3 owns per-planet Stellar Map keys and the journey/UI retarget.
-- Freeze Mars `mineAsset` paths now rather than selecting them during implementation.
-- Name the three concrete implementation risks rather than inventing framework/performance concerns.
+- Task 2 no longer reshapes `StellarMapView`; the full view-model + sheet + screen retarget moves together in Task 3 so every task can actually end green.
+- Task 1 explicitly searches for catalog-wide count strings/exhaustive enum lists and includes `technology_sheet_test.dart`.
+- Surveying effect text counts sectors on currently unlocked planets only.
+- Mars visual identity is no longer assumed to come from seed/background alone. `MiningGame` reuses the existing `planet.tint` as a world-space `BlendMode.color` overlay above terrain and below sectors; no second tint field is added.
+- Stellar Map prerequisite progress is referenced by `requiredMasteryPlanetId` and the prerequisite planet's own view entry rather than duplicated name/count fields.
+- The 25,000 mastery reward stays frozen but is explicitly a modest completion flourish/rebate, not a new progression jump.
+- Mars is progressively disclosed: hidden on a fresh save, visible once Lunar Frontier is unlocked.
 
 ## Global constraints
 
-- One branch and one PR for HPA-641; continue implementation on this draft PR.
+- One branch and one PR for HPA-641; continue on draft PR #17.
 - Exactly one new planet: Mars Frontier.
 - Exactly three Mars sectors and three new raw resources.
-- Keep Surveying capped at 5; do not add another technology tier.
+- Keep Surveying capped at 5.
 - Keep one `MiningController`, `MiningSimulation`, `MiningSaveRepository`, `horologium.mining.save`, and active `MiningGame`.
 - Keep `MiningSave.sectors` flat and globally keyed by `MiningSectorId`.
-- Keep the save strict and unversioned. **No six-key decoder branch, `schemaVersion`, migration registry, or compatibility reader.**
-- Old HPA-638 six-sector development documents use `recoveredFromInvalidSave` and start fresh current state.
-- No new image/audio files. Mars uses `Assets.woodFactory`, `Assets.riceHuller`, and `Assets.sawmill`.
-- No generic requirement/reward engine, processing, logistics, worker, market, retention, or DLC infrastructure.
-- Each implementation task ends with `flutter analyze --fatal-infos` and `flutter test` green before commit.
+- Save stays strict/unversioned: no six-key decoder branch, `schemaVersion`, migration registry, or compatibility reader.
+- Old HPA-638 six-sector development documents clean-reset through `recoveredFromInvalidSave`.
+- No new image/audio files.
+- Frozen Mars facility sprites: `Assets.woodFactory`, `Assets.riceHuller`, `Assets.sawmill`.
+- Use existing `planet.tint`; do not add a second terrain-tint content field.
+- No generic requirement/reward engine, processing, logistics, workers, markets, retention, or DLC infrastructure.
+- Each task ends with `flutter analyze --fatal-infos` and `flutter test` green before commit.
 
 ## Frozen Mars values
 
@@ -45,82 +46,87 @@ The planning review is incorporated as follows:
 | Silica Dunes | Silica | Silica Extractor | `Assets.riceHuller` | 5 | 12,000 | 9,000 | 0.55 | 160 | 55 | 12,000 / 24,000 / 48,000 / 96,000 |
 | Cobalt Chasm | Cobalt Ore | Cobalt Drill | `Assets.sawmill` | 5 | 30,000 | 18,000 | 0.35 | 130 | 110 | 24,000 / 48,000 / 96,000 / 192,000 |
 
-Mars Frontier: seed `641`, tint `0xFF2A1512`, unlock after Lunar mastery + Surveying 5 + 20,000 cash, mastery reward 25,000 cash.
+Mars Frontier:
+
+- seed `641`;
+- tint `0xFF2A1512`;
+- unlock after Lunar mastery + Surveying 5 + 20,000 cash;
+- mastery reward 25,000 cash;
+- world overlay uses `planet.tint.withAlpha(96)` + `BlendMode.color`.
 
 ## Expected final file map
 
-**Core/content**
-- `lib/game/resources/resource_type.dart` — add Iron Ore, Silica, Cobalt Ore identities.
-- `lib/mining/mining_content.dart` — Mars catalog, frozen sprite paths, unlock metadata, mastery helper, silhouettes, optional discovery/facility copy.
-- `lib/mining/mining_state.dart` — enum-derived current initial sector map.
-- `lib/mining/mining_save_repository.dart` — strict exact-current decode and generic locked-planet invariant; no compatibility branch.
-- `lib/mining/mining_controller.dart` — data-driven planet unlock and Mars mastery reward through normal build flow.
-- `lib/mining/mining_progression_views.dart` — list-based Stellar Map projections with separate own/prerequisite counts.
-- `lib/mining/mining_sheet_view.dart` — surface authored resource/discovery/facility copy without changing actions.
+**Core/content/state**
 
-**Flutter**
-- `lib/mining/presentation/stellar_map_sheet.dart` — render authored planet cards, own/prerequisite mastery progress, per-planet keys, generic unlock/travel callbacks.
-- `lib/mining/presentation/mining_screen.dart` — generic unlock callback and optional successful mutation message.
+- `lib/game/resources/resource_type.dart`
+- `lib/mining/mining_content.dart`
+- `lib/mining/mining_state.dart`
+- `lib/mining/mining_save_repository.dart`
+- `lib/mining/mining_progression_views.dart`
+- `lib/mining/mining_controller.dart`
+- `lib/mining/mining_sheet_view.dart`
+
+**Flutter/Flame presentation**
+
+- `lib/mining/presentation/stellar_map_sheet.dart`
+- `lib/mining/presentation/mining_screen.dart`
+- `lib/mining/world/mining_game.dart`
 
 **Repository guidance**
-- `CLAUDE.md` — current contract becomes three planets / nine sectors / nine resources while retaining strict unversioned clean-reset semantics and no compatibility reader.
 
-**Expected no structural change**
-- `lib/mining/mining_simulation.dart` — characterization should prove three-planet reuse; modify only for a concrete bug.
-- `lib/mining/world/mining_game.dart` — existing planet projection should accept Mars unchanged.
-- `lib/mining/presentation/offline_return_sheet.dart` — existing grouped summary should render Mars unchanged.
+- `CLAUDE.md`
 
 **Primary tests**
+
 - `test/resources/resource_type_test.dart`
 - `test/mining/mining_content_test.dart`
 - `test/mining/mining_state_test.dart`
 - `test/mining/mining_save_repository_test.dart`
-- `test/mining/mining_controller_test.dart`
 - `test/mining/mining_progression_views_test.dart`
+- `test/mining/presentation/technology_sheet_test.dart`
+- `test/mining/mining_controller_test.dart`
 - `test/mining/mining_sheet_view_test.dart`
-- `test/mining/mining_simulation_test.dart`
 - `test/mining/presentation/stellar_map_sheet_test.dart`
 - `test/mining/presentation/mining_screen_test.dart`
+- `test/mining/world/mining_game_test.dart`
+- `test/mining/mining_simulation_test.dart`
 - `test/integration/mining_mvp_journey_test.dart`
-- existing world/offline-return tests only where needed to pin unchanged reuse.
+
+Existing offline/world tests may be extended only where needed to pin unchanged reuse.
 
 ## Risks
 
-1. **Stellar Map Unlock key/callback collision.** One `mining-stellar-map-unlock` key and Lunar-only callback cannot represent Lunar and Mars being locked simultaneously. Land generic callbacks and per-planet keys together in Task 3.
-2. **Own mastery vs prerequisite mastery count overload.** A single `minesBuilt/mineTotal` pair cannot show `Lunar mines 2/3` on locked Mars and later `Mars Mines 2/3` after unlock. Task 2 defines separate fields and pins both meanings before widget work.
-3. **Stale six-sector persisted fixtures.** There is intentionally no converter, so any old raw-save helper silently enters recovery instead of its intended scenario. Task 1 searches and retargets every current persisted fixture to nine keys and keeps one explicit old-six-key recovery test.
-
-Balance feel and portrait layout remain verification concerns, not reasons to add architecture.
+1. **Intermediate Stellar Map compile break.** `StellarMapView` is consumed directly by `StellarMapSheet`, `MiningScreen`, and widget fixtures. The reshape must land with all those consumers in Task 3, not earlier.
+2. **Stale catalog-wide assertions.** Enum growth breaks exact resource lists and technology strings such as `3 of 6` / `6 of 6` even though those tests contain no save helper. Task 1 explicitly searches exhaustive enum lists and catalog-count strings.
+3. **Visual promise vs renderer.** A new seed and background tint do not make the playable terrain rust-toned. Task 3 adds the required world-space tint overlay and tests its render ordering.
+4. **Stale persisted fixtures.** With no converter, a six-key fixture silently exercises recovery instead of its intended scenario. Task 1 retargets every current-shape raw fixture and keeps only one explicit six-key recovery test.
 
 ---
 
-## Task 1: Add the Mars catalog and establish the strict nine-sector current contract
+## Task 1: Add Mars catalog/state and establish the strict nine-sector current contract
 
 **Files:**
+
 - Modify: `lib/game/resources/resource_type.dart`
 - Modify: `lib/mining/mining_content.dart`
 - Modify: `lib/mining/mining_state.dart`
 - Modify: `lib/mining/mining_save_repository.dart`
+- Modify: `lib/mining/mining_progression_views.dart` **only for Surveying effect counting**
 - Modify: `CLAUDE.md`
 - Modify: `test/resources/resource_type_test.dart`
 - Modify: `test/mining/mining_content_test.dart`
 - Modify: `test/mining/mining_state_test.dart`
 - Modify: `test/mining/mining_save_repository_test.dart`
-- Modify mechanically as required: persisted/current-shape helpers in `test/mining/presentation/mining_screen_test.dart`, `test/integration/mining_mvp_journey_test.dart`, controller/view/simulation tests, and any other raw/current save fixtures found by search.
+- Modify: `test/mining/mining_progression_views_test.dart` **only for Surveying effect assertions**
+- Modify: `test/mining/presentation/technology_sheet_test.dart`
+- Mechanically retarget any current raw-save fixtures found in controller/simulation/presentation/integration tests.
 
-**Interfaces produced:**
-- `MiningPlanetId.marsFrontier`
-- `MiningSectorId.ochreBasin`, `.silicaDunes`, `.cobaltChasm`
-- `ResourceType.ironOre`, `.silica`, `.cobaltOre`
-- direct unlock/reward fields on `MiningPlanetDefinition`
-- optional `facilityName` / `discoveryText` on `MiningSectorDefinition`
-- current `MiningSave.initial()` containing all `MiningSectorId.values`
-- repository exact-current decode and generic locked-planet validation.
+**Do not reshape `StellarMapView` in this task.** Keep the existing Lunar-specific projection compiling until Task 3.
 
 ### Step 1: Write RED Mars catalog/resource tests
 
-- [ ] Assert `MiningPlanetId.values` / registry contain exactly Homeworld, Lunar Frontier, and Mars Frontier in authored order.
-- [ ] Assert Mars name, seed `641`, tint `0xFF2A1512`, sector order, anchors, reveal chain, Surveying gates, costs, rates, capacities, sale values, and upgrade curves.
+- [ ] Assert `MiningPlanetId.values` / registry authored order is Homeworld, Lunar Frontier, Mars Frontier.
+- [ ] Assert Mars name, seed, tint, sector order, anchors, reveal chain, Surveying gates, economy values, and upgrade curves.
 - [ ] Assert exact sprite paths:
 
 ```dart
@@ -129,9 +135,9 @@ expect(content.sector(MiningSectorId.silicaDunes).mineAsset, Assets.riceHuller);
 expect(content.sector(MiningSectorId.cobaltChasm).mineAsset, Assets.sawmill);
 ```
 
-- [ ] Assert `facilityName` and `discoveryText` carry the frozen Mars copy.
-- [ ] Extend `test/resources/resource_type_test.dart` so `ResourceType.values` and stable names contain exactly nine current identities.
-- [ ] Assert Mars `ResourceSilhouette` entries use three distinct Material-icon/color identities.
+- [ ] Assert `facilityName` / `discoveryText` values.
+- [ ] Extend `ResourceType.values` exact-list/stable-name tests to nine current identities.
+- [ ] Assert three distinct Mars `ResourceSilhouette` identities.
 
 Run:
 
@@ -140,14 +146,14 @@ flutter test test/resources/resource_type_test.dart \
   test/mining/mining_content_test.dart
 ```
 
-Expected: RED because Mars identities/catalog values do not exist.
+Expected: RED.
 
-### Step 2: Write RED current-state/recovery tests
+### Step 2: Write RED initial-state/repository tests
 
-- [ ] Assert `MiningSave.initial()` contains exactly `MiningSectorId.values.toSet()`.
-- [ ] Assert only Landing Basin is initially revealed; every other sector is unrevealed with no mine.
-- [ ] Assert a valid nine-sector document round-trips unchanged.
-- [ ] Seed the exact HPA-638 six-sector document and assert the **existing recovery boundary**, not migration:
+- [ ] `MiningSave.initial().sectors.keys.toSet()` equals `MiningSectorId.values.toSet()`.
+- [ ] Only Landing Basin starts revealed; all other sectors are pristine.
+- [ ] Valid exact-nine document round-trips.
+- [ ] Exact old six-sector HPA-638 document clean-resets:
 
 ```dart
 expect(result.recoveredFromInvalidSave, isTrue);
@@ -155,8 +161,8 @@ expect(result.wasMissing, isFalse);
 expect(result.state, MiningSave.initial(nowUtc: now));
 ```
 
-- [ ] Assert any locked authored planet with a revealed sector or mine is invalid.
-- [ ] Keep unknown/malformed/root-key tests strict.
+- [ ] Any locked authored planet containing revealed/mine state is invalid.
+- [ ] Unknown/malformed/root-key tests remain strict.
 
 Run:
 
@@ -165,14 +171,16 @@ flutter test test/mining/mining_state_test.dart \
   test/mining/mining_save_repository_test.dart
 ```
 
-Expected: RED until current state/decode follows the nine-sector contract.
+Expected: RED.
 
 ### Step 3: Implement the smallest catalog/state/repository change
 
-- [ ] Add Mars planet/sector/resource enum values.
-- [ ] Add the three resource silhouettes; no files under `assets/`.
-- [ ] Add optional `facilityName` and `discoveryText` with defaults that keep existing content concise.
-- [ ] Add these direct fields to `MiningPlanetDefinition`:
+- [ ] Add `marsFrontier`.
+- [ ] Add `ochreBasin`, `silicaDunes`, `cobaltChasm`.
+- [ ] Add `ironOre`, `silica`, `cobaltOre`.
+- [ ] Add Mars silhouettes using Material icons; no files under `assets/`.
+- [ ] Add optional `facilityName` / `discoveryText` to `MiningSectorDefinition`.
+- [ ] Add direct planet unlock/reward fields:
 
 ```dart
 final MiningPlanetId? unlockRequiredMasteryPlanetId;
@@ -181,59 +189,66 @@ final int unlockCashCost;
 final int masteryRewardCash;
 ```
 
-- [ ] Move Lunar's Homeworld/Surveying-3/2,500 requirements onto its planet definition.
-- [ ] Add Mars with the frozen values and exact sprite paths.
-- [ ] Replace the handwritten initial sector literal with:
+- [ ] Populate Homeworld/Lunar/Mars values from the frozen design.
+- [ ] Keep existing `lunarUnlockCashCost` / `lunarUnlockSurveyingLevel` statics temporarily because `StellarMapView` and its widget tests still consume them. **Do not remove them in Task 1 or Task 2.**
+- [ ] Replace handwritten `MiningSave.initial()` sector map with the `MiningSectorId.values` comprehension.
+- [ ] Keep `_decodeSectors()` exact-key validation based on `MiningSectorId.values`; no compatibility branch.
+- [ ] Replace stale “six authored sectors” copy with current-neutral wording.
+- [ ] Generalize locked-planet pristine validation over `content.planets`.
 
-```dart
-sectors: {
-  for (final id in MiningSectorId.values)
-    id: SectorProgress(
-      revealed: id == MiningSectorId.landingBasin,
-    ),
-},
+### Step 4: Make Surveying effect text honest for unlocked planets
+
+The effect currently counts all authored sectors. Change numerator and denominator to sectors belonging to `state.unlockedPlanetIds`.
+
+- [ ] Adjust the pure effect calculation to receive the state/unlocked planet set.
+- [ ] Fresh save at Surveying 0: `3 of 3 sectors revealable`.
+- [ ] Lunar unlocked at Surveying 3: `4 of 6 sectors revealable`.
+- [ ] Mars unlocked at Surveying 5: `9 of 9 sectors revealable`.
+- [ ] No reveal/controller rules change.
+
+Run:
+
+```sh
+flutter test test/mining/mining_progression_views_test.dart \
+  test/mining/presentation/technology_sheet_test.dart
 ```
 
-- [ ] Keep `_decodeSectors` exact-key validation based on `MiningSectorId.values`; **do not** add a six-key branch.
-- [ ] Change stale “six authored sectors” error copy to “authored sectors” or equivalent current-neutral wording.
-- [ ] Replace Lunar-only pristine validation with:
+### Step 5: Retarget every old catalog/current-shape assertion
 
-```text
-for each content.planets entry not in unlockedPlanetIds:
-  every sector must be unrevealed and have no mine
-```
-
-### Step 4: Retarget every existing exact-shape consumer before commit
-
-Search the repository for all old shape assumptions, including:
+Search for both **shape helpers** and **catalog-wide assertions**. At minimum:
 
 ```text
 sixSector
 _sixSectorDocuments
-MiningSectorId.heliumMare literals near raw save maps
-ResourceType.helium3 exact lists
-mining save JSON helpers
 "six authored"
+"3 of 6"
+"4 of 6"
+"6 of 6"
+"sectors revealable"
+ResourceType.values
+MiningSectorId.values
+helium3 exact lists
+raw mining save JSON helpers
 ```
 
-Then:
+Rule: find any assertion that embeds a catalog-wide count, exhaustive enum list, or exact current save shape — not only helpers whose names contain “six”.
 
-- [ ] Update `test/mining/mining_save_repository_test.dart` current-sector helper and exact-current assertions to nine keys.
-- [ ] Update raw save helpers such as `_sixSectorDocuments` in `test/integration/mining_mvp_journey_test.dart` to a nine-sector current helper with pristine Mars entries.
-- [ ] Update `_seededLunarActiveSave()` / `_unlockableLunarSave()` and any raw/persisted fixtures in `test/mining/presentation/mining_screen_test.dart` to current nine-key data.
-- [ ] Update controller/simulation/view fixtures that hand-list the flat sector map.
-- [ ] Keep the one intentional old-six-key repository test from Step 2 as the recovery characterization.
-- [ ] Update `CLAUDE.md`: three planets, nine sector IDs/resources, exact strict-current semantics, and **still no compatibility reader**.
-- [ ] Do not yet change Stellar Map widget keys/callback behavior; Task 3 owns that semantic UI retarget.
+- [ ] Update `test/mining/mining_save_repository_test.dart` current-sector helper/assertions to nine keys.
+- [ ] Update integration `_sixSectorDocuments` helper to a current nine-sector helper with pristine Mars records.
+- [ ] Update `_seededLunarActiveSave()` / `_unlockableLunarSave()` and any persisted/raw fixtures in `mining_screen_test.dart`.
+- [ ] Update controller/simulation/view fixtures that hand-list full current sector maps.
+- [ ] Update `technology_sheet_test.dart` and progression-view catalog count assertions.
+- [ ] Keep exactly one intentional old-six repository recovery characterization.
+- [ ] Update `CLAUDE.md`: three planets, nine sector/resource identities, strict current save, still no compatibility reader.
 
-### Step 5: Full GREEN before commit
+### Step 6: Full GREEN before commit
 
 ```sh
 flutter analyze --fatal-infos
 flutter test
 ```
 
-Expected: both PASS; Task 1 must not leave stale six-key fixtures for later tasks.
+Expected: PASS. Task 1 must not leave stale enum/count/save-shape failures for later tasks.
 
 Commit:
 
@@ -244,28 +259,21 @@ git commit -m "feat(mining): add Mars content catalog"
 
 ---
 
-## Task 2: Make unlock/mastery planet-driven and model honest Stellar Map progress
+## Task 2: Make unlock/mastery planet-driven and add the Mars mastery reward
 
 **Files:**
+
 - Modify: `lib/mining/mining_content.dart`
 - Modify: `lib/mining/mining_controller.dart`
-- Modify: `lib/mining/mining_progression_views.dart`
 - Modify: `test/mining/mining_content_test.dart`
 - Modify: `test/mining/mining_controller_test.dart`
-- Modify: `test/mining/mining_progression_views_test.dart`
 
-**Interfaces produced:**
-- `isPlanetMastered(MiningPlanetId, Iterable<MiningSectorId>)`
-- data-driven `unlockPlanet(MiningPlanetId)`
-- success result may carry an optional message
-- `StellarMapView.planets`
-- `StellarMapPlanetView` with separate own and prerequisite counts.
+**Do not modify `StellarMapView`, `StellarMapSheet`, or `MiningScreen` here.** The existing Lunar statics remain until Task 3 so this task can end green.
 
-### Step 1: Write RED planet-mastery tests
+### Step 1: Write RED `isPlanetMastered` tests
 
-- [ ] Replace Homeworld-only mastery expectations with `isPlanetMastered(planetId, minedSectorIds)`.
-- [ ] Prove Homeworld, Lunar, and Mars are mastered only when all three of their own sectors have mines.
-- [ ] Prove mines on other planets do not satisfy mastery.
+- [ ] Homeworld/Lunar/Mars each require all three of their own mines.
+- [ ] Mines on another planet do not satisfy mastery.
 
 Run:
 
@@ -273,104 +281,55 @@ Run:
 flutter test test/mining/mining_content_test.dart
 ```
 
-### Step 2: Write RED controller unlock tests
+### Step 2: Implement planet mastery
+
+- [ ] Replace `isHomeworldMastered` with `isPlanetMastered(planetId, minedSectorIds)`.
+- [ ] Keep content independent of state objects.
+
+### Step 3: Write RED data-driven unlock tests
 
 - [ ] Lunar still requires Homeworld mastery + Surveying 3 + 2,500 cash.
 - [ ] Mars fails without Lunar mastery.
 - [ ] Mars fails below Surveying 5.
 - [ ] Mars fails below 20,000 cash.
-- [ ] Successful Mars unlock accrues first, debits exactly 20,000, adds only Mars, makes it active, and saves once.
-- [ ] Homeworld/planets without an unlock prerequisite cannot be passed through the unlock mutation.
+- [ ] Mars success accrues first, debits 20,000 exactly, unlocks Mars once, makes Mars active, saves once.
+- [ ] Homeworld/non-unlockable targets are rejected.
 
-Run:
+### Step 4: Implement data-driven `unlockPlanet`
 
-```sh
-flutter test test/mining/mining_controller_test.dart
-```
-
-### Step 3: Implement data-driven unlock/mastery
-
-- [ ] Replace `isHomeworldMastered` with `isPlanetMastered`.
-- [ ] Replace the `id == lunarFrontier` branch with target `MiningPlanetDefinition` metadata.
+- [ ] Read requirement values from target `MiningPlanetDefinition`.
 - [ ] Validate only prerequisite mastery, Surveying, and cash.
 - [ ] Accrue once, save once, publish once.
-- [ ] Remove Lunar-only static unlock constants after all callers use planet metadata.
-- [ ] Do not introduce requirement classes, predicates, or reward objects.
+- [ ] No planet-specific controller branches.
+- [ ] Leave Lunar static constants in place for the still-old Stellar Map projection; they are removed in Task 3 after all UI consumers move.
 
-### Step 4: Write RED mastery-reward tests
+### Step 5: Write RED mastery reward tests
 
-- [ ] Building Mars mine 1 and 2 grants no completion reward.
-- [ ] Building the final missing Mars mine debits its build cost and credits exactly 25,000 cash in the same next state.
-- [ ] Successful result carries `Mars mastered — +25000 cash.` or the exact approved equivalent.
-- [ ] Homeworld/Lunar builds remain unchanged because their `masteryRewardCash` is zero.
-- [ ] Retrying a built sector cannot award again.
+- [ ] First/second Mars mine grants no completion reward.
+- [ ] Final Mars mine debits normal build cost and credits exactly 25,000 cash in the same next state.
+- [ ] Result carries `Mars mastered — +25,000 cash.` or exact approved equivalent.
+- [ ] Homeworld/Lunar builds have no reward.
+- [ ] Retrying a built sector cannot reward again.
 
-### Step 5: Implement reward as the existing build transition
+### Step 6: Implement reward through existing build transition
 
-- [ ] Resolve the planet through `content.planetForSector(id)`.
-- [ ] Compute `wasMastered` from pre-build mined IDs.
-- [ ] Apply the existing build update/cost.
+- [ ] Resolve planet via `content.planetForSector(id)`.
+- [ ] Compute pre-build mastery.
+- [ ] Run existing build update/cost.
 - [ ] Compute post-build mastery.
-- [ ] Credit `masteryRewardCash` only on `false -> true`.
-- [ ] Widen `MiningActionResult.success` to accept an optional message while preserving current no-message callers.
-- [ ] Save the combined build/reward state once.
+- [ ] Credit `masteryRewardCash` only on false → true.
+- [ ] Widen `MiningActionResult.success` to accept optional message; the field already exists.
+- [ ] Save combined build/reward once.
+- [ ] No reward-claim flag or hierarchy.
 
-### Step 6: Write RED Stellar Map view-model tests
-
-Define the intended shape explicitly:
-
-```dart
-class StellarMapPlanetView {
-  final MiningPlanetId id;
-  final String name;
-  final bool isUnlocked;
-  final bool isActive;
-
-  final int minesBuilt;
-  final int mineTotal;
-
-  final String? requiredMasteryPlanetName;
-  final int? requiredMinesBuilt;
-  final int? requiredMineTotal;
-  final bool hasRequiredMastery;
-
-  final int requiredSurveyingLevel;
-  final bool hasSurveying;
-  final int unlockCashCost;
-  final bool hasCash;
-
-  bool get canUnlock;
-}
-```
-
-Tests:
-
-- [ ] Homeworld card reports its own mine progress and no prerequisite.
-- [ ] Locked Lunar card reports **Homeworld prerequisite** progress independently from Lunar own progress.
-- [ ] Locked Mars card reports **Lunar prerequisite** progress independently from Mars own progress.
-- [ ] Unlocked Mars card reports Mars `minesBuilt/mineTotal` (for example 2/3) so mastery progress remains visible.
-- [ ] Mars requirement values are Surveying 5 and 20,000 cash.
-- [ ] `canUnlock` is false until all target requirements are satisfied.
-
-Run:
-
-```sh
-flutter test test/mining/mining_progression_views_test.dart
-```
-
-### Step 7: Implement list-based pure projection
-
-- [ ] Replace fixed Homeworld/Lunar fields with `List<StellarMapPlanetView> planets` in authored catalog order.
-- [ ] Compute own mine counts from each planet's sectors.
-- [ ] Compute prerequisite counts from `unlockRequiredMasteryPlanetId` separately.
-- [ ] Keep all eligibility in the pure view model; widgets render only.
-
-### Step 8: Full GREEN before commit
+### Step 7: Full GREEN before commit
 
 ```sh
 flutter analyze --fatal-infos
 flutter test
 ```
+
+Expected: PASS with the old Stellar Map UI still compiling.
 
 Commit:
 
@@ -381,23 +340,31 @@ git commit -m "feat(mining): integrate Mars progression"
 
 ---
 
-## Task 3: Render Mars and the generic three-planet Stellar Map
+## Task 3: Render Mars, retarget Stellar Map end-to-end, and add world tint
 
 **Files:**
+
+- Modify: `lib/mining/mining_progression_views.dart` **Stellar Map portion only**
 - Modify: `lib/mining/mining_sheet_view.dart`
 - Modify: `lib/mining/presentation/stellar_map_sheet.dart`
 - Modify: `lib/mining/presentation/mining_screen.dart`
+- Modify: `lib/mining/world/mining_game.dart`
+- Modify: `lib/mining/mining_content.dart` to remove now-unused Lunar statics after consumers are retargeted
+- Modify: `test/mining/mining_progression_views_test.dart` **Stellar Map portion**
 - Modify: `test/mining/mining_sheet_view_test.dart`
 - Modify: `test/mining/presentation/stellar_map_sheet_test.dart`
 - Modify: `test/mining/presentation/mining_screen_test.dart`
+- Modify: `test/mining/world/mining_game_test.dart`
 - Modify: `test/integration/mining_mvp_journey_test.dart`
+
+This task owns the entire breaking Stellar Map interface change in one green commit.
 
 ### Step 1: Write RED sector-content presentation tests
 
-- [ ] Revealed Mars sectors include resource display name and authored `discoveryText`.
-- [ ] Buildable Mars sector copy uses its `facilityName` while keeping `MiningSheetAction.build`.
-- [ ] Reveal/build/upgrade disabled reasons remain governed by existing state/cash/Surveying logic.
-- [ ] Existing planets remain readable with default facility/discovery values.
+- [ ] Revealed Mars sector exposes resource display name and `discoveryText`.
+- [ ] Buildable Mars copy uses `facilityName` with the existing build action.
+- [ ] Disabled reasons remain governed by current reveal/build/upgrade rules.
+- [ ] Existing sectors remain readable with defaults.
 
 Run:
 
@@ -405,74 +372,154 @@ Run:
 flutter test test/mining/mining_sheet_view_test.dart
 ```
 
-### Step 2: Implement content-only sector copy
+### Step 2: Implement content-only sheet copy
 
-- [ ] Surface resource name/discovery text after reveal.
-- [ ] Surface facility name in build label/body.
-- [ ] Do not create a discovery route, facility action type, or resource-detail screen.
+- [ ] Surface resource/discovery text after reveal.
+- [ ] Surface facility name in build copy.
+- [ ] No discovery route, modal, or facility action type.
 
-### Step 3: Write RED three-card Stellar Map widget tests
+### Step 3: Write RED Stellar Map projection tests
 
-- [ ] Render Homeworld, Lunar Frontier, and Mars Frontier from `view.planets`.
-- [ ] Locked Lunar renders prerequisite `Homeworld mines x/3`.
-- [ ] Locked Mars renders prerequisite `Lunar Frontier mines x/3`, Surveying 5, and 20,000 cash.
-- [ ] Unlocked Mars renders own `Mines 2/3` (or another seeded own-progress value).
-- [ ] Unlock callback returns the target planet ID.
-- [ ] Use unique keys:
+Use this target shape:
+
+```dart
+class StellarMapPlanetView {
+  final MiningPlanetId id;
+  final String name;
+  final bool isUnlocked;
+  final bool isActive;
+  final int minesBuilt;
+  final int mineTotal;
+  final MiningPlanetId? requiredMasteryPlanetId;
+  final bool hasRequiredMastery;
+  final int requiredSurveyingLevel;
+  final bool hasSurveying;
+  final int unlockCashCost;
+  final bool hasCash;
+
+  bool get canUnlock;
+}
+
+class StellarMapView {
+  final List<StellarMapPlanetView> planets;
+
+  StellarMapPlanetView planet(MiningPlanetId id) =>
+      planets.singleWhere((view) => view.id == id);
+}
+```
+
+Tests:
+
+- [ ] Fresh save contains Homeworld + Lunar but not Mars.
+- [ ] Lunar-unlocked state contains all three planets, with locked Mars visible.
+- [ ] Each planet's `minesBuilt/mineTotal` reports only its own sectors.
+- [ ] Locked Lunar stores `requiredMasteryPlanetId == homeworld` and `hasRequiredMastery`.
+- [ ] Locked Mars stores `requiredMasteryPlanetId == lunarFrontier` and `hasRequiredMastery`.
+- [ ] There are **no duplicated prerequisite name/mine-count fields** on the target planet view.
+- [ ] Mars requirement values are Surveying 5 / 20,000 cash.
+- [ ] `canUnlock` is correct.
+
+Run:
+
+```sh
+flutter test test/mining/mining_progression_views_test.dart
+```
+
+### Step 4: Implement list projection + progressive disclosure
+
+- [ ] Build one own-progress entry per visible planet in authored order.
+- [ ] Visible rule:
+  - Homeworld always;
+  - an unlocked planet always;
+  - a locked planet only when its prerequisite planet is unlocked.
+- [ ] Keep only `requiredMasteryPlanetId` + `hasRequiredMastery` on the target card.
+- [ ] Add `StellarMapView.planet(id)` accessor.
+- [ ] Do not introduce polymorphic card/requirement types.
+
+### Step 5: Write RED Stellar Map widget tests
+
+- [ ] Fresh sheet renders two cards: Homeworld + Lunar.
+- [ ] Lunar-unlocked sheet renders three cards including locked Mars.
+- [ ] Locked card resolves prerequisite name/count from `view.planet(requiredMasteryPlanetId)`.
+- [ ] Locked Mars shows `Lunar Frontier mines x/3`, Surveying 5, 20,000 cash.
+- [ ] Unlocked Mars shows own `Mines 2/3`.
+- [ ] Generic unlock callback returns Mars ID.
+- [ ] Generic travel callback returns target ID.
+- [ ] Keys are unique:
 
 ```text
-mining-stellar-map-unlock-lunarFrontier
-mining-stellar-map-unlock-marsFrontier
-mining-stellar-map-travel-homeworld
-mining-stellar-map-travel-lunarFrontier
-mining-stellar-map-travel-marsFrontier
+mining-stellar-map-unlock-${id.name}
+mining-stellar-map-travel-${id.name}
 ```
 
-- [ ] Three cards remain reachable in the current scroll view at 360×640.
+- [ ] 360×640 remains scrollable/reachable; controls remain ≥48px.
+
+### Step 6: Implement Stellar Map sheet + screen together
+
+- [ ] Replace hard-coded Homeworld/Lunar cards with loop over `view.planets`.
+- [ ] Resolve prerequisite view by ID when rendering locked requirement row.
+- [ ] Replace `onUnlockLunar` with `onUnlock(MiningPlanetId)`.
+- [ ] Keep `onTravel(MiningPlanetId)`.
+- [ ] Replace `_unlockLunar()` with `_unlockPlanet(id)` in `MiningScreen`.
+- [ ] Make success snackbar prefer `MiningActionResult.message` when provided.
+- [ ] After every former UI/test consumer is moved to planet metadata/list projection, remove `lunarUnlockCashCost` and `lunarUnlockSurveyingLevel` statics.
+
+### Step 7: Write RED world-tint tests
+
+The current seed changes generated terrain but does not give Mars a rust palette, and `backgroundColor()` colors only outside the terrain. Pin the new renderer seam.
+
+- [ ] `MiningGame` mounts one world-sized `RectangleComponent` used as terrain tint.
+- [ ] Its RGB comes from `planet.tint` with alpha 96.
+- [ ] `paint.blendMode == BlendMode.color`.
+- [ ] Render priority/order is terrain < tint overlay < sector components.
+- [ ] Overlay size equals `worldSize` and is centered.
+- [ ] No change under `lib/game/terrain/`.
 
 Run:
 
 ```sh
-flutter test test/mining/presentation/stellar_map_sheet_test.dart
+flutter test test/mining/world/mining_game_test.dart
 ```
 
-### Step 4: Implement list-based Stellar Map rendering
+### Step 8: Implement the renderer-owned tint overlay
 
-- [ ] Replace `homeworldName`, `lunarName`, and `onUnlockLunar` with the pure authored list plus `onUnlock(MiningPlanetId)` and existing `onTravel`.
-- [ ] Loop one card per `StellarMapPlanetView`.
-- [ ] Locked card: prerequisite mastery / Surveying / cash rows + Unlock.
-- [ ] Unlocked card: own `Mines x/y` + Travel/current-location state.
-- [ ] Keep current `_requirementRow`, scroll behavior, and 48px action controls.
-- [ ] Do not add tabs, paging, or map-card subclasses.
+In `MiningGame.onLoad()`:
 
-### Step 5: Wire generic unlock and successful result messages in `MiningScreen`
+- [ ] Keep current `backgroundColor() => planet.tint`.
+- [ ] Add the existing terrain with an explicit lower priority.
+- [ ] Add one `RectangleComponent` centered over `worldSize`, using:
 
-- [ ] Replace `_unlockLunar()` with `_unlockPlanet(MiningPlanetId id)`.
-- [ ] Reuse `_runSheetAction` and keyed `MiningGame` replacement after successful unlock.
-- [ ] Make `_successMessage` prefer a non-null successful `MiningActionResult.message`; otherwise keep current action-specific copy.
-- [ ] Keep current haptics/reward visuals; no completion dialog.
+```dart
+paint
+  ..color = planet.tint.withAlpha(96)
+  ..blendMode = BlendMode.color;
+```
 
-### Step 6: Retarget integration key usage and add the Mars journey
+- [ ] Add sectors at a higher priority so icons/facility sprites are not recolored.
+- [ ] Reuse the same mechanism for all planets; no Mars-specific branch and no new `terrainTint` field.
 
-`test/integration/mining_mvp_journey_test.dart` already had its raw save helper updated to nine keys in Task 1. Now retarget semantic Stellar Map behavior:
+### Step 9: Retarget MiningScreen/integration journey
 
-- [ ] Replace the old single `mining-stellar-map-unlock` finder with the Lunar per-planet key in the existing Lunar journey.
-- [ ] Keep existing two-planet assertions that are intentionally about the first/Lunar journey, but update any assertions that intentionally enumerate **all** current planets/resources.
-- [ ] Add/extend targeted journey coverage: qualified Lunar state → open map → unlock Mars → reveal free Ochre Basin → build Iron Rig.
-- [ ] Prove travel away/back preserves Mars state.
-- [ ] Progress an unlocked Mars fixture to `Mines 2/3`, open Stellar Map, and assert own mastery progress is visible.
-- [ ] Build final Mars mine and observe reward cash/message through the existing screen path.
-- [ ] Repeat the critical Mars unlock/first-mine path with reduced motion.
-- [ ] Keep 360×640 and 430×932 overflow checks.
+Cover:
+
+- [ ] fresh Stellar Map does not show Mars;
+- [ ] qualified Lunar state → unlock Mars card is visible;
+- [ ] unlock Mars → Mars active;
+- [ ] reveal free Ochre Basin → build Iron Rig through normal action;
+- [ ] travel away/back preserves Mars state;
+- [ ] build final Mars mine → 25,000 reward + snackbar;
+- [ ] reduced-motion path completes;
+- [ ] 360×640 and 430×932 do not overflow.
 
 Run:
 
 ```sh
-flutter test test/mining/presentation/mining_screen_test.dart \
+flutter test test/mining/presentation/stellar_map_sheet_test.dart \
+  test/mining/presentation/mining_screen_test.dart \
   test/integration/mining_mvp_journey_test.dart
 ```
 
-### Step 7: Full GREEN before commit
+### Step 10: Full GREEN before commit
 
 ```sh
 flutter analyze --fatal-infos
@@ -488,24 +535,23 @@ git commit -m "feat(mining): present Mars Frontier journey"
 
 ---
 
-## Task 4: Characterize three-planet reuse and close verification
+## Task 4: Prove three-planet reuse, offline behavior, and budgets
 
 **Files:**
+
 - Modify: `test/mining/mining_simulation_test.dart`
-- Modify: existing offline-return/world tests only if a missing assertion is needed.
-- Modify: `lib/mining/mining_simulation.dart` only if tests expose a real generic bug.
-- Modify: `lib/mining/world/mining_game.dart` only if tests expose a real generic bug.
-- Modify: `lib/mining/presentation/offline_return_sheet.dart` only if tests expose a real generic bug.
-- Update: draft PR body with reuse/budget/verification evidence.
+- Extend existing offline-return/world tests only if a missing assertion is needed.
+- Modify production simulation/offline code only if characterization exposes a concrete generic bug.
+- Update draft PR body with verification/budget evidence.
 
-### Step 1: Add three-planet deterministic simulation characterization
+### Step 1: Add deterministic three-planet characterization
 
-- [ ] Seed one mine on Homeworld, Lunar Frontier, and Mars Frontier.
-- [ ] Advance one UTC elapsed window.
-- [ ] Assert all three accrue from that same elapsed duration.
-- [ ] Assert Extraction applies exactly once to Mars rate.
-- [ ] Assert Logistics applies exactly once to Mars capacity/global offline cap.
-- [ ] Assert locked Mars remains pristine and produces zero.
+- [ ] Seed one mine on Homeworld, Lunar, Mars.
+- [ ] Advance one supplied UTC elapsed window.
+- [ ] All three accrue from exactly that duration.
+- [ ] Extraction applies once to Mars rate.
+- [ ] Logistics applies once to Mars capacity/offline cap.
+- [ ] Locked Mars stays pristine and produces zero.
 
 Run:
 
@@ -513,24 +559,25 @@ Run:
 flutter test test/mining/mining_simulation_test.dart
 ```
 
-Intended result: GREEN with no production-code change. If RED reveals a generic defect, fix only that defect and keep a narrow regression assertion.
+Intended result: GREEN with no structural production change.
 
-### Step 2: Pin full storage and offline-summary reuse
+### Step 2: Pin full storage/offline grouping reuse
 
 - [ ] Mars at effective capacity produces no excess and does not disturb other planets.
-- [ ] Existing `productionByPlanet` includes Mars totals without a new summary shape.
-- [ ] Existing `OfflineReturnSheet` renders the Mars group without planet-specific code.
-- [ ] Switching active planet does not change which unlocked planets accrue.
-- [ ] Existing `MiningGame(planet: mars, ...)` builds exactly three Mars sector components without world-code changes.
+- [ ] Offline summary includes Mars through existing `productionByPlanet` grouping.
+- [ ] Switching active planet does not affect which unlocked planets accrue.
 
-### Step 3: Record art/loading/memory/frame budget evidence
+### Step 3: Visual/budget smoke
 
-- [ ] Confirm diff adds **zero** image/audio files; asset payload delta = 0 bytes.
-- [ ] Confirm Mars uses exactly `Assets.woodFactory`, `Assets.riceHuller`, `Assets.sawmill` plus built-in resource icons.
-- [ ] Confirm only one `MiningGame` is mounted and Mars has exactly three sectors over the same 36×36 terrain.
-- [ ] Smoke 360×640 and 430×932 with all three planets available.
+- [ ] Branch adds **zero** image/audio files; asset payload delta = 0 bytes.
+- [ ] Mars uses only frozen existing facility sprites + Material resource icons.
+- [ ] Exactly one active `MiningGame` is mounted.
+- [ ] Each active world has one 36×36 terrain, one tint overlay, and three sector components.
+- [ ] Smoke Homeworld/Lunar/Mars at 360×640 and 430×932.
+- [ ] Confirm Mars terrain reads as rust-toned inside the playable world, not merely in letterbox/background.
+- [ ] Confirm Lunar/Homeworld remain readable under the same overlay mechanism.
 - [ ] Smoke reduced motion.
-- [ ] Record observed loading/frame behavior in the PR; do not create a benchmark framework unless a reproducible regression is found.
+- [ ] Record any observed load/frame regression; do not add a benchmark harness absent a reproducible issue.
 
 ### Step 4: Run final repository gates
 
@@ -553,16 +600,16 @@ Expected: all pass.
 - [ ] No Surveying 6 or new technology system.
 - [ ] No new currency.
 - [ ] No new image/audio files.
-- [ ] No Mars-specific controller, simulation branch, repository, or save key.
+- [ ] No six→nine compatibility reader.
+- [ ] No Mars-specific controller/simulation/repository/save key.
 - [ ] No generic requirement/reward engine.
-- [ ] No six-to-nine compatibility reader or schema version.
-- [ ] Old six-key HPA-638 development data is intentionally covered by the existing clean-reset recovery path.
-- [ ] Current fixtures/documentation all use the exact nine-sector shape.
-- [ ] Locked Stellar Map cards show prerequisite counts; unlocked cards show own counts.
-- [ ] Existing Homeworld/Lunar behavior remains covered.
+- [ ] No second terrain tint/content field or terrain-generation fork.
+- [ ] Fresh map hides Mars; Lunar-unlocked map reveals it.
+- [ ] Surveying text counts unlocked planets only.
+- [ ] Mars mastery reward remains 25,000 and is treated as a completion flourish.
 - [ ] PR reuse/change ledger matches the design.
 
-Commit final test/documentation-only adjustments:
+Commit any final test/documentation-only adjustments:
 
 ```sh
 git add .
@@ -571,4 +618,4 @@ git commit -m "test(mining): verify Mars content pack"
 
 ## Completion definition
 
-HPA-641 is ready for review when Mars Frontier is playable from unlock through mastery on this same PR, all current saves/tests use the strict nine-sector document, incompatible pre-release six-sector data continues through clean-reset recovery, all three unlocked planets accrue through the existing deterministic simulation, Mars own mastery and unlock-prerequisite mastery are both represented truthfully in the Stellar Map, the 25,000-cash reward is granted exactly once, and verification shows the content pack stayed within the zero-new-asset / one-active-world budget.
+HPA-641 is ready for review when Mars Frontier is playable from reveal through mastery on the same PR; its world is visibly rust-toned using the existing planet tint and zero new assets; current save/test fixtures use the strict nine-sector shape while old six-sector data clean-resets; all three unlocked planets accrue through the existing deterministic simulation; Surveying/Map presentation is honest about currently accessible content; the 25,000 mastery flourish is granted exactly once; and all repository gates pass.
