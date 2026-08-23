@@ -320,4 +320,66 @@ void main() {
     );
     expect(view.body, contains('capacity 135.0'));
   });
+
+  test('revealed Mars sector exposes its resource and discovery copy', () {
+    final view = MiningSheetView.from(
+      state: stateWith(
+        now: now,
+        cash: 5000,
+        technology: const TechnologyLevels(surveying: 5),
+        activePlanet: MiningPlanetId.marsFrontier,
+        sectors: {
+          MiningSectorId.ochreBasin: const SectorProgress(revealed: true),
+        },
+      ),
+      content: content,
+      selectedSectorId: MiningSectorId.ochreBasin,
+      isBusy: false,
+    );
+
+    expect(view.action, MiningSheetAction.build);
+    expect(view.body, contains('Iron Ore'));
+    expect(
+      view.body,
+      contains('iron-rich regolith supports the first heavy extraction rig.'),
+    );
+  });
+
+  test('buildable Mars copy names the authored facility', () {
+    final view = MiningSheetView.from(
+      state: stateWith(
+        now: now,
+        cash: 5000,
+        technology: const TechnologyLevels(surveying: 5),
+        activePlanet: MiningPlanetId.marsFrontier,
+        sectors: {
+          MiningSectorId.ochreBasin: const SectorProgress(revealed: true),
+        },
+      ),
+      content: content,
+      selectedSectorId: MiningSectorId.ochreBasin,
+      isBusy: false,
+    );
+
+    expect(view.primaryLabel, 'Build for 5000 cash');
+    expect(view.body, contains('Iron Rig'));
+  });
+
+  test('Mars reveal remains disabled by the current Surveying rule', () {
+    final view = MiningSheetView.from(
+      state: stateWith(
+        now: now,
+        cash: 10000,
+        technology: const TechnologyLevels(surveying: 4),
+        activePlanet: MiningPlanetId.marsFrontier,
+      ),
+      content: content,
+      selectedSectorId: MiningSectorId.ochreBasin,
+      isBusy: false,
+    );
+
+    expect(view.action, MiningSheetAction.reveal);
+    expect(view.primaryEnabled, isFalse);
+    expect(view.disabledReason, 'Requires Surveying 5.');
+  });
 }

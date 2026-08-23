@@ -118,8 +118,6 @@ class MiningContentRegistry {
     MiningSectorId.frozenBasin,
     MiningSectorId.titaniumHighlands,
   ];
-  static const int lunarUnlockCashCost = 2500;
-  static const int lunarUnlockSurveyingLevel = 3;
   static const offlineCapsByLogistics = <Duration>[
     Duration(hours: 8),
     Duration(hours: 10),
@@ -417,8 +415,4 @@ class MiningContentRegistry {
       planetId,
     ).sectors.every((sector) => mined.contains(sector.id));
   }
-
-  /// Kept for the pre-Mars Stellar Map projection until its consumers move.
-  bool isHomeworldMastered(Iterable<MiningSectorId> minedSectorIds) =>
-      isPlanetMastered(MiningPlanetId.homeworld, minedSectorIds);
 }

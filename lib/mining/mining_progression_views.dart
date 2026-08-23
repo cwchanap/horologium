@@ -128,54 +128,108 @@ class TechnologySheetView {
   }
 }
 
-class StellarMapView {
-  const StellarMapView({
-    required this.homeworldMinesBuilt,
-    required this.homeworldMineTotal,
-    required this.hasHomeworldMastery,
+class StellarMapPlanetView {
+  const StellarMapPlanetView({
+    required this.id,
+    required this.name,
+    required this.isUnlocked,
+    required this.isActive,
+    required this.minesBuilt,
+    required this.mineTotal,
+    required this.requiredMasteryPlanetId,
+    required this.hasRequiredMastery,
     required this.requiredSurveyingLevel,
     required this.hasSurveying,
-    required this.lunarUnlockCashCost,
+    required this.unlockCashCost,
     required this.hasCash,
-    required this.isLunarUnlocked,
   });
 
-  final int homeworldMinesBuilt;
-  final int homeworldMineTotal;
-  final bool hasHomeworldMastery;
+  final MiningPlanetId id;
+  final String name;
+  final bool isUnlocked;
+  final bool isActive;
+  final int minesBuilt;
+  final int mineTotal;
+  final MiningPlanetId? requiredMasteryPlanetId;
+  final bool hasRequiredMastery;
   final int requiredSurveyingLevel;
   final bool hasSurveying;
-  final int lunarUnlockCashCost;
+  final int unlockCashCost;
   final bool hasCash;
-  final bool isLunarUnlocked;
 
-  bool get canUnlockLunar =>
-      !isLunarUnlocked && hasHomeworldMastery && hasSurveying && hasCash;
+  bool get canUnlock =>
+      !isUnlocked &&
+      requiredMasteryPlanetId != null &&
+      hasRequiredMastery &&
+      hasSurveying &&
+      hasCash;
+}
+
+class StellarMapView {
+  const StellarMapView({required this.planets});
+
+  final List<StellarMapPlanetView> planets;
+
+  StellarMapPlanetView planet(MiningPlanetId id) =>
+      planets.singleWhere((view) => view.id == id);
 
   static StellarMapView from({
     required MiningSave state,
     required MiningContentRegistry content,
   }) {
-    final homeworld = content.planet(MiningPlanetId.homeworld).sectors;
+    final unlockedPlanetIds = state.unlockedPlanetIds;
     final minedSectorIds = state.sectors.entries
         .where((entry) => entry.value.mine != null)
         .map((entry) => entry.key);
 
     return StellarMapView(
-      homeworldMinesBuilt: homeworld
-          .where((sector) => state.sectors[sector.id]?.mine != null)
-          .length,
-      homeworldMineTotal: homeworld.length,
-      hasHomeworldMastery: content.isHomeworldMastered(minedSectorIds),
-      requiredSurveyingLevel: MiningContentRegistry.lunarUnlockSurveyingLevel,
+      planets: [
+        for (final definition in content.planets.values)
+          if (_isVisible(definition, unlockedPlanetIds))
+            _planetView(state, content, definition, minedSectorIds),
+      ],
+    );
+  }
+
+  static bool _isVisible(
+    MiningPlanetDefinition definition,
+    Set<MiningPlanetId> unlockedPlanetIds,
+  ) {
+    final requiredMasteryPlanetId = definition.unlockRequiredMasteryPlanetId;
+    return definition.id == MiningPlanetId.homeworld ||
+        unlockedPlanetIds.contains(definition.id) ||
+        (requiredMasteryPlanetId != null &&
+            unlockedPlanetIds.contains(requiredMasteryPlanetId));
+  }
+
+  static StellarMapPlanetView _planetView(
+    MiningSave state,
+    MiningContentRegistry content,
+    MiningPlanetDefinition definition,
+    Iterable<MiningSectorId> minedSectorIds,
+  ) {
+    final requiredMasteryPlanetId = definition.unlockRequiredMasteryPlanetId;
+    final hasRequiredMastery =
+        requiredMasteryPlanetId == null ||
+        content.isPlanetMastered(requiredMasteryPlanetId, minedSectorIds);
+    final minesBuilt = definition.sectors
+        .where((sector) => state.sectors[sector.id]?.mine != null)
+        .length;
+
+    return StellarMapPlanetView(
+      id: definition.id,
+      name: definition.name,
+      isUnlocked: state.unlockedPlanetIds.contains(definition.id),
+      isActive: state.activePlanetId == definition.id,
+      minesBuilt: minesBuilt,
+      mineTotal: definition.sectors.length,
+      requiredMasteryPlanetId: requiredMasteryPlanetId,
+      hasRequiredMastery: hasRequiredMastery,
+      requiredSurveyingLevel: definition.unlockRequiredSurveyingLevel,
       hasSurveying:
-          state.technology.surveying >=
-          MiningContentRegistry.lunarUnlockSurveyingLevel,
-      lunarUnlockCashCost: MiningContentRegistry.lunarUnlockCashCost,
-      hasCash: state.cash >= MiningContentRegistry.lunarUnlockCashCost,
-      isLunarUnlocked: state.unlockedPlanetIds.contains(
-        MiningPlanetId.lunarFrontier,
-      ),
+          state.technology.surveying >= definition.unlockRequiredSurveyingLevel,
+      unlockCashCost: definition.unlockCashCost,
+      hasCash: state.cash >= definition.unlockCashCost,
     );
   }
 }

@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'dart:ui' show Color;
+import 'dart:ui' show BlendMode, Color;
 
 import 'package:flame/components.dart';
 import 'package:flame/events.dart' as flame_events;
@@ -60,12 +60,25 @@ class MiningGame extends FlameGame
           )
           ..parallaxEnabled = false
           ..anchor = Anchor.center
-          ..position = Vector2.zero();
+          ..position = Vector2.zero()
+          ..priority = 0;
     world.add(terrain);
+
+    final tint =
+        RectangleComponent(
+            size: worldSize,
+            position: Vector2.zero(),
+            anchor: Anchor.center,
+            priority: 1,
+          )
+          ..paint.color = planet.tint.withAlpha(96)
+          ..paint.blendMode = BlendMode.color;
+    world.add(tint);
 
     for (final definition in planet.sectors) {
       final component = MiningSectorComponent(definition: definition)
         ..position = Vector2(definition.anchor.x, definition.anchor.y)
+        ..priority = 2
         ..onSelected = _handleSectorSelected;
       _sectors[definition.id] = component;
       world.add(component);

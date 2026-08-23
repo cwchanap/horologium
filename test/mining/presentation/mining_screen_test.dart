@@ -1216,10 +1216,11 @@ void main() {
     expect(find.text('Homeworld mines 0/3'), findsOneWidget);
     expect(find.text('Surveying 3'), findsOneWidget);
     expect(find.text('2500 cash'), findsOneWidget);
+    expect(find.text('Mars Frontier'), findsNothing);
 
     final unlock = tester.widget<ElevatedButton>(
       find.descendant(
-        of: find.byKey(const Key('mining-stellar-map-unlock')),
+        of: find.byKey(const Key('mining-stellar-map-unlock-lunarFrontier')),
         matching: find.byType(ElevatedButton),
       ),
     );
@@ -1336,7 +1337,9 @@ void main() {
       await tester.tap(find.byKey(const Key('mining-stellar-map-button')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.byKey(const Key('mining-stellar-map-unlock')));
+      await tester.tap(
+        find.byKey(const Key('mining-stellar-map-unlock-lunarFrontier')),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
@@ -1390,7 +1393,9 @@ void main() {
     await tester.tap(find.byKey(const Key('mining-stellar-map-button')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.byKey(const Key('mining-stellar-map-unlock')));
+    await tester.tap(
+      find.byKey(const Key('mining-stellar-map-unlock-lunarFrontier')),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 

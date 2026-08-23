@@ -181,82 +181,141 @@ void main() {
       MiningSectorId.carbonRidge: mined(),
       MiningSectorId.graniteCrater: mined(),
     };
+    final masteredLunar = {
+      MiningSectorId.frozenBasin: mined(),
+      MiningSectorId.titaniumHighlands: mined(),
+      MiningSectorId.heliumMare: mined(),
+    };
 
-    test(
-      'initial state has zero mastery and every Lunar requirement unmet',
-      () {
-        final view = StellarMapView.from(
-          state: MiningSave.initial(nowUtc: now),
-          content: content,
-        );
-        expect(view.homeworldMinesBuilt, 0);
-        expect(view.homeworldMineTotal, 3);
-        expect(view.hasHomeworldMastery, isFalse);
-        expect(view.requiredSurveyingLevel, 3);
-        expect(view.hasSurveying, isFalse);
-        expect(view.lunarUnlockCashCost, 2500);
-        expect(view.hasCash, isFalse);
-        expect(view.isLunarUnlocked, isFalse);
-        expect(view.canUnlockLunar, isFalse);
-      },
-    );
-
-    test('mastery alone leaves surveying and cash unmet', () {
+    test('fresh save shows Homeworld and Lunar but not Mars', () {
       final view = StellarMapView.from(
-        state: stateWith(now: now, sectors: masteredHomeworld),
+        state: MiningSave.initial(nowUtc: now),
         content: content,
       );
-      expect(view.homeworldMinesBuilt, 3);
-      expect(view.hasHomeworldMastery, isTrue);
-      expect(view.hasSurveying, isFalse);
-      expect(view.hasCash, isFalse);
-      expect(view.canUnlockLunar, isFalse);
+
+      expect(view.planets.map((planet) => planet.id), [
+        MiningPlanetId.homeworld,
+        MiningPlanetId.lunarFrontier,
+      ]);
+      expect(
+        view.planets.any((planet) => planet.id == MiningPlanetId.marsFrontier),
+        isFalse,
+      );
+      expect(view.planet(MiningPlanetId.lunarFrontier).canUnlock, isFalse);
     });
 
-    test('surveying and cash alone leave mastery unmet', () {
+    test('Lunar unlock reveals a locked Mars entry', () {
       final view = StellarMapView.from(
         state: stateWith(
           now: now,
-          cash: 2500,
-          technology: const TechnologyLevels(surveying: 3),
-        ),
-        content: content,
-      );
-      expect(view.hasHomeworldMastery, isFalse);
-      expect(view.hasSurveying, isTrue);
-      expect(view.hasCash, isTrue);
-      expect(view.canUnlockLunar, isFalse);
-    });
-
-    test('all requirements met unlocks the Lunar affordance', () {
-      final view = StellarMapView.from(
-        state: stateWith(
-          now: now,
-          cash: 2500,
-          technology: const TechnologyLevels(surveying: 3),
-          sectors: masteredHomeworld,
-        ),
-        content: content,
-      );
-      expect(view.canUnlockLunar, isTrue);
-    });
-
-    test('already unlocked Lunar disables the unlock affordance', () {
-      final view = StellarMapView.from(
-        state: stateWith(
-          now: now,
-          cash: 2500,
-          technology: const TechnologyLevels(surveying: 3),
           unlockedPlanets: {
             MiningPlanetId.homeworld,
             MiningPlanetId.lunarFrontier,
           },
-          sectors: masteredHomeworld,
         ),
         content: content,
       );
-      expect(view.isLunarUnlocked, isTrue);
-      expect(view.canUnlockLunar, isFalse);
+
+      expect(view.planets.map((planet) => planet.id), [
+        MiningPlanetId.homeworld,
+        MiningPlanetId.lunarFrontier,
+        MiningPlanetId.marsFrontier,
+      ]);
+      expect(view.planet(MiningPlanetId.marsFrontier).isUnlocked, isFalse);
+      expect(view.planet(MiningPlanetId.marsFrontier).canUnlock, isFalse);
     });
+
+    test('each planet reports mine progress from only its own sectors', () {
+      final view = StellarMapView.from(
+        state: stateWith(
+          now: now,
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+          sectors: {
+            MiningSectorId.landingBasin: mined(),
+            MiningSectorId.frozenBasin: mined(),
+            MiningSectorId.titaniumHighlands: mined(),
+            MiningSectorId.ochreBasin: mined(),
+          },
+        ),
+        content: content,
+      );
+
+      expect(view.planet(MiningPlanetId.homeworld).minesBuilt, 1);
+      expect(view.planet(MiningPlanetId.homeworld).mineTotal, 3);
+      expect(view.planet(MiningPlanetId.lunarFrontier).minesBuilt, 2);
+      expect(view.planet(MiningPlanetId.lunarFrontier).mineTotal, 3);
+      expect(view.planet(MiningPlanetId.marsFrontier).minesBuilt, 1);
+      expect(view.planet(MiningPlanetId.marsFrontier).mineTotal, 3);
+    });
+
+    test(
+      'locked Lunar references Homeworld mastery without duplicated progress',
+      () {
+        final view = StellarMapView.from(
+          state: stateWith(now: now, sectors: masteredHomeworld),
+          content: content,
+        );
+
+        final lunar = view.planet(MiningPlanetId.lunarFrontier);
+        expect(lunar.requiredMasteryPlanetId, MiningPlanetId.homeworld);
+        expect(lunar.hasRequiredMastery, isTrue);
+        expect(lunar.minesBuilt, 0);
+        expect(lunar.mineTotal, 3);
+        expect(lunar.canUnlock, isFalse);
+      },
+    );
+
+    test('locked Mars references Lunar mastery and authored requirements', () {
+      final view = StellarMapView.from(
+        state: stateWith(
+          now: now,
+          cash: 20000,
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+          sectors: {...masteredHomeworld, ...masteredLunar},
+        ),
+        content: content,
+      );
+
+      final mars = view.planet(MiningPlanetId.marsFrontier);
+      expect(mars.requiredMasteryPlanetId, MiningPlanetId.lunarFrontier);
+      expect(mars.hasRequiredMastery, isTrue);
+      expect(mars.requiredSurveyingLevel, 5);
+      expect(mars.hasSurveying, isTrue);
+      expect(mars.unlockCashCost, 20000);
+      expect(mars.hasCash, isTrue);
+      expect(mars.canUnlock, isTrue);
+    });
+
+    test(
+      'unlocked planet is not unlockable even when its requirements are met',
+      () {
+        final view = StellarMapView.from(
+          state: stateWith(
+            now: now,
+            cash: 20000,
+            technology: const TechnologyLevels(surveying: 5),
+            unlockedPlanets: {
+              MiningPlanetId.homeworld,
+              MiningPlanetId.lunarFrontier,
+              MiningPlanetId.marsFrontier,
+            },
+            sectors: {...masteredHomeworld, ...masteredLunar},
+          ),
+          content: content,
+        );
+
+        final mars = view.planet(MiningPlanetId.marsFrontier);
+        expect(mars.isUnlocked, isTrue);
+        expect(mars.isActive, isFalse);
+        expect(mars.canUnlock, isFalse);
+      },
+    );
   });
 }
