@@ -2,90 +2,133 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Evaluate whether the completed three-planet mining game needs one extra post-Mars return goal and, only if play evidence confirms that exact gap, extend the existing Mars planet card with a Level-3 mine-progress goal.
+**Goal:** Evaluate whether the completed three-planet mining game has a real post-Mars return-motivation gap and, only if Task 0 confirms that exact problem, add one derived “fully upgrade Mars to Level 5” goal on the existing Offline Return and Mars Stellar Map surfaces.
 
-**Architecture:** Reuse the current planet/mastery/Stellar Map seams instead of adding a retention subsystem. One optional `postMasteryMineLevelTarget` value lives on `MiningPlanetDefinition`; the existing `StellarMapPlanetView` projects the derived count, and the existing Mars card renders one extra progress line after normal Mars mastery. There is no new save state, helper module, view type, second card, controller/economy change, timer, or generic milestone framework.
+**Architecture:** Reuse existing planet/mastery/progression seams. Mars gets one optional `postMasteryMineLevelTarget: 5`; `StellarMapPlanetView` projects the currently visible target and count after normal Mars mastery using the existing `MiningContentRegistry.isPlanetMastered` helper. `MiningScreen` turns that projection into one optional string for the existing Offline Return next-action line, while the existing Mars card shows the same progress secondarily. No save state, helper module, new view type, second card, controller/economy change, timer, or generic goal framework is added.
 
 **Tech Stack:** Dart 3.8, Flutter, Flame 1.30, SharedPreferences 2.5, existing `flutter_test` suites.
 
 **Spec:** `docs/superpowers/specs/2026-08-23-hpa-640-lightweight-retention-experiment-design.md`
 
-## Global constraints
+## Global Constraints
 
 - One branch and one PR for HPA-640.
-- **Task 0 is a hard runtime-code gate.** Do not execute Tasks 1–3 unless a real three-planet playtest records the specific missing-post-Mars-goal problem in Linear HPA-640.
-- A valid final outcome is **No retention feature needed** with zero runtime changes.
-- If implemented, exactly one mechanic ships: after normal Mars mastery, the existing Mars card shows progress toward all three Mars mines reaching Level 3+.
+- **Task 0 is a hard runtime-code gate.** Do not execute Tasks 1–3 unless a real post-Mars playtest records the specific missing-terminal-goal problem in Linear HPA-640.
+- A valid terminal outcome is **No retention feature needed** with zero runtime Dart changes.
+- Before Task 0 play begins, pre-register predicted Stellar Map opens and predicted next actions; do not rewrite the predictions afterward.
+- Task 0 must explicitly evaluate the copy-only `lib/mining/mining_sheet_view.dart` alternative: announce the next visible facility tier in the existing upgrade body. If that would solve the observed problem, do not add a retention goal.
+- If implemented, exactly one derived goal ships: after normal Mars mastery, all three Mars mines reach Level 5.
 - No additional cash reward is part of this plan.
-- If Task 0 specifically proves a completion payout is required, stop and revise the design/plan before runtime code. Do not improvise a reward while executing this plan.
-- Keep the current strict mining save shape unchanged; add no persisted milestone state, claim flag, compatibility reader, or second save key.
+- If Task 0 says a payout is necessary, stop and revise the spec/plan before runtime code. Do not improvise a reward while executing this plan.
+- Keep the strict mining save shape unchanged; add no persisted goal/completion/claim state, compatibility reader, or second save key.
 - Keep one `MiningController`, `MiningSimulation`, `MiningSaveRepository`, save key, and active `MiningGame`.
-- Do not create `mining_retention.dart`, `MarsDeepOperationsView`, a second Stellar Map card/section, or another progress model.
-- Normal Reveal, Build, Mine, Sell, Upgrade, Technology, Stellar Map unlock/travel, and offline behavior remain unchanged.
-- No timer, recurrence, daily reset, streak, contract generation, dynamic market, new currency, server, analytics, notification, or new asset.
-- No generic quest/objective/achievement/milestone/reward engine.
+- Do not create `mining_retention.dart`, `MarsDeepOperationsView`, another progress model, or a second Stellar Map card/section.
+- Do not modify `MiningController`, `MiningSimulation`, selling, technology, resource identities, mine economics, or assets for the default experiment.
+- No timer, recurrence, daily reset, streak, generated contract, dynamic market, new currency, server, analytics, notification, or generic quest/objective/achievement framework.
 - Each implementation task ends with `flutter analyze --fatal-infos` and `flutter test` green before commit.
 
-## Conditional experiment
+## Frozen Conditional Candidate
 
-The runtime work below is authorized only when Task 0 records that the real observed gap is a missing visible post-Mars upgrade goal.
+Runtime work is authorized only if Task 0 confirms the exact problem this candidate addresses.
 
 ```text
 Eligibility: Mars Frontier normal mastery (existing Mines 3/3)
-Goal:        all 3 Mars mines at Level 3+
+Goal:        all 3 Mars mines at Level 5
 Reward:      no additional cash reward
-Surface:     one extra line in the existing Mars Stellar Map card
+Primary UI:  existing Offline Return next-action line
+Secondary UI: existing Mars Stellar Map card
 Persistence: existing mine levels only
 ```
 
-Current Level-1 -> Level-3 Mars upgrade spend remains unchanged:
+### Sizing evidence
+
+Current Level-1 full Mars cargo value at Logistics 0:
 
 ```text
-Iron Rig          7,000 + 14,000 = 21,000
-Silica Extractor 12,000 + 24,000 = 36,000
-Cobalt Drill     24,000 + 48,000 = 72,000
-Total                              129,000
+Iron Rig        180 ×  32 =  5,760
+Silica          160 ×  55 =  8,800
+Cobalt          130 × 110 = 14,300
+Total                      = 28,860
 ```
 
-## Expected final file map when the gate passes
+At Logistics 5 the capacity multiplier is 2.0, so the same Level-1 full sweep is 57,720. Extraction changes fill time, not full-storage sale value.
 
-**Modify only**
+Upgrade spend:
+
+```text
+L1 -> L3 total = 129,000
+L1 -> L5 total = 645,000
+L3 -> L5 delta = 516,000
+```
+
+From a just-mastered low-cash Mars state that received the existing 25,000 mastery reward, a simple full-return/cheapest-next-upgrade estimate is approximately:
+
+```text
+Level 3: ~2-3 returns
+Level 5: ~5 returns at Logistics 5; ~9 at Logistics 0
+```
+
+These are sizing estimates, not evidence that the mechanic is needed. Pre-existing cash and player behavior can shorten them. Level 5 is selected because it is both better-sized and semantically terminal: it is max mine level and the renderer's final elite-ring tier.
+
+## Expected Final File Map When the Gate Passes
+
+**Modify:**
 
 - `lib/mining/mining_content.dart`
 - `lib/mining/mining_progression_views.dart`
+- `lib/mining/presentation/offline_return_sheet.dart`
+- `lib/mining/presentation/mining_screen.dart`
 - `lib/mining/presentation/stellar_map_sheet.dart`
 - `test/mining/mining_content_test.dart`
 - `test/mining/mining_progression_views_test.dart`
+- `test/mining/presentation/offline_return_sheet_test.dart`
+- `test/mining/presentation/mining_screen_test.dart`
 - `test/mining/presentation/stellar_map_sheet_test.dart`
 - `test/integration/mining_mvp_journey_test.dart`
 
-Do not modify:
+**Do not modify for the frozen candidate:**
 
 - `lib/mining/mining_controller.dart`
 - `lib/mining/mining_state.dart`
 - `lib/mining/mining_save_repository.dart`
 - `lib/mining/mining_simulation.dart`
+- `lib/mining/mining_sheet_view.dart` — this is evaluated in Task 0 as the cheaper alternative, not bundled with the selected experiment.
 - assets or resource identities.
 
-## Main risks
+## Main Risks
 
-1. **Inventing evidence.** Engineering completeness is not retention playtesting. Task 0 must stop the work when no real gap is observed.
-2. **Forking mastery progress.** The experiment must remain fields on the existing planet definition/view and copy on the existing Mars card; no parallel module/view/card.
-3. **Implied payout.** Derived mine levels cannot prove that a cash reward was granted. This plan has no second payout and UI must not say `cash earned`.
-4. **UI duplication.** Before Mars normal mastery, the card remains the current `Mines x/3` shape. The Level-3 line appears only after `Mines 3/3`.
-5. **Sticky experiment code.** The implementation must be removable by deleting one content value, two scalar view fields/counting lines, and one presentation branch.
+1. **Inventing evidence.** Engineering completeness is not retention evidence. Task 0 must stop when no real gap is observed.
+2. **Unobservable experiment.** A goal shown only on Stellar Map could fail simply because players do not open the travel/unlock sheet after Mars mastery. The primary surface is therefore the existing Offline Return next-action line, with Stellar Map secondary.
+3. **Target too grindy.** Level 5 costs 645,000 from Level 1. Task 0 and final review must reject/remove it if the terminal goal feels like chore work rather than purposeful upgrading.
+4. **Ignoring the cheaper explanation.** If the real problem is only that facility tier changes are invisible in `MiningSheetView`, one string is cheaper than a new post-mastery goal. Task 0 must test this explicitly.
+5. **Forking mastery logic.** Use `MiningContentRegistry.isPlanetMastered`; do not introduce `minesBuilt == mineTotal` as a second mastery spelling in `_planetView`.
+6. **Fixture churn / ambiguous tests.** Default the two new planet-view fields and scope `Mines 3/3` finders to the Mars card because all three planets can render the same text.
+7. **Sticky experiment code.** Removal must remain one content value, two optional/defaulted view fields plus inline count, one Offline Return override path, one existing-card line, and tests.
 
 ---
 
-## Task 0: Run and record the HPA-640 evidence gate
+## Task 0: Pre-register, play, and record the HPA-640 evidence gate
 
 **Files:** none.
 
-**Produces:** one Linear HPA-640 evidence/decision comment that either stops the task or authorizes the existing-card Level-3 goal.
+**Produces:** Linear evidence that either closes HPA-640 with no runtime code or authorizes Tasks 1–3.
 
-- [ ] **Step 1: Use a representative progressed save**
+- [ ] **Step 1: Pre-register the prediction before playing**
 
-Start from a state with:
+Add a Linear HPA-640 comment containing exactly these fields before the first return session:
+
+```text
+Pre-registered prediction
+- Stellar Map opens across two return sessions: <number>
+- Next action I expect to want after each return: <action>
+- Problem I expect to notice, if any: <one sentence>
+```
+
+Do not edit these values after playing. The later gate note compares observation against prediction.
+
+- [ ] **Step 2: Use a representative just-mastered Mars save**
+
+Start from shipped post-HPA-641 behavior with:
 
 ```text
 Homeworld mastered
@@ -93,57 +136,88 @@ Lunar Frontier mastered
 Mars Frontier unlocked and mastered
 Surveying 5
 all three Mars mines built
-at least one Mars mine still below Level 3
+at least one Mars mine below Level 5
+no retention experiment code
 ```
 
-Use the current post-HPA-641 build. Do not add debug retention code to create the observation.
+Do not manufacture an experiment UI before observing the current game.
 
-- [ ] **Step 2: Play the current return loop without an experiment**
+- [ ] **Step 3: Play two current return sessions naturally**
 
-Perform at least two short return sessions using only shipped behavior:
+Use only shipped behavior:
 
 ```text
-return -> review offline production -> sell cargo -> inspect upgrades
--> inspect Stellar Map -> decide whether another return feels purposeful
+return
+-> read Offline Return
+-> sell cargo
+-> inspect whichever mine/upgrade UI you naturally use
+-> open Stellar Map only if you would naturally do so
+-> leave
+-> return again
 ```
 
-Check the canonical portrait sizes when practical:
+Record:
 
 ```text
-360x640
-430x932
+Observed Stellar Map opens: <number>
+Observed next action after return 1: <action>
+Observed next action after return 2: <action>
+Was the existing Offline Return next-action copy useful?: <yes/no + why>
 ```
 
-- [ ] **Step 3: Record the gate decision**
+Use 360x640 and 430x932 when practical, but do not confuse layout checking with retention evidence.
 
-If the existing loop already gives a clear satisfying reason to return, add a Linear comment containing exactly:
+- [ ] **Step 4: Explicitly evaluate the cheapest copy-only alternative**
+
+Inspect `lib/mining/mining_sheet_view.dart`'s current upgrade body. The concrete alternative to the retention goal is:
+
+```text
+Add one clause announcing the next visible facility tier — e.g. that Level 5 brings the mine to its final/elite facility tier.
+```
+
+The gate note must answer:
+
+```text
+Would this one-string per-mine hint solve the observed problem? <yes/no + reason>
+```
+
+If **yes**, do not execute Tasks 1–3. HPA-640 has no justified retention mechanic.
+
+- [ ] **Step 5: Make the gate decision**
+
+If there is no real return-motivation gap, record:
 
 ```text
 Decision: No retention feature needed
 ```
 
-Include the observed current behavior that made an extra mechanic unnecessary. Stop; do not execute Tasks 1–3.
+Include observed behavior and stop the plan.
 
-If a real missing-goal problem is observed, the Linear comment must contain:
-
-```text
-Observed gap: <what the player actually experienced>
-Rejected simpler alternatives: <why copy/reward presentation, balance tuning, or another planet is not the immediate fix>
-Selected mechanic: existing Mars card Level-3 mine goal
-Success criteria: <what would make the goal worth keeping>
-Removal criteria: <what would make it redundant/chore-like>
-```
-
-- [ ] **Step 4: Re-check the selected shape before code**
-
-Proceed only when the observation is specifically compatible with:
+If the specific problem is a missing visible post-Mars terminal upgrade goal, record all required HPA-640 fields:
 
 ```text
-After Mars Mines 3/3, show Level 3 mines x/3 on the same Mars card.
-No additional payout.
+Observed gap: <what actually happened>
+Rejected simpler alternatives:
+- mining_sheet_view.dart visible-tier hint: <why insufficient>
+- clearer existing goal/reward presentation: <why insufficient>
+- balance tuning: <why insufficient>
+- another planet: <why not the immediate solution>
+Selected mechanic: derived Mars Level-5 goal on Offline Return + existing Mars card
+Success criteria: <observable keep criteria>
+Removal criteria: <observable removal criteria>
+Prediction comparison: <what matched/did not match the pre-registration>
 ```
 
-If the playtest points to a different mechanic or says a payout is necessary, stop and revise the design/plan on this PR before touching runtime Dart.
+- [ ] **Step 6: Re-check candidate fit before runtime code**
+
+Proceed only when the observation matches:
+
+```text
+After normal Mars mastery, make “all three Mars mines Level 5” visible on return.
+No second payout.
+```
+
+If the evidence points to a different target, a payout, or another mechanic, stop and revise both spec and plan on this PR first.
 
 ---
 
@@ -158,12 +232,12 @@ If the playtest points to a different mechanic or says a payout is necessary, st
 
 **Interfaces:**
 
-- Consumes: existing `MiningPlanetDefinition`, `MiningSave.sectors`, `StellarMapPlanetView`, and normal Mars `minesBuilt / mineTotal` projection.
-- Produces: optional `MiningPlanetDefinition.postMasteryMineLevelTarget`, plus `StellarMapPlanetView.postMasteryMineLevelTarget` and `minesAtPostMasteryTarget` on the same planet record.
+- Consumes: `MiningPlanetDefinition`, existing `MiningContentRegistry.isPlanetMastered`, `MiningSave.sectors`, `StellarMapPlanetView`.
+- Produces: `MiningPlanetDefinition.postMasteryMineLevelTarget`, `StellarMapPlanetView.postMasteryMineLevelTarget`, and `StellarMapPlanetView.minesAtPostMasteryTarget`.
 
-### Step 1: Write RED content tests
+- [ ] **Step 1: Write RED authored-content tests**
 
-- [ ] Extend `test/mining/mining_content_test.dart` to pin the single authored target:
+Add to `test/mining/mining_content_test.dart`:
 
 ```dart
 final content = MiningContentRegistry.stellarMining();
@@ -178,7 +252,7 @@ expect(
 );
 expect(
   content.planet(MiningPlanetId.marsFrontier).postMasteryMineLevelTarget,
-  3,
+  5,
 );
 ```
 
@@ -188,11 +262,11 @@ Run:
 flutter test test/mining/mining_content_test.dart
 ```
 
-Expected: RED because `postMasteryMineLevelTarget` does not exist.
+Expected: RED because the field does not exist.
 
-### Step 2: Add the smallest planet content field
+- [ ] **Step 2: Add the smallest optional planet content field**
 
-- [ ] Extend `MiningPlanetDefinition` with an optional constructor field:
+Extend `MiningPlanetDefinition`:
 
 ```dart
 class MiningPlanetDefinition {
@@ -214,18 +288,18 @@ class MiningPlanetDefinition {
 }
 ```
 
-- [ ] Set only Mars:
+Set only Mars:
 
 ```dart
 masteryRewardCash: 25000,
-postMasteryMineLevelTarget: 3,
+postMasteryMineLevelTarget: 5,
 ```
 
-Homeworld and Lunar use the default `null`.
+Homeworld and Lunar inherit `null`.
 
-Do not add a reward amount, milestone ID, name, type, registry, or helper module.
+Do not add title, reward amount, milestone ID, condition list, registry, or helper module.
 
-- [ ] Run:
+Run:
 
 ```sh
 flutter test test/mining/mining_content_test.dart
@@ -233,11 +307,9 @@ flutter test test/mining/mining_content_test.dart
 
 Expected: PASS.
 
-### Step 3: Write RED projection tests on the existing Mars planet view
+- [ ] **Step 3: Write RED existing-planet-view projection tests**
 
-- [ ] Extend `test/mining/mining_progression_views_test.dart` with a Mars-mastered state whose mine levels are `3, 2, 4`.
-
-Assert the existing planet record carries the progress:
+In `test/mining/mining_progression_views_test.dart`, create a Mars-mastered state with Mars mine levels `5, 4, 5` and assert:
 
 ```dart
 final view = StellarMapView.from(state: state, content: content);
@@ -245,11 +317,11 @@ final mars = view.planet(MiningPlanetId.marsFrontier);
 
 expect(mars.minesBuilt, 3);
 expect(mars.mineTotal, 3);
-expect(mars.postMasteryMineLevelTarget, 3);
+expect(mars.postMasteryMineLevelTarget, 5);
 expect(mars.minesAtPostMasteryTarget, 2);
 ```
 
-- [ ] Add pre-mastery coverage. With only two Mars mines built:
+Add pre-mastery coverage with only two Mars mines built:
 
 ```dart
 expect(mars.minesBuilt, 2);
@@ -257,13 +329,13 @@ expect(mars.postMasteryMineLevelTarget, isNull);
 expect(mars.minesAtPostMasteryTarget, 0);
 ```
 
-- [ ] Add `3, 4, 5` coverage:
+Add complete coverage with levels `5, 5, 5`:
 
 ```dart
 expect(mars.minesAtPostMasteryTarget, 3);
 ```
 
-- [ ] Keep Homeworld/Lunar target fields null even when their mines are high-level.
+Keep Homeworld/Lunar target fields null.
 
 Run:
 
@@ -271,106 +343,320 @@ Run:
 flutter test test/mining/mining_progression_views_test.dart
 ```
 
-Expected: RED because the two scalar view fields do not exist.
+Expected: RED because the view fields do not exist.
 
-### Step 4: Extend `StellarMapPlanetView` and `_planetView` inline
+- [ ] **Step 4: Add defaulted view fields and reuse the mastery helper**
 
-- [ ] Add only these fields to `StellarMapPlanetView`:
+Extend the existing constructor without forcing unrelated fixtures to change:
 
 ```dart
-final int? postMasteryMineLevelTarget;
-final int minesAtPostMasteryTarget;
+class StellarMapPlanetView {
+  const StellarMapPlanetView({
+    required this.id,
+    required this.name,
+    required this.isUnlocked,
+    required this.isActive,
+    required this.minesBuilt,
+    required this.mineTotal,
+    required this.requiredMasteryPlanetId,
+    required this.hasRequiredMastery,
+    required this.requiredSurveyingLevel,
+    required this.hasSurveying,
+    required this.unlockCashCost,
+    required this.hasCash,
+    this.postMasteryMineLevelTarget,
+    this.minesAtPostMasteryTarget = 0,
+  });
+
+  // existing fields...
+
+  /// Currently visible authored post-mastery target. Null means either no
+  /// target is authored or normal mastery has not made it visible yet.
+  final int? postMasteryMineLevelTarget;
+  final int minesAtPostMasteryTarget;
+}
 ```
 
-- [ ] In `_planetView(...)`, keep the existing `minesBuilt` query and add the target/count beside it:
+Inside `StellarMapView._planetView`, keep the current `minesBuilt` calculation, then add:
 
 ```dart
-final isMastered = minesBuilt == definition.sectors.length;
-final postMasteryMineLevelTarget = isMastered
+final isMastered = content.isPlanetMastered(definition.id, minedSectorIds);
+final postMasteryTarget = isMastered
     ? definition.postMasteryMineLevelTarget
     : null;
-final minesAtPostMasteryTarget = postMasteryMineLevelTarget == null
+final minesAtPostMasteryTarget = postMasteryTarget == null
     ? 0
     : definition.sectors
           .where(
             (sector) =>
                 (state.sectors[sector.id]?.mine?.level ?? 0) >=
-                postMasteryMineLevelTarget,
+                postMasteryTarget,
           )
           .length;
 ```
 
-- [ ] Pass those values into the existing `StellarMapPlanetView` constructor.
+Populate the existing planet view:
 
-Do not extract a helper function or new class for this five-line count.
+```dart
+postMasteryMineLevelTarget: postMasteryTarget,
+minesAtPostMasteryTarget: minesAtPostMasteryTarget,
+```
 
-- [ ] Run focused tests:
+Do **not** use `minesBuilt == definition.sectors.length` as a second spelling of mastery. Do **not** extract the five-line target count into a helper.
+
+Run:
 
 ```sh
 flutter test test/mining/mining_content_test.dart \
   test/mining/mining_progression_views_test.dart
-```
-
-Expected: PASS.
-
-### Step 5: Full GREEN before commit
-
-```sh
 flutter analyze --fatal-infos
 flutter test
 ```
 
 Expected: PASS.
 
-Commit:
+- [ ] **Step 5: Commit Task 1**
 
 ```sh
 git add lib/mining/mining_content.dart \
   lib/mining/mining_progression_views.dart \
   test/mining/mining_content_test.dart \
   test/mining/mining_progression_views_test.dart
-git commit -m "feat(mining): project Mars level goal"
+git commit -m "feat(mining): project Mars terminal upgrade goal"
 ```
 
 ---
 
-## Task 2: Extend the existing Mars card progress row
+## Task 2: Put the goal on the existing return flow and existing Mars card
 
 **Files:**
 
+- Modify: `lib/mining/presentation/offline_return_sheet.dart`
+- Modify: `lib/mining/presentation/mining_screen.dart`
 - Modify: `lib/mining/presentation/stellar_map_sheet.dart`
+- Modify: `test/mining/presentation/offline_return_sheet_test.dart`
+- Modify: `test/mining/presentation/mining_screen_test.dart`
 - Modify: `test/mining/presentation/stellar_map_sheet_test.dart`
 
 **Interfaces:**
 
-- Consumes: the existing `StellarMapPlanetView` plus `postMasteryMineLevelTarget` and `minesAtPostMasteryTarget` from Task 1.
-- Produces: no new widget type or callback; only additional copy inside the existing planet card `_progressRow`.
+- Consumes: existing `StellarMapView` / `StellarMapPlanetView` projection from Task 1.
+- Produces: optional `OfflineReturnSheet.nextActionText`, MiningScreen-supplied Mars goal copy, and one additional line in the existing Mars card.
 
-### Step 1: Write RED widget tests for the same card
+- [ ] **Step 1: Write RED Offline Return tests before changing the widget**
 
-- [ ] Extend `stellar_map_sheet_test.dart` so a mastered Mars view with Level-3 progress `1/3` still renders one Mars planet card and shows:
+Extend `test/mining/presentation/offline_return_sheet_test.dart`.
+
+Default behavior must remain byte-for-byte meaningful:
+
+```dart
+expect(
+  find.text('Next: sell cargo or upgrade a mine to keep the operation moving.'),
+  findsOneWidget,
+);
+```
+
+Add an override case:
+
+```dart
+await tester.pumpWidget(
+  MaterialApp(
+    home: OfflineReturnSheet(
+      summary: summary,
+      content: content,
+      nextActionText: 'Next: fully upgrade Mars mines to Level 5 (2/3).',
+    ),
+  ),
+);
+
+expect(
+  find.byKey(const Key('offline-return-next-action')),
+  findsOneWidget,
+);
+expect(
+  find.text('Next: fully upgrade Mars mines to Level 5 (2/3).'),
+  findsOneWidget,
+);
+```
+
+Also cover settled copy:
+
+```text
+Mars fully operational — Level 5 mines 3/3.
+```
+
+Run:
+
+```sh
+flutter test test/mining/presentation/offline_return_sheet_test.dart
+```
+
+Expected: RED because `nextActionText` does not exist.
+
+- [ ] **Step 2: Add one optional presentation-ready Offline Return parameter**
+
+Change only the existing sheet constructor/data:
+
+```dart
+class OfflineReturnSheet extends StatelessWidget {
+  const OfflineReturnSheet({
+    super.key,
+    required this.summary,
+    required this.content,
+    this.nextActionText,
+  });
+
+  final OfflineProductionSummary summary;
+  final MiningContentRegistry content;
+  final String? nextActionText;
+}
+```
+
+Replace the constant next-action `Text` with:
+
+```dart
+Text(
+  nextActionText ??
+      'Next: sell cargo or upgrade a mine to keep the operation moving.',
+  key: const Key('offline-return-next-action'),
+  style: const TextStyle(color: Colors.white70),
+),
+```
+
+Do not pass state/controller into the sheet. Do not add another key or section.
+
+Run:
+
+```sh
+flutter test test/mining/presentation/offline_return_sheet_test.dart
+```
+
+Expected: PASS.
+
+- [ ] **Step 3: Write RED MiningScreen return-copy tests**
+
+In `test/mining/presentation/mining_screen_test.dart`, reuse the existing repository/clock setup to cover three states that produce an Offline Return summary:
+
+```text
+pre-Mars mastery           -> existing generic next-action copy
+Mars mastered, Level 5 2/3 -> Next: fully upgrade Mars mines to Level 5 (2/3).
+Mars mastered, Level 5 3/3 -> Mars fully operational — Level 5 mines 3/3.
+```
+
+Assert by the existing key first, then text:
+
+```dart
+final nextAction = find.byKey(const Key('offline-return-next-action'));
+expect(nextAction, findsOneWidget);
+expect(
+  find.descendant(
+    of: nextAction,
+    matching: find.text('Next: fully upgrade Mars mines to Level 5 (2/3).'),
+  ),
+  findsOneWidget,
+);
+```
+
+Run:
+
+```sh
+flutter test test/mining/presentation/mining_screen_test.dart
+```
+
+Expected: RED because MiningScreen does not supply the override.
+
+- [ ] **Step 4: Derive return copy from the existing Stellar Map projection**
+
+Add one private presentation helper in `_MiningScreenState`; do not repeat mine-level counting:
+
+```dart
+String? _offlineReturnNextActionText() {
+  final view = StellarMapView.from(
+    state: _controller.state,
+    content: _content,
+  );
+  final marsViews = view.planets.where(
+    (planet) => planet.id == MiningPlanetId.marsFrontier,
+  );
+  if (marsViews.isEmpty) return null;
+
+  final mars = marsViews.single;
+  final target = mars.postMasteryMineLevelTarget;
+  if (target == null) return null;
+
+  if (mars.minesAtPostMasteryTarget >= mars.mineTotal) {
+    return 'Mars fully operational — Level $target mines '
+        '${mars.minesAtPostMasteryTarget}/${mars.mineTotal}.';
+  }
+  return 'Next: fully upgrade Mars mines to Level $target '
+      '(${mars.minesAtPostMasteryTarget}/${mars.mineTotal}).';
+}
+```
+
+Pass it through the existing `_showOfflineReturn` builder:
+
+```dart
+builder: (_) => OfflineReturnSheet(
+  summary: summary,
+  content: _content,
+  nextActionText: _offlineReturnNextActionText(),
+),
+```
+
+This deliberately reuses `StellarMapView` as the presentation projection. Do not call `MiningContentRegistry.isPlanetMastered` or recount levels again in MiningScreen.
+
+Run:
+
+```sh
+flutter test test/mining/presentation/mining_screen_test.dart \
+  test/mining/presentation/offline_return_sheet_test.dart
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Write RED Mars-card tests with card-scoped finders**
+
+In `test/mining/presentation/stellar_map_sheet_test.dart`, do **not** write:
 
 ```dart
 expect(find.text('Mines 3/3'), findsOneWidget);
-expect(find.text('Level 3 mines 1/3'), findsOneWidget);
 ```
 
-- [ ] Before normal Mars mastery, assert the current shape remains:
+because multiple mastered planets legitimately render `Mines 3/3`.
+
+Scope all mastery/target assertions to the Mars card:
 
 ```dart
-expect(find.text('Mines 2/3'), findsOneWidget);
-expect(find.textContaining('Level 3 mines'), findsNothing);
+final marsCard = find.byKey(
+  const Key('stellar-map-planet-marsFrontier'),
+);
+
+expect(
+  find.descendant(
+    of: marsCard,
+    matching: find.text('Mines 3/3'),
+  ),
+  findsOneWidget,
+);
+expect(
+  find.descendant(
+    of: marsCard,
+    matching: find.text('Level 5 mines 2/3'),
+  ),
+  findsOneWidget,
+);
 ```
 
-- [ ] At completion, assert:
+Add coverage:
 
-```dart
-expect(find.text('Level 3 mines 3/3 — complete'), findsOneWidget);
-expect(find.textContaining('cash earned'), findsNothing);
-expect(find.textContaining('+25,000'), findsNothing);
+```text
+pre-mastery Mars -> no Level 5 line
+mastered 0/3     -> Level 5 mines 0/3
+mastered 2/3     -> Level 5 mines 2/3
+complete 3/3     -> Level 5 mines 3/3 — complete
 ```
 
-- [ ] Assert the existing Mars card key remains the only Mars card key; do not introduce a second card/section key.
+The existing test fixtures should compile unchanged because Task 1 defaulted both new view fields. Only Mars fixtures that exercise the feature need explicit target/count values.
 
 Run:
 
@@ -378,121 +664,161 @@ Run:
 flutter test test/mining/presentation/stellar_map_sheet_test.dart
 ```
 
-Expected: RED because `_progressRow` renders only `Mines x/y`.
+Expected: RED because `_progressRow` has no target line.
 
-### Step 2: Change `_progressRow` only
+- [ ] **Step 6: Extend only the existing Mars-card progress row**
 
-- [ ] Replace the single `Text` with a compact column owned by the same card:
+Keep the same card/key. Change `_progressRow` from one `Text` to a small presentation group such as:
 
 ```dart
-Widget _progressRow(StellarMapPlanetView planet) {
-  final target = planet.postMasteryMineLevelTarget;
-  final targetCount = planet.minesAtPostMasteryTarget;
-  final complete = target != null && targetCount == planet.mineTotal;
-
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
+Widget _progressRow(StellarMapPlanetView planet) => Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Text(
+      'Mines ${planet.minesBuilt}/${planet.mineTotal}',
+      style: const TextStyle(color: Colors.white70),
+    ),
+    if (planet.postMasteryMineLevelTarget case final target?) ...[
+      const SizedBox(height: 4),
       Text(
-        'Mines ${planet.minesBuilt}/${planet.mineTotal}',
+        'Level $target mines '
+        '${planet.minesAtPostMasteryTarget}/${planet.mineTotal}'
+        '${planet.minesAtPostMasteryTarget >= planet.mineTotal ? ' — complete' : ''}',
         style: const TextStyle(color: Colors.white70),
       ),
-      if (target != null)
-        Text(
-          'Level $target mines $targetCount/${planet.mineTotal}'
-          '${complete ? ' — complete' : ''}',
-          style: const TextStyle(color: Colors.white70),
-        ),
     ],
-  );
-}
+  ],
+);
 ```
 
-No icon, progress bar, nested card, button, or new key is required for this experiment.
+Do not add a second card, button, section, key, `MarsDeepOperationsView`, or progress indicator.
 
-- [ ] Run:
+Run:
 
 ```sh
-flutter test test/mining/presentation/stellar_map_sheet_test.dart
-```
-
-Expected: PASS.
-
-### Step 3: Pin portrait layout with the extra line
-
-- [ ] Reuse the existing sheet layout helper/tests and render the mastered Mars card at:
-
-```text
-360x640
-430x932
-```
-
-Assert no overflow exception and that `Level 3 mines 1/3` is reachable in the existing scroll view.
-
-Do not add a screenshot/golden harness.
-
-### Step 4: Full GREEN before commit
-
-```sh
+flutter test test/mining/presentation/stellar_map_sheet_test.dart \
+  test/mining/presentation/offline_return_sheet_test.dart \
+  test/mining/presentation/mining_screen_test.dart
 flutter analyze --fatal-infos
 flutter test
 ```
 
 Expected: PASS.
 
-Commit:
+- [ ] **Step 7: Commit Task 2**
 
 ```sh
-git add lib/mining/presentation/stellar_map_sheet.dart \
+git add lib/mining/presentation/offline_return_sheet.dart \
+  lib/mining/presentation/mining_screen.dart \
+  lib/mining/presentation/stellar_map_sheet.dart \
+  test/mining/presentation/offline_return_sheet_test.dart \
+  test/mining/presentation/mining_screen_test.dart \
   test/mining/presentation/stellar_map_sheet_test.dart
-git commit -m "feat(mining): show Mars level goal"
+git commit -m "feat(mining): surface Mars terminal upgrade goal"
 ```
 
 ---
 
-## Task 3: Prove the progressed journey and record Keep / Revise once / Remove
+## Task 3: Pin the return journey, verify the experiment, and record keep/remove
 
 **Files:**
 
 - Modify: `test/integration/mining_mvp_journey_test.dart`
-- Modify: `CLAUDE.md` only when its current progression description would otherwise be factually incomplete.
+- Modify: `CLAUDE.md` only if it enumerates post-Mars progression in a way that becomes misleading; otherwise leave it untouched.
 
 **Interfaces:**
 
-- Consumes: existing Mars progression, mine upgrades, Stellar Map opening, and the same-card Level-3 projection from Tasks 1–2.
-- Produces: one end-to-end regression plus the final HPA-640 experiment decision.
+- Consumes: Task 1 projection and Task 2 existing-surface copy.
+- Produces: one integrated progressed-save return characterization and the HPA-640 final Keep / Revise once / Remove decision.
 
-### Step 1: Add the integration journey assertion
+- [ ] **Step 1: Make the existing save helper able to seed mine levels**
 
-- [ ] Extend the existing progressed Mars journey rather than creating another end-to-end harness.
-
-Seed or advance a valid Mars-mastered save with mine levels below the target, open the Stellar Map, and assert:
+The current helper hardcodes Level 1. Change it explicitly rather than inventing another fixture helper:
 
 ```dart
-expect(find.text('Mines 3/3'), findsOneWidget);
-expect(find.text('Level 3 mines 1/3'), findsOneWidget);
+Map<String, Object?> _mineDocument({
+  int level = 1,
+  double storedAmount = 0,
+}) => <String, Object?>{
+  'level': level,
+  'storedAmount': storedAmount,
+};
 ```
 
-Then advance/seed the same valid state so all three Mars mines are Level 3+ and reopen/refresh the map:
+Existing callers remain unchanged because `level` defaults to 1.
+
+- [ ] **Step 2: Add a progressed Mars return journey**
+
+Seed the existing strict nine-sector document with:
+
+```text
+Homeworld/Lunar/Mars unlocked and mastered
+active planet: Mars
+Mars mine levels: 5, 4, 5
+non-zero/eligible offline production window
+```
+
+Use `_mineDocument(level: ...)` for the three Mars mine records.
+
+After pumping the screen and presenting Offline Return, assert:
 
 ```dart
-expect(find.text('Level 3 mines 3/3 — complete'), findsOneWidget);
-expect(find.textContaining('cash earned'), findsNothing);
+expect(
+  find.text('Next: fully upgrade Mars mines to Level 5 (2/3).'),
+  findsOneWidget,
+);
 ```
 
-The journey must continue to use the existing mining controller/sell/upgrade behavior; do not add a retention controller API.
+Dismiss Offline Return, open Stellar Map, then scope to the Mars card:
 
-Run:
+```dart
+final marsCard = find.byKey(
+  const Key('stellar-map-planet-marsFrontier'),
+);
 
-```sh
-flutter test test/integration/mining_mvp_journey_test.dart
+expect(
+  find.descendant(
+    of: marsCard,
+    matching: find.text('Mines 3/3'),
+  ),
+  findsOneWidget,
+);
+expect(
+  find.descendant(
+    of: marsCard,
+    matching: find.text('Level 5 mines 2/3'),
+  ),
+  findsOneWidget,
+);
 ```
 
-Expected: PASS after Tasks 1–2.
+Also verify another planet's `Mines 3/3` does not make the Mars-scoped assertion ambiguous.
 
-### Step 2: Run repository verification
+- [ ] **Step 3: Pin the no-schema/no-economy boundary**
+
+Do not add controller reward tests because the frozen candidate does not change controller cash.
+
+Keep persistence assertions focused on the existing document:
+
+```text
+no new root key
+no claim/completion field
+mine levels remain the source of progress
+sell values and upgrade costs unchanged
+```
+
+No test should look for `retention`, `goalState`, `claimed`, or another save key.
+
+- [ ] **Step 4: Run focused and full repository gates**
 
 ```sh
+flutter test test/mining/mining_content_test.dart \
+  test/mining/mining_progression_views_test.dart \
+  test/mining/presentation/offline_return_sheet_test.dart \
+  test/mining/presentation/mining_screen_test.dart \
+  test/mining/presentation/stellar_map_sheet_test.dart \
+  test/integration/mining_mvp_journey_test.dart
+
 dart format --output=none --set-exit-if-changed .
 flutter analyze --fatal-infos
 flutter test
@@ -501,69 +827,70 @@ flutter build apk --debug
 flutter build web
 ```
 
-Expected: PASS.
+Expected: all pass when implementation occurs.
 
-Scope audit:
+- [ ] **Step 5: Run the representative post-implementation review**
 
-```sh
-git diff --name-only main...HEAD
-```
+Compare the implemented experiment with the Task 0 pre-registration and observed baseline.
 
-Confirm there is no:
+Review at 360x640 and 430x932, including reduced motion, and record:
 
 ```text
-lib/mining/mining_retention.dart
-new save field
-new SharedPreferences key
-new controller mutation
-new Stellar Map card/section
-new image/audio asset
+Did I notice the Level-5 goal on Offline Return without opening Stellar Map?
+Did normal Sell -> Upgrade returns visibly advance it?
+Did Level 5 feel terminal/satisfying or grindy?
+Did the existing Mars card agree with Offline Return progress?
+Would I have upgraded anyway without the named goal?
+Would the mining_sheet_view.dart one-string hint have been enough?
 ```
 
-### Step 3: Run the post-implementation product review
+- [ ] **Step 6: Record exactly one HPA-640 decision**
 
-On a representative mobile/portrait build, review:
-
-- whether the player notices `Level 3 mines x/3` after Mars mastery;
-- whether normal Sell -> Upgrade sessions visibly advance it;
-- whether the Level-3 facility transformation is satisfying enough to justify the line;
-- whether the line feels redundant or chore-like;
-- whether the player can still identify the normal next mining action without opening Stellar Map.
-
-### Step 4: Record exactly one Linear decision
-
-Record one of:
+Choose:
 
 ```text
-Decision: Keep
-Decision: Revise once
-Decision: Remove
+Keep
+Revise once
+Remove
 ```
 
-Include the observed evidence.
+Rules:
 
-For **Revise once**, restrict changes to copy or target presentation. If the requested revision is a cash payout or different mechanic, revise the design/plan first instead of smuggling the change into implementation.
+- **Keep:** goal is noticed on return, advances naturally, and Level 5 feels like a useful optional terminal objective.
+- **Revise once:** only bounded copy or target-level evidence is wrong. Any target change requires updating the sizing arithmetic/spec before code.
+- **Remove:** goal is ignored, redundant, grindy, or the copy-only alternative would have been sufficient.
 
-For **Remove**, delete the Mars target field/value, the two scalar view fields/counting logic, the `_progressRow` branch, and their tests on this same PR. Do not leave dormant experiment infrastructure.
+If removing, delete the implementation on this same PR before closeout; do not leave dormant experiment code behind.
 
-### Step 5: Commit final verification/doc changes
+- [ ] **Step 7: Commit Task 3 when implementation is kept/revised**
 
 ```sh
 git add test/integration/mining_mvp_journey_test.dart CLAUDE.md
-git commit -m "test(mining): verify Mars level goal"
+git commit -m "test(mining): verify Mars terminal goal journey"
 ```
 
-If `CLAUDE.md` did not require a factual update, omit it from `git add`.
+If `CLAUDE.md` did not require a change, omit it from `git add`.
 
 ---
 
-## Execution stop rules
+## Final Scope Audit
 
-Stop implementation immediately when any of these is true:
+Before making PR #18 ready for review, confirm:
 
-1. Task 0 finds no real retention gap -> close with **No retention feature needed**.
-2. Task 0 finds a different gap -> revise design/plan before code.
-3. Task 0 says a completion payout is required -> revise design/plan before code; do not add a reward ad hoc.
-4. Implementing the Level-3 line appears to require save state, a controller API, a generic objective abstraction, or a second UI surface -> the proposed shape is wrong; stop and re-evaluate.
+```text
+[ ] Task 0 evidence exists and pre-registration predates runtime code.
+[ ] The concrete MiningSheetView copy-only alternative was explicitly rejected by observed evidence.
+[ ] Exactly one optional target exists: Mars Level 5.
+[ ] Offline Return is the primary goal surface; existing Mars card is secondary.
+[ ] Normal mastery uses MiningContentRegistry.isPlanetMastered.
+[ ] No mining_retention.dart or parallel progress model exists.
+[ ] No second card/section/key exists.
+[ ] No second cash payout exists.
+[ ] No save field/key/version/migration exists.
+[ ] MiningController and MiningSimulation are unchanged by the experiment.
+[ ] Tests scope repeated Mines 3/3 text to the Mars card.
+[ ] Integration _mineDocument has a defaulted level parameter instead of another helper.
+[ ] Removal remains cheap and the final Linear Keep/Revise/Remove decision is recorded.
+```
 
-The expected implementation is deliberately small: one optional planet content field, two scalar values on the existing planet view, one inline count, one existing-card copy branch, and tests.
+If Task 0 fails, none of Tasks 1–3 execute; PR #18 remains planning-only and HPA-640 closes with **No retention feature needed**.
