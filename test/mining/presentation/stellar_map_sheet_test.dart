@@ -6,39 +6,114 @@ import 'package:horologium/mining/presentation/stellar_map_sheet.dart';
 
 const _viewports = [Size(360, 640), Size(430, 932)];
 
-StellarMapView _lockedView({int minesBuilt = 0}) => StellarMapView(
-  homeworldMinesBuilt: minesBuilt,
-  homeworldMineTotal: 3,
-  hasHomeworldMastery: minesBuilt == 3,
-  requiredSurveyingLevel: 3,
-  hasSurveying: false,
-  lunarUnlockCashCost: 2500,
-  hasCash: false,
-  isLunarUnlocked: false,
+const _homeworld = StellarMapPlanetView(
+  id: MiningPlanetId.homeworld,
+  name: 'Homeworld',
+  isUnlocked: true,
+  isActive: true,
+  minesBuilt: 0,
+  mineTotal: 3,
+  requiredMasteryPlanetId: null,
+  hasRequiredMastery: true,
+  requiredSurveyingLevel: 0,
+  hasSurveying: true,
+  unlockCashCost: 0,
+  hasCash: true,
 );
 
-StellarMapView _unlockedLunarActiveView() => const StellarMapView(
-  homeworldMinesBuilt: 3,
-  homeworldMineTotal: 3,
-  hasHomeworldMastery: true,
+const _homeworldMastered = StellarMapPlanetView(
+  id: MiningPlanetId.homeworld,
+  name: 'Homeworld',
+  isUnlocked: true,
+  isActive: true,
+  minesBuilt: 3,
+  mineTotal: 3,
+  requiredMasteryPlanetId: null,
+  hasRequiredMastery: true,
+  requiredSurveyingLevel: 0,
+  hasSurveying: true,
+  unlockCashCost: 0,
+  hasCash: true,
+);
+
+const _lockedLunar = StellarMapPlanetView(
+  id: MiningPlanetId.lunarFrontier,
+  name: 'Lunar Frontier',
+  isUnlocked: false,
+  isActive: false,
+  minesBuilt: 0,
+  mineTotal: 3,
+  requiredMasteryPlanetId: MiningPlanetId.homeworld,
+  hasRequiredMastery: false,
+  requiredSurveyingLevel: 3,
+  hasSurveying: false,
+  unlockCashCost: 2500,
+  hasCash: false,
+);
+
+const _unlockedLunar = StellarMapPlanetView(
+  id: MiningPlanetId.lunarFrontier,
+  name: 'Lunar Frontier',
+  isUnlocked: true,
+  isActive: false,
+  minesBuilt: 1,
+  mineTotal: 3,
+  requiredMasteryPlanetId: MiningPlanetId.homeworld,
+  hasRequiredMastery: true,
   requiredSurveyingLevel: 3,
   hasSurveying: true,
-  lunarUnlockCashCost: 2500,
+  unlockCashCost: 2500,
   hasCash: true,
-  isLunarUnlocked: true,
+);
+
+const _lockedMars = StellarMapPlanetView(
+  id: MiningPlanetId.marsFrontier,
+  name: 'Mars Frontier',
+  isUnlocked: false,
+  isActive: false,
+  minesBuilt: 0,
+  mineTotal: 3,
+  requiredMasteryPlanetId: MiningPlanetId.lunarFrontier,
+  hasRequiredMastery: false,
+  requiredSurveyingLevel: 5,
+  hasSurveying: false,
+  unlockCashCost: 20000,
+  hasCash: false,
+);
+
+const _unlockedMars = StellarMapPlanetView(
+  id: MiningPlanetId.marsFrontier,
+  name: 'Mars Frontier',
+  isUnlocked: true,
+  isActive: true,
+  minesBuilt: 2,
+  mineTotal: 3,
+  requiredMasteryPlanetId: MiningPlanetId.lunarFrontier,
+  hasRequiredMastery: true,
+  requiredSurveyingLevel: 5,
+  hasSurveying: true,
+  unlockCashCost: 20000,
+  hasCash: true,
+);
+
+StellarMapView _freshView() =>
+    const StellarMapView(planets: [_homeworld, _lockedLunar]);
+
+StellarMapView _lunarUnlockedView() => const StellarMapView(
+  planets: [_homeworldMastered, _unlockedLunar, _lockedMars],
+);
+
+StellarMapView _marsUnlockedView() => const StellarMapView(
+  planets: [_homeworldMastered, _unlockedLunar, _unlockedMars],
 );
 
 Widget _sheet(
   StellarMapView view, {
-  MiningPlanetId activePlanetId = MiningPlanetId.homeworld,
-  VoidCallback? onUnlockLunar,
+  ValueChanged<MiningPlanetId>? onUnlock,
   ValueChanged<MiningPlanetId>? onTravel,
 }) => StellarMapSheet(
   view: view,
-  activePlanetId: activePlanetId,
-  homeworldName: 'Homeworld',
-  lunarName: 'Lunar Frontier',
-  onUnlockLunar: onUnlockLunar ?? () {},
+  onUnlock: onUnlock ?? (_) {},
   onTravel: onTravel ?? (_) {},
 );
 
@@ -54,123 +129,144 @@ Future<void> _pump(WidgetTester tester, Size viewport, Widget sheet) async {
 }
 
 void main() {
+  testWidgets('fresh map renders Homeworld and Lunar only', (tester) async {
+    await _pump(tester, const Size(360, 640), _sheet(_freshView()));
+
+    expect(
+      find.byKey(const Key('stellar-map-planet-homeworld')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('stellar-map-planet-lunarFrontier')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('stellar-map-planet-marsFrontier')),
+      findsNothing,
+    );
+    expect(find.text('Mars Frontier'), findsNothing);
+  });
+
   for (final viewport in _viewports) {
     testWidgets(
-      'locked Lunar card shows exact unmet requirements at $viewport',
+      'locked Mars shows its prerequisite and authored gates at $viewport',
       (tester) async {
-        await _pump(tester, viewport, _sheet(_lockedView(minesBuilt: 1)));
+        await _pump(tester, viewport, _sheet(_lunarUnlockedView()));
 
         expect(
-          find.byKey(const Key('mining-stellar-map-sheet')),
+          find.byKey(const Key('stellar-map-planet-marsFrontier')),
           findsOneWidget,
         );
-        expect(find.text('Homeworld'), findsOneWidget);
-        expect(find.text('Lunar Frontier'), findsOneWidget);
-        expect(find.text('Homeworld mines 1/3'), findsOneWidget);
-        expect(find.text('Surveying 3'), findsOneWidget);
-        expect(find.text('2500 cash'), findsOneWidget);
-
-        // Requirements are decorated with satisfied/unmet status icons.
-        expect(find.byIcon(Icons.cancel), findsNWidgets(3));
-
+        expect(find.text('Lunar Frontier mines 1/3'), findsOneWidget);
+        expect(find.text('Surveying 5'), findsOneWidget);
+        expect(find.text('20000 cash'), findsOneWidget);
+        expect(
+          find.byKey(const Key('mining-stellar-map-unlock-marsFrontier')),
+          findsOneWidget,
+        );
+        expect(find.text('Homeworld mines 3/3'), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
 
-    testWidgets('controls meet the 48px minimum at $viewport', (tester) async {
-      await _pump(
-        tester,
-        viewport,
-        _sheet(
-          _unlockedLunarActiveView(),
-          activePlanetId: MiningPlanetId.lunarFrontier,
-        ),
-      );
-      for (final key in const [
-        'mining-stellar-map-travel-homeworld',
-        'mining-stellar-map-travel-lunarFrontier',
-      ]) {
-        final size = tester.getSize(find.byKey(Key(key)));
-        expect(size.height, greaterThanOrEqualTo(48));
-        expect(size.width, greaterThanOrEqualTo(48));
-      }
+    testWidgets('unlocked Mars shows its own mine progress at $viewport', (
+      tester,
+    ) async {
+      await _pump(tester, viewport, _sheet(_marsUnlockedView()));
 
-      await _pump(tester, viewport, _sheet(_lockedView()));
-      final unlock = tester.getSize(
-        find.byKey(const Key('mining-stellar-map-unlock')),
+      final marsCard = find.byKey(const Key('stellar-map-planet-marsFrontier'));
+      expect(
+        find.descendant(of: marsCard, matching: find.text('Mines 2/3')),
+        findsOneWidget,
       );
-      expect(unlock.height, greaterThanOrEqualTo(48));
-      expect(unlock.width, greaterThanOrEqualTo(48));
+      expect(
+        find.byKey(const Key('mining-stellar-map-travel-marsFrontier')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
     });
   }
 
-  testWidgets('unlock stays disabled until the view allows it', (tester) async {
-    await _pump(
-      tester,
-      const Size(360, 640),
-      _sheet(_lockedView(minesBuilt: 1)),
-    );
-
-    final locked = tester.widget<ElevatedButton>(
-      find.descendant(
-        of: find.byKey(const Key('mining-stellar-map-unlock')),
-        matching: find.byType(ElevatedButton),
-      ),
-    );
-    expect(locked.onPressed, isNull);
-
-    // Travel to locked Lunar is not offered; travel to the active planet is
-    // inert.
-    expect(
-      find.byKey(const Key('mining-stellar-map-travel-lunarFrontier')),
-      findsNothing,
-    );
-    final activeTravel = tester.widget<ElevatedButton>(
-      find.descendant(
-        of: find.byKey(const Key('mining-stellar-map-travel-homeworld')),
-        matching: find.byType(ElevatedButton),
-      ),
-    );
-    expect(activeTravel.onPressed, isNull);
-  });
-
-  testWidgets('unlock and travel callbacks fire from the sheet', (
+  testWidgets('generic unlock and travel callbacks receive planet ids', (
     tester,
   ) async {
-    final unlocked = <bool>[];
+    final unlocked = <MiningPlanetId>[];
     final traveled = <MiningPlanetId>[];
-    final view = StellarMapView(
-      homeworldMinesBuilt: 3,
-      homeworldMineTotal: 3,
-      hasHomeworldMastery: true,
-      requiredSurveyingLevel: 3,
-      hasSurveying: true,
-      lunarUnlockCashCost: 2500,
-      hasCash: true,
-      isLunarUnlocked: false,
+    final unlockableMars = StellarMapView(
+      planets: [
+        _homeworldMastered,
+        _unlockedLunar,
+        _lockedMars.copyWithForTest(
+          hasRequiredMastery: true,
+          hasSurveying: true,
+          hasCash: true,
+        ),
+      ],
     );
 
     await _pump(
       tester,
       const Size(360, 640),
-      _sheet(view, onUnlockLunar: () => unlocked.add(true)),
+      _sheet(unlockableMars, onUnlock: unlocked.add, onTravel: traveled.add),
     );
-    await tester.tap(find.byKey(const Key('mining-stellar-map-unlock')));
-    expect(unlocked, [true]);
+    final marsUnlock = find.byKey(
+      const Key('mining-stellar-map-unlock-marsFrontier'),
+    );
+    await tester.ensureVisible(marsUnlock);
+    await tester.tap(marsUnlock);
+    expect(unlocked, [MiningPlanetId.marsFrontier]);
 
-    await _pump(
-      tester,
-      const Size(360, 640),
-      _sheet(
-        _unlockedLunarActiveView(),
-        activePlanetId: MiningPlanetId.lunarFrontier,
-        onTravel: traveled.add,
-      ),
+    final lunarTravel = find.byKey(
+      const Key('mining-stellar-map-travel-lunarFrontier'),
     );
-    await tester.tap(
-      find.byKey(const Key('mining-stellar-map-travel-homeworld')),
-    );
-    expect(traveled, [MiningPlanetId.homeworld]);
-    expect(find.byIcon(Icons.check_circle), findsNWidgets(0));
+    await tester.ensureVisible(lunarTravel);
+    await tester.tap(lunarTravel);
+    expect(traveled, [MiningPlanetId.lunarFrontier]);
   });
+
+  testWidgets('all map controls remain at least 48px', (tester) async {
+    await _pump(tester, const Size(360, 640), _sheet(_lunarUnlockedView()));
+
+    for (final key in const [
+      'mining-stellar-map-travel-homeworld',
+      'mining-stellar-map-travel-lunarFrontier',
+      'mining-stellar-map-unlock-marsFrontier',
+    ]) {
+      final size = tester.getSize(find.byKey(Key(key)));
+      expect(size.height, greaterThanOrEqualTo(48));
+      expect(size.width, greaterThanOrEqualTo(48));
+    }
+  });
+
+  testWidgets('the long Mars map remains scrollable and reachable', (
+    tester,
+  ) async {
+    await _pump(tester, const Size(360, 640), _sheet(_lunarUnlockedView()));
+
+    final mars = find.byKey(const Key('stellar-map-planet-marsFrontier'));
+    await tester.ensureVisible(mars);
+    expect(mars, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+extension on StellarMapPlanetView {
+  StellarMapPlanetView copyWithForTest({
+    bool? hasRequiredMastery,
+    bool? hasSurveying,
+    bool? hasCash,
+  }) => StellarMapPlanetView(
+    id: id,
+    name: name,
+    isUnlocked: isUnlocked,
+    isActive: isActive,
+    minesBuilt: minesBuilt,
+    mineTotal: mineTotal,
+    requiredMasteryPlanetId: requiredMasteryPlanetId,
+    hasRequiredMastery: hasRequiredMastery ?? this.hasRequiredMastery,
+    requiredSurveyingLevel: requiredSurveyingLevel,
+    hasSurveying: hasSurveying ?? this.hasSurveying,
+    unlockCashCost: unlockCashCost,
+    hasCash: hasCash ?? this.hasCash,
+  );
 }

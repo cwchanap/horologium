@@ -229,6 +229,7 @@ class _MiningScreenState extends State<MiningScreen>
   String _successMessage(MiningSheetAction action, dynamic result) {
     if (result is MiningActionResult) {
       if (!result.isSuccess) return result.message ?? 'Action failed.';
+      if (result.message != null) return result.message!;
       switch (action) {
         case MiningSheetAction.reveal:
           return 'Sector revealed.';
@@ -362,10 +363,7 @@ class _MiningScreenState extends State<MiningScreen>
             state: _controller.state,
             content: _content,
           ),
-          activePlanetId: _controller.state.activePlanetId,
-          homeworldName: _content.planet(MiningPlanetId.homeworld).name,
-          lunarName: _content.planet(MiningPlanetId.lunarFrontier).name,
-          onUnlockLunar: _unlockLunar,
+          onUnlock: _unlockPlanet,
           onTravel: _travelTo,
         ),
       ),
@@ -379,11 +377,10 @@ class _MiningScreenState extends State<MiningScreen>
     );
   }
 
-  void _unlockLunar() {
+  void _unlockPlanet(MiningPlanetId id) {
     _runSheetAction(
-      () => _controller.unlockPlanet(MiningPlanetId.lunarFrontier),
-      successMessage:
-          '${_content.planet(MiningPlanetId.lunarFrontier).name} unlocked.',
+      () => _controller.unlockPlanet(id),
+      successMessage: '${_content.planet(id).name} unlocked.',
     );
   }
 
@@ -412,7 +409,7 @@ class _MiningScreenState extends State<MiningScreen>
       _refreshPresentation();
       if (result.isSuccess) {
         unawaited(HapticFeedback.lightImpact());
-        _showResult(successMessage);
+        _showResult(result.message ?? successMessage);
       } else {
         _showResult(result.message ?? 'Action failed.');
       }

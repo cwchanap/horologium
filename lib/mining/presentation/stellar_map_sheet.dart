@@ -2,25 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 
-/// Render surface for [StellarMapView]. It renders the pre-computed unlock
+/// Render surface for [StellarMapView]. It renders the pre-computed planet
 /// requirements and forwards unlock/travel taps; it never calculates
 /// eligibility.
 class StellarMapSheet extends StatelessWidget {
   const StellarMapSheet({
     super.key,
     required this.view,
-    required this.activePlanetId,
-    required this.homeworldName,
-    required this.lunarName,
-    required this.onUnlockLunar,
+    required this.onUnlock,
     required this.onTravel,
   });
 
   final StellarMapView view;
-  final MiningPlanetId activePlanetId;
-  final String homeworldName;
-  final String lunarName;
-  final VoidCallback onUnlockLunar;
+  final ValueChanged<MiningPlanetId> onUnlock;
   final ValueChanged<MiningPlanetId> onTravel;
 
   @override
@@ -63,30 +57,7 @@ class StellarMapSheet extends StatelessWidget {
                   style: TextStyle(color: Colors.white70),
                 ),
                 const SizedBox(height: 10),
-                _planetCard(
-                  key: const Key('stellar-map-planet-homeworld'),
-                  name: homeworldName,
-                  isActive: activePlanetId == MiningPlanetId.homeworld,
-                  child: _travelButton(
-                    context: context,
-                    key: const Key('mining-stellar-map-travel-homeworld'),
-                    planetId: MiningPlanetId.homeworld,
-                  ),
-                ),
-                _planetCard(
-                  key: const Key('stellar-map-planet-lunarFrontier'),
-                  name: lunarName,
-                  isActive: activePlanetId == MiningPlanetId.lunarFrontier,
-                  child: view.isLunarUnlocked
-                      ? _travelButton(
-                          context: context,
-                          key: const Key(
-                            'mining-stellar-map-travel-lunarFrontier',
-                          ),
-                          planetId: MiningPlanetId.lunarFrontier,
-                        )
-                      : _lockedLunarCard(context),
-                ),
+                for (final planet in view.planets) _planetCard(context, planet),
               ],
             ),
           ),
@@ -95,56 +66,121 @@ class StellarMapSheet extends StatelessWidget {
     );
   }
 
-  Widget _travelButton({
-    required BuildContext context,
-    required Key key,
-    required MiningPlanetId planetId,
-  }) {
-    final isActive = activePlanetId == planetId;
-    return SizedBox(
-      key: key,
+  Widget _planetCard(BuildContext context, StellarMapPlanetView planet) {
+    return Container(
+      key: Key('stellar-map-planet-${planet.id.name}'),
       width: double.infinity,
-      height: 48,
-      child: ElevatedButton(
-        onPressed: isActive
-            ? null
-            : () {
-                final navigator = Navigator.of(context);
-                if (navigator.canPop()) navigator.pop();
-                onTravel(planetId);
-              },
-        child: Text(isActive ? 'CURRENT LOCATION' : 'TRAVEL HERE'),
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: planet.isActive ? Colors.cyanAccent : Colors.white24,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                planet.isActive ? Icons.public : Icons.public_outlined,
+                color: planet.isActive ? Colors.cyanAccent : Colors.white54,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  planet.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              if (planet.isActive)
+                const Text(
+                  'ACTIVE',
+                  style: TextStyle(
+                    color: Colors.cyanAccent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _progressRow(planet),
+          const SizedBox(height: 8),
+          if (planet.isUnlocked)
+            _travelButton(context: context, planet: planet)
+          else
+            _lockedPlanet(context, planet),
+        ],
       ),
     );
   }
 
-  Widget _lockedLunarCard(BuildContext context) {
+  Widget _progressRow(StellarMapPlanetView planet) => Text(
+    'Mines ${planet.minesBuilt}/${planet.mineTotal}',
+    style: const TextStyle(color: Colors.white70),
+  );
+
+  Widget _travelButton({
+    required BuildContext context,
+    required StellarMapPlanetView planet,
+  }) {
+    return SizedBox(
+      key: Key('mining-stellar-map-travel-${planet.id.name}'),
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton(
+        onPressed: planet.isActive
+            ? null
+            : () {
+                final navigator = Navigator.of(context);
+                if (navigator.canPop()) navigator.pop();
+                onTravel(planet.id);
+              },
+        child: Text(planet.isActive ? 'CURRENT LOCATION' : 'TRAVEL HERE'),
+      ),
+    );
+  }
+
+  Widget _lockedPlanet(BuildContext context, StellarMapPlanetView planet) {
+    final requiredMasteryPlanetId = planet.requiredMasteryPlanetId;
+    final requiredPlanet = requiredMasteryPlanetId == null
+        ? null
+        : view.planet(requiredMasteryPlanetId);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (requiredPlanet != null)
+          _requirementRow(
+            '${requiredPlanet.name} mines '
+            '${requiredPlanet.minesBuilt}/${requiredPlanet.mineTotal}',
+            planet.hasRequiredMastery,
+          ),
         _requirementRow(
-          'Homeworld mines ${view.homeworldMinesBuilt}/${view.homeworldMineTotal}',
-          view.hasHomeworldMastery,
+          'Surveying ${planet.requiredSurveyingLevel}',
+          planet.hasSurveying,
         ),
-        _requirementRow(
-          'Surveying ${view.requiredSurveyingLevel}',
-          view.hasSurveying,
-        ),
-        _requirementRow('${view.lunarUnlockCashCost} cash', view.hasCash),
+        _requirementRow('${planet.unlockCashCost} cash', planet.hasCash),
         const SizedBox(height: 8),
         SizedBox(
-          key: const Key('mining-stellar-map-unlock'),
+          key: Key('mining-stellar-map-unlock-${planet.id.name}'),
           width: double.infinity,
           height: 48,
           child: ElevatedButton(
-            onPressed: view.canUnlockLunar
+            onPressed: planet.canUnlock
                 ? () {
                     final navigator = Navigator.of(context);
                     if (navigator.canPop()) navigator.pop();
-                    onUnlockLunar();
+                    onUnlock(planet.id);
                   }
                 : null,
-            child: Text('UNLOCK FOR ${view.lunarUnlockCashCost} CASH'),
+            child: Text('UNLOCK FOR ${planet.unlockCashCost} CASH'),
           ),
         ),
       ],
@@ -165,61 +201,6 @@ class StellarMapSheet extends StatelessWidget {
           Expanded(
             child: Text(text, style: const TextStyle(color: Colors.white70)),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _planetCard({
-    required Key key,
-    required String name,
-    required bool isActive,
-    required Widget child,
-  }) {
-    return Container(
-      key: key,
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: isActive ? Colors.cyanAccent : Colors.white24,
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isActive ? Icons.public : Icons.public_outlined,
-                color: isActive ? Colors.cyanAccent : Colors.white54,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              if (isActive)
-                const Text(
-                  'ACTIVE',
-                  style: TextStyle(
-                    color: Colors.cyanAccent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 11,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          child,
         ],
       ),
     );

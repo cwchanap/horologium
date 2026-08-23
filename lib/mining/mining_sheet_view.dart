@@ -141,12 +141,16 @@ class MiningSheetView {
 
     if (mine == null) {
       final enabled = state.cash >= definition.buildCost;
+      final buildCopy = definition.facilityName == null
+          ? 'Build cost ${definition.buildCost} cash.'
+          : 'Build ${definition.facilityName} for ${definition.buildCost} cash.';
       return MiningSheetView(
         title: definition.name,
         body:
-            'Build cost ${definition.buildCost} cash. Produces '
+            '$buildCopy Produces '
             '${_rate(state, content, id, 1)}/s, capacity '
-            '${_capacity(state, content, id, 1)}.',
+            '${_capacity(state, content, id, 1)}. '
+            '${_sectorDetails(definition)}',
         primaryLabel: 'Build for ${definition.buildCost} cash',
         action: MiningSheetAction.build,
         primaryEnabled: enabled,
@@ -162,7 +166,8 @@ class MiningSheetView {
         body:
             'Level 5 mine. Produces ${_rate(state, content, id, 5)}/s, '
             'capacity ${_capacity(state, content, id, 5)}, stored '
-            '${mine.storedAmount.toStringAsFixed(1)}.',
+            '${mine.storedAmount.toStringAsFixed(1)}. '
+            '${_sectorDetails(definition)}',
         primaryLabel: 'Max Level',
         action: MiningSheetAction.none,
         primaryEnabled: false,
@@ -178,7 +183,8 @@ class MiningSheetView {
           'Level ${mine.level} mine. Produces '
           '${_rate(state, content, id, mine.level)}/s, capacity '
           '${_capacity(state, content, id, mine.level)}, stored '
-          '${mine.storedAmount.toStringAsFixed(1)}.',
+          '${mine.storedAmount.toStringAsFixed(1)}. '
+          '${_sectorDetails(definition)}',
       primaryLabel: 'Upgrade for $cost cash',
       action: MiningSheetAction.upgrade,
       primaryEnabled: enabled,
@@ -203,4 +209,13 @@ class MiningSheetView {
   ) => content
       .effectiveCapacity(id, level, state.technology.logistics)
       .toStringAsFixed(1);
+
+  static String _sectorDetails(MiningSectorDefinition definition) {
+    final resourceName =
+        MiningContentRegistry.resourceSilhouettes[definition.resource]!.name;
+    final discovery = definition.discoveryText;
+    return discovery == null
+        ? 'Resource: $resourceName.'
+        : 'Resource: $resourceName. $discovery';
+  }
 }

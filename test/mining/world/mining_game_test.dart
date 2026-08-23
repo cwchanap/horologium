@@ -123,6 +123,31 @@ void main() {
     expect(terrain.size.y, MiningContentRegistry.worldExtent);
   });
 
+  testWidgets('mounts a centered planet tint between terrain and sectors', (
+    tester,
+  ) async {
+    final content = MiningContentRegistry.stellarMining();
+    final planet = content.planet(MiningPlanetId.marsFrontier);
+    final game = MiningGame(planet: planet, initialProgress: const {});
+    await pumpMiningGame(tester, game);
+    await tester.pump(const Duration(milliseconds: 100));
+    game.updateTree(0);
+
+    final terrain = game.world.children
+        .whereType<ParallaxTerrainComponent>()
+        .single;
+    final tint = game.world.children.whereType<RectangleComponent>().single;
+    final sector = game.sector(MiningSectorId.ochreBasin);
+
+    expect(tint.paint.color.toARGB32(), planet.tint.withAlpha(96).toARGB32());
+    expect(tint.paint.blendMode, BlendMode.color);
+    expect(tint.size, game.worldSize);
+    expect(tint.position, Vector2.zero());
+    expect(tint.anchor, Anchor.center);
+    expect(terrain.priority, lessThan(tint.priority));
+    expect(tint.priority, lessThan(sector.priority));
+  });
+
   testWidgets('levels one three and five add distinct mounted structure', (
     tester,
   ) async {

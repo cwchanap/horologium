@@ -539,7 +539,9 @@ void main() {
     expect(state.cash, 5500);
 
     await openStellarMap(tester);
-    await tester.tap(find.byKey(const Key('mining-stellar-map-unlock')));
+    await tester.tap(
+      find.byKey(const Key('mining-stellar-map-unlock-lunarFrontier')),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
@@ -738,6 +740,179 @@ void main() {
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('fresh Stellar Map progressively discloses Mars', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = _viewport;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final repository = MiningSaveRepository(
+      content: MiningContentRegistry.stellarMining(),
+    );
+    final clock = TestClock(DateTime.utc(2026, 8, 21, 12));
+    await pumpInjectedMiningScreen(
+      tester,
+      repository: repository,
+      nowUtc: clock.call,
+      disableAnimations: true,
+    );
+
+    await openStellarMap(tester);
+    final sheet = find.byKey(const Key('mining-stellar-map-sheet'));
+    expect(
+      find.descendant(of: sheet, matching: find.text('Homeworld')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: sheet, matching: find.text('Lunar Frontier')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: sheet, matching: find.text('Mars Frontier')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('stellar-map-planet-marsFrontier')),
+      findsNothing,
+    );
+    Navigator.of(tester.element(sheet)).pop();
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'completes the Mars Frontier unlock, travel, and mastery journey',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = _viewport;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final start = DateTime.utc(2026, 8, 21, 12);
+      final clock = TestClock(start);
+      final content = MiningContentRegistry.stellarMining();
+      final repository = MiningSaveRepository(content: content);
+      seedCurrentMiningSave(
+        cash: 120000,
+        lastAccruedAtUtc: start,
+        surveying: 5,
+        unlockedPlanetIds: ['homeworld', 'lunarFrontier'],
+        activePlanetId: 'lunarFrontier',
+        sectors: _currentSectorDocuments(
+          landingBasin: _sectorDocument(revealed: true, mine: _mineDocument()),
+          carbonRidge: _sectorDocument(revealed: true, mine: _mineDocument()),
+          graniteCrater: _sectorDocument(revealed: true, mine: _mineDocument()),
+          frozenBasin: _sectorDocument(revealed: true, mine: _mineDocument()),
+          titaniumHighlands: _sectorDocument(
+            revealed: true,
+            mine: _mineDocument(),
+          ),
+          heliumMare: _sectorDocument(revealed: true, mine: _mineDocument()),
+        ),
+      );
+
+      await pumpInjectedMiningScreen(
+        tester,
+        repository: repository,
+        nowUtc: clock.call,
+        disableAnimations: true,
+      );
+
+      await openStellarMap(tester);
+      expect(
+        find.byKey(const Key('stellar-map-planet-marsFrontier')),
+        findsOneWidget,
+      );
+      expect(find.text('Lunar Frontier mines 3/3'), findsOneWidget);
+      expect(find.text('Surveying 5'), findsOneWidget);
+      expect(find.text('20000 cash'), findsOneWidget);
+
+      final marsUnlock = find.byKey(
+        const Key('mining-stellar-map-unlock-marsFrontier'),
+      );
+      await tester.ensureVisible(marsUnlock);
+      await tester.tap(marsUnlock);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      var state = stateFromScreen(tester);
+      expect(state.activePlanetId, MiningPlanetId.marsFrontier);
+      expect(state.unlockedPlanetIds, contains(MiningPlanetId.marsFrontier));
+      expect(state.cash, 100000);
+
+      await selectSector(tester, MiningSectorId.ochreBasin);
+      await tapPrimary(
+        tester,
+        'Reveal for 0 cash',
+        successMessage: 'Sector revealed.',
+      );
+      expect(find.textContaining('Iron Rig'), findsOneWidget);
+      await tapPrimary(
+        tester,
+        'Build for 5000 cash',
+        successMessage: 'Mine built.',
+      );
+
+      await openStellarMap(tester);
+      final lunarTravel = find.byKey(
+        const Key('mining-stellar-map-travel-lunarFrontier'),
+      );
+      await tester.ensureVisible(lunarTravel);
+      await tester.tap(lunarTravel);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(
+        stateFromScreen(tester).activePlanetId,
+        MiningPlanetId.lunarFrontier,
+      );
+
+      await openStellarMap(tester);
+      final marsTravel = find.byKey(
+        const Key('mining-stellar-map-travel-marsFrontier'),
+      );
+      await tester.ensureVisible(marsTravel);
+      await tester.tap(marsTravel);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      state = stateFromScreen(tester);
+      expect(state.activePlanetId, MiningPlanetId.marsFrontier);
+      expect(state.sectors[MiningSectorId.ochreBasin]!.mine, isNotNull);
+
+      await selectSector(tester, MiningSectorId.silicaDunes);
+      await tapPrimary(
+        tester,
+        'Reveal for 12000 cash',
+        successMessage: 'Sector revealed.',
+      );
+      await tapPrimary(
+        tester,
+        'Build for 9000 cash',
+        successMessage: 'Mine built.',
+      );
+
+      await selectSector(tester, MiningSectorId.cobaltChasm);
+      await tapPrimary(
+        tester,
+        'Reveal for 30000 cash',
+        successMessage: 'Sector revealed.',
+      );
+      await tapPrimary(
+        tester,
+        'Build for 18000 cash',
+        successMessage: 'Mars mastered — +25,000 cash.',
+      );
+
+      state = stateFromScreen(tester);
+      expect(state.cash, 51000);
+      expect(state.sectors[MiningSectorId.cobaltChasm]!.mine, isNotNull);
       expect(tester.takeException(), isNull);
     },
   );
