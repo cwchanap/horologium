@@ -69,7 +69,9 @@ class MiningSheetView {
     if (totalCargo <= 0) {
       return MiningSheetView(
         title: 'Sell Cargo',
-        body: 'No cargo in any mine.',
+        body:
+            'No cargo in any mine on '
+            '${content.planet(state.activePlanetId).name}.',
         primaryLabel: 'Sell All',
         action: MiningSheetAction.sell,
         primaryEnabled: false,

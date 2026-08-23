@@ -55,7 +55,9 @@ class MiningSimulation {
     final full = <MiningSectorId>{};
     final sectors = <MiningSectorId, SectorProgress>{...state.sectors};
 
-    for (final planetId in state.unlockedPlanetIds) {
+    for (final entry in content.planets.entries) {
+      if (!state.unlockedPlanetIds.contains(entry.key)) continue;
+      final planetId = entry.key;
       for (final definition in content.planet(planetId).sectors) {
         final progress = sectors[definition.id]!;
         final mine = progress.mine;
