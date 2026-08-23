@@ -60,10 +60,21 @@ class AlwaysFailingSaveRepository extends MiningSaveRepository {
   }
 }
 
+class CountingMiningSaveRepository extends MiningSaveRepository {
+  var saveCount = 0;
+
+  @override
+  Future<void> save(MiningSave state) async {
+    saveCount++;
+    await super.save(state);
+  }
+}
+
 MiningSave seededSave(
   DateTime now, {
   int cash = 100,
   Map<MiningSectorId, MineState> mines = const {},
+  Set<MiningSectorId> revealedSectors = const {},
   TechnologyLevels technology = const TechnologyLevels(),
   Set<MiningPlanetId> unlockedPlanets = const {MiningPlanetId.homeworld},
   MiningPlanetId activePlanet = MiningPlanetId.homeworld,
@@ -77,7 +88,10 @@ MiningSave seededSave(
     sectors: {
       for (final entry in base.sectors.entries)
         entry.key: entry.value.copyWith(
-          revealed: entry.value.revealed || mines[entry.key] != null,
+          revealed:
+              entry.value.revealed ||
+              revealedSectors.contains(entry.key) ||
+              mines[entry.key] != null,
           mine: mines[entry.key],
         ),
     },
@@ -90,9 +104,21 @@ const Map<MiningSectorId, MineState> masteryMines = {
   MiningSectorId.graniteCrater: MineState(level: 1, storedAmount: 0),
 };
 
+const Map<MiningSectorId, MineState> lunarMasteryMines = {
+  MiningSectorId.frozenBasin: MineState(level: 1, storedAmount: 0),
+  MiningSectorId.titaniumHighlands: MineState(level: 1, storedAmount: 0),
+  MiningSectorId.heliumMare: MineState(level: 1, storedAmount: 0),
+};
+
 const Set<MiningPlanetId> bothPlanets = {
   MiningPlanetId.homeworld,
   MiningPlanetId.lunarFrontier,
+};
+
+const Set<MiningPlanetId> allPlanets = {
+  MiningPlanetId.homeworld,
+  MiningPlanetId.lunarFrontier,
+  MiningPlanetId.marsFrontier,
 };
 
 void main() {
@@ -532,6 +558,228 @@ void main() {
       expect(controller.state.cash, 2500);
       expect(controller.state.unlockedPlanetIds, bothPlanets);
       expect(controller.state.activePlanetId, MiningPlanetId.lunarFrontier);
+    });
+
+    test('Mars unlock fails without Lunar mastery', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 20000,
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanets: bothPlanets,
+          activePlanet: MiningPlanetId.lunarFrontier,
+        ),
+      );
+
+      final result = await controller.unlockPlanet(MiningPlanetId.marsFrontier);
+
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Build every Lunar Frontier mine first.');
+    });
+
+    test('Mars unlock fails below Surveying 5', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 20000,
+          technology: const TechnologyLevels(surveying: 4),
+          unlockedPlanets: bothPlanets,
+          activePlanet: MiningPlanetId.lunarFrontier,
+          mines: lunarMasteryMines,
+        ),
+      );
+
+      final result = await controller.unlockPlanet(MiningPlanetId.marsFrontier);
+
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Requires Surveying 5.');
+    });
+
+    test('Mars unlock fails below 20,000 cash', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 19999,
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanets: bothPlanets,
+          activePlanet: MiningPlanetId.lunarFrontier,
+          mines: lunarMasteryMines,
+        ),
+      );
+
+      final result = await controller.unlockPlanet(MiningPlanetId.marsFrontier);
+
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Not enough cash.');
+    });
+
+    test(
+      'Mars unlock accrues first, charges 20,000, activates, and saves once',
+      () async {
+        final repository = CountingMiningSaveRepository();
+        final controller = await controllerOver(
+          repository,
+          seed: seededSave(
+            clock.now,
+            cash: 20000,
+            technology: const TechnologyLevels(surveying: 5),
+            unlockedPlanets: bothPlanets,
+            activePlanet: MiningPlanetId.lunarFrontier,
+            mines: lunarMasteryMines,
+          ),
+        );
+        clock.now = clock.now.add(const Duration(seconds: 10));
+
+        final result = await controller.unlockPlanet(
+          MiningPlanetId.marsFrontier,
+        );
+
+        expect(result.isSuccess, isTrue);
+        expect(controller.state.cash, 0);
+        expect(
+          controller
+              .state
+              .sectors[MiningSectorId.frozenBasin]!
+              .mine!
+              .storedAmount,
+          10,
+        );
+        expect(controller.state.unlockedPlanetIds, {
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+          MiningPlanetId.marsFrontier,
+        });
+        expect(controller.state.activePlanetId, MiningPlanetId.marsFrontier);
+        expect(repository.saveCount, 1);
+      },
+    );
+
+    test('Homeworld cannot be unlocked', () async {
+      final before = controller.state.toJson();
+
+      final result = await controller.unlockPlanet(MiningPlanetId.homeworld);
+
+      expect(result.isSuccess, isFalse);
+      expect(controller.state.toJson(), before);
+    });
+
+    group('planet mastery reward', () {
+      const allMarsSectors = {
+        MiningSectorId.ochreBasin,
+        MiningSectorId.silicaDunes,
+        MiningSectorId.cobaltChasm,
+      };
+
+      test('first and second Mars mines grant no completion reward', () async {
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(
+            clock.now,
+            cash: 100000,
+            technology: const TechnologyLevels(surveying: 5),
+            unlockedPlanets: allPlanets,
+            activePlanet: MiningPlanetId.marsFrontier,
+            revealedSectors: allMarsSectors,
+          ),
+        );
+
+        final first = await controller.buildMine(MiningSectorId.ochreBasin);
+        final second = await controller.buildMine(MiningSectorId.silicaDunes);
+
+        expect(first.isSuccess, isTrue);
+        expect(first.message, isNull);
+        expect(second.isSuccess, isTrue);
+        expect(second.message, isNull);
+        expect(controller.state.cash, 86000);
+      });
+
+      test('final Mars mine pays 25,000 after its normal build cost', () async {
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(
+            clock.now,
+            cash: 50000,
+            technology: const TechnologyLevels(surveying: 5),
+            unlockedPlanets: allPlanets,
+            activePlanet: MiningPlanetId.marsFrontier,
+            mines: {
+              MiningSectorId.ochreBasin: MineState(level: 1, storedAmount: 0),
+              MiningSectorId.silicaDunes: MineState(level: 1, storedAmount: 0),
+            },
+            revealedSectors: {MiningSectorId.cobaltChasm},
+          ),
+        );
+
+        final result = await controller.buildMine(MiningSectorId.cobaltChasm);
+
+        expect(result.isSuccess, isTrue);
+        expect(result.message, 'Mars mastered — +25,000 cash.');
+        expect(controller.state.cash, 57000);
+        expect(
+          controller.state.sectors[MiningSectorId.cobaltChasm]!.mine,
+          isNotNull,
+        );
+      });
+
+      test('Homeworld and Lunar builds have no mastery reward', () async {
+        final homeworld = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(clock.now, cash: 100),
+        );
+        final lunar = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(
+            clock.now,
+            cash: 1000,
+            technology: const TechnologyLevels(surveying: 5),
+            unlockedPlanets: allPlanets,
+            activePlanet: MiningPlanetId.lunarFrontier,
+            revealedSectors: {MiningSectorId.frozenBasin},
+          ),
+        );
+
+        final homeworldResult = await homeworld.buildMine(
+          MiningSectorId.landingBasin,
+        );
+        final lunarResult = await lunar.buildMine(MiningSectorId.frozenBasin);
+
+        expect(homeworldResult.isSuccess, isTrue);
+        expect(homeworldResult.message, isNull);
+        expect(homeworld.state.cash, 50);
+        expect(lunarResult.isSuccess, isTrue);
+        expect(lunarResult.message, isNull);
+        expect(lunar.state.cash, 500);
+      });
+
+      test('retrying a built Mars sector cannot reward again', () async {
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(
+            clock.now,
+            cash: 50000,
+            technology: const TechnologyLevels(surveying: 5),
+            unlockedPlanets: allPlanets,
+            activePlanet: MiningPlanetId.marsFrontier,
+            mines: {
+              MiningSectorId.ochreBasin: MineState(level: 1, storedAmount: 0),
+              MiningSectorId.silicaDunes: MineState(level: 1, storedAmount: 0),
+            },
+            revealedSectors: {MiningSectorId.cobaltChasm},
+          ),
+        );
+
+        final first = await controller.buildMine(MiningSectorId.cobaltChasm);
+        final cashAfterMastery = controller.state.cash;
+        final retry = await controller.buildMine(MiningSectorId.cobaltChasm);
+
+        expect(first.isSuccess, isTrue);
+        expect(retry.isSuccess, isFalse);
+        expect(retry.message, 'Mine already built.');
+        expect(controller.state.cash, cashAfterMastery);
+      });
     });
 
     test('switch accrues before changing the active planet', () async {

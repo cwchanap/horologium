@@ -406,12 +406,19 @@ class MiningContentRegistry {
 
   Duration offlineCapFor(int logistics) => offlineCapsByLogistics[logistics];
 
-  /// Homeworld mastery: every Homeworld mine exists. Takes only sector ids so
+  /// Planet mastery: every mine on [planetId] exists. Takes only sector ids so
   /// content never imports mining state.
-  bool isHomeworldMastered(Iterable<MiningSectorId> minedSectorIds) {
+  bool isPlanetMastered(
+    MiningPlanetId planetId,
+    Iterable<MiningSectorId> minedSectorIds,
+  ) {
     final mined = minedSectorIds.toSet();
     return planet(
-      MiningPlanetId.homeworld,
+      planetId,
     ).sectors.every((sector) => mined.contains(sector.id));
   }
+
+  /// Kept for the pre-Mars Stellar Map projection until its consumers move.
+  bool isHomeworldMastered(Iterable<MiningSectorId> minedSectorIds) =>
+      isPlanetMastered(MiningPlanetId.homeworld, minedSectorIds);
 }

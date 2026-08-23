@@ -210,6 +210,85 @@ void main() {
     );
   });
 
+  test('planet mastery requires all three mines on that planet', () {
+    final content = MiningContentRegistry.stellarMining();
+    const homeworld = {
+      MiningSectorId.landingBasin,
+      MiningSectorId.carbonRidge,
+      MiningSectorId.graniteCrater,
+    };
+    const lunar = {
+      MiningSectorId.frozenBasin,
+      MiningSectorId.titaniumHighlands,
+      MiningSectorId.heliumMare,
+    };
+    const mars = {
+      MiningSectorId.ochreBasin,
+      MiningSectorId.silicaDunes,
+      MiningSectorId.cobaltChasm,
+    };
+
+    expect(
+      content.isPlanetMastered(MiningPlanetId.homeworld, homeworld),
+      isTrue,
+    );
+    expect(
+      content.isPlanetMastered(MiningPlanetId.lunarFrontier, lunar),
+      isTrue,
+    );
+    expect(content.isPlanetMastered(MiningPlanetId.marsFrontier, mars), isTrue);
+    expect(
+      content.isPlanetMastered(
+        MiningPlanetId.homeworld,
+        {...homeworld}..remove(MiningSectorId.graniteCrater),
+      ),
+      isFalse,
+    );
+    expect(
+      content.isPlanetMastered(
+        MiningPlanetId.lunarFrontier,
+        {...lunar}..remove(MiningSectorId.heliumMare),
+      ),
+      isFalse,
+    );
+    expect(
+      content.isPlanetMastered(
+        MiningPlanetId.marsFrontier,
+        {...mars}..remove(MiningSectorId.cobaltChasm),
+      ),
+      isFalse,
+    );
+  });
+
+  test('mines on another planet do not satisfy planet mastery', () {
+    final content = MiningContentRegistry.stellarMining();
+
+    expect(
+      content.isPlanetMastered(MiningPlanetId.homeworld, const {
+        MiningSectorId.frozenBasin,
+        MiningSectorId.titaniumHighlands,
+        MiningSectorId.heliumMare,
+      }),
+      isFalse,
+    );
+    expect(
+      content.isPlanetMastered(MiningPlanetId.lunarFrontier, const {
+        MiningSectorId.ochreBasin,
+        MiningSectorId.silicaDunes,
+        MiningSectorId.cobaltChasm,
+      }),
+      isFalse,
+    );
+    expect(
+      content.isPlanetMastered(MiningPlanetId.marsFrontier, const {
+        MiningSectorId.landingBasin,
+        MiningSectorId.carbonRidge,
+        MiningSectorId.graniteCrater,
+      }),
+      isFalse,
+    );
+  });
+
   test(
     'technology economy helpers pin exact extraction, logistics, and cap values',
     () {
