@@ -45,6 +45,41 @@ MiningSave stellarState(
   );
 }
 
+MiningSave threePlanetState(
+  DateTime now, {
+  TechnologyLevels technology = const TechnologyLevels(),
+  double homeworldStored = 0,
+  double lunarStored = 0,
+  double marsStored = 0,
+  MiningPlanetId activePlanet = MiningPlanetId.marsFrontier,
+}) {
+  final base = MiningSave.initial(nowUtc: now);
+  return base.copyWith(
+    technology: technology,
+    unlockedPlanetIds: const {
+      MiningPlanetId.homeworld,
+      MiningPlanetId.lunarFrontier,
+      MiningPlanetId.marsFrontier,
+    },
+    activePlanetId: activePlanet,
+    sectors: {
+      ...base.sectors,
+      MiningSectorId.landingBasin: SectorProgress(
+        revealed: true,
+        mine: MineState(level: 1, storedAmount: homeworldStored),
+      ),
+      MiningSectorId.frozenBasin: SectorProgress(
+        revealed: true,
+        mine: MineState(level: 1, storedAmount: lunarStored),
+      ),
+      MiningSectorId.ochreBasin: SectorProgress(
+        revealed: true,
+        mine: MineState(level: 1, storedAmount: marsStored),
+      ),
+    },
+  );
+}
+
 void main() {
   final content = MiningContentRegistry.stellarMining();
   final simulation = MiningSimulation(content);
@@ -128,6 +163,45 @@ void main() {
     expect(result.summary.produced[ResourceType.waterIce], closeTo(11, 0.0001));
   });
 
+  test('all three unlocked planets accrue one supplied window', () {
+    final result = simulation.accrue(
+      threePlanetState(
+        start,
+        technology: const TechnologyLevels(extraction: 1, logistics: 2),
+      ),
+      start.add(const Duration(seconds: 10)),
+    );
+
+    expect(result.summary.elapsedUsed, const Duration(seconds: 10));
+    expect(
+      result.state.sectors[MiningSectorId.landingBasin]!.mine!.storedAmount,
+      closeTo(5.5, 0.0001),
+    );
+    expect(
+      result.state.sectors[MiningSectorId.frozenBasin]!.mine!.storedAmount,
+      closeTo(11, 0.0001),
+    );
+    expect(
+      result.state.sectors[MiningSectorId.ochreBasin]!.mine!.storedAmount,
+      closeTo(8.25, 0.0001),
+    );
+    expect(
+      result.summary.productionByPlanet[MiningPlanetId.homeworld]![ResourceType
+          .gold],
+      closeTo(5.5, 0.0001),
+    );
+    expect(
+      result.summary.productionByPlanet[MiningPlanetId
+          .lunarFrontier]![ResourceType.waterIce],
+      closeTo(11, 0.0001),
+    );
+    expect(
+      result.summary.productionByPlanet[MiningPlanetId
+          .marsFrontier]![ResourceType.ironOre],
+      closeTo(8.25, 0.0001),
+    );
+  });
+
   test('summary groups production by planet with flat full sectors', () {
     final state = stellarState(
       start,
@@ -183,6 +257,145 @@ void main() {
       result.summary.fullSectors,
       isNot(contains(MiningSectorId.frozenBasin)),
     );
+  });
+
+  test('locked Mars Frontier stays pristine and produces zero', () {
+    final state =
+        threePlanetState(
+          start,
+          technology: const TechnologyLevels(extraction: 1, logistics: 2),
+          marsStored: 7,
+        ).copyWith(
+          unlockedPlanetIds: const {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+          activePlanetId: MiningPlanetId.homeworld,
+        );
+    final result = simulation.accrue(
+      state,
+      start.add(const Duration(minutes: 10)),
+    );
+
+    expect(
+      result.state.sectors[MiningSectorId.ochreBasin],
+      state.sectors[MiningSectorId.ochreBasin],
+    );
+    expect(
+      result.state.sectors[MiningSectorId.silicaDunes],
+      state.sectors[MiningSectorId.silicaDunes],
+    );
+    expect(
+      result.state.sectors[MiningSectorId.cobaltChasm],
+      state.sectors[MiningSectorId.cobaltChasm],
+    );
+    expect(
+      result.summary.productionByPlanet,
+      isNot(contains(MiningPlanetId.marsFrontier)),
+    );
+    expect(result.summary.produced, isNot(contains(ResourceType.ironOre)));
+  });
+
+  test('Mars reuses effective logistics capacity and offline cap', () {
+    final content = MiningContentRegistry.stellarMining();
+    final result = simulation.accrue(
+      threePlanetState(
+        start,
+        technology: const TechnologyLevels(extraction: 1, logistics: 2),
+      ),
+      start.add(const Duration(hours: 13)),
+    );
+
+    expect(result.summary.elapsedUsed, content.offlineCapFor(2));
+    expect(result.summary.wasOfflineCapped, isTrue);
+    expect(
+      result.state.sectors[MiningSectorId.ochreBasin]!.mine!.storedAmount,
+      closeTo(
+        content.effectiveCapacity(MiningSectorId.ochreBasin, 1, 2),
+        0.0001,
+      ),
+    );
+    expect(result.summary.fullSectors, contains(MiningSectorId.ochreBasin));
+    expect(
+      result.summary.productionByPlanet[MiningPlanetId
+          .marsFrontier]![ResourceType.ironOre],
+      closeTo(
+        content.effectiveCapacity(MiningSectorId.ochreBasin, 1, 2),
+        0.0001,
+      ),
+    );
+  });
+
+  test('full Mars storage does not disturb other unlocked planets', () {
+    final content = MiningContentRegistry.stellarMining();
+    final marsCapacity = content.effectiveCapacity(
+      MiningSectorId.ochreBasin,
+      1,
+      2,
+    );
+    final result = simulation.accrue(
+      threePlanetState(
+        start,
+        technology: const TechnologyLevels(extraction: 1, logistics: 2),
+        marsStored: marsCapacity,
+      ),
+      start.add(const Duration(seconds: 10)),
+    );
+
+    expect(
+      result.state.sectors[MiningSectorId.ochreBasin]!.mine!.storedAmount,
+      marsCapacity,
+    );
+    expect(
+      result.summary.productionByPlanet[MiningPlanetId
+          .marsFrontier]![ResourceType.ironOre],
+      0,
+    );
+    expect(
+      result.state.sectors[MiningSectorId.landingBasin]!.mine!.storedAmount,
+      closeTo(5.5, 0.0001),
+    );
+    expect(
+      result.state.sectors[MiningSectorId.frozenBasin]!.mine!.storedAmount,
+      closeTo(11, 0.0001),
+    );
+    expect(result.summary.fullSectors, contains(MiningSectorId.ochreBasin));
+  });
+
+  test('active planet selection does not change multi-planet accrual', () {
+    final homeworldActive = simulation.accrue(
+      threePlanetState(
+        start,
+        technology: const TechnologyLevels(extraction: 1, logistics: 2),
+        activePlanet: MiningPlanetId.homeworld,
+      ),
+      start.add(const Duration(seconds: 10)),
+    );
+    final marsActive = simulation.accrue(
+      threePlanetState(
+        start,
+        technology: const TechnologyLevels(extraction: 1, logistics: 2),
+        activePlanet: MiningPlanetId.marsFrontier,
+      ),
+      start.add(const Duration(seconds: 10)),
+    );
+
+    expect(homeworldActive.summary.produced, marsActive.summary.produced);
+    expect(
+      homeworldActive.summary.productionByPlanet,
+      marsActive.summary.productionByPlanet,
+    );
+    expect(homeworldActive.summary.fullSectors, marsActive.summary.fullSectors);
+    for (final id in [
+      MiningSectorId.landingBasin,
+      MiningSectorId.frozenBasin,
+      MiningSectorId.ochreBasin,
+    ]) {
+      expect(
+        homeworldActive.state.sectors[id]!.mine!.storedAmount,
+        marsActive.state.sectors[id]!.mine!.storedAmount,
+      );
+    }
   });
 
   test('offline cap grows with logistics', () {

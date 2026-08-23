@@ -17,12 +17,21 @@ void main() {
 
     const summary = OfflineProductionSummary(
       elapsedUsed: Duration(hours: 2),
-      produced: {ResourceType.gold: 5.0, ResourceType.waterIce: 20.0},
+      produced: {
+        ResourceType.gold: 5.0,
+        ResourceType.waterIce: 20.0,
+        ResourceType.ironOre: 8.0,
+      },
       productionByPlanet: {
         MiningPlanetId.homeworld: {ResourceType.gold: 5.0},
         MiningPlanetId.lunarFrontier: {ResourceType.waterIce: 20.0},
+        MiningPlanetId.marsFrontier: {ResourceType.ironOre: 8.0},
       },
-      fullSectors: {MiningSectorId.graniteCrater, MiningSectorId.heliumMare},
+      fullSectors: {
+        MiningSectorId.graniteCrater,
+        MiningSectorId.heliumMare,
+        MiningSectorId.cobaltChasm,
+      },
       wasOfflineCapped: false,
     );
 
@@ -40,8 +49,10 @@ void main() {
 
     final homeworld = find.byKey(const Key('offline-return-planet-homeworld'));
     final lunar = find.byKey(const Key('offline-return-planet-lunarFrontier'));
+    final mars = find.byKey(const Key('offline-return-planet-marsFrontier'));
     expect(homeworld, findsOneWidget);
     expect(lunar, findsOneWidget);
+    expect(mars, findsOneWidget);
 
     // Each planet's production rows and silhouettes live under its section.
     expect(
@@ -80,6 +91,23 @@ void main() {
       find.descendant(of: lunar, matching: find.text('+20.0')),
       findsOneWidget,
     );
+    expect(
+      find.descendant(of: mars, matching: find.text('Iron Ore')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: mars,
+        matching: find.byIcon(
+          MiningContentRegistry.resourceSilhouettes[ResourceType.ironOre]!.icon,
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: mars, matching: find.text('+8.0')),
+      findsOneWidget,
+    );
 
     // fullSectors is flat; each sector name resolves to its own planet
     // section via the catalog.
@@ -94,6 +122,13 @@ void main() {
       find.descendant(
         of: lunar,
         matching: find.text('Storage full: Helium Mare.'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: mars,
+        matching: find.text('Storage full: Cobalt Chasm.'),
       ),
       findsOneWidget,
     );

@@ -148,6 +148,56 @@ void main() {
     expect(tint.priority, lessThan(sector.priority));
   });
 
+  for (final planetId in MiningPlanetId.values) {
+    for (final viewport in const [Size(360, 640), Size(430, 932)]) {
+      testWidgets(
+        'reuses one complete reduced-motion world for $planetId at $viewport',
+        (tester) async {
+          final content = MiningContentRegistry.stellarMining();
+          final planet = content.planet(planetId);
+          final game = MiningGame(planet: planet, initialProgress: const {})
+            ..reducedMotion = true;
+
+          await pumpMiningGame(tester, game, size: viewport);
+          await tester.pump(const Duration(milliseconds: 100));
+          game.updateTree(0);
+
+          expect(game.reducedMotion, isTrue);
+
+          final terrain = game.world.children
+              .whereType<ParallaxTerrainComponent>()
+              .toList();
+          expect(terrain, hasLength(1));
+          expect(terrain.single.gridSize, 36);
+          expect(terrain.single.cellSize, 50);
+          expect(terrain.single.size, Vector2.all(1800));
+
+          final tints = game.world.children
+              .whereType<RectangleComponent>()
+              .toList();
+          expect(tints, hasLength(1));
+          final tint = tints.single;
+          expect(tint.size, game.worldSize);
+          expect(
+            tint.paint.color.toARGB32(),
+            planet.tint.withAlpha(96).toARGB32(),
+          );
+          expect(tint.paint.blendMode, BlendMode.color);
+
+          final sectors = [
+            for (final definition in planet.sectors) game.sector(definition.id),
+          ];
+          expect(sectors, hasLength(3));
+          expect(terrain.single.priority, lessThan(tint.priority));
+          for (final sector in sectors) {
+            expect(tint.priority, lessThan(sector.priority));
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   testWidgets('levels one three and five add distinct mounted structure', (
     tester,
   ) async {
