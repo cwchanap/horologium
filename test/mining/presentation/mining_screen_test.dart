@@ -253,6 +253,10 @@ void main() {
 
       expect(find.text('Landing Basin'), findsWidgets);
       expect(find.text('SELL ALL CARGO'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate((widget) => widget is GameWidget),
+        findsOneWidget,
+      );
       expectMiningStatusToStayFocused(tester);
       expect(tester.takeException(), isNull);
 
@@ -1134,6 +1138,10 @@ void main() {
           tester.state(find.byType(MiningScreen)) as MiningScreenHandles;
       final originalController = handles.controller;
       final oldGame = currentGame();
+      expect(
+        find.byWidgetPredicate((widget) => widget is GameWidget),
+        findsOneWidget,
+      );
       expect(oldGame.planet.id, MiningPlanetId.homeworld);
       final oldSelections = <MiningSectorId>[];
       oldGame.onSelectionChanged = (id) =>
@@ -1153,6 +1161,10 @@ void main() {
       expect(
         find.byKey(const ValueKey(MiningPlanetId.homeworld)),
         findsNothing,
+      );
+      expect(
+        find.byWidgetPredicate((widget) => widget is GameWidget),
+        findsOneWidget,
       );
       expect(newGame, isNot(same(oldGame)));
       expect(newGame.planet.id, MiningPlanetId.lunarFrontier);
