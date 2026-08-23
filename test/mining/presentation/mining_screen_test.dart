@@ -9,6 +9,7 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_screen.dart';
+import 'package:horologium/mining/presentation/technology_sheet.dart';
 import 'package:horologium/mining/world/mining_components.dart';
 import 'package:horologium/mining/world/mining_game.dart';
 import '../../support/fake_background_music_player.dart';
@@ -221,7 +222,10 @@ MiningSave _techPurchaseSave() => MiningSave(
       revealed: true,
       mine: MineState(level: 1, storedAmount: 0),
     ),
-    MiningSectorId.carbonRidge: const SectorProgress(revealed: false),
+    MiningSectorId.carbonRidge: const SectorProgress(
+      revealed: true,
+      mine: MineState(level: 1, storedAmount: 0),
+    ),
     MiningSectorId.graniteCrater: const SectorProgress(revealed: false),
     MiningSectorId.frozenBasin: const SectorProgress(revealed: false),
     MiningSectorId.titaniumHighlands: const SectorProgress(revealed: false),
@@ -1236,6 +1240,62 @@ void main() {
     expect(handles.controller.state.cash, 700);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'disables progression entry points and ignores stale sheet actions while '
+    'saving',
+    (tester) async {
+      final repository = DelayedMiningSaveRepository();
+      await MiningSaveRepository(
+        content: MiningContentRegistry.stellarMining(),
+      ).save(_techPurchaseSave());
+      await pumpMiningScreen(
+        tester,
+        _viewports.first,
+        repository: repository,
+        disableAnimations: true,
+      );
+
+      await tester.tap(find.byKey(const Key('mining-technology-button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      final staleOnPurchase = tester
+          .widget<TechnologySheet>(find.byType(TechnologySheet))
+          .onPurchase;
+
+      await tester.tap(
+        find.byKey(const Key('mining-technology-buy-extraction')),
+      );
+      await repository.saveStarted.future;
+      await tester.pump();
+
+      final technologyOnPressed = tester
+          .widget<IconButton>(find.byKey(const Key('mining-technology-button')))
+          .onPressed;
+      final stellarMapOnPressed = tester
+          .widget<IconButton>(
+            find.byKey(const Key('mining-stellar-map-button')),
+          )
+          .onPressed;
+      final settingsOnPressed = tester
+          .widget<IconButton>(find.byKey(const Key('mining-settings-button')))
+          .onPressed;
+
+      staleOnPurchase(TechnologyTrack.extraction);
+      repository.allowSave.complete();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final handles =
+          tester.state(find.byType(MiningScreen)) as MiningScreenHandles;
+      expect(handles.controller.state.technology.extraction, 1);
+      expect(handles.controller.state.cash, 700);
+      expect(technologyOnPressed, isNull);
+      expect(stellarMapOnPressed, isNull);
+      expect(settingsOnPressed, isNotNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'unlocking Lunar awaits the mutation and replaces the projected game',
