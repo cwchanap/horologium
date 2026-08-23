@@ -139,10 +139,10 @@ class MiningSave {
     technology: const TechnologyLevels(),
     unlockedPlanetIds: const {MiningPlanetId.homeworld},
     activePlanetId: MiningPlanetId.homeworld,
-    sectors: {
+    sectors: Map.unmodifiable({
       for (final id in MiningSectorId.values)
         id: SectorProgress(revealed: id == MiningSectorId.landingBasin),
-    },
+    }),
   );
 
   MiningSave copyWith({
