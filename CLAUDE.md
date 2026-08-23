@@ -59,9 +59,10 @@ small callbacks or values at the `MiningScreen`/`MiningGame` boundary.
 unversioned. The root keys are exactly `cash`, `lastAccruedAtUtc`, `technology`,
 `unlockedPlanetIds`, `activePlanetId`, and `sectors`. `technology` has exactly
 `extraction`, `logistics`, and `surveying`; `sectors` is one flat map containing
-the six authored sector IDs, and each sector has exactly `revealed` and `mine`,
-while a mine has `level` and `storedAmount`. `activePlanetId` must be one of the
-unlocked planets; sector progress is not nested under planet objects.
+the nine authored sector IDs across Homeworld, Lunar Frontier, and Mars
+Frontier, and each sector has exactly `revealed` and `mine`, while a mine has
+`level` and `storedAmount`. `activePlanetId` must be one of the unlocked
+planets; sector progress is not nested under planet objects.
 
 There is intentionally no version field, migration table, or compatibility
 reader. Until a shipped compatibility need exists, preserve this contract:
@@ -85,15 +86,18 @@ Audio preferences are separate from mining state. `AudioManager` owns the
 
 `lib/game/resources/resource_type.dart` defines the complete current resource
 identity: `ResourceType.gold`, `ResourceType.coal`, `ResourceType.stone`,
-`ResourceType.waterIce`, `ResourceType.titaniumOre`, and
-`ResourceType.helium3`. `MiningContentRegistry` maps three sectors on each of
-the Homeworld and Lunar Frontier planets to these enum values.
+`ResourceType.waterIce`, `ResourceType.titaniumOre`, `ResourceType.helium3`,
+`ResourceType.ironOre`, `ResourceType.silica`, and
+`ResourceType.cobaltOre`. `MiningContentRegistry` maps three sectors on each
+of the Homeworld, Lunar Frontier, and Mars Frontier planets to these enum
+values.
 Use the enum in maps and exhaustive switches; do not introduce string resource
 IDs or a generic resource registry without an approved contract change.
 
 `TechnologyLevels` has level 0–5 tracks for Extraction, Logistics, and
 Surveying. Extraction scales mining rate; Logistics scales mine capacity and
-the offline accrual cap; Surveying gates sector reveals and Lunar progression.
+the offline accrual cap; Surveying gates sector reveals and Lunar/Mars
+progression.
 Technology purchases are controller mutations with mine-progression gates and
 cash costs.
 

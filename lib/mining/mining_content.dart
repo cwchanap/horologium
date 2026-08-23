@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:horologium/constants/assets_path.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 
-enum MiningPlanetId { homeworld, lunarFrontier }
+enum MiningPlanetId { homeworld, lunarFrontier, marsFrontier }
 
 enum MiningSectorId {
   landingBasin,
@@ -11,6 +11,9 @@ enum MiningSectorId {
   frozenBasin,
   titaniumHighlands,
   heliumMare,
+  ochreBasin,
+  silicaDunes,
+  cobaltChasm,
 }
 
 enum TechnologyTrack { extraction, logistics, surveying }
@@ -37,6 +40,8 @@ class MiningSectorDefinition {
     required this.saleValuePerUnit,
     required this.upgradeCosts,
     required this.anchor,
+    this.facilityName,
+    this.discoveryText,
   });
 
   final MiningSectorId id;
@@ -52,6 +57,8 @@ class MiningSectorDefinition {
   final int saleValuePerUnit;
   final List<int> upgradeCosts;
   final MiningWorldAnchor anchor;
+  final String? facilityName;
+  final String? discoveryText;
 }
 
 /// Built-in Material-icon silhouette for a resource: distinct icon, display
@@ -75,6 +82,10 @@ class MiningPlanetDefinition {
     required this.sectors,
     required this.terrainSeed,
     required this.tint,
+    required this.unlockRequiredMasteryPlanetId,
+    required this.unlockRequiredSurveyingLevel,
+    required this.unlockCashCost,
+    required this.masteryRewardCash,
   });
 
   final MiningPlanetId id;
@@ -85,6 +96,10 @@ class MiningPlanetDefinition {
   /// Mining-world tint. The world renders this as its atmosphere/background
   /// so each planet keeps a distinct visual identity.
   final Color tint;
+  final MiningPlanetId? unlockRequiredMasteryPlanetId;
+  final int unlockRequiredSurveyingLevel;
+  final int unlockCashCost;
+  final int masteryRewardCash;
 }
 
 class MiningContentRegistry {
@@ -165,117 +180,205 @@ class MiningContentRegistry {
       name: 'Helium-3',
       color: Colors.cyanAccent,
     ),
+    ResourceType.ironOre: ResourceSilhouette(
+      icon: Icons.construction,
+      name: 'Iron Ore',
+      color: Colors.deepOrange,
+    ),
+    ResourceType.silica: ResourceSilhouette(
+      icon: Icons.grain,
+      name: 'Silica',
+      color: Colors.amber,
+    ),
+    ResourceType.cobaltOre: ResourceSilhouette(
+      icon: Icons.science,
+      name: 'Cobalt Ore',
+      color: Colors.blueAccent,
+    ),
   };
 
-  factory MiningContentRegistry.stellarMining() =>
-      const MiningContentRegistry._({
-        MiningPlanetId.homeworld: MiningPlanetDefinition(
-          id: MiningPlanetId.homeworld,
-          name: 'Homeworld',
-          terrainSeed: 631,
-          tint: Color(0xFF0A1218),
-          sectors: [
-            MiningSectorDefinition(
-              id: MiningSectorId.landingBasin,
-              name: 'Landing Basin',
-              resource: ResourceType.gold,
-              mineAsset: Assets.goldMine,
-              revealCost: 0,
-              requiredSector: null,
-              requiredSurveyingLevel: 0,
-              buildCost: 50,
-              baseRatePerSecond: 0.50,
-              baseCapacity: 90,
-              saleValuePerUnit: 4,
-              upgradeCosts: [80, 160, 320, 640],
-              anchor: MiningWorldAnchor(-72, 396),
-            ),
-            MiningSectorDefinition(
-              id: MiningSectorId.carbonRidge,
-              name: 'Carbon Ridge',
-              resource: ResourceType.coal,
-              mineAsset: Assets.coalMine,
-              revealCost: 250,
-              requiredSector: MiningSectorId.landingBasin,
-              requiredSurveyingLevel: 0,
-              buildCost: 100,
-              baseRatePerSecond: 0.75,
-              baseCapacity: 120,
-              saleValuePerUnit: 3,
-              upgradeCosts: [150, 300, 600, 1200],
-              anchor: MiningWorldAnchor(-396, -72),
-            ),
-            MiningSectorDefinition(
-              id: MiningSectorId.graniteCrater,
-              name: 'Granite Crater',
-              resource: ResourceType.stone,
-              mineAsset: Assets.quarry,
-              revealCost: 700,
-              requiredSector: MiningSectorId.carbonRidge,
-              requiredSurveyingLevel: 0,
-              buildCost: 250,
-              baseRatePerSecond: 0.60,
-              baseCapacity: 120,
-              saleValuePerUnit: 5,
-              upgradeCosts: [350, 700, 1400, 2800],
-              anchor: MiningWorldAnchor(324, -360),
-            ),
-          ],
+  factory MiningContentRegistry.stellarMining() => const MiningContentRegistry._({
+    MiningPlanetId.homeworld: MiningPlanetDefinition(
+      id: MiningPlanetId.homeworld,
+      name: 'Homeworld',
+      terrainSeed: 631,
+      tint: Color(0xFF0A1218),
+      unlockRequiredMasteryPlanetId: null,
+      unlockRequiredSurveyingLevel: 0,
+      unlockCashCost: 0,
+      masteryRewardCash: 0,
+      sectors: [
+        MiningSectorDefinition(
+          id: MiningSectorId.landingBasin,
+          name: 'Landing Basin',
+          resource: ResourceType.gold,
+          mineAsset: Assets.goldMine,
+          revealCost: 0,
+          requiredSector: null,
+          requiredSurveyingLevel: 0,
+          buildCost: 50,
+          baseRatePerSecond: 0.50,
+          baseCapacity: 90,
+          saleValuePerUnit: 4,
+          upgradeCosts: [80, 160, 320, 640],
+          anchor: MiningWorldAnchor(-72, 396),
         ),
-        MiningPlanetId.lunarFrontier: MiningPlanetDefinition(
-          id: MiningPlanetId.lunarFrontier,
-          name: 'Lunar Frontier',
-          terrainSeed: 638,
-          tint: Color(0xFF151324),
-          sectors: [
-            MiningSectorDefinition(
-              id: MiningSectorId.frozenBasin,
-              name: 'Frozen Basin',
-              resource: ResourceType.waterIce,
-              mineAsset: Assets.waterTreatmentPlant,
-              revealCost: 0,
-              requiredSector: null,
-              requiredSurveyingLevel: 3,
-              buildCost: 500,
-              baseRatePerSecond: 1.00,
-              baseCapacity: 150,
-              saleValuePerUnit: 6,
-              upgradeCosts: [700, 1400, 2800, 5600],
-              anchor: MiningWorldAnchor(-420, 320),
-            ),
-            MiningSectorDefinition(
-              id: MiningSectorId.titaniumHighlands,
-              name: 'Titanium Highlands',
-              resource: ResourceType.titaniumOre,
-              mineAsset: Assets.grinderMill,
-              revealCost: 3000,
-              requiredSector: MiningSectorId.frozenBasin,
-              requiredSurveyingLevel: 4,
-              buildCost: 1200,
-              baseRatePerSecond: 0.80,
-              baseCapacity: 140,
-              saleValuePerUnit: 12,
-              upgradeCosts: [1600, 3200, 6400, 12800],
-              anchor: MiningWorldAnchor(120, -80),
-            ),
-            MiningSectorDefinition(
-              id: MiningSectorId.heliumMare,
-              name: 'Helium Mare',
-              resource: ResourceType.helium3,
-              mineAsset: Assets.researchLab,
-              revealCost: 8000,
-              requiredSector: MiningSectorId.titaniumHighlands,
-              requiredSurveyingLevel: 5,
-              buildCost: 3000,
-              baseRatePerSecond: 0.55,
-              baseCapacity: 120,
-              saleValuePerUnit: 30,
-              upgradeCosts: [4000, 8000, 16000, 32000],
-              anchor: MiningWorldAnchor(390, -410),
-            ),
-          ],
+        MiningSectorDefinition(
+          id: MiningSectorId.carbonRidge,
+          name: 'Carbon Ridge',
+          resource: ResourceType.coal,
+          mineAsset: Assets.coalMine,
+          revealCost: 250,
+          requiredSector: MiningSectorId.landingBasin,
+          requiredSurveyingLevel: 0,
+          buildCost: 100,
+          baseRatePerSecond: 0.75,
+          baseCapacity: 120,
+          saleValuePerUnit: 3,
+          upgradeCosts: [150, 300, 600, 1200],
+          anchor: MiningWorldAnchor(-396, -72),
         ),
-      });
+        MiningSectorDefinition(
+          id: MiningSectorId.graniteCrater,
+          name: 'Granite Crater',
+          resource: ResourceType.stone,
+          mineAsset: Assets.quarry,
+          revealCost: 700,
+          requiredSector: MiningSectorId.carbonRidge,
+          requiredSurveyingLevel: 0,
+          buildCost: 250,
+          baseRatePerSecond: 0.60,
+          baseCapacity: 120,
+          saleValuePerUnit: 5,
+          upgradeCosts: [350, 700, 1400, 2800],
+          anchor: MiningWorldAnchor(324, -360),
+        ),
+      ],
+    ),
+    MiningPlanetId.lunarFrontier: MiningPlanetDefinition(
+      id: MiningPlanetId.lunarFrontier,
+      name: 'Lunar Frontier',
+      terrainSeed: 638,
+      tint: Color(0xFF151324),
+      unlockRequiredMasteryPlanetId: MiningPlanetId.homeworld,
+      unlockRequiredSurveyingLevel: 3,
+      unlockCashCost: 2500,
+      masteryRewardCash: 0,
+      sectors: [
+        MiningSectorDefinition(
+          id: MiningSectorId.frozenBasin,
+          name: 'Frozen Basin',
+          resource: ResourceType.waterIce,
+          mineAsset: Assets.waterTreatmentPlant,
+          revealCost: 0,
+          requiredSector: null,
+          requiredSurveyingLevel: 3,
+          buildCost: 500,
+          baseRatePerSecond: 1.00,
+          baseCapacity: 150,
+          saleValuePerUnit: 6,
+          upgradeCosts: [700, 1400, 2800, 5600],
+          anchor: MiningWorldAnchor(-420, 320),
+        ),
+        MiningSectorDefinition(
+          id: MiningSectorId.titaniumHighlands,
+          name: 'Titanium Highlands',
+          resource: ResourceType.titaniumOre,
+          mineAsset: Assets.grinderMill,
+          revealCost: 3000,
+          requiredSector: MiningSectorId.frozenBasin,
+          requiredSurveyingLevel: 4,
+          buildCost: 1200,
+          baseRatePerSecond: 0.80,
+          baseCapacity: 140,
+          saleValuePerUnit: 12,
+          upgradeCosts: [1600, 3200, 6400, 12800],
+          anchor: MiningWorldAnchor(120, -80),
+        ),
+        MiningSectorDefinition(
+          id: MiningSectorId.heliumMare,
+          name: 'Helium Mare',
+          resource: ResourceType.helium3,
+          mineAsset: Assets.researchLab,
+          revealCost: 8000,
+          requiredSector: MiningSectorId.titaniumHighlands,
+          requiredSurveyingLevel: 5,
+          buildCost: 3000,
+          baseRatePerSecond: 0.55,
+          baseCapacity: 120,
+          saleValuePerUnit: 30,
+          upgradeCosts: [4000, 8000, 16000, 32000],
+          anchor: MiningWorldAnchor(390, -410),
+        ),
+      ],
+    ),
+    MiningPlanetId.marsFrontier: MiningPlanetDefinition(
+      id: MiningPlanetId.marsFrontier,
+      name: 'Mars Frontier',
+      terrainSeed: 641,
+      tint: Color(0xFF2A1512),
+      unlockRequiredMasteryPlanetId: MiningPlanetId.lunarFrontier,
+      unlockRequiredSurveyingLevel: 5,
+      unlockCashCost: 20000,
+      masteryRewardCash: 25000,
+      sectors: [
+        MiningSectorDefinition(
+          id: MiningSectorId.ochreBasin,
+          name: 'Ochre Basin',
+          resource: ResourceType.ironOre,
+          mineAsset: Assets.woodFactory,
+          revealCost: 0,
+          requiredSector: null,
+          requiredSurveyingLevel: 5,
+          buildCost: 5000,
+          baseRatePerSecond: 0.75,
+          baseCapacity: 180,
+          saleValuePerUnit: 32,
+          upgradeCosts: [7000, 14000, 28000, 56000],
+          anchor: MiningWorldAnchor(-360, 330),
+          facilityName: 'Iron Rig',
+          discoveryText:
+              'iron-rich regolith supports the first heavy extraction rig.',
+        ),
+        MiningSectorDefinition(
+          id: MiningSectorId.silicaDunes,
+          name: 'Silica Dunes',
+          resource: ResourceType.silica,
+          mineAsset: Assets.riceHuller,
+          revealCost: 12000,
+          requiredSector: MiningSectorId.ochreBasin,
+          requiredSurveyingLevel: 5,
+          buildCost: 9000,
+          baseRatePerSecond: 0.55,
+          baseCapacity: 160,
+          saleValuePerUnit: 55,
+          upgradeCosts: [12000, 24000, 48000, 96000],
+          anchor: MiningWorldAnchor(280, -60),
+          facilityName: 'Silica Extractor',
+          discoveryText:
+              'glassy dune deposits trade lower throughput for stronger sale value.',
+        ),
+        MiningSectorDefinition(
+          id: MiningSectorId.cobaltChasm,
+          name: 'Cobalt Chasm',
+          resource: ResourceType.cobaltOre,
+          mineAsset: Assets.sawmill,
+          revealCost: 30000,
+          requiredSector: MiningSectorId.silicaDunes,
+          requiredSurveyingLevel: 5,
+          buildCost: 18000,
+          baseRatePerSecond: 0.35,
+          baseCapacity: 130,
+          saleValuePerUnit: 110,
+          upgradeCosts: [24000, 48000, 96000, 192000],
+          anchor: MiningWorldAnchor(-80, -400),
+          facilityName: 'Cobalt Drill',
+          discoveryText:
+              'deep cobalt seams are the final high-value Mars target.',
+        ),
+      ],
+    ),
+  });
 
   MiningPlanetDefinition planet(MiningPlanetId id) => planets[id]!;
 

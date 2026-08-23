@@ -135,13 +135,17 @@ void main() {
         content: content,
       );
       final surveying = view.track(TechnologyTrack.surveying);
-      expect(surveying.currentEffect, '3 of 6 sectors revealable');
-      expect(surveying.nextEffect, '3 of 6 sectors revealable');
+      expect(surveying.currentEffect, '3 of 3 sectors revealable');
+      expect(surveying.nextEffect, '3 of 3 sectors revealable');
 
       final advanced = TechnologySheetView.from(
         state: stateWith(
           now: now,
           technology: const TechnologyLevels(surveying: 3),
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
           sectors: {MiningSectorId.landingBasin: mined()},
         ),
         content: content,
@@ -149,6 +153,24 @@ void main() {
       expect(
         advanced.track(TechnologyTrack.surveying).currentEffect,
         '4 of 6 sectors revealable',
+      );
+
+      final mars = TechnologySheetView.from(
+        state: stateWith(
+          now: now,
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+            MiningPlanetId.marsFrontier,
+          },
+          sectors: {MiningSectorId.landingBasin: mined()},
+        ),
+        content: content,
+      );
+      expect(
+        mars.track(TechnologyTrack.surveying).currentEffect,
+        '9 of 9 sectors revealable',
       );
     });
   });

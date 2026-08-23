@@ -15,11 +15,12 @@ void main() {
     );
   });
 
-  test('initial save contains the flat six-sector current state', () {
+  test('initial save contains the flat nine-sector current state', () {
     final now = DateTime.utc(2026, 8, 18, 12);
     final state = MiningSave.initial(nowUtc: now);
 
     expect(state.sectors.keys.toSet(), MiningSectorId.values.toSet());
+    expect(state.sectors.length, 9);
     expect(state.technology, const TechnologyLevels());
     expect(state.unlockedPlanetIds, {MiningPlanetId.homeworld});
     expect(state.activePlanetId, MiningPlanetId.homeworld);

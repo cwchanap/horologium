@@ -38,7 +38,7 @@ TechnologySheetView _view() => const TechnologySheetView(
       track: TechnologyTrack.surveying,
       name: 'Surveying',
       level: 5,
-      currentEffect: '6 of 6 sectors revealable',
+      currentEffect: '9 of 9 sectors revealable',
       nextEffect: null,
       cost: null,
       gateSectorName: null,
@@ -85,7 +85,7 @@ void main() {
       expect(find.text('Build the Landing Basin mine first.'), findsOneWidget);
 
       // Max level shows no next effect and no cost row.
-      expect(find.text('6 of 6 sectors revealable'), findsOneWidget);
+      expect(find.text('9 of 9 sectors revealable'), findsOneWidget);
       expect(find.textContaining('Next:'), findsNWidgets(2));
 
       expect(tester.takeException(), isNull);

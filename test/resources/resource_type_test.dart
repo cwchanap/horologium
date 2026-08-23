@@ -12,6 +12,9 @@ void main() {
         ResourceType.waterIce,
         ResourceType.titaniumOre,
         ResourceType.helium3,
+        ResourceType.ironOre,
+        ResourceType.silica,
+        ResourceType.cobaltOre,
       ]),
     );
   });
@@ -23,5 +26,8 @@ void main() {
     expect(ResourceType.waterIce.name, 'waterIce');
     expect(ResourceType.titaniumOre.name, 'titaniumOre');
     expect(ResourceType.helium3.name, 'helium3');
+    expect(ResourceType.ironOre.name, 'ironOre');
+    expect(ResourceType.silica.name, 'silica');
+    expect(ResourceType.cobaltOre.name, 'cobaltOre');
   });
 }

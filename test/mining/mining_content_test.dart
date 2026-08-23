@@ -6,13 +6,19 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
 
 void main() {
-  test('stellar mining exposes the Homeworld and Lunar Frontier catalogs', () {
+  test('stellar mining exposes planets in authored order', () {
     final content = MiningContentRegistry.stellarMining();
 
-    expect(content.planets.keys.toSet(), {
+    expect(MiningPlanetId.values, [
       MiningPlanetId.homeworld,
       MiningPlanetId.lunarFrontier,
-    });
+      MiningPlanetId.marsFrontier,
+    ]);
+    expect(content.planets.keys, [
+      MiningPlanetId.homeworld,
+      MiningPlanetId.lunarFrontier,
+      MiningPlanetId.marsFrontier,
+    ]);
     expect(content.planet(MiningPlanetId.homeworld).sectors.map((s) => s.id), [
       MiningSectorId.landingBasin,
       MiningSectorId.carbonRidge,
@@ -26,6 +32,91 @@ void main() {
         MiningSectorId.heliumMare,
       ],
     );
+    expect(
+      content.planet(MiningPlanetId.marsFrontier).sectors.map((s) => s.id),
+      [
+        MiningSectorId.ochreBasin,
+        MiningSectorId.silicaDunes,
+        MiningSectorId.cobaltChasm,
+      ],
+    );
+  });
+
+  test('Mars identity and unlock metadata are authored explicitly', () {
+    final content = MiningContentRegistry.stellarMining();
+    final mars = content.planet(MiningPlanetId.marsFrontier);
+
+    expect(mars.name, 'Mars Frontier');
+    expect(mars.terrainSeed, 641);
+    expect(mars.tint, const Color(0xFF2A1512));
+    expect(mars.unlockRequiredMasteryPlanetId, MiningPlanetId.lunarFrontier);
+    expect(mars.unlockRequiredSurveyingLevel, 5);
+    expect(mars.unlockCashCost, 20000);
+    expect(mars.masteryRewardCash, 25000);
+  });
+
+  test('Mars sector chain, anchors, copy, sprites, and economy are frozen', () {
+    final content = MiningContentRegistry.stellarMining();
+
+    final ochre = content.sector(MiningSectorId.ochreBasin);
+    expect(ochre.name, 'Ochre Basin');
+    expect(ochre.resource, ResourceType.ironOre);
+    expect(ochre.mineAsset, Assets.woodFactory);
+    expect(ochre.facilityName, 'Iron Rig');
+    expect(
+      ochre.discoveryText,
+      'iron-rich regolith supports the first heavy extraction rig.',
+    );
+    expect(ochre.requiredSector, isNull);
+    expect(ochre.requiredSurveyingLevel, 5);
+    expect(ochre.revealCost, 0);
+    expect(ochre.buildCost, 5000);
+    expect(ochre.baseRatePerSecond, 0.75);
+    expect(ochre.baseCapacity, 180);
+    expect(ochre.saleValuePerUnit, 32);
+    expect(ochre.upgradeCosts, [7000, 14000, 28000, 56000]);
+    expect(ochre.anchor.x, -360);
+    expect(ochre.anchor.y, 330);
+
+    final silica = content.sector(MiningSectorId.silicaDunes);
+    expect(silica.name, 'Silica Dunes');
+    expect(silica.resource, ResourceType.silica);
+    expect(silica.mineAsset, Assets.riceHuller);
+    expect(silica.facilityName, 'Silica Extractor');
+    expect(
+      silica.discoveryText,
+      'glassy dune deposits trade lower throughput for stronger sale value.',
+    );
+    expect(silica.requiredSector, MiningSectorId.ochreBasin);
+    expect(silica.requiredSurveyingLevel, 5);
+    expect(silica.revealCost, 12000);
+    expect(silica.buildCost, 9000);
+    expect(silica.baseRatePerSecond, 0.55);
+    expect(silica.baseCapacity, 160);
+    expect(silica.saleValuePerUnit, 55);
+    expect(silica.upgradeCosts, [12000, 24000, 48000, 96000]);
+    expect(silica.anchor.x, 280);
+    expect(silica.anchor.y, -60);
+
+    final cobalt = content.sector(MiningSectorId.cobaltChasm);
+    expect(cobalt.name, 'Cobalt Chasm');
+    expect(cobalt.resource, ResourceType.cobaltOre);
+    expect(cobalt.mineAsset, Assets.sawmill);
+    expect(cobalt.facilityName, 'Cobalt Drill');
+    expect(
+      cobalt.discoveryText,
+      'deep cobalt seams are the final high-value Mars target.',
+    );
+    expect(cobalt.requiredSector, MiningSectorId.silicaDunes);
+    expect(cobalt.requiredSurveyingLevel, 5);
+    expect(cobalt.revealCost, 30000);
+    expect(cobalt.buildCost, 18000);
+    expect(cobalt.baseRatePerSecond, 0.35);
+    expect(cobalt.baseCapacity, 130);
+    expect(cobalt.saleValuePerUnit, 110);
+    expect(cobalt.upgradeCosts, [24000, 48000, 96000, 192000]);
+    expect(cobalt.anchor.x, -80);
+    expect(cobalt.anchor.y, -400);
   });
 
   test('Lunar balance and terrain seeds are authored explicitly', () {
@@ -197,18 +288,28 @@ void main() {
     expect(homeworld.tint, isNot(equals(lunar.tint)));
   });
 
-  test('resource silhouettes give Lunar resources distinct identities', () {
-    final silhouettes = MiningContentRegistry.resourceSilhouettes;
+  test(
+    'resource silhouettes give Lunar and Mars resources distinct identities',
+    () {
+      final silhouettes = MiningContentRegistry.resourceSilhouettes;
 
-    expect(silhouettes.keys.toSet(), ResourceType.values.toSet());
-    final water = silhouettes[ResourceType.waterIce]!;
-    final titanium = silhouettes[ResourceType.titaniumOre]!;
-    final helium = silhouettes[ResourceType.helium3]!;
-    expect({water.icon, titanium.icon, helium.icon}.length, 3);
-    expect({water.name, titanium.name, helium.name}.length, 3);
-    expect({water.color, titanium.color, helium.color}.length, 3);
-    expect(water.icon, isA<IconData>());
-  });
+      expect(silhouettes.keys.toSet(), ResourceType.values.toSet());
+      final water = silhouettes[ResourceType.waterIce]!;
+      final titanium = silhouettes[ResourceType.titaniumOre]!;
+      final helium = silhouettes[ResourceType.helium3]!;
+      expect({water.icon, titanium.icon, helium.icon}.length, 3);
+      expect({water.name, titanium.name, helium.name}.length, 3);
+      expect({water.color, titanium.color, helium.color}.length, 3);
+      expect(water.icon, isA<IconData>());
+
+      final iron = silhouettes[ResourceType.ironOre]!;
+      final silica = silhouettes[ResourceType.silica]!;
+      final cobalt = silhouettes[ResourceType.cobaltOre]!;
+      expect({iron.icon, silica.icon, cobalt.icon}.length, 3);
+      expect({iron.name, silica.name, cobalt.name}.length, 3);
+      expect({iron.color, silica.color, cobalt.color}.length, 3);
+    },
+  );
 
   test('clean mining state reveals only Landing Basin', () {
     final now = DateTime.utc(2026, 8, 18, 12);

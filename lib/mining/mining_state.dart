@@ -139,13 +139,9 @@ class MiningSave {
     technology: const TechnologyLevels(),
     unlockedPlanetIds: const {MiningPlanetId.homeworld},
     activePlanetId: MiningPlanetId.homeworld,
-    sectors: const {
-      MiningSectorId.landingBasin: SectorProgress(revealed: true),
-      MiningSectorId.carbonRidge: SectorProgress(revealed: false),
-      MiningSectorId.graniteCrater: SectorProgress(revealed: false),
-      MiningSectorId.frozenBasin: SectorProgress(revealed: false),
-      MiningSectorId.titaniumHighlands: SectorProgress(revealed: false),
-      MiningSectorId.heliumMare: SectorProgress(revealed: false),
+    sectors: {
+      for (final id in MiningSectorId.values)
+        id: SectorProgress(revealed: id == MiningSectorId.landingBasin),
     },
   );
 
