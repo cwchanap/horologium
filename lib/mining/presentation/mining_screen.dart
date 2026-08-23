@@ -403,9 +403,11 @@ class _MiningScreenState extends State<MiningScreen>
     Future<MiningActionResult> Function() operation, {
     required String successMessage,
   }) async {
-    if (!_initialized) return;
+    if (!_initialized || _controller.isBusy) return;
+    final pendingOperation = operation();
+    _refreshPresentation();
     try {
-      final result = await operation();
+      final result = await pendingOperation;
       if (!mounted) return;
       _refreshPresentation();
       if (result.isSuccess) {
@@ -484,14 +486,14 @@ class _MiningScreenState extends State<MiningScreen>
                 key: const Key('mining-technology-button'),
                 tooltip: 'Technology',
                 icon: Icons.science,
-                onPressed: _openTechnology,
+                onPressed: _controller.isBusy ? null : _openTechnology,
               ),
               const SizedBox(width: 8),
               _chromeIconButton(
                 key: const Key('mining-stellar-map-button'),
                 tooltip: 'Stellar Map',
                 icon: Icons.map_outlined,
-                onPressed: _openStellarMap,
+                onPressed: _controller.isBusy ? null : _openStellarMap,
               ),
               const SizedBox(width: 8),
               _chromeIconButton(
@@ -511,7 +513,7 @@ class _MiningScreenState extends State<MiningScreen>
     required Key key,
     required String tooltip,
     required IconData icon,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
   }) {
     return IconButton(
       key: key,
