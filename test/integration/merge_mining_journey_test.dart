@@ -30,10 +30,22 @@ Future<void> earnUntil(
   TestClock clock, {
   required int cashAtLeast,
   required String phase,
+  int maxIterations = 100,
 }) async {
   final startedAt = clock.now;
   final revenues = <int>[];
+  var iterations = 0;
   while (controller.state.cash < cashAtLeast) {
+    if (iterations >= maxIterations) {
+      fail(
+        '$phase failed to reach cash target $cashAtLeast after '
+        '$iterations five-minute accruals; '
+        'current cash=${controller.state.cash}; '
+        'last revenue=${revenues.isEmpty ? 'none' : revenues.last}; '
+        'revenue history=${revenues.join('/')}',
+      );
+    }
+    iterations++;
     clock.advance(const Duration(minutes: 5));
     final sale = await controller.sellAllCargo();
     expect(
@@ -50,6 +62,41 @@ Future<void> earnUntil(
 }
 
 void main() {
+  test(
+    'earnUntil reports phase, target, cash, and revenue at its bound',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final clock = TestClock(DateTime.utc(2026, 8, 27, 12));
+      final content = MiningContentRegistry.stellarMining();
+      final repository = MiningSaveRepository(content: content);
+      final controller = MiningController(
+        content: content,
+        repository: repository,
+        nowUtc: clock.call,
+      );
+      await controller.initialize();
+
+      await expectLater(
+        earnUntil(
+          controller,
+          clock,
+          cashAtLeast: 101,
+          phase: 'bound probe',
+          maxIterations: 0,
+        ),
+        throwsA(
+          predicate<Object>((error) {
+            final message = error.toString();
+            return message.contains('bound probe') &&
+                message.contains('cash target 101') &&
+                message.contains('current cash=100') &&
+                message.contains('last revenue=none');
+          }),
+        ),
+      );
+    },
+  );
+
   test(
     'fresh public actions commission every site through Mars and reload the save',
     () async {

@@ -9,6 +9,9 @@
 - This follow-up adds the responsive landscape layout and closes the browser
   suite/build evidence gates. Follow-up commit subject:
   `fix(mining): preserve landscape site actions`.
+- Review follow-up: bounded the journey's simulated earning helper with a
+  deterministic iteration ceiling and corrected `CLAUDE.md` to describe
+  `refresh()` as in-memory publication rather than per-second persistence.
 - Changed deliverables: `test/integration/merge_mining_journey_test.dart`,
   removal of `test/integration/mining_mvp_journey_test.dart`,
   `docs/playtests/2026-08-26-hpa-285-three-planet-merge-mining.md`,
@@ -30,6 +33,13 @@ or bypasses affordability.
   that assertion with `Expected: <101> Actual: <100>`.
 - GREEN: restored the contract assertion to `100`; the same command passed with
   `00:00 +1: All tests passed!`.
+- Review RED: the focused bound-diagnostic test was added before the helper
+  bound; the focused command failed to compile with `No named parameter with
+  the name 'maxIterations'`.
+- Review GREEN: `earnUntil` now defaults to 100 five-minute iterations and
+  fails with phase, cash target, current cash, last revenue, and revenue
+  history evidence. The focused host and Chrome journey commands pass with
+  `00:00 +2: All tests passed!`.
 - The journey starts with the two fresh Homeworld T1 rigs, merges them, and
   deploys T2 to Landing Basin. It then earns and sells through Carbon Ridge and
   Granite Crater, commissions Homeworld, buys Surveying 1/2/3, unlocks Lunar,
@@ -141,12 +151,12 @@ There is exactly one current declaration for each required class.
 | --- | --- | --- |
 | `dart format --output=none --set-exit-if-changed .` | PASS | Final source check: `Formatted 50 files (0 changed)`. |
 | `flutter analyze --fatal-infos` | PASS | Final source analysis recorded after the follow-up edits: `No issues found!`. |
-| `flutter test` | PASS | Final host suite: `00:10 +205: All tests passed!`. |
-| `flutter test --coverage` | PASS | Final host coverage suite: `00:07 +205: All tests passed!`; coverage file generated. |
-| `flutter test --platform chrome` | PASS (`+204 ~1`) | Full Chrome suite completed in about 23 seconds with 204 passed and one intentional skip. The only skip is `every site cavern node and card resolves`, skipped only under `kIsWeb` because this runner stalls on the first `rootBundle` byte load; the complete sequential proof remains active in host/full/coverage suites. |
+| `flutter test` | PASS | Final host suite before this review follow-up: `00:10 +205: All tests passed!`; review follow-up full host rerun: `00:05 +206: All tests passed!`. |
+| `flutter test --coverage` | PASS | Final host coverage suite before this review follow-up: `00:07 +205: All tests passed!`; review follow-up refresh: `00:07 +206: All tests passed!`; coverage file generated. |
+| `flutter test --platform chrome` | PASS (`+205 ~1`) | Review follow-up full Chrome suite completed in about 20 seconds with 205 passed and one intentional skip. The only skip is `every site cavern node and card resolves`, skipped only under `kIsWeb` because this runner stalls on the first `rootBundle` byte load; the complete sequential proof remains active in host/full/coverage suites. |
 | focused Site Deck presentation | PASS (`+5`) | `flutter test test/mining/presentation/site_deck_screen_test.dart`: existing states/callback/target/portrait checks plus the 874x402/text-scale-1.3 dock/navigation reachability regression. |
 | focused Chrome visuals | PASS (`+2 ~1`) | `flutter test --platform chrome test/mining/presentation/mining_visuals_test.dart`: structural/common-asset checks pass; web-only byte-load test is explicitly skipped for the runner limitation. |
-| focused Chrome journey | PASS | `flutter test --platform chrome test/integration/merge_mining_journey_test.dart`: `+1: All tests passed!`. |
+| focused Chrome journey | PASS (`+2`) | `flutter test --platform chrome test/integration/merge_mining_journey_test.dart`: `00:00 +2: All tests passed!`. |
 | `flutter build apk --debug` | PASS | Exact escalated run completed; artifact `build/app/outputs/flutter-apk/app-debug.apk`. Generated native migration diffs were restored because native scaffold migration is outside this task's scope. |
 | `flutter build web` | PASS | Exact escalated run completed: `✓ Built build/web`. |
 | supporting `flutter build web --release` | PASS | Release build completed with `✓ Built build/web`; this artifact powered the genuine Chrome session. |
@@ -174,6 +184,10 @@ replaced with path-only assertions.
 - [x] README/CLAUDE describe the current architecture and persistence/economy/
   asset semantics.
 - [x] Exact legacy and uniqueness scans were run and recorded.
+- [x] `earnUntil` has a deterministic 100-iteration bound with phase, target,
+  current cash, and revenue diagnostics plus a focused regression test.
+- [x] `CLAUDE.md` distinguishes in-memory `refresh()` publication from
+  persistence performed by committing mutations and lifecycle checkpoints.
 - [x] The 874x402 landscape Site Deck action is clear of the dock/navigation
   at text scale 1.3 with all tested controls retaining 48px minimum targets.
 - [x] Host format, fatal-info analysis, full tests, and coverage pass.
