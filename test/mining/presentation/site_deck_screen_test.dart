@@ -257,22 +257,29 @@ void main() {
       },
     );
     await tester.pumpWidget(
-      MediaQuery(
-        data: MediaQueryData(textScaler: TextScaler.linear(1.3)),
-        child: MaterialApp(
-          home: SiteDeckScreen(
-            view: _deckView(state),
-            fleetDock: _dockView(state),
-            onEnterSite: (_) {},
-            onUnlockSite: (_) {},
-            onBayTap: (_) {},
-            onSpawnRig: () {},
-            onDestinationSelected: (_) {},
-          ),
+      MaterialApp(
+        home: SiteDeckScreen(
+          view: _deckView(state),
+          fleetDock: _dockView(state),
+          onEnterSite: (_) {},
+          onUnlockSite: (_) {},
+          onBayTap: (_) {},
+          onSpawnRig: () {},
+          onDestinationSelected: (_) {},
+        ),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(1.3)),
+          child: child!,
         ),
       ),
     );
-    for (final size in [const Size(360, 640), const Size(430, 932)]) {
+    for (final size in [
+      const Size(360, 640),
+      const Size(430, 932),
+      const Size(874, 402),
+    ]) {
       tester.view.physicalSize = size;
       await tester.pump();
       expect(tester.takeException(), isNull);
@@ -287,4 +294,75 @@ void main() {
       expect(navRect.bottom, lessThanOrEqualTo(size.height));
     }
   });
+
+  testWidgets(
+    'keeps the landscape site action reachable above the fixed dock',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(874, 402);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      final state = _stateWith(
+        cash: 2_000,
+        sites: {MiningSiteId.landingBasin: _progress(unlocked: true)},
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SiteDeckScreen(
+            view: _deckView(state),
+            fleetDock: _dockView(state),
+            onEnterSite: (_) {},
+            onUnlockSite: (_) {},
+            onBayTap: (_) {},
+            onSpawnRig: () {},
+            onDestinationSelected: (_) {},
+          ),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(1.3)),
+            child: child!,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final action = find.byKey(const Key('site-card-landingBasin-enter'));
+      final initialActionRect = tester.getRect(action);
+      final dockRect = tester.getRect(find.byKey(const Key('fleet-dock')));
+      final navRect = tester.getRect(
+        find.byKey(const Key('mining-bottom-navigation')),
+      );
+      expect(initialActionRect.top, greaterThanOrEqualTo(0));
+      expect(initialActionRect.bottom, lessThanOrEqualTo(navRect.top));
+      expect(initialActionRect.overlaps(dockRect), isFalse);
+      expect(initialActionRect.overlaps(navRect), isFalse);
+      final spawn = find.byKey(const Key('fleet-dock-spawn'));
+      final spawnSize = tester.getSize(spawn);
+      expect(spawnSize.width, greaterThanOrEqualTo(48));
+      expect(spawnSize.height, greaterThanOrEqualTo(48));
+      for (final bay in DockBayId.values) {
+        final control = find.byKey(ValueKey<String>(bay.name));
+        final size = tester.getSize(control);
+        expect(size.width, greaterThanOrEqualTo(48));
+        expect(size.height, greaterThanOrEqualTo(48));
+      }
+      for (final destination in MiningNavigationDestination.values) {
+        final control = find.byKey(Key('mining-nav-${destination.name}'));
+        final size = tester.getSize(control);
+        expect(size.width, greaterThanOrEqualTo(48));
+        expect(size.height, greaterThanOrEqualTo(48));
+      }
+      await tester.ensureVisible(action);
+      await tester.pump();
+      final actionRect = tester.getRect(action);
+      expect(actionRect.top, greaterThanOrEqualTo(0));
+      expect(actionRect.bottom, lessThanOrEqualTo(navRect.top));
+      expect(actionRect.overlaps(dockRect), isFalse);
+      expect(actionRect.overlaps(navRect), isFalse);
+      expect(actionRect.height, greaterThanOrEqualTo(48));
+    },
+  );
 }

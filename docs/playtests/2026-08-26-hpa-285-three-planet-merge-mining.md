@@ -15,7 +15,8 @@ deterministic journey.
   served locally at `http://127.0.0.1:8766/`.
 - Representative session: Chrome `151.0.7922.174` on macOS Darwin 25.5,
   arm64. The available iPad Pro 13-inch (M5) iOS 26.5 simulator was not used
-  for gameplay because the iOS build could not produce a runnable app.
+  for gameplay; the simulator debug build now passes, but no representative
+  iOS gameplay session was run.
 - Audio: opened Settings in the running app and switched Music from enabled to
   disabled; the muted toggle was visibly off. No audio was introduced by the
   mining surfaces.
@@ -38,10 +39,12 @@ horologium-360x640-muted-reduced.png`, `horologium-402x874-shell.png`,
 | 360x640 | portrait | Site Deck, muted/reduced-motion state, Landing Basin and Fleet Dock visible; no overflow observed |
 | 402x874 | portrait | Site Deck showed all three Homeworld cards, dock, and bottom navigation |
 | 430x932 | portrait | Site Deck and Mine Site usable; deployment controls, cavern, node, cargo, sell, and dock rendered |
-| 874x402 | landscape | Mine Site remained usable with the right rail; Site Deck's lower card/action area was covered by the fixed Fleet Dock |
+| 874x402 | landscape | The live release capture showed the Site Deck action behind the fixed full-width Fleet Dock; the follow-up responsive side rail now reserves the dock beside the deck, and the 874x402/text-scale-1.3 geometry regression confirms the action does not overlap the dock or navigation |
 
-The landscape Site Deck overlap is an observed presentation concern. It did not
-change the economy decision and was not changed in this validation task.
+The landscape overlap was an observed presentation defect in the captured
+release build. It did not change the economy decision; the follow-up layout fix
+is covered by the focused host geometry test rather than represented as a new
+live release observation.
 
 ## Live early-game observations
 
@@ -105,7 +108,5 @@ representative long session should re-check those timings before tuning.
 - Live mid/late fill timing, both live transition merge cycles, and live
   fresh-to-Mars completion remain unobserved; do not represent the deterministic
   journey as device evidence.
-- Landscape Site Deck content is obscured by the fixed Fleet Dock at 874x402.
-- The required iOS simulator debug build was attempted separately and is
-  blocked by the local Flutter/Xcode/plugin environment; see the Task 11
-  report for the exact error.
+- No representative iOS gameplay session was run, despite the simulator debug
+  build passing.

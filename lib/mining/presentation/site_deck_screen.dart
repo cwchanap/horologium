@@ -34,89 +34,115 @@ class SiteDeckScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).height < 500;
+    final size = MediaQuery.sizeOf(context);
+    final compact = size.height < 500;
+    final landscape = size.width > size.height;
+    final deckContent = <Widget>[
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+        child: MiningHud(
+          planetName: view.planetName,
+          cash: cash,
+          commissionedSites: view.commissionedCount,
+          totalSites: view.siteCount,
+          cargoValue: view.projectedValue,
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 5),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.radar_rounded,
+              color: MiningTheme.accent,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '${view.planetName.toUpperCase()} SITE DECK',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MiningTheme.primaryText,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+            Text(
+              '${view.totalRate.toStringAsFixed(2)}/s',
+              style: const TextStyle(
+                color: MiningTheme.accent,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+      if (!compact)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 5),
+          child: _DeckSummary(view: view),
+        ),
+      Expanded(
+        child: ListView.separated(
+          key: const Key('site-deck-scroll'),
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+          itemCount: view.sites.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 9),
+          itemBuilder: (context, index) => _SiteCard(
+            card: view.sites[index],
+            onEnter: () => onEnterSite(view.sites[index].id),
+            onUnlock: () => onUnlockSite(view.sites[index].id),
+          ),
+        ),
+      ),
+    ];
+    final dock = Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: FleetDock(
+        view: fleetDock,
+        onBayTap: onBayTap,
+        onSpawnRig: onSpawnRig,
+      ),
+    );
+    final navigation = MiningNavigationBar(
+      selected: selectedDestination,
+      onDestinationSelected: onDestinationSelected,
+    );
     return ColoredBox(
       key: const Key('mining-shell-placeholder'),
       color: const Color(0xFF07111E),
       child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-              child: MiningHud(
-                planetName: view.planetName,
-                cash: cash,
-                commissionedSites: view.commissionedCount,
-                totalSites: view.siteCount,
-                cargoValue: view.projectedValue,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 5),
-              child: Row(
+        child: landscape
+            ? Column(
                 children: [
-                  const Icon(
-                    Icons.radar_rounded,
-                    color: MiningTheme.accent,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      '${view.planetName.toUpperCase()} SITE DECK',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: MiningTheme.primaryText,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.1,
-                      ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: Column(children: deckContent)),
+                        SizedBox(
+                          width: 248,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 10, 12, 8),
+                            child: FleetDock(
+                              view: fleetDock,
+                              onBayTap: onBayTap,
+                              onSpawnRig: onSpawnRig,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Text(
-                    '${view.totalRate.toStringAsFixed(2)}/s',
-                    style: const TextStyle(
-                      color: MiningTheme.accent,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  navigation,
                 ],
-              ),
-            ),
-            if (!compact)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 5),
-                child: _DeckSummary(view: view),
-              ),
-            Expanded(
-              child: ListView.separated(
-                key: const Key('site-deck-scroll'),
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-                itemCount: view.sites.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 9),
-                itemBuilder: (context, index) => _SiteCard(
-                  card: view.sites[index],
-                  onEnter: () => onEnterSite(view.sites[index].id),
-                  onUnlock: () => onUnlockSite(view.sites[index].id),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: FleetDock(
-                view: fleetDock,
-                onBayTap: onBayTap,
-                onSpawnRig: onSpawnRig,
-              ),
-            ),
-            MiningNavigationBar(
-              selected: selectedDestination,
-              onDestinationSelected: onDestinationSelected,
-            ),
-          ],
-        ),
+              )
+            : Column(children: [...deckContent, dock, navigation]),
       ),
     );
   }
