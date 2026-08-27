@@ -172,7 +172,7 @@ void main() {
     );
   });
 
-  testWidgets('controller and audio identities survive rebuild', (
+  testWidgets('controller and audio identities survive rebuild and rotation', (
     tester,
   ) async {
     final clock = TestClock(_start);
@@ -190,25 +190,32 @@ void main() {
     );
     final before = shellHandles(tester);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: MediaQuery(
-          data: const MediaQueryData(),
-          child: MiningShell(
-            key: shellKey,
-            content: MiningContentRegistry.stellarMining(),
-            repository: null,
-            nowUtc: null,
-            audioManager: null,
+    final portraitSize = tester.view.physicalSize;
+    try {
+      tester.view.physicalSize = const Size(640, 360);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(),
+            child: MiningShell(
+              key: shellKey,
+              content: MiningContentRegistry.stellarMining(),
+              repository: repository,
+              nowUtc: clock.call,
+              audioManager: audioManager,
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    final after = shellHandles(tester);
-    expect(after.controller, same(before.controller));
-    expect(after.audioManager, same(before.audioManager));
+      final after = shellHandles(tester);
+      expect(after.controller, same(before.controller));
+      expect(after.audioManager, same(before.audioManager));
+    } finally {
+      tester.view.physicalSize = portraitSize;
+      await tester.pump();
+    }
   });
 
   testWidgets('first gesture starts BGM through the injected manager', (
