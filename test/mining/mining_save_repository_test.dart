@@ -6,81 +6,111 @@ import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  const key = 'horologium.mining.save';
-  final now = DateTime.utc(2026, 8, 18, 12);
-  const validMiningSave =
-      '{"cash":100,"lastAccruedAtUtc":"2026-08-18T12:00:00.000Z",'
-      '"technology":{"extraction":0,"logistics":0,"surveying":0},'
-      '"unlockedPlanetIds":["homeworld"],"activePlanetId":"homeworld",'
-      '"sectors":{"landingBasin":{"revealed":true,"mine":null},'
-      '"carbonRidge":{"revealed":false,"mine":null},'
-      '"graniteCrater":{"revealed":false,"mine":null},'
-      '"frozenBasin":{"revealed":false,"mine":null},'
-      '"titaniumHighlands":{"revealed":false,"mine":null},'
-      '"heliumMare":{"revealed":false,"mine":null},'
-      '"ochreBasin":{"revealed":false,"mine":null},'
-      '"silicaDunes":{"revealed":false,"mine":null},'
-      '"cobaltChasm":{"revealed":false,"mine":null}}}';
+MiningSave _progressedState(DateTime now) {
+  final initial = MiningSave.initial(nowUtc: now);
+  final docks = <MiningPlanetId, Map<DockBayId, RigTier?>>{
+    for (final entry in initial.docks.entries)
+      entry.key: Map<DockBayId, RigTier?>.from(entry.value),
+  };
+  final sites = <MiningSiteId, SiteProgress>{
+    for (final entry in initial.sites.entries)
+      entry.key: entry.value.copyWith(
+        rigByNode: Map<MiningNodeId, RigTier?>.from(entry.value.rigByNode),
+      ),
+  };
 
-  const oldSixSectorSave =
-      '{"cash":100,"lastAccruedAtUtc":"2026-08-18T12:00:00.000Z",'
-      '"technology":{"extraction":0,"logistics":0,"surveying":0},'
-      '"unlockedPlanetIds":["homeworld"],"activePlanetId":"homeworld",'
-      '"sectors":{"landingBasin":{"revealed":true,"mine":null},'
-      '"carbonRidge":{"revealed":false,"mine":null},'
-      '"graniteCrater":{"revealed":false,"mine":null},'
-      '"frozenBasin":{"revealed":false,"mine":null},'
-      '"titaniumHighlands":{"revealed":false,"mine":null},'
-      '"heliumMare":{"revealed":false,"mine":null}}}';
+  docks[MiningPlanetId.homeworld]![DockBayId.b1] = RigTier.t3;
+  docks[MiningPlanetId.homeworld]![DockBayId.b2] = null;
+  docks[MiningPlanetId.lunarFrontier]![DockBayId.b1] = RigTier.t1;
+  docks[MiningPlanetId.lunarFrontier]![DockBayId.b2] = RigTier.t2;
+
+  sites[MiningSiteId.landingBasin] = sites[MiningSiteId.landingBasin]!.copyWith(
+    commissioned: true,
+    storedAmount: 80,
+    rigByNode: {
+      ...sites[MiningSiteId.landingBasin]!.rigByNode,
+      MiningNodeId.n1: RigTier.t1,
+    },
+  );
+  sites[MiningSiteId.carbonRidge] = sites[MiningSiteId.carbonRidge]!.copyWith(
+    unlocked: true,
+    commissioned: true,
+    storedAmount: 40,
+    rigByNode: {
+      ...sites[MiningSiteId.carbonRidge]!.rigByNode,
+      MiningNodeId.n1: RigTier.t1,
+    },
+  );
+  sites[MiningSiteId.frozenBasin] = sites[MiningSiteId.frozenBasin]!.copyWith(
+    unlocked: true,
+    commissioned: true,
+    storedAmount: 60,
+    rigByNode: {
+      ...sites[MiningSiteId.frozenBasin]!.rigByNode,
+      MiningNodeId.n1: RigTier.t2,
+    },
+  );
+
+  return initial.copyWith(
+    cash: 4321,
+    lastAccruedAtUtc: now,
+    technology: const TechnologyLevels(
+      extraction: 2,
+      logistics: 1,
+      surveying: 3,
+    ),
+    unlockedPlanetIds: const {
+      MiningPlanetId.homeworld,
+      MiningPlanetId.lunarFrontier,
+    },
+    activePlanetId: MiningPlanetId.lunarFrontier,
+    docks: docks,
+    sites: sites,
+  );
+}
+
+Map<String, Object?> _rawDocument({MiningSave? state, DateTime? nowUtc}) =>
+    Map<String, Object?>.from(
+      (state ?? MiningSave.initial(nowUtc: nowUtc ?? DateTime.utc(2026, 8, 27)))
+          .toJson(),
+    );
+
+void main() {
+  final now = DateTime.utc(2026, 8, 27, 12);
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
-
-  const pristineSector = <String, Object?>{'revealed': false, 'mine': null};
-
-  Map<String, Object?> currentSectors({
-    Map<String, Object?>? landingBasin,
-    Map<String, Object?>? carbonRidge,
-    Map<String, Object?>? graniteCrater,
-    Map<String, Object?>? frozenBasin,
-    Map<String, Object?>? titaniumHighlands,
-    Map<String, Object?>? heliumMare,
-    Map<String, Object?>? ochreBasin,
-    Map<String, Object?>? silicaDunes,
-    Map<String, Object?>? cobaltChasm,
-  }) => <String, Object?>{
-    'landingBasin': landingBasin ?? pristineSector,
-    'carbonRidge': carbonRidge ?? pristineSector,
-    'graniteCrater': graniteCrater ?? pristineSector,
-    'frozenBasin': frozenBasin ?? pristineSector,
-    'titaniumHighlands': titaniumHighlands ?? pristineSector,
-    'heliumMare': heliumMare ?? pristineSector,
-    'ochreBasin': ochreBasin ?? pristineSector,
-    'silicaDunes': silicaDunes ?? pristineSector,
-    'cobaltChasm': cobaltChasm ?? pristineSector,
-  };
-
-  Map<String, Object?> currentDoc({
-    int cash = 100,
-    String? lastAccruedAtUtc,
-    Map<String, Object?>? technology,
-    List<String>? unlockedPlanetIds,
-    String? activePlanetId,
-    Map<String, Object?>? sectors,
-  }) => <String, Object?>{
-    'cash': cash,
-    'lastAccruedAtUtc': lastAccruedAtUtc ?? now.toIso8601String(),
-    'technology':
-        technology ?? {'extraction': 0, 'logistics': 0, 'surveying': 0},
-    'unlockedPlanetIds': unlockedPlanetIds ?? ['homeworld'],
-    'activePlanetId': activePlanetId ?? 'homeworld',
-    'sectors': sectors ?? currentSectors(),
-  };
 
   group('hasSave presence', () {
     test('empty preferences report no mining save', () async {
       expect(await MiningSaveRepository().hasSave(), isFalse);
     });
+
+    test('presence ignores retired mining key', () async {
+      SharedPreferences.setMockInitialValues({'horologium.mining.save': '{}'});
+      final repository = MiningSaveRepository();
+
+      expect(MiningSaveRepository.saveKey, 'horologium.mergeMining.save');
+      expect(await repository.hasSave(), isFalse);
+    });
+
+    test('presence of a valid merge-mining document reports a save', () async {
+      SharedPreferences.setMockInitialValues({
+        MiningSaveRepository.saveKey: jsonEncode(_rawDocument(nowUtc: now)),
+      });
+
+      expect(await MiningSaveRepository().hasSave(), isTrue);
+    });
+
+    test(
+      'presence of a malformed merge-mining document still reports a save',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          MiningSaveRepository.saveKey: '{ malformed mining json',
+        });
+
+        expect(await MiningSaveRepository().hasSave(), isTrue);
+      },
+    );
 
     test('legacy city keys do not count as a mining save', () async {
       SharedPreferences.setMockInitialValues({
@@ -91,39 +121,26 @@ void main() {
 
       expect(await MiningSaveRepository().hasSave(), isFalse);
     });
-
-    test('presence of a valid mining document reports a save', () async {
-      SharedPreferences.setMockInitialValues({key: validMiningSave});
-
-      expect(await MiningSaveRepository().hasSave(), isTrue);
-    });
-
-    test(
-      'presence of a malformed mining document still reports a save',
-      () async {
-        SharedPreferences.setMockInitialValues({
-          key: '{ malformed mining json',
-        });
-
-        expect(await MiningSaveRepository().hasSave(), isTrue);
-      },
-    );
   });
 
   group('load', () {
     test('missing save returns clean state without recovery warning', () async {
       final result = await MiningSaveRepository().load(nowUtc: now);
-      expect(result.state.cash, 100);
+
+      expect(result.state, MiningSave.initial(nowUtc: now));
       expect(result.recoveredFromInvalidSave, isFalse);
       expect(result.wasMissing, isTrue);
     });
 
-    test('round trips the exact first-planet document', () async {
+    test('round-trips enum-keyed docks and flat sites', () async {
       final repository = MiningSaveRepository();
-      final state = MiningSave.initial(nowUtc: now).copyWith(cash: 321);
-      await repository.save(state);
+      final expected = _progressedState(now);
+
+      await repository.save(expected);
       final loaded = await repository.load(nowUtc: now);
-      expect(loaded.state.toJson(), state.toJson());
+
+      expect(loaded.state, expected);
+      expect(loaded.recoveredFromInvalidSave, isFalse);
       expect(loaded.wasMissing, isFalse);
     });
 
@@ -132,7 +149,9 @@ void main() {
       await repository.save(MiningSave.initial(nowUtc: now));
 
       final prefs = await SharedPreferences.getInstance();
-      final decoded = jsonDecode(prefs.getString(key)!) as Map<String, Object?>;
+      final decoded =
+          jsonDecode(prefs.getString(MiningSaveRepository.saveKey)!)
+              as Map<String, Object?>;
 
       expect(decoded.keys.toSet(), {
         'cash',
@@ -140,12 +159,19 @@ void main() {
         'technology',
         'unlockedPlanetIds',
         'activePlanetId',
-        'sectors',
+        'docks',
+        'sites',
       });
     });
 
-    test('old six-sector HPA-638 document resets through recovery', () async {
-      SharedPreferences.setMockInitialValues({key: oldSixSectorSave});
+    test('retired sector schema resets through recovery', () async {
+      final raw = _rawDocument(nowUtc: now)
+        ..remove('docks')
+        ..remove('sites')
+        ..['sectors'] = <String, Object?>{};
+      SharedPreferences.setMockInitialValues({
+        MiningSaveRepository.saveKey: jsonEncode(raw),
+      });
 
       final result = await MiningSaveRepository().load(nowUtc: now);
 
@@ -155,22 +181,27 @@ void main() {
     });
 
     test('malformed JSON resets and reports recovery', () async {
-      SharedPreferences.setMockInitialValues({key: '{not-json'});
+      SharedPreferences.setMockInitialValues({
+        MiningSaveRepository.saveKey: '{not-json',
+      });
+
       final result = await MiningSaveRepository().load(nowUtc: now);
-      expect(result.state.cash, 100);
+
+      expect(result.state, MiningSave.initial(nowUtc: now));
       expect(result.recoveredFromInvalidSave, isTrue);
       expect(result.wasMissing, isFalse);
     });
 
     test('non-String preference value resets and reports recovery', () async {
-      // SharedPreferences.getString throws a runtime cast error when the
-      // stored value is not a String. hasSave() still reports presence, so
-      // load() must route this case through the recovery boundary instead of
-      // letting the cast escape and brick the screen.
-      SharedPreferences.setMockInitialValues({key: 123});
-      expect(await MiningSaveRepository().hasSave(), isTrue);
-      final result = await MiningSaveRepository().load(nowUtc: now);
-      expect(result.state.cash, 100);
+      SharedPreferences.setMockInitialValues({
+        MiningSaveRepository.saveKey: 123,
+      });
+      final repository = MiningSaveRepository();
+
+      expect(await repository.hasSave(), isTrue);
+      final result = await repository.load(nowUtc: now);
+
+      expect(result.state, MiningSave.initial(nowUtc: now));
       expect(result.recoveredFromInvalidSave, isTrue);
       expect(result.wasMissing, isFalse);
     });
@@ -181,62 +212,17 @@ void main() {
         'planet.earth.resources.cash': 888888.0,
         'buildings': <String>['1,1,Gold Mine'],
       });
+
       final result = await MiningSaveRepository().load(nowUtc: now);
-      expect(result.state.cash, 100);
-      expect(result.state.sectors[MiningSectorId.landingBasin]!.mine, isNull);
+
+      expect(result.state, MiningSave.initial(nowUtc: now));
       expect(result.wasMissing, isTrue);
     });
 
-    test(
-      'positive cargo above newly tuned capacity clamps without recovery',
-      () async {
-        final raw = currentDoc(
-          sectors: currentSectors(
-            landingBasin: {
-              'revealed': true,
-              'mine': {'level': 1, 'storedAmount': 120.0},
-            },
-          ),
-        );
-        SharedPreferences.setMockInitialValues({key: jsonEncode(raw)});
-
-        final result = await MiningSaveRepository().load(nowUtc: now);
-
-        expect(result.recoveredFromInvalidSave, isFalse);
-        expect(
-          result.state.sectors[MiningSectorId.landingBasin]!.mine!.storedAmount,
-          90,
-        );
-      },
-    );
-
-    test(
-      'logistics raises the decode clamp through effective capacity',
-      () async {
-        final raw = currentDoc(
-          technology: {'extraction': 0, 'logistics': 1, 'surveying': 0},
-          sectors: currentSectors(
-            landingBasin: {
-              'revealed': true,
-              'mine': {'level': 1, 'storedAmount': 120.0},
-            },
-          ),
-        );
-        SharedPreferences.setMockInitialValues({key: jsonEncode(raw)});
-
-        final result = await MiningSaveRepository().load(nowUtc: now);
-
-        expect(result.recoveredFromInvalidSave, isFalse);
-        expect(
-          result.state.sectors[MiningSectorId.landingBasin]!.mine!.storedAmount,
-          closeTo(103.5, 0.0001),
-        );
-        expect(result.state.technology.logistics, 1);
-      },
-    );
-
-    test('decoded unlocked planet ids are unmodifiable', () async {
-      SharedPreferences.setMockInitialValues({key: jsonEncode(currentDoc())});
+    test('decoded nested maps are unmodifiable', () async {
+      SharedPreferences.setMockInitialValues({
+        MiningSaveRepository.saveKey: jsonEncode(_rawDocument(nowUtc: now)),
+      });
 
       final result = await MiningSaveRepository().load(nowUtc: now);
 
@@ -244,152 +230,318 @@ void main() {
         () => result.state.unlockedPlanetIds.add(MiningPlanetId.lunarFrontier),
         throwsUnsupportedError,
       );
+      expect(
+        () =>
+            result.state.docks[MiningPlanetId.homeworld]![DockBayId.b1] = null,
+        throwsUnsupportedError,
+      );
+      expect(
+        () =>
+            result
+                    .state
+                    .sites[MiningSiteId.landingBasin]!
+                    .rigByNode[MiningNodeId.n1] =
+                RigTier.t1,
+        throwsUnsupportedError,
+      );
+    });
+  });
+
+  group('capacity normalization', () {
+    test('one deployed T1 cargo above 90 clamps without recovery', () async {
+      final initial = MiningSave.initial(nowUtc: now);
+      final state = initial.copyWith(
+        technology: const TechnologyLevels(surveying: 3),
+        sites: {
+          ...initial.sites,
+          MiningSiteId.landingBasin: initial.sites[MiningSiteId.landingBasin]!
+              .copyWith(
+                commissioned: true,
+                storedAmount: 120,
+                rigByNode: {
+                  for (final node in MiningNodeId.values)
+                    node: node == MiningNodeId.n1 ? RigTier.t1 : null,
+                },
+              ),
+        },
+      );
+      SharedPreferences.setMockInitialValues({
+        MiningSaveRepository.saveKey: jsonEncode(state.toJson()),
+      });
+
+      final result = await MiningSaveRepository().load(nowUtc: now);
+
+      expect(result.recoveredFromInvalidSave, isFalse);
+      expect(result.state.sites[MiningSiteId.landingBasin]!.storedAmount, 90);
+    });
+
+    test('four deployed T1 rigs preserve cargo below 360', () async {
+      final initial = MiningSave.initial(nowUtc: now);
+      final state = initial.copyWith(
+        technology: const TechnologyLevels(surveying: 3),
+        sites: {
+          ...initial.sites,
+          MiningSiteId.landingBasin: initial.sites[MiningSiteId.landingBasin]!
+              .copyWith(
+                commissioned: true,
+                storedAmount: 359,
+                rigByNode: {
+                  for (final node in MiningNodeId.values) node: RigTier.t1,
+                },
+              ),
+        },
+      );
+      SharedPreferences.setMockInitialValues({
+        MiningSaveRepository.saveKey: jsonEncode(state.toJson()),
+      });
+
+      final result = await MiningSaveRepository().load(nowUtc: now);
+
+      expect(result.recoveredFromInvalidSave, isFalse);
+      expect(result.state.sites[MiningSiteId.landingBasin]!.storedAmount, 359);
     });
   });
 
   group('invalid saves reset to initial with recovery flag', () {
+    Future<void> expectRecovered(Map<String, Object?> raw) async {
+      SharedPreferences.setMockInitialValues({
+        MiningSaveRepository.saveKey: jsonEncode(raw),
+      });
+
+      final result = await MiningSaveRepository().load(nowUtc: now);
+
+      expect(result.state, MiningSave.initial(nowUtc: now));
+      expect(result.recoveredFromInvalidSave, isTrue);
+      expect(result.wasMissing, isFalse);
+    }
+
+    test('root keys must be exact', () async {
+      final missing = _rawDocument(nowUtc: now)..remove('sites');
+      await expectRecovered(missing);
+
+      final extra = _rawDocument(nowUtc: now)..['extra'] = true;
+      await expectRecovered(extra);
+    });
+
+    test('docks must use exact planet and bay enum names', () async {
+      final missingPlanet = _rawDocument(nowUtc: now);
+      (missingPlanet['docks']! as Map<String, Object?>).remove('marsFrontier');
+      await expectRecovered(missingPlanet);
+
+      final extraPlanet = _rawDocument(nowUtc: now);
+      final extraPlanetDocks = Map<String, Object?>.from(
+        extraPlanet['docks']! as Map<String, Object?>,
+      );
+      extraPlanetDocks['venus'] = <String, Object?>{};
+      extraPlanet['docks'] = extraPlanetDocks;
+      await expectRecovered(extraPlanet);
+
+      final missingBay = _rawDocument(nowUtc: now);
+      final missingBayHomeworld =
+          (missingBay['docks']! as Map<String, Object?>)['homeworld']!
+              as Map<String, Object?>;
+      missingBayHomeworld.remove('b4');
+      await expectRecovered(missingBay);
+
+      final extraBay = _rawDocument(nowUtc: now);
+      ((extraBay['docks']! as Map<String, Object?>)['homeworld']!
+              as Map<String, Object?>)['b5'] =
+          null;
+      await expectRecovered(extraBay);
+
+      final invalidDockTier = _rawDocument(nowUtc: now);
+      ((invalidDockTier['docks']! as Map<String, Object?>)['homeworld']!
+              as Map<String, Object?>)['b1'] =
+          't6';
+      await expectRecovered(invalidDockTier);
+    });
+
+    test('sites and rigByNode use exact site and node enum names', () async {
+      final missingSite = _rawDocument(nowUtc: now);
+      (missingSite['sites']! as Map<String, Object?>).remove('cobaltChasm');
+      await expectRecovered(missingSite);
+
+      final extraSite = _rawDocument(nowUtc: now);
+      (extraSite['sites']! as Map<String, Object?>)['venus'] =
+          <String, Object?>{};
+      await expectRecovered(extraSite);
+
+      final missingField = _rawDocument(nowUtc: now);
+      ((missingField['sites']! as Map<String, Object?>)['landingBasin']!
+              as Map<String, Object?>)
+          .remove('commissioned');
+      await expectRecovered(missingField);
+
+      final extraField = _rawDocument(nowUtc: now);
+      ((extraField['sites']! as Map<String, Object?>)['landingBasin']!
+              as Map<String, Object?>)['extra'] =
+          true;
+      await expectRecovered(extraField);
+
+      final missingNode = _rawDocument(nowUtc: now);
+      (((missingNode['sites']! as Map<String, Object?>)['landingBasin']!
+                  as Map<String, Object?>)['rigByNode']!
+              as Map<String, Object?>)
+          .remove('n4');
+      await expectRecovered(missingNode);
+
+      final extraNode = _rawDocument(nowUtc: now);
+      (((extraNode['sites']! as Map<String, Object?>)['landingBasin']!
+                  as Map<String, Object?>)['rigByNode']!
+              as Map<String, Object?>)['n5'] =
+          null;
+      await expectRecovered(extraNode);
+
+      final invalidNodeTier = _rawDocument(nowUtc: now);
+      (((invalidNodeTier['sites']! as Map<String, Object?>)['landingBasin']!
+                  as Map<String, Object?>)['rigByNode']!
+              as Map<String, Object?>)['n1'] =
+          't6';
+      await expectRecovered(invalidNodeTier);
+    });
+
     final cases = <String, Map<String, Object?>>{
-      'negative cash': currentDoc(cash: -5),
-      'non-int cash': currentDoc()..['cash'] = 100.5,
-      'missing root field lastAccruedAtUtc': currentDoc()
+      'negative cash': _rawDocument(nowUtc: now)..['cash'] = -5,
+      'non-int cash': _rawDocument(nowUtc: now)..['cash'] = 100.5,
+      'missing root field lastAccruedAtUtc': _rawDocument(nowUtc: now)
         ..remove('lastAccruedAtUtc'),
-      'missing root field sectors': currentDoc()..remove('sectors'),
-      'missing root field technology': currentDoc()..remove('technology'),
-      'negative technology level': currentDoc(
-        technology: {'extraction': -1, 'logistics': 0, 'surveying': 0},
-      ),
-      'non-int technology level': currentDoc(
-        technology: {'extraction': 'one', 'logistics': 0, 'surveying': 0},
-      ),
-      'extraction technology level above 5': currentDoc(
-        technology: {'extraction': 6, 'logistics': 0, 'surveying': 0},
-      ),
-      'logistics technology level above 5': currentDoc(
-        technology: {'extraction': 0, 'logistics': 6, 'surveying': 0},
-      ),
-      'unknown planet id in unlocked list': currentDoc(
-        unlockedPlanetIds: ['homeworld', 'bogus'],
-      ),
-      'empty unlocked planet list': currentDoc(unlockedPlanetIds: []),
-      'active planet not unlocked': currentDoc(
-        unlockedPlanetIds: ['lunarFrontier'],
-        activePlanetId: 'homeworld',
-      ),
-      'Homeworld is not unlocked': currentDoc(
-        unlockedPlanetIds: ['lunarFrontier'],
-        activePlanetId: 'lunarFrontier',
-      ),
-      'locked Lunar sector is revealed': currentDoc(
-        sectors: currentSectors(frozenBasin: {'revealed': true, 'mine': null}),
-      ),
-      'locked Lunar sector has a mine': currentDoc(
-        sectors: currentSectors(
-          frozenBasin: {
-            'revealed': true,
-            'mine': {'level': 1, 'storedAmount': 10.0},
+      'malformed timestamp': _rawDocument(nowUtc: now)
+        ..['lastAccruedAtUtc'] = 'not-a-date',
+      'non-UTC timestamp': _rawDocument(nowUtc: now)
+        ..['lastAccruedAtUtc'] = '2026-08-27T12:00:00',
+      'missing technology field': _rawDocument(nowUtc: now)
+        ..remove('technology'),
+      'technology with unknown field': _rawDocument(nowUtc: now)
+        ..['technology'] = {
+          'extraction': 0,
+          'logistics': 0,
+          'surveying': 0,
+          'unknown': 0,
+        },
+      'negative technology level': _rawDocument(nowUtc: now)
+        ..['technology'] = {'extraction': -1, 'logistics': 0, 'surveying': 0},
+      'non-int technology level': _rawDocument(
+        nowUtc: now,
+      )..['technology'] = {'extraction': 'one', 'logistics': 0, 'surveying': 0},
+      'technology level above 5': _rawDocument(nowUtc: now)
+        ..['technology'] = {'extraction': 6, 'logistics': 0, 'surveying': 0},
+      'empty unlocked planet list': _rawDocument(nowUtc: now)
+        ..['unlockedPlanetIds'] = <String>[],
+      'duplicate unlocked planet': _rawDocument(nowUtc: now)
+        ..['unlockedPlanetIds'] = ['homeworld', 'homeworld'],
+      'unknown unlocked planet': _rawDocument(nowUtc: now)
+        ..['unlockedPlanetIds'] = ['homeworld', 'bogus'],
+      'unknown active planet': _rawDocument(nowUtc: now)
+        ..['activePlanetId'] = 'bogus',
+      'active planet not unlocked': _rawDocument(nowUtc: now)
+        ..['activePlanetId'] = 'lunarFrontier',
+      'Homeworld is not unlocked': _rawDocument(nowUtc: now)
+        ..['unlockedPlanetIds'] = ['lunarFrontier']
+        ..['activePlanetId'] = 'lunarFrontier',
+      'unlocked planet prerequisite missing': _rawDocument(nowUtc: now)
+        ..['unlockedPlanetIds'] = ['homeworld', 'marsFrontier']
+        ..['activePlanetId'] = 'homeworld',
+      'locked planet has a rig': _rawDocument(nowUtc: now)
+        ..['docks'] = {
+          ...(_rawDocument(nowUtc: now)['docks']! as Map<String, Object?>),
+          'lunarFrontier': {'b1': 't1', 'b2': null, 'b3': null, 'b4': null},
+        },
+      'locked planet has non-pristine site': _rawDocument(nowUtc: now)
+        ..['sites'] = {
+          ...(_rawDocument(nowUtc: now)['sites']! as Map<String, Object?>),
+          'frozenBasin': {
+            'unlocked': false,
+            'commissioned': false,
+            'storedAmount': 1,
+            'rigByNode': {'n1': null, 'n2': null, 'n3': null, 'n4': null},
           },
-        ),
-      ),
-      'locked Mars sector is revealed': currentDoc(
-        sectors: currentSectors(ochreBasin: {'revealed': true, 'mine': null}),
-      ),
-      'locked Mars sector has a mine': currentDoc(
-        sectors: currentSectors(
-          ochreBasin: {
-            'revealed': true,
-            'mine': {'level': 1, 'storedAmount': 10.0},
+        },
+      'locked site is commissioned': _rawDocument(nowUtc: now)
+        ..['sites'] = {
+          ...(_rawDocument(nowUtc: now)['sites']! as Map<String, Object?>),
+          'carbonRidge': {
+            'unlocked': false,
+            'commissioned': true,
+            'storedAmount': 0,
+            'rigByNode': {'n1': null, 'n2': null, 'n3': null, 'n4': null},
           },
-        ),
-      ),
-      'unknown active planet': currentDoc(activePlanetId: 'mars'),
-      'unknown sector key': currentDoc(
-        sectors: currentSectors()
-          ..['bogus'] = {'revealed': false, 'mine': null},
-      ),
-      'missing sector key': currentDoc(
-        sectors: currentSectors()..remove('graniteCrater'),
-      ),
-      'malformed timestamp': currentDoc(lastAccruedAtUtc: 'not-a-date'),
-      'non-UTC timestamp': currentDoc(lastAccruedAtUtc: '2026-08-18T12:00:00'),
-      'non-bool revealed': currentDoc(
-        sectors: currentSectors(
-          landingBasin: {'revealed': 'yes', 'mine': null},
-        ),
-      ),
-      'mine on an unrevealed sector': currentDoc(
-        sectors: currentSectors(
-          carbonRidge: {
-            'revealed': false,
-            'mine': {'level': 1, 'storedAmount': 10.0},
+        },
+      'commissioned site is locked': _rawDocument(nowUtc: now)
+        ..['sites'] = {
+          ...(_rawDocument(nowUtc: now)['sites']! as Map<String, Object?>),
+          'landingBasin': {
+            'unlocked': false,
+            'commissioned': true,
+            'storedAmount': 0,
+            'rigByNode': {'n1': null, 'n2': null, 'n3': null, 'n4': null},
           },
-        ),
-      ),
-      'mine level below 1': currentDoc(
-        sectors: currentSectors(
-          landingBasin: {
-            'revealed': true,
-            'mine': {'level': 0, 'storedAmount': 10.0},
+        },
+      'later site unlocked before prerequisite': _rawDocument(nowUtc: now)
+        ..['sites'] = {
+          ...(_rawDocument(nowUtc: now)['sites']! as Map<String, Object?>),
+          'graniteCrater': {
+            'unlocked': true,
+            'commissioned': false,
+            'storedAmount': 0,
+            'rigByNode': {'n1': null, 'n2': null, 'n3': null, 'n4': null},
           },
-        ),
-      ),
-      'mine level above 5': currentDoc(
-        sectors: currentSectors(
-          landingBasin: {
-            'revealed': true,
-            'mine': {'level': 6, 'storedAmount': 10.0},
+        },
+      'unlocked planet first site is locked': _rawDocument(nowUtc: now)
+        ..['unlockedPlanetIds'] = ['homeworld', 'lunarFrontier']
+        ..['activePlanetId'] = 'lunarFrontier',
+      'deployed rig above Surveying availability': _rawDocument(nowUtc: now)
+        ..['sites'] = {
+          ...(_rawDocument(nowUtc: now)['sites']! as Map<String, Object?>),
+          'landingBasin': {
+            'unlocked': true,
+            'commissioned': true,
+            'storedAmount': 0,
+            'rigByNode': {'n1': null, 'n2': null, 'n3': 't1', 'n4': null},
           },
-        ),
-      ),
-      'negative cargo': currentDoc(
-        sectors: currentSectors(
-          landingBasin: {
-            'revealed': true,
-            'mine': {'level': 1, 'storedAmount': -10.0},
+        },
+      'negative cargo': _rawDocument(nowUtc: now)
+        ..['sites'] = {
+          ...(_rawDocument(nowUtc: now)['sites']! as Map<String, Object?>),
+          'landingBasin': {
+            'unlocked': true,
+            'commissioned': false,
+            'storedAmount': -1,
+            'rigByNode': {'n1': null, 'n2': null, 'n3': null, 'n4': null},
           },
-        ),
-      ),
-      'non-numeric cargo': currentDoc(
-        sectors: currentSectors(
-          landingBasin: {
-            'revealed': true,
-            'mine': {'level': 1, 'storedAmount': 'abc'},
+        },
+      'non-numeric cargo': _rawDocument(nowUtc: now)
+        ..['sites'] = {
+          ...(_rawDocument(nowUtc: now)['sites']! as Map<String, Object?>),
+          'landingBasin': {
+            'unlocked': true,
+            'commissioned': false,
+            'storedAmount': 'abc',
+            'rigByNode': {'n1': null, 'n2': null, 'n3': null, 'n4': null},
           },
-        ),
-      ),
-      'extra root key': currentDoc()..['zzz'] = 1,
-      'extra sector key': currentDoc(
-        sectors: currentSectors(
-          landingBasin: {'revealed': true, 'mine': null, 'note': 'hi'},
-        ),
-      ),
+        },
     };
 
     cases.forEach((name, raw) {
-      test(name, () async {
-        SharedPreferences.setMockInitialValues({key: jsonEncode(raw)});
-        final result = await MiningSaveRepository().load(nowUtc: now);
-        expect(result.state.cash, 100);
-        expect(result.recoveredFromInvalidSave, isTrue);
-      });
+      test(name, () => expectRecovered(raw));
     });
   });
 
   test(
-    'save writes only the mining key and leaves city keys untouched',
+    'save writes only the new mining key and leaves retired keys untouched',
     () async {
       SharedPreferences.setMockInitialValues({
+        'horologium.mining.save': 'retired',
         'cash': 999999.0,
         'buildings': <String>['1,1,Gold Mine'],
       });
-      final repository = MiningSaveRepository();
-      await repository.save(MiningSave.initial(nowUtc: now));
+      await MiningSaveRepository().save(MiningSave.initial(nowUtc: now));
 
       final prefs = await SharedPreferences.getInstance();
-      final miningKeys = prefs
-          .getKeys()
-          .where((k) => k.startsWith('horologium.mining'))
-          .toSet();
-      expect(miningKeys, <String>{key});
+      expect(
+        prefs.getKeys().where((k) => k.startsWith('horologium.')).toSet(),
+        <String>{MiningSaveRepository.saveKey, 'horologium.mining.save'},
+      );
+      expect(prefs.getString('horologium.mining.save'), 'retired');
       expect(prefs.getDouble('cash'), 999999.0);
       expect(prefs.getStringList('buildings'), <String>['1,1,Gold Mine']);
     },
