@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
-import 'package:horologium/mining/presentation/mining_screen.dart';
+import 'package:horologium/mining/presentation/mining_shell.dart';
 
 class MainMenu extends StatefulWidget {
   const MainMenu({super.key});
@@ -182,7 +182,7 @@ class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
                                   return _buildMenuButton(
                                     label,
                                     Icons.precision_manufacturing,
-                                    _openMiningScreen,
+                                    _openMiningShell,
                                   );
                                 },
                               ),
@@ -260,10 +260,10 @@ class _MainMenuState extends State<MainMenu> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _openMiningScreen() async {
+  Future<void> _openMiningShell() async {
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const MiningScreen()));
+    ).push(MaterialPageRoute<void>(builder: (_) => const MiningShell()));
     if (!mounted) return;
     setState(() {
       _hasSaveFuture = MiningSaveRepository().hasSave();

@@ -86,16 +86,16 @@ class OfflineReturnSheet extends StatelessWidget {
   }
 
   /// One section per producing planet. The flat [OfflineProductionSummary
-  /// .fullSectors] set resolves to per-planet names by filtering the catalog.
+  /// .fullSites] set resolves to per-planet names by filtering the catalog.
   Widget _planetSection(
     MiningPlanetId planetId,
     Map<ResourceType, double> production,
   ) {
     final planet = content.planet(planetId);
-    final fullSectorNames = planet.sectors
+    final fullSiteNames = planet.sites
         .map((definition) => definition.id)
-        .where(summary.fullSectors.contains)
-        .map((id) => content.sector(id).name);
+        .where(summary.fullSites.contains)
+        .map((id) => content.site(id).name);
 
     return Container(
       key: Key('offline-return-planet-${planetId.name}'),
@@ -150,7 +150,7 @@ class OfflineReturnSheet extends StatelessWidget {
                 ],
               ),
             ),
-          for (final name in fullSectorNames)
+          for (final name in fullSiteNames)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(

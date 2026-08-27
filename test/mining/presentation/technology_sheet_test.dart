@@ -15,7 +15,7 @@ TechnologySheetView _view() => const TechnologySheetView(
       currentEffect: 'Mining rate ×1.00',
       nextEffect: 'Mining rate ×1.10',
       cost: 300,
-      gateSectorName: 'Landing Basin',
+      gateSiteName: 'Landing Basin',
       isGateSatisfied: true,
       isAffordable: true,
       isMaxLevel: false,
@@ -28,20 +28,20 @@ TechnologySheetView _view() => const TechnologySheetView(
       currentEffect: 'Mine capacity ×1.00, offline cap 8h',
       nextEffect: 'Mine capacity ×1.15, offline cap 10h',
       cost: 300,
-      gateSectorName: 'Landing Basin',
+      gateSiteName: 'Landing Basin',
       isGateSatisfied: false,
       isAffordable: true,
       isMaxLevel: false,
-      disabledReason: 'Build the Landing Basin mine first.',
+      disabledReason: 'Commission the Landing Basin site first.',
     ),
     TechnologyTrackView(
       track: TechnologyTrack.surveying,
       name: 'Surveying',
       level: 5,
-      currentEffect: '9 of 9 sectors revealable',
+      currentEffect: '9 of 9 sites revealable',
       nextEffect: null,
       cost: null,
-      gateSectorName: null,
+      gateSiteName: null,
       isGateSatisfied: true,
       isAffordable: true,
       isMaxLevel: true,
@@ -82,10 +82,13 @@ void main() {
       expect(find.text('Next: Mining rate ×1.10'), findsOneWidget);
 
       // Unmet gate reason flows straight from the view model.
-      expect(find.text('Build the Landing Basin mine first.'), findsOneWidget);
+      expect(
+        find.text('Commission the Landing Basin site first.'),
+        findsOneWidget,
+      );
 
       // Max level shows no next effect and no cost row.
-      expect(find.text('9 of 9 sectors revealable'), findsOneWidget);
+      expect(find.text('9 of 9 sites revealable'), findsOneWidget);
       expect(find.textContaining('Next:'), findsNWidgets(2));
 
       expect(tester.takeException(), isNull);

@@ -7,7 +7,7 @@ import 'package:horologium/mining/presentation/offline_return_sheet.dart';
 
 void main() {
   testWidgets('renders one section per producing planet with catalog-resolved '
-      'full sectors', (tester) async {
+      'full sites', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(360, 640);
     addTearDown(() {
@@ -27,10 +27,10 @@ void main() {
         MiningPlanetId.lunarFrontier: {ResourceType.waterIce: 20.0},
         MiningPlanetId.marsFrontier: {ResourceType.ironOre: 8.0},
       },
-      fullSectors: {
-        MiningSectorId.graniteCrater,
-        MiningSectorId.heliumMare,
-        MiningSectorId.cobaltChasm,
+      fullSites: {
+        MiningSiteId.graniteCrater,
+        MiningSiteId.heliumMare,
+        MiningSiteId.cobaltChasm,
       },
       wasOfflineCapped: false,
     );
@@ -109,8 +109,8 @@ void main() {
       findsOneWidget,
     );
 
-    // fullSectors is flat; each sector name resolves to its own planet
-    // section via the catalog.
+    // fullSites is flat; each site name resolves to its own planet section
+    // via the catalog.
     expect(
       find.descendant(
         of: homeworld,
@@ -146,7 +146,7 @@ void main() {
       productionByPlanet: const {
         MiningPlanetId.homeworld: {ResourceType.gold: 1.0},
       },
-      fullSectors: const {},
+      fullSites: const {},
       wasOfflineCapped: true,
     );
 
