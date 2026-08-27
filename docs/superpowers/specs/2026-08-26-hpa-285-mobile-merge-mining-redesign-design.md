@@ -4,25 +4,59 @@
 
 Implementation design for Linear HPA-285, **Ship the Horologium mobile merge-mining redesign**.
 
-Planning, implementation, review, cutover, cleanup, and verification stay on **one branch and one pull request**. The prototype ZIP attached manually to HPA-285 is the visual and interaction reference. The repository catalog and this design remain authoritative where the prototype contains placeholder copy or example values.
+Planning, implementation, review, production cutover, cleanup, and verification stay on **one branch and one pull request**. The prototype ZIP attached manually to HPA-285 is the visual and interaction reference. Repository behavior and this design remain authoritative where prototype copy or sample numbers differ.
 
-This revision is grounded on `main` commit `d022ce7a5214e3b13c80759fbd61e70ccc98df70` and incorporates the design review that rejected a duplicate `lib/mining/domain/` stack.
+This revision is grounded on `main` commit `d022ce7a5214e3b13c80759fbd61e70ccc98df70`.
 
-## Review disposition
+## Latest review disposition
 
-The review is accepted with the following concrete changes:
+The second design review is accepted with one correction to its capacity formula.
 
-- evolve the existing mining catalog/state/simulation/repository/controller **in place** instead of copying them into a second domain;
-- keep globally unique site IDs and a flat `sites` save map; add a separate per-planet `docks` map;
-- preserve `MiningController.refresh()` and the current best-effort initial persistence for missing/recovered saves;
-- extend the existing `TechnologySheetView` / `StellarMapView` in `lib/mining/mining_progression_views.dart` rather than creating a parallel progression file;
-- reuse the current controller-test clock and concrete repository subclasses instead of introducing a repository interface or `implements` fake;
-- make site capacity explicitly independent of deployed rig count/tier;
-- treat the twelve missing Lunar/Mars cavern/node PNGs as a hard external input gate, not an implementation step;
-- add risks for the art gap, refresh/persistence regressions, and the faster post-upgrade economy;
-- delete or retarget all old flat-domain and presentation tests as part of cutover, including `mining_sheet_view_test.dart` and `mining_progression_views_test.dart`.
+Accepted:
 
-The old Flame presentation may be temporarily broken by intermediate in-place domain commits. That is acceptable on this pre-release branch. Focused tests gate those commits; the full Flutter suite becomes mandatory again at the production cutover commit. No dual-stack runtime or duplicate mining catalog is introduced merely to keep every intermediate commit globally green.
+- keep one in-place mining domain; no `lib/mining/domain/` fork;
+- keep flat globally unique site progress plus per-planet docks;
+- use closed `DockBayId` rather than raw `int` bay indices;
+- keep the existing `capacityMultipliers` table and make deployed rigs scale storage as well as throughput;
+- move per-site visual asset paths onto `MiningSiteDefinition`; keep shared node anchors in presentation constants;
+- evolve `mining_status_bar.dart` into `mining_hud.dart` instead of creating a parallel HUD and deleting the old status widget;
+- split Homeworld/common asset validation from the missing Lunar/Mars asset gate;
+- cut the old Flame/terrain/presentation runtime out early once the remodeled core is coherent, then keep the full repository green while the new screens are built;
+- isolate shell ownership, Site Deck, Mine Site, and Stellar Map into separate commits inside the same PR.
+
+Capacity formula correction:
+
+The review proposed dividing summed capacity shares by four. That would make one deployed T1 rig hold only one quarter of the current L1 mine capacity even though the design preserves the current `baseCapacity` numbers. The redesign instead treats each deployed rig as one replacement extraction/storage unit:
+
+```text
+siteRate = baseRatePerSecond
+         * extractionRateMultiplier
+         * Σ rateMultipliers[tier]
+
+siteCapacity = baseCapacity
+             * logisticsCapacityMultiplier
+             * Σ capacityMultipliers[tier]
+```
+
+There is **no `/4` normalization**.
+
+This preserves the current per-unit fill-time curve:
+
+```text
+one T1 rig        ~= current L1 mine fill time
+four T1 rigs      ~= same fill time, ~4x full cargo
+one T5 rig        ~= current L5 mine fill time
+four T5 rigs      ~= same fill time, ~4x full cargo
+```
+
+For Landing Basin at Extraction 5 / Logistics 5:
+
+```text
+4 x T1: rate 4.0/s, capacity 720, fill ~= 180s
+4 x T5: rate 18.0/s, capacity 2880, fill ~= 160s
+```
+
+That keeps offline/check-in cargo meaningful relative to the current economy and makes merged rigs improve the amount earned per capped return rather than merely shortening an already-short fill window.
 
 ## Goal
 
@@ -49,7 +83,7 @@ The product remains a casual idle mining game. Merge and deployment add one visi
 
 ## Current reusable baseline
 
-The current production boundary is:
+The current runtime already provides the ownership seams to preserve:
 
 ```text
 MainMenu
@@ -62,16 +96,18 @@ MainMenu
       -> MiningGame -> ParallaxTerrainComponent
 ```
 
-The redesign keeps the proven ownership and changes the interaction/state model:
+Reuse rather than recreate:
 
-- `MiningContentRegistry` already owns all nine site identities, rates, capacities, sale values, technology tables, offline caps, planet requirements, and Mars reward metadata.
-- `MiningSave` / `TechnologyLevels` already provide immutable state values.
-- `MiningSaveRepository` already owns strict `hasExactKeys` decoding, generic raw preference reads, invalid-save recovery, and cargo clamping.
-- `MiningSimulation` already owns deterministic multi-planet elapsed-time accrual, rollback behavior, offline caps, and per-planet summaries.
-- `MiningController` already owns `_enqueueMutation`, save-before-publish semantics, `refresh()`, best-effort initial save persistence, active-planet selling, technology, planet progression, and mastery reward logic.
-- `MiningScreen` already owns the one-second timer, `AudioManager`, lifecycle observer, reduced-motion propagation, and read-only test handles.
+- `MiningContentRegistry` as the sole catalog for nine sites, economy tables, technology, planet requirements, and Mars reward;
+- `TechnologyLevels` and immutable `MiningSave` conventions;
+- `MiningSaveRepository` strict `hasExactKeys`, generic raw read, recovery, and capacity clamp behavior;
+- `MiningSimulation` deterministic elapsed-time, rollback, offline-cap, and multi-planet summary behavior;
+- `MiningController` `_enqueueMutation`, save-before-publish, `refresh()`, missing/recovered initial persistence, active-planet sale, technology, planet unlock/travel, and mastery reward pattern;
+- `MiningProgressionViews` progressive Stellar Map disclosure;
+- `MiningScreen` ownership of one controller, one timer, one `AudioManager`, lifecycle, reduced motion, and test handles;
+- current HUD/offline cyan/panel/warning presentation tokens.
 
-Do not duplicate these classes under another folder. Modify or rename the existing files in place.
+Do not duplicate any of these classes or tables.
 
 ## Selected architecture
 
@@ -79,7 +115,7 @@ Do not duplicate these classes under another folder. Modify or rename the existi
 
 Rename/evolve `MiningScreen` into `MiningShell` and keep it as the single runtime owner.
 
-Implement:
+Final player surfaces:
 
 1. `SiteDeckScreen` — active-planet overview, site cards, fleet dock, spawn/merge entry point.
 2. `MineSiteScreen` — one responsive screen with portrait and landscape compositions.
@@ -100,30 +136,32 @@ MainMenu
       -> TechnologySheet / MiningSettingsSheet / OfflineReturnSheet
 ```
 
-`MiningShell` owns:
+`MiningShell` owns exactly:
 
-- one controller and current display snapshot;
+- one controller and display snapshot;
 - one `AudioManager`;
 - one lifecycle observer;
-- one one-second refresh timer;
+- one one-second foreground refresh timer;
 - current primary surface and open site;
 - selected dock bay;
 - offline-return presentation;
 - transient action feedback.
 
-`MiningShellHandles` is the renamed successor of the current `MiningScreenHandles` test seam and exposes the same long-lived controller/audio identities.
+`MiningShellHandles` is the renamed successor of `MiningScreenHandles` and exposes the same long-lived controller/audio identities for tests.
 
-Do not add Provider, Riverpod, Bloc, `ChangeNotifier`, a service locator, command bus, routing package, generic screen registry, or design-system package. Local navigation is one enum/value in the shell.
+Do not add Provider, Riverpod, Bloc, `ChangeNotifier`, a service locator, command bus, routing package, generic screen registry, repository interface, or design-system package.
 
 ### Flutter replaces Flame
 
-Build Mine Site with Flutter `Stack`, `LayoutBuilder`, anchored tap targets, `AnimatedSwitcher`, and short opacity/scale effects. It needs no camera, collision, physics, pathfinding, or frame-authoritative economy.
+Mine Site uses Flutter `Stack`, `LayoutBuilder`, anchored tap targets, `AnimatedSwitcher`, and short opacity/scale effects. It needs no camera, collision, physics, pathfinding, or frame-authoritative economy.
 
-Delete `MiningGame`, mining Flame components, and the terrain closure only after repository import search proves no surviving consumer. Remove the `flame` dependency only after that closure is gone.
+Once the remodeled core controller compiles, cut `MiningScreen` to a thin `MiningShell` owner and delete the old Flame world/presentation closure early. Repository search already shows `ParallaxTerrainComponent` has one production consumer, `lib/mining/world/mining_game.dart`; after that world is gone, delete the now-orphaned terrain closure and remove `flame` when `rg "package:flame" lib test` is empty.
 
-### Final production layout
+This restores `flutter analyze` / `flutter test` before the new visual surfaces are complete instead of keeping a red dual-stack branch behind an external art dependency.
 
-Keep the small flat mining core because it already exists and has one owner per file:
+## Final production layout
+
+Keep the small flat core:
 
 ```text
 lib/mining/
@@ -141,7 +179,7 @@ lib/mining/
     mining_theme.dart
     mining_visuals.dart
     mining_navigation.dart
-    mining_hud.dart
+    mining_hud.dart          # renamed/evolved mining_status_bar.dart
     fleet_dock.dart
     site_deck_screen.dart
     mine_site_screen.dart
@@ -151,11 +189,9 @@ lib/mining/
     offline_return_sheet.dart
 ```
 
-There is one `MiningContentRegistry`, `MiningSave`, `MiningSimulation`, `MiningSaveRepository`, and `MiningController` throughout the branch.
+There is one current `MiningContentRegistry`, `MiningSave`, `MiningSimulation`, `MiningSaveRepository`, and `MiningController` throughout the PR.
 
-## Closed identity and authored content
-
-Rename the globally unique sector identity to site identity in the existing catalog:
+## Closed identity
 
 ```dart
 enum MiningPlanetId { homeworld, lunarFrontier, marsFrontier }
@@ -173,54 +209,94 @@ enum MiningSiteId {
 }
 
 enum MiningNodeId { n1, n2, n3, n4 }
+enum DockBayId { b1, b2, b3, b4 }
 enum RigTier { t1, t2, t3, t4, t5 }
 enum TechnologyTrack { extraction, logistics, surveying }
 ```
 
-Node IDs repeat inside each site's `rigByNode` map. No rig UUID or global node ID is needed.
+`DockBayId` and `MiningNodeId` make both fixed four-slot structures closed and exact-key-decodable. Controller/view APIs use these enums instead of unvalidated integers.
 
-### Catalog changes in place
+No rig UUID or global node identity is needed.
 
-Evolve `MiningSectorDefinition` into `MiningSiteDefinition` and preserve the current source-of-truth numbers.
+## Authored content in one table
 
-Keep:
+Evolve `MiningSectorDefinition` into `MiningSiteDefinition` in `lib/mining/mining_content.dart`.
 
-- resource identity;
-- site name;
-- unlock/prerequisite chain (`revealCost` becomes site unlock cost);
-- `requiredSurveyingLevel`;
-- `baseRatePerSecond`;
-- `baseCapacity`;
-- `saleValuePerUnit`;
-- planet unlock requirements and Mars mastery reward;
-- technology costs/gates;
-- Extraction multipliers;
-- Logistics capacity multipliers;
-- offline caps.
+```dart
+class MiningSiteDefinition {
+  const MiningSiteDefinition({
+    required this.id,
+    required this.name,
+    required this.resource,
+    required this.unlockCost,
+    required this.requiredSite,
+    required this.requiredSurveyingLevel,
+    required this.baseRatePerSecond,
+    required this.baseCapacity,
+    required this.saleValuePerUnit,
+    required this.nodes,
+    required this.cavernAsset,
+    required this.nodeAsset,
+    required this.cardAsset,
+    this.facilityName,
+    this.discoveryText,
+  });
 
-Remove when their final consumers disappear:
+  final MiningSiteId id;
+  final String name;
+  final ResourceType resource;
+  final int unlockCost;
+  final MiningSiteId? requiredSite;
+  final int requiredSurveyingLevel;
+  final double baseRatePerSecond;
+  final double baseCapacity;
+  final int saleValuePerUnit;
+  final List<MiningNodeDefinition> nodes;
+  final String cavernAsset;
+  final String nodeAsset;
+  final String cardAsset;
+  final String? facilityName;
+  final String? discoveryText;
+}
+```
 
-- mine `buildCost`;
-- mine `upgradeCosts`;
-- `MiningWorldAnchor`;
-- `terrainSeed` / `tint` used only by the retired Flame world;
-- old mine sprite fields used only by `MiningGame`.
+This replaces the old `mineAsset`/world-anchor fields rather than creating a second nine-row visual catalog.
 
-The current `MiningContentRegistry.rateMultipliers` table becomes the rig tier multiplier table; do not author a second copy of `1.00, 1.50, 2.25, 3.25, 4.50`. The old mine-level `capacityMultipliers` table is removed because rig tiers no longer scale storage.
+`MiningPlanetDefinition` keeps one row per planet and adds only:
 
-### Rig ladder and spawn costs
+```dart
+final int rigSpawnCost;
+final String planetAsset;
+```
 
-| Tier | Production multiplier | T1 rigs represented |
-| --- | ---: | ---: |
-| T1 | 1.00 | 1 |
-| T2 | 1.50 | 2 |
-| T3 | 2.25 | 4 |
-| T4 | 3.25 | 8 |
-| T5 | 4.50 | 16 |
+alongside existing unlock/mastery metadata and the list of sites.
+
+Keep `mining_content.dart` as the only per-site/per-planet authored table. It already imports Flutter Material types for silhouettes/colors, so asset-path strings do not create a new layering problem.
+
+### Shared presentation assets
+
+`mining_visuals.dart` owns only cross-site presentation constants:
+
+- one shared portrait four-node `Alignment` list;
+- one shared landscape four-node `Alignment` list;
+- at most one explicit site anchor override when a real composition proves necessary;
+- rig asset mapping `T1..T5` from the prototype `art-worker-t*.png` files;
+- cash/cargo/merge/technology/effect/offline shared asset constants.
+
+It does **not** own another `Map<MiningSiteId, MiningSiteVisuals>`.
+
+### Rig ladder and capacity shares
+
+Reuse both current mine-level tables as rig tables:
+
+```text
+rateMultipliers     = [1.00, 1.50, 2.25, 3.25, 4.50]
+capacityMultipliers = [1.00, 1.50, 2.00, 3.00, 4.00]
+```
 
 Two same-tier docked rigs merge into the next tier in the tapped destination bay; the source becomes empty. T5 is terminal. Merging is dock-only.
 
-Each planet has four dock bays and one authored T1 spawn cost:
+Each planet has four bays and an authored T1 spawn cost:
 
 | Planet | T1 spawn cost | Starter dock when first unlocked |
 | --- | ---: | --- |
@@ -240,11 +316,11 @@ Fleets are planet-local and never transfer between planets.
 
 Keep the catalog name **Mars Frontier**. `Rust Belt` is prototype placeholder copy.
 
-Unlocking Lunar or Mars seeds its two T1 rigs, unlocks its first site, and makes the planet active in the same saved mutation.
+Unlocking Lunar or Mars seeds its two T1 rigs, unlocks its first site, and makes the planet active in one saved mutation.
 
-### Sites
+### Site starting values
 
-The old build and mine-upgrade cash sinks disappear because rigs now own throughput progression. Preserve the nine current site values as the starting balance:
+Old build and upgrade costs disappear because rigs now own throughput/storage progression. Preserve current resource, unlock, rate, capacity, and sale values as the initial balance:
 
 | Site | Resource | Prerequisite | Surveying | Unlock | Base rate/s | Base capacity | Sale/unit |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
@@ -262,7 +338,7 @@ First sites are unlocked with their planet. Later sites require the prerequisite
 
 ### Node availability
 
-Every site has four fixed nodes. Node availability is authored, not procedural:
+Every site has four fixed nodes:
 
 | Site | n1 | n2 | n3 | n4 |
 | --- | ---: | ---: | ---: | ---: |
@@ -278,11 +354,11 @@ Every site has four fixed nodes. Node availability is authored, not procedural:
 
 Technology costs remain `300, 700, 1,500, 4,000, 9,000`. Levels 1-5 are gated by commissioned Landing Basin, Carbon Ridge, Granite Crater, Frozen Basin, and Titanium Highlands respectively.
 
-Keep current Extraction multipliers `1.00, 1.10, 1.25, 1.45, 1.70, 2.00`, Logistics capacity multipliers `1.00, 1.15, 1.30, 1.50, 1.75, 2.00`, and offline caps `8h, 10h, 12h, 16h, 20h, 24h` as starting balance.
+Keep current Extraction multipliers `1.00, 1.10, 1.25, 1.45, 1.70, 2.00`, Logistics multipliers `1.00, 1.15, 1.30, 1.50, 1.75, 2.00`, and offline caps `8h, 10h, 12h, 16h, 20h, 24h` as starting balance.
 
-## Mutable state: flat sites plus planet docks
+## Mutable state: flat sites plus enum-keyed docks
 
-Do not nest site progress beneath planet progress. Planet ownership is already authored by `planetForSite` and every `MiningSiteId` is globally unique.
+Planet ownership remains authored by `planetForSite`; it is not duplicated by nesting sites under planets.
 
 ```dart
 class SiteProgress {
@@ -298,8 +374,8 @@ class MiningSave {
   final TechnologyLevels technology;
   final Set<MiningPlanetId> unlockedPlanetIds;
   final MiningPlanetId activePlanetId;
-  final Map<MiningPlanetId, List<RigTier?>> docks; // three keys, four bays each
-  final Map<MiningSiteId, SiteProgress> sites;     // exactly nine keys
+  final Map<MiningPlanetId, Map<DockBayId, RigTier?>> docks;
+  final Map<MiningSiteId, SiteProgress> sites;
 }
 ```
 
@@ -308,43 +384,69 @@ Fresh state:
 - 100 cash;
 - Homeworld unlocked and active;
 - Landing Basin unlocked;
-- Homeworld dock `[T1, T1, null, null]`;
-- Lunar/Mars docks empty while locked;
+- Homeworld dock `{b1:T1, b2:T1, b3:null, b4:null}`;
+- Lunar/Mars docks all-null while locked;
 - no commissioned site, cargo, or deployed rig;
 - all other sites locked/pristine.
 
-`commissioned` flips to true on the first successful deployment and never reverses. Planet mastery means every authored site for that planet is commissioned. Recall cannot revoke mastery.
+`commissioned` flips on the first successful deployment and never reverses. Planet mastery means every authored site for that planet is commissioned. Recall cannot revoke mastery.
 
-All values are immutable and copied atomically. Selection, current screen, orientation, hints, and animation state are not persisted.
+Selection, current screen, orientation, hints, and animation state are not persisted.
 
-## Deterministic simulation and capacity invariant
+## Deterministic simulation
 
 For every unlocked site with deployed rigs:
 
 ```text
-siteRate = site.baseRatePerSecond * sum(rateMultipliers[tier])
-siteRate *= extractionMultiplier
-siteCapacity = site.baseCapacity * logisticsCapacityMultiplier
+rateShare     = Σ rateMultipliers[tier]
+capacityShare = Σ capacityMultipliers[tier]
+
+siteRate = baseRatePerSecond
+         * extractionRateMultiplier
+         * rateShare
+
+siteCapacity = baseCapacity
+             * logisticsCapacityMultiplier
+             * capacityShare
+
 produced = min(siteRate * elapsedSeconds, siteCapacity - storedAmount)
 ```
 
-**Capacity invariant:** deployed rig count and rig tier affect throughput only. They never scale site capacity. All four nodes share one site store. Logistics is the only multiplicative capacity progression.
-
 Rules:
 
-- docked rigs produce nothing;
-- all unlocked planets produce while inactive;
+- no deployed rig means zero production and zero effective capacity;
+- docked rigs produce and store nothing for that site;
+- all unlocked planets accrue while inactive;
 - locked sites or sites with no deployed rig produce nothing;
-- storage never exceeds effective site capacity;
+- storage never exceeds the capacity implied by the currently deployed rigs;
 - clock rollback produces zero and never moves the timestamp backward;
 - elapsed time is capped by Logistics and then advances the timestamp to `nowUtc`;
-- equal state plus equal `nowUtc` yields equal output.
+- equal state plus equal `nowUtc` yields equal output;
+- `OfflineProductionSummary.fullSectors` is renamed `fullSites`.
 
-`OfflineProductionSummary` retains the current shape but renames `fullSectors` to `fullSites`.
+### Recall capacity safety
 
-### Live foreground accrual is required
+Because deployed rigs now contribute storage capacity, recall must never silently destroy cargo.
 
-The one-second timer is presentation infrastructure, but it must still advance in-memory economy state exactly as the current screen does:
+Before recalling a rig:
+
+```text
+postRecallCapacity = capacity from the rigs that would remain deployed
+```
+
+Reject recall when:
+
+```text
+storedAmount > postRecallCapacity
+```
+
+with presentation-ready copy equivalent to **Sell cargo before recalling this rig.**
+
+This keeps the persisted invariant `storedAmount <= effectiveSiteCapacity` true without adding a `maxCapacitySeen` field or a cargo-loss normalization path. After selling, the player can recall freely. Recalling the last rig is therefore allowed when site cargo is zero.
+
+### Live foreground accrual remains required
+
+The one-second timer is presentation infrastructure, but it must still call the existing non-persisting `MiningController.refresh()` before projection:
 
 ```dart
 Timer.periodic(const Duration(seconds: 1), (_) {
@@ -355,34 +457,35 @@ Timer.periodic(const Duration(seconds: 1), (_) {
 });
 ```
 
-`MiningController.refresh()` remains non-persisting. It accrues from `_state` to the injected current UTC and publishes the in-memory result. The timer must not merely re-project `controller.state`, or cargo will appear frozen until another action/checkpoint.
+A timer that only re-reads `controller.state` is incorrect because cargo would appear frozen until another action/checkpoint.
 
 ## Serialized controller
 
-Keep the current future-chain queue and existing initialization/refresh semantics.
+Keep the current future-chain mutation queue and initialization semantics.
 
 ### Initialization contract
 
-`initialize()` must continue to:
+`initialize()` continues to:
 
-1. load the new save key;
+1. load the new key;
 2. preserve `recoveredFromInvalidSave`;
 3. accrue to current UTC;
-4. queue the resulting offline summary for one-time presentation when production occurred;
-5. best-effort persist the newly constructed state when the key was missing or recovery produced a fresh save.
+4. expose one pending offline summary when production occurred;
+5. best-effort persist the new initial/recovered state when `wasMissing || recoveredFromInvalidSave`.
 
-The fifth step is required so a first entry followed by an immediate back-to-menu cannot race `hasSave()` against an unawaited dispose checkpoint.
+That last write preserves the current Main Menu race fix: entering a fresh game and immediately backing out must still make Continue visible even if dispose checkpoint has not finished.
 
-A failure of this convenience write does not brick initialization; the in-memory fresh/recovered state remains playable and the next mutation/checkpoint retries persistence.
-
-### Required actions
+### Controller actions
 
 ```dart
 Future<MiningActionResult> unlockSite(MiningSiteId siteId);
 Future<MiningActionResult> spawnRig();
-Future<MiningActionResult> mergeDockRigs(int sourceBay, int targetBay);
+Future<MiningActionResult> mergeDockRigs(
+  DockBayId sourceBay,
+  DockBayId targetBay,
+);
 Future<MiningActionResult> deployRig(
-  int sourceBay,
+  DockBayId sourceBay,
   MiningSiteId siteId,
   MiningNodeId nodeId,
 );
@@ -400,19 +503,20 @@ Future<OfflineProductionSummary?> resume();
 
 Specific rules:
 
-- Spawn uses the first empty active-planet bay and fails for full dock or insufficient cash.
+- Spawn uses `DockBayId.values.firstWhere` for the first empty active-planet bay.
 - Merge requires distinct occupied same-tier bays and rejects T5.
-- Deploy requires active-planet ownership, an unlocked site, available empty node, and occupied source bay; the rig moves atomically.
-- Recall requires an occupied node and first empty active-planet bay; full dock is a non-mutating failure.
+- Deploy requires active-planet ownership, unlocked site, available empty node, and occupied source bay; the rig moves atomically.
+- First deployment makes the site commissioned.
+- Recall uses the first empty active dock bay and applies the post-recall capacity safety rule before saving.
 - Site unlock preserves prerequisite, Surveying, and cash checks.
 - Technology gates use commissioned sites.
-- Planet unlock preserves current mastery, Surveying, and cash requirements and seeds the first site/fleet.
-- Travel only changes active planet after accrual and save.
+- Planet unlock preserves current mastery/Surveying/cash requirements, seeds its dock/first site, and makes it active.
+- Travel accrues, saves, then changes active planet.
 - Sell All clears all active-planet site cargo and floors aggregate gross value once.
 - Zero cargo fails without mutation; UI disables positive cargo worth less than one cash.
-- The 25,000 Mars reward is granted only when `deployRig` changes Mars mastery false -> true by commissioning the final uncommissioned site. Sticky `commissioned` state makes recall/redeploy ineligible for another reward.
+- The 25,000 Mars reward moves from `buildMine` to the false-to-true mastery transition caused by the final first commission. Recall/redeploy never pays again.
 
-Queued duplicate actions and save failures must never copy, lose, or publish a moved rig.
+Queued duplicate actions and failed saves must never copy, lose, or publish a moved rig.
 
 ## Persistence
 
@@ -422,265 +526,325 @@ Use one fresh key:
 horologium.mergeMining.save
 ```
 
-Do not read, migrate, convert, or delete `horologium.mining.save`. Main Menu Start/Continue checks only the new key. This is an intentional pre-release breaking redesign.
+Do not read, migrate, convert, or delete `horologium.mining.save`.
 
-The root document is exactly:
+The root keys are exactly:
 
 ```text
 cash
 lastAccruedAtUtc
-technology { extraction, logistics, surveying }
+technology
 unlockedPlanetIds
 activePlanetId
 docks
-  exactly homeworld, lunarFrontier, marsFrontier
-    each exactly four nullable tier names
 sites
-  exactly the nine MiningSiteId names
-    unlocked
-    commissioned
-    storedAmount
-    rigByNode { exactly n1, n2, n3, n4 }
 ```
 
-This retains the current flat identity model: site ownership stays in the catalog and is not repeated in save nesting.
+`docks` contains exactly three planet keys. Each planet value is an object with exactly `b1`, `b2`, `b3`, `b4`, each nullable or a valid rig tier.
+
+`sites` contains exactly all nine globally unique site keys. Each site value has exactly:
+
+```text
+unlocked
+commissioned
+storedAmount
+rigByNode
+```
+
+and `rigByNode` has exactly `n1`, `n2`, `n3`, `n4`.
+
+Both four-slot maps reuse `hasExactKeys`; there is no separate length-index validation path.
 
 Structural invalidity resets to fresh state and reports recovery:
 
-- malformed JSON, wrong types, extra/missing keys, unknown/duplicate enum strings;
+- malformed JSON, wrong types, extra/missing keys, unknown enum strings;
 - negative/non-integer cash or invalid/non-UTC timestamp;
 - technology outside 0-5;
-- dock length other than four or unknown tier;
 - active planet not unlocked or Homeworld not unlocked;
-- locked planet with any docked rig or non-pristine site;
-- locked site with commission, cargo, or deployed rig;
+- locked planet with any rig or non-pristine site;
+- locked site with commission/cargo/rigs;
 - commissioned site not unlocked;
 - later site unlocked while prerequisite is locked;
 - first site locked on an unlocked planet;
-- deployed rig on a node above the saved Surveying level;
-- negative/non-numeric cargo.
+- deployed rig above saved Surveying availability;
+- negative/non-numeric cargo;
+- cargo above current effective capacity after normalization rules are applied.
 
-The only tolerant normalization is:
+As today, structurally valid over-capacity cargo caused by balance tuning may clamp to current effective capacity without marking recovery. Normal controller actions must never create that condition.
 
-```text
-storedAmount = min(storedAmount, effectiveSiteCapacity(site, logistics))
-```
-
-Keep the current repository patterns: `hasExactKeys`, generic raw preference read before String cast, clean recovery, and concrete repository type. Add no repository interface.
+No version, migration registry, compatibility reader, backup rotation, or second save key is added.
 
 ## Pure projections
 
-Widgets do not derive eligibility, economy totals, or disabled copy.
+Widgets do not derive economy formulas, eligibility, or disabled reasons.
 
-### New views
+### Fleet Dock
 
-Add small flat view files:
+`FleetDockView` exposes exactly four enum-keyed bays, selection/tier state, merge-eligible destinations, active-planet spawn cost, spawn state/reason, and contextual hint.
 
-- `fleet_dock_view.dart` — exactly four bays, selected/tier state, merge destinations, spawn cost/reason, contextual hint.
-- `site_deck_view.dart` — cash, active planet, commissioned progress, active-planet cargo/capacity/value/rate, fleet dock, site cards.
-- `mine_site_view.dart` — selected site, four nodes, node Surveying/rig/rate/action/reason, site cargo, planet sale projection, fleet dock.
-
-`MiningSiteCardState` is exactly:
+### Site Deck
 
 ```dart
 enum MiningSiteCardState { locked, available, idle, operational }
 ```
 
-### Existing progression views are extended
-
-Keep `lib/mining/mining_progression_views.dart` and extend its existing `TechnologySheetView` and `StellarMapView`.
-
-- Technology gates read `commissioned` sites rather than mine existence.
-- Surveying copy talks about site/node availability as appropriate.
-- `StellarMapView._isVisible` keeps the current progressive disclosure: fresh shows Homeworld + Lunar; Mars becomes visible after Lunar is unlocked.
-- Planet rows report commissioned sites, active production rate, cargo/capacity/value, site indicators, unlock requirements, and action/busy reason.
-
-Do not create a second progression view module that risks drifting from the current visibility rules.
-
-## Presentation
-
-### Theme reuse
-
-`MiningTheme` lifts current cyan/panel/warning tokens from `MiningStatusBar` and `OfflineReturnSheet`; it does not invent a second palette. Remove undeclared `fontFamily: 'Orbitron'` from `lib/main.dart` and use system typography.
-
-### Site Deck
-
-Full-screen scrollable surface:
-
-- safe-area cash shard;
-- active planet + commissioned-site progress;
-- aggregate cargo/capacity and rate;
-- one card per authored active-planet site;
-- horizontal four-bay dock and spawn affordance;
-- navigation for Site Deck, Technology, Stellar Map, Settings.
-
-Cards render only projection values.
+`SiteDeckView` exposes cash, active planet, commissioned progress, aggregate active-planet cargo/capacity/value, aggregate rate, Fleet Dock, and one site card per authored site.
 
 ### Mine Site
 
-One `MineSiteScreen` uses `LayoutBuilder` and shared node anchor constants.
+`MineSiteView` exposes the selected site, four node views, deployed tiers/rates, site cargo/capacity, active-planet projected sale, Fleet Dock, and contextual hint. It also exposes recall disabled copy from the post-recall capacity rule.
 
-- portrait: HUD top, cavern middle, horizontal dock bottom;
-- landscape: cavern left, fixed right fleet rail, compact bottom-left navigation;
-- at most one explicit site-specific anchor override is allowed if shared anchors fail a real composition; do not create an anchor framework.
+### Technology and Stellar Map
 
-Tap rules:
+Extend the existing `lib/mining/mining_progression_views.dart` in place.
 
-- occupied bay selects;
-- selected bay + same-tier occupied bay merges into tapped destination;
-- selected bay + available empty node deploys;
-- occupied node recalls;
-- cargo/shipping control sells active-planet cargo with no confirmation.
+Technology:
 
-Contextual hints derive from current state and are not persisted.
+- current effects remain Extraction rate / Logistics capacity+offline cap / Surveying availability;
+- gates become commissioned sites;
+- Surveying copy counts currently unlocked site nodes honestly.
 
-### Stellar Map
-
-Promote the current sheet projection into a full-screen `StellarMapScreen`. Keep `Mars Frontier`; do not adopt prototype placeholder `Rust Belt`.
-
-### Secondary surfaces
-
-Restyle/adapt Technology, Settings, and Offline Return only as required for the new projections and terminology. Keep `AudioManager` ownership, audio preference keys, first-gesture BGM, lifecycle forwarding, haptics, and `MediaQuery.disableAnimations` as the reduced-motion source.
-
-## Visual asset contract and hard gate
-
-The attached prototype ZIP contains these production inputs:
-
-- Homeworld caverns: gold, coal, stone — `800x1200`;
-- Homeworld nodes: gold, coal, stone — `512x512` RGBA;
-- Homeworld site cards: basin, ridge, crater — `740x494`;
-- planets: Homeworld/Lunar/Mars — `640x640` RGBA;
-- workers T1-T5 — `512x512` RGBA;
-- cash/cargo/extraction/logistics/merge/surveying icons — `256x256`;
-- merge burst — `512x512` RGBA;
-- offline hero — `1915x821`.
-
-Map the prototype worker filenames explicitly:
+Stellar Map keeps `_isVisible` progressive disclosure:
 
 ```text
-art-worker-t1.png -> mining/rigs/t1.png
-art-worker-t2.png -> mining/rigs/t2.png
-art-worker-t3.png -> mining/rigs/t3.png
-art-worker-t4.png -> mining/rigs/t4.png
-art-worker-t5.png -> mining/rigs/t5.png
+fresh: Homeworld + Lunar visible
+Lunar unlocked: Homeworld + Lunar + Mars visible
 ```
 
-The ZIP does **not** contain Lunar/Mars cavern/node art. The following twelve final PNGs are a hard external input gate:
+Planet projections add commissioned-site progress, aggregate rate/cargo/capacity/value, three site indicators, requirements, action, busy state, and `Mars Frontier` copy.
+
+## Visual and responsive presentation
+
+### Site visual ownership
+
+Per-site `cavernAsset`, `nodeAsset`, and `cardAsset` live on `MiningSiteDefinition`.
+
+For Lunar/Mars cards, `cardAsset` may equal the cavern asset and `SiteDeckScreen` crops it with `BoxFit.cover`.
+
+### Shared node anchors
+
+Keep one portrait and one landscape `List<Alignment>` in `mining_visuals.dart`. Allow at most one explicit site override only when real final art proves shared anchors fail. Do not create an anchor framework or nine-row anchor table.
+
+### HUD evolution
+
+Rename/evolve:
 
 ```text
-caverns/water_ice.png      800x1200
-nodes/water_ice.png        512x512 RGBA
-caverns/titanium_ore.png   800x1200
-nodes/titanium_ore.png     512x512 RGBA
-caverns/helium_3.png       800x1200
-nodes/helium_3.png         512x512 RGBA
-caverns/iron_ore.png       800x1200
-nodes/iron_ore.png         512x512 RGBA
-caverns/silica.png         800x1200
-nodes/silica.png           512x512 RGBA
-caverns/cobalt_ore.png     800x1200
-nodes/cobalt_ore.png       512x512 RGBA
+mining_status_bar.dart -> mining_hud.dart
+MiningStatusBar        -> MiningHud
+revealedSectors        -> commissionedSites
+totalSectors           -> totalSites
 ```
 
-These files must be authored outside the Dart implementation loop and committed before Lunar/Mars Mine Site visual completion. The coding task must not generate them, substitute placeholders, or silently fall back to old facility/terrain art. Lunar/Mars Site Deck cards deliberately crop the corresponding final cavern image rather than requiring six additional card files.
+Lift its current cyan/panel tokens plus existing offline warning color into `MiningTheme`. Do not invent a parallel palette.
 
-Import only the named prototype asset files, not the standalone HTML, duplicate `uploads/` copy, thumbnail, support scripts, or unrelated ZIP content. Use explicit `git add` paths; do not `git add -A` the unpacked ZIP.
+### Mine Site orientation
+
+One public `MineSiteScreen` chooses private layouts with `LayoutBuilder`.
+
+Portrait:
+
+- cash/planet HUD top;
+- cargo/rate top-right;
+- cavern middle;
+- horizontal dock bottom;
+- compact navigation below/adjacent.
+
+Landscape:
+
+- cavern uses space left of a fixed right rail;
+- cargo immediately left of rail or at its top;
+- vertical dock/spawn in rail;
+- compact back/settings at bottom-left.
+
+Rotation changes layout only; it does not recreate controller/audio or persisted state.
+
+## Asset input contract
+
+The prototype ZIP provides:
+
+- Homeworld gold/coal/stone caverns;
+- Homeworld gold/coal/stone nodes;
+- three Homeworld site cards;
+- `art-worker-t1.png` through `art-worker-t5.png`;
+- three planet images;
+- cash/cargo/merge/technology icons;
+- merge burst;
+- offline hero.
+
+Map worker files explicitly:
+
+```text
+art-worker-t1.png -> rigs/t1.png
+art-worker-t2.png -> rigs/t2.png
+art-worker-t3.png -> rigs/t3.png
+art-worker-t4.png -> rigs/t4.png
+art-worker-t5.png -> rigs/t5.png
+```
+
+It does **not** contain the six Lunar/Mars cavern images or six Lunar/Mars node images.
+
+Required external art before final visual completion:
+
+```text
+caverns/water_ice.png      nodes/water_ice.png
+caverns/titanium_ore.png   nodes/titanium_ore.png
+caverns/helium_3.png       nodes/helium_3.png
+caverns/iron_ore.png       nodes/iron_ore.png
+caverns/silica.png         nodes/silica.png
+caverns/cobalt_ore.png     nodes/cobalt_ore.png
+```
+
+Caverns: 800x1200 PNG. Nodes: 512x512 transparent RGBA PNG.
+
+### Art gate scope
+
+The missing twelve files block **only final Lunar/Mars visual completion and merge readiness**.
+
+Before they arrive:
+
+- the in-place domain can be completed;
+- the old Flame runtime can be removed;
+- `MiningShell`, projections, and all Homeworld UI can be built and tested;
+- structural visual tests can assert every site declares asset paths and all supplied Homeworld/common/rig/planet assets resolve.
+
+Do not make an all-nine `rootBundle.load` test part of the Homeworld/common asset task. The final art task adds the all-nine bundle-resolution test and is the hard merge gate.
+
+Do not generate missing art in Dart, use legacy mine sprites as fallback, or commit placeholders.
+
+## Technology, settings, offline return
+
+Keep the existing ownership:
+
+- Technology retains the three tracks and current cost/effect model, retargeted to commissioned site gates.
+- Settings keeps the same `AudioManager`, `audio.musicEnabled`, `audio.musicVolume`, and system reduced-motion message.
+- Offline Return keeps deterministic per-planet/resource summary, cap messaging, full-site warnings, and one next action; terminology changes to sites/rigs and the supplied hero may be used.
+
+No claims, ads, streaks, notifications, boosts, or new settings service.
 
 ## Economy validation
 
-The throughput model is much faster than the old mine-level economy because:
+Removing build/upgrade costs changes cash sinks while multi-rig sites increase full-check-in revenue. Treat this as numeric balance risk, not justification for another mechanic.
 
-- mine build/upgrade cash sinks are removed;
-- four rigs can produce at once;
-- T5 affects rate but not capacity.
-
-Example worst case at Landing Basin:
+Required fresh journey:
 
 ```text
-4 x T5, Extraction 5:
-rate = 4 * 4.5 * 2.0 * 0.5 = 18 units/s
-Logistics 5 capacity = 90 * 2.0 = 180
-fill time ~= 10 seconds
+commission all Homeworld sites
+  + Surveying 3
+  + required cash
+-> Lunar Frontier
+
+commission all Lunar sites
+  + Surveying 5
+  + required cash
+-> Mars Frontier
+
+commission all Mars sites
+-> existing 25,000 Mars mastery reward
 ```
 
-Do not add a new mechanic to compensate. The representative playtest must record:
+The journey test uses public controller actions and clock advancement only after initialization; it cannot edit state to bypass affordability.
 
-- fill time by representative early/mid/late site;
-- sell cadence / how often storage caps during normal play;
-- number of spawn/merge/sell cycles needed for key unlocks;
-- whether Homeworld -> Lunar -> Mars remains reachable without debug state edits.
+The representative playtest records:
 
-If storage fills too quickly, tune the existing `baseCapacity` and/or Logistics capacity multipliers first. Other authorized tuning remains spawn cost, site unlock cost, base rate, sale value, and current technology costs/effects. Document any change with observed before/after evidence.
+- early/mid/late site fill times;
+- sell cadence / cap frequency;
+- spawn/merge/sell cycles for Homeworld -> Lunar and Lunar -> Mars;
+- fresh-to-Mars completion;
+- portrait/landscape sizes;
+- text scale 1.3;
+- reduced motion;
+- muted audio.
 
-HPA-640 remains canceled. The merge ladder is playtested before any retention work is reconsidered.
+Allowed tuning when evidence requires:
 
-## Accessibility and responsive contract
+- spawn costs;
+- site unlock costs;
+- base rate;
+- base capacity;
+- sale value;
+- existing technology costs/effects;
+- rate/capacity multiplier tables.
 
-- controls are at least 48x48 logical pixels;
-- icon-only actions have semantic labels/tooltips where appropriate;
-- state is not color-only;
-- critical actions remain reachable at text scale 1.3;
-- verify 360x640, 402x874, 430x932 portrait and 874x402 landscape;
-- respect safe areas and landscape rail geometry;
-- reduced motion removes nonessential translation/scale while retaining feedback;
-- muted-audio play remains understandable.
+Do not add a new sink/mechanic merely to solve balance.
 
-## Testing strategy
+## Accessibility
 
-### Reuse existing test seams
+- interactive targets >=48x48 logical pixels;
+- icon-only controls have semantic labels/tooltips where applicable;
+- primary state is not color-only;
+- prototype micro-labels are increased to readable phone sizes;
+- text scale 1.3 keeps critical actions reachable;
+- safe areas and landscape rail avoid overlap;
+- reduced motion removes nonessential transforms while retaining state feedback;
+- muted audio journey remains understandable.
 
-- Reuse/rename the existing `TestClock` in `test/mining/mining_controller_test.dart` rather than creating a second clock type.
-- Continue subclassing concrete `MiningSaveRepository` for delayed/failing/counting behavior. Do not introduce a repository interface or `implements MiningSaveRepository` fake.
-- Extend existing controller/simulation/repository tests in place as the domain changes.
-- Extend `test/mining/mining_progression_views_test.dart` for new technology/Stellar Map behavior.
-- Delete `test/mining/mining_sheet_view_test.dart` when `MiningSheetView` is removed and replacement Site Deck/Mine Site projection tests cover its responsibilities.
-- Rename/retarget `test/mining/presentation/mining_screen_test.dart` to shell ownership/lifecycle/refresh coverage rather than constructing a second shell harness from scratch.
+Use system typography. Remove undeclared `fontFamily: 'Orbitron'` from `lib/main.dart`.
 
-### Verification cadence
+## Implementation sequencing contract
 
-Because the domain is remodeled in place, focused tests are authoritative before the UI cutover. From the cutover commit onward, the full Flutter suite must pass on every remaining task.
+The implementation plan follows this dependency shape:
 
-Final verification includes formatting, analyzer, full tests, Chrome tests, APK/web builds, and available iOS simulator build.
+```text
+1. remodel catalog/state
+2. retarget repository/simulation
+3. retarget controller/progression
+4. isolate MiningScreen -> MiningShell ownership; remove old Flame/terrain/action runtime; restore full-suite green
+5. add projections + supplied Homeworld/common visuals
+6. ship Site Deck
+7. ship Mine Site
+8. ship Stellar Map + secondary surfaces
+9. satisfy final Lunar/Mars art gate
+10. journey/playtest/docs/final gates
+```
+
+Tasks 4-8 land as independently green, reviewable commits. The external art dependency gates Task 9 rather than blocking shell/UI development.
 
 ## Risks and mitigations
 
 | Risk | Mitigation / proof |
 | --- | --- |
-| Twelve Lunar/Mars visual files are missing from the ZIP | Hard external-art gate; coding agent never invents or substitutes them; full asset-resolution test blocks completion |
-| Shell timer only re-projects state and foreground cargo appears frozen | Preserve `MiningController.refresh()` and assert timer calls refresh before projection |
-| Fresh/recovered save is not persisted until dispose, causing Main Menu Continue race | Preserve current `initialize()` best-effort `wasMissing || recoveredFromInvalidSave` save and test immediate enter/back behavior |
-| Duplicate catalog/state types drift during cutover | No second domain; modify current files in place and reuse current numeric tables |
-| Removing mine-level capacity scaling makes high-tier rigs fill storage in seconds | Capacity invariant is explicit; playtest records fill time/sell cadence and tunes existing capacity/logistics values only |
-| In-place domain change temporarily breaks the old Flame route | Accept focused-test-only intermediate commits; restore full-suite green at the single production cutover |
-| Flame/terrain cleanup removes a surviving shared consumer | `rg` import closure before deletion and dependency removal |
+| Merge throughput outgrows storage and makes capped returns equal | Keep existing capacity multipliers per deployed rig; test fill-time curve and full-cargo growth |
+| Dynamic capacity makes recall destructive | Reject recall when post-recall capacity is below stored cargo; sell first |
+| Missing Lunar/Mars art blocks implementation | Split structural/Homeworld resolution from final all-nine bundle gate |
+| Branch remains red while waiting for art | Cut thin `MiningShell`, old Flame/presentation, terrain closure, and dependency after core remodel; resume full-suite gate before visual work |
+| Shell rename drops live accrual | Regression-test timer -> `controller.refresh()` -> projection |
+| Shell rename drops initial save persistence | Keep current missing/recovered best-effort write tests |
+| Duplicate catalog/visual tables drift | One `MiningContentRegistry`; per-site asset paths live on `MiningSiteDefinition`; shared anchors are constants |
+| Raw bay indices leak invalid values | `DockBayId` at save/controller/view boundaries |
+| New cash sinks/revenue cadence are off | Public-action journey + observed fill/sell cadence; numeric tuning only |
+| Large UI cutover is hard to review | Shell ownership, Site Deck, Mine Site, Stellar Map/secondary surfaces are separate commits in one PR |
 
 ## Non-goals
 
 Do not add:
 
-- a second mining domain or compatibility facade;
-- old-save migration/versioning;
-- finite depletion/regeneration/resurvey;
+- finite deposits, regeneration, resurvey, exhaustion;
 - drag-and-drop;
-- rig IDs, equipment stats, rarity, workers, crew, inventory, crafting, processing;
-- dynamic prices, contracts, prestige, another currency, retention mechanics;
+- rig identity, rarity, workers, crew, equipment, crafting;
+- processing/refineries or dynamic markets;
+- another currency, prestige, contracts, missions, retention systems;
 - server/account/cloud/analytics/remote configuration;
-- generic navigation/state-management/design/asset frameworks;
-- generated Lunar/Mars production art inside the coding task.
+- old-save migration/versioning/compatibility;
+- state-management/routing/repository abstractions;
+- generic content, asset, anchor, objective, or animation frameworks;
+- a fourth planet or Mars rename.
 
-## Acceptance
+## Final acceptance
 
-HPA-285 is ready to merge only when:
+The PR cannot merge until:
 
-- one in-place mining catalog/state/controller/simulation/repository owns the runtime;
-- new key persistence is strict, flat, and proven; old key is ignored;
-- foreground timer accrual and first-save persistence are covered;
-- spawn/merge/deploy/recall/unlock/site commission/technology/planet travel/selling are deterministic and save-backed;
-- all nine sites have final cavern/node visual mappings, including the twelve externally authored Lunar/Mars files;
-- Site Deck, responsive Mine Site, and full-screen Stellar Map meet geometry/accessibility contracts;
-- Technology, Settings, and Offline Return retain their established ownership behavior;
-- fresh public-action-only play reaches Mars mastery and the reward occurs once;
-- the balance note records fill times and sell cadence, not only reachability;
-- old Flame mining/terrain closure and unused dependency are removed after import proof;
-- README/CLAUDE describe the final architecture;
-- formatting, analysis, tests, and representative builds pass.
+- one current mining catalog/state/simulation/repository/controller remains;
+- fresh save uses enum-keyed four-bay Homeworld dock with two T1 rigs;
+- spawn, merge, deploy, recall, recall-capacity rejection, unlock, sale, technology, travel, and mastery reward are deterministic and save-backed;
+- foreground timer visibly advances cargo without per-second writes;
+- missing/recovered initial state is best-effort persisted;
+- site capacity scales with deployed rig capacity shares and Logistics;
+- Site Deck, portrait/landscape Mine Site, and full-screen Stellar Map pass geometry/accessibility tests;
+- all nine final cavern/node assets resolve with no fallback;
+- fresh public-action journey reaches Mars mastery and reloads;
+- playtest records fill time and sell cadence;
+- old key is ignored;
+- old action sheet/Flame world/unused terrain closure/flame dependency are gone;
+- README and CLAUDE describe the final shell architecture;
+- formatting, analysis, test suites, coverage, Chrome, APK, web, and available iOS build gates pass.
