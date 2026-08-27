@@ -7,14 +7,14 @@ class OfflineProductionSummary {
     required this.elapsedUsed,
     required this.produced,
     required this.productionByPlanet,
-    required this.fullSectors,
+    required this.fullSites,
     required this.wasOfflineCapped,
   });
 
   final Duration elapsedUsed;
   final Map<ResourceType, double> produced;
   final Map<MiningPlanetId, Map<ResourceType, double>> productionByPlanet;
-  final Set<MiningSectorId> fullSectors;
+  final Set<MiningSiteId> fullSites;
   final bool wasOfflineCapped;
 
   double get totalProduced =>
@@ -41,7 +41,7 @@ class MiningSimulation {
           elapsedUsed: Duration.zero,
           produced: {},
           productionByPlanet: {},
-          fullSectors: {},
+          fullSites: {},
           wasOfflineCapped: false,
         ),
       );
@@ -52,35 +52,35 @@ class MiningSimulation {
     final seconds = elapsed.inMicroseconds / Duration.microsecondsPerSecond;
     final produced = <ResourceType, double>{};
     final producedByPlanet = <MiningPlanetId, Map<ResourceType, double>>{};
-    final full = <MiningSectorId>{};
-    final sectors = <MiningSectorId, SectorProgress>{...state.sectors};
+    final full = <MiningSiteId>{};
+    final sites = <MiningSiteId, SiteProgress>{...state.sites};
 
     for (final entry in content.planets.entries) {
       if (!state.unlockedPlanetIds.contains(entry.key)) continue;
       final planetId = entry.key;
-      for (final definition in content.planet(planetId).sectors) {
-        final progress = sectors[definition.id]!;
-        final mine = progress.mine;
-        if (!progress.revealed || mine == null) continue;
+      for (final definition in content.planet(planetId).sites) {
+        final progress = sites[definition.id]!;
+        final deployedRigs = progress.rigByNode.values
+            .whereType<RigTier>()
+            .toList();
+        if (!progress.unlocked || deployedRigs.isEmpty) continue;
 
-        final rate = content.effectiveRate(
+        final rate = content.effectiveSiteRate(
           definition.id,
-          mine.level,
+          deployedRigs,
           state.technology.extraction,
         );
-        final capacity = content.effectiveCapacity(
+        final capacity = content.effectiveSiteCapacity(
           definition.id,
-          mine.level,
+          deployedRigs,
           state.technology.logistics,
         );
-        final remaining = (capacity - mine.storedAmount)
+        final remaining = (capacity - progress.storedAmount)
             .clamp(0.0, capacity)
             .toDouble();
         final amount = (rate * seconds).clamp(0.0, remaining).toDouble();
-        final stored = mine.storedAmount + amount;
-        sectors[definition.id] = progress.copyWith(
-          mine: mine.copyWith(storedAmount: stored),
-        );
+        final stored = progress.storedAmount + amount;
+        sites[definition.id] = progress.copyWith(storedAmount: stored);
         produced.update(
           definition.resource,
           (value) => value + amount,
@@ -98,7 +98,7 @@ class MiningSimulation {
     }
 
     return AccrualResult(
-      state: state.copyWith(lastAccruedAtUtc: now, sectors: sectors),
+      state: state.copyWith(lastAccruedAtUtc: now, sites: sites),
       summary: OfflineProductionSummary(
         elapsedUsed: elapsed,
         produced: Map.unmodifiable(produced),
@@ -107,7 +107,7 @@ class MiningSimulation {
               for (final entry in producedByPlanet.entries)
                 entry.key: Map.unmodifiable(entry.value),
             }),
-        fullSectors: Set.unmodifiable(full),
+        fullSites: Set.unmodifiable(full),
         wasOfflineCapped: rawElapsed > offlineCap,
       ),
     );
