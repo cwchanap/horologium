@@ -206,6 +206,109 @@ void main() {
     },
   );
 
+  testWidgets(
+    'travel clears the selected dock bay before the new planet view',
+    (tester) async {
+      final initial = MiningSave.initial(nowUtc: _start);
+      final repository = CountingMiningSaveRepository();
+      final sites = <MiningSiteId, SiteProgress>{...initial.sites};
+      sites[MiningSiteId.frozenBasin] = sites[MiningSiteId.frozenBasin]!
+          .copyWith(unlocked: true);
+      final lunarDock = <DockBayId, RigTier?>{
+        ...initial.docks[MiningPlanetId.lunarFrontier]!,
+        DockBayId.b1: RigTier.t1,
+      };
+      await repository.save(
+        initial.copyWith(
+          cash: 5_000,
+          technology: const TechnologyLevels(surveying: 3),
+          unlockedPlanetIds: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+          docks: {...initial.docks, MiningPlanetId.lunarFrontier: lunarDock},
+          sites: sites,
+        ),
+      );
+      await pumpShell(tester, repository: repository);
+
+      await tester.tap(find.byKey(const ValueKey<String>('b1')));
+      await tester.tap(find.byKey(const Key('mining-nav-stellarMap')));
+      await tester.pump();
+      final travel = find.byKey(
+        const Key('mining-stellar-map-travel-lunarFrontier'),
+      );
+      await tester.ensureVisible(travel);
+      await tester.tap(travel);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const Key('mining-nav-siteDeck')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('site-card-frozenBasin-enter')));
+      await tester.pump();
+      final node = find.byKey(const Key('mine-site-node-n1'));
+      expect(tester.widget<InkWell>(node).onTap, isNull);
+      await tester.tap(node);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final state = shellHandles(tester).controller.state;
+      expect(state.activePlanetId, MiningPlanetId.lunarFrontier);
+      expect(
+        state.sites[MiningSiteId.frozenBasin]!.rigByNode[MiningNodeId.n1],
+        isNull,
+      );
+    },
+  );
+
+  testWidgets('planet unlock clears the selected dock bay before activation', (
+    tester,
+  ) async {
+    final initial = MiningSave.initial(nowUtc: _start);
+    final repository = CountingMiningSaveRepository();
+    final sites = <MiningSiteId, SiteProgress>{...initial.sites};
+    for (final site
+        in MiningContentRegistry.stellarMining()
+            .planet(MiningPlanetId.homeworld)
+            .sites) {
+      sites[site.id] = sites[site.id]!.copyWith(
+        unlocked: true,
+        commissioned: true,
+      );
+    }
+    await repository.save(
+      initial.copyWith(
+        cash: 5_000,
+        technology: const TechnologyLevels(surveying: 3),
+        sites: sites,
+      ),
+    );
+    await pumpShell(tester, repository: repository);
+
+    await tester.tap(find.byKey(const ValueKey<String>('b1')));
+    await tester.tap(find.byKey(const Key('mining-nav-stellarMap')));
+    await tester.pump();
+    final unlock = find.byKey(
+      const Key('mining-stellar-map-unlock-lunarFrontier'),
+    );
+    await tester.ensureVisible(unlock);
+    await tester.tap(unlock);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byKey(const Key('mining-nav-siteDeck')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('site-card-frozenBasin-enter')));
+    await tester.pump();
+    final node = find.byKey(const Key('mine-site-node-n1'));
+    expect(tester.widget<InkWell>(node).onTap, isNull);
+    await tester.tap(node);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final state = shellHandles(tester).controller.state;
+    expect(state.activePlanetId, MiningPlanetId.lunarFrontier);
+    expect(
+      state.sites[MiningSiteId.frozenBasin]!.rigByNode[MiningNodeId.n1],
+      isNull,
+    );
+  });
+
   testWidgets('missing save attempts initial persistence', (tester) async {
     final repository = CountingMiningSaveRepository();
 

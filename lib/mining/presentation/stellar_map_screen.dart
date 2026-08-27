@@ -11,7 +11,7 @@ class StellarMapScreen extends StatelessWidget {
   const StellarMapScreen({
     super.key,
     required this.view,
-    this.content,
+    required this.content,
     required this.onUnlock,
     required this.onTravel,
     this.onDestinationSelected,
@@ -19,7 +19,7 @@ class StellarMapScreen extends StatelessWidget {
   });
 
   final StellarMapView view;
-  final MiningContentRegistry? content;
+  final MiningContentRegistry content;
   final ValueChanged<MiningPlanetId> onUnlock;
   final ValueChanged<MiningPlanetId> onTravel;
   final ValueChanged<MiningNavigationDestination>? onDestinationSelected;
@@ -27,7 +27,6 @@ class StellarMapScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = content ?? MiningContentRegistry.stellarMining();
     return ColoredBox(
       key: const Key('stellar-map-screen'),
       color: const Color(0xFF07111E),
@@ -51,7 +50,7 @@ class StellarMapScreen extends StatelessWidget {
                         ),
                         child: _PlanetCard(
                           view: view.planets[index],
-                          content: catalog,
+                          content: content,
                           onUnlock: onUnlock,
                           onTravel: onTravel,
                         ),
