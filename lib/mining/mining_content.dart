@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:horologium/constants/assets_path.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 
 enum MiningPlanetId { homeworld, lunarFrontier, marsFrontier }
 
-enum MiningSectorId {
+enum MiningSiteId {
   landingBasin,
   carbonRidge,
   graniteCrater,
@@ -16,47 +15,56 @@ enum MiningSectorId {
   cobaltChasm,
 }
 
+enum MiningNodeId { n1, n2, n3, n4 }
+
+enum DockBayId { b1, b2, b3, b4 }
+
+enum RigTier { t1, t2, t3, t4, t5 }
+
 enum TechnologyTrack { extraction, logistics, surveying }
 
-// World-pixel offset from centered 1800×1800 terrain origin.
-class MiningWorldAnchor {
-  const MiningWorldAnchor(this.x, this.y);
-  final double x;
-  final double y;
+class MiningNodeDefinition {
+  const MiningNodeDefinition({
+    required this.id,
+    required this.requiredSurveyingLevel,
+  });
+
+  final MiningNodeId id;
+  final int requiredSurveyingLevel;
 }
 
-class MiningSectorDefinition {
-  const MiningSectorDefinition({
+class MiningSiteDefinition {
+  const MiningSiteDefinition({
     required this.id,
     required this.name,
     required this.resource,
-    required this.mineAsset,
-    required this.revealCost,
-    required this.requiredSector,
+    required this.unlockCost,
+    required this.requiredSite,
     required this.requiredSurveyingLevel,
-    required this.buildCost,
     required this.baseRatePerSecond,
     required this.baseCapacity,
     required this.saleValuePerUnit,
-    required this.upgradeCosts,
-    required this.anchor,
+    required this.nodes,
+    required this.cavernAsset,
+    required this.nodeAsset,
+    required this.cardAsset,
     this.facilityName,
     this.discoveryText,
   });
 
-  final MiningSectorId id;
+  final MiningSiteId id;
   final String name;
   final ResourceType resource;
-  final String mineAsset;
-  final int revealCost;
-  final MiningSectorId? requiredSector;
+  final int unlockCost;
+  final MiningSiteId? requiredSite;
   final int requiredSurveyingLevel;
-  final int buildCost;
   final double baseRatePerSecond;
   final double baseCapacity;
   final int saleValuePerUnit;
-  final List<int> upgradeCosts;
-  final MiningWorldAnchor anchor;
+  final List<MiningNodeDefinition> nodes;
+  final String cavernAsset;
+  final String nodeAsset;
+  final String cardAsset;
   final String? facilityName;
   final String? discoveryText;
 }
@@ -79,44 +87,37 @@ class MiningPlanetDefinition {
   const MiningPlanetDefinition({
     required this.id,
     required this.name,
-    required this.sectors,
-    required this.terrainSeed,
-    required this.tint,
+    required this.sites,
     required this.unlockRequiredMasteryPlanetId,
     required this.unlockRequiredSurveyingLevel,
     required this.unlockCashCost,
     required this.masteryRewardCash,
+    required this.rigSpawnCost,
+    required this.planetAsset,
   });
 
   final MiningPlanetId id;
   final String name;
-  final List<MiningSectorDefinition> sectors;
-  final int terrainSeed;
-
-  /// Mining-world tint. The world renders this as its atmosphere/background
-  /// so each planet keeps a distinct visual identity.
-  final Color tint;
+  final List<MiningSiteDefinition> sites;
   final MiningPlanetId? unlockRequiredMasteryPlanetId;
   final int unlockRequiredSurveyingLevel;
   final int unlockCashCost;
   final int masteryRewardCash;
+  final int rigSpawnCost;
+  final String planetAsset;
 }
 
 class MiningContentRegistry {
   const MiningContentRegistry._(this.planets);
 
-  static const int terrainGridSize = 36;
-  static const double terrainCellSize = 50;
-  static const double worldExtent = terrainGridSize * terrainCellSize;
-  static const double worldHalfExtent = worldExtent / 2;
   static const int maxTechnologyLevel = 5;
   static const technologyCosts = <int>[300, 700, 1500, 4000, 9000];
-  static const technologyMineGates = <MiningSectorId>[
-    MiningSectorId.landingBasin,
-    MiningSectorId.carbonRidge,
-    MiningSectorId.graniteCrater,
-    MiningSectorId.frozenBasin,
-    MiningSectorId.titaniumHighlands,
+  static const technologySiteGates = <MiningSiteId>[
+    MiningSiteId.landingBasin,
+    MiningSiteId.carbonRidge,
+    MiningSiteId.graniteCrater,
+    MiningSiteId.frozenBasin,
+    MiningSiteId.titaniumHighlands,
   ];
   static const offlineCapsByLogistics = <Duration>[
     Duration(hours: 8),
@@ -199,177 +200,330 @@ class MiningContentRegistry {
     MiningPlanetId.homeworld: MiningPlanetDefinition(
       id: MiningPlanetId.homeworld,
       name: 'Homeworld',
-      terrainSeed: 631,
-      tint: Color(0xFF0A1218),
       unlockRequiredMasteryPlanetId: null,
       unlockRequiredSurveyingLevel: 0,
       unlockCashCost: 0,
       masteryRewardCash: 0,
-      sectors: [
-        MiningSectorDefinition(
-          id: MiningSectorId.landingBasin,
+      rigSpawnCost: 25,
+      planetAsset: 'assets/images/mining/planets/homeworld.png',
+      sites: [
+        MiningSiteDefinition(
+          id: MiningSiteId.landingBasin,
           name: 'Landing Basin',
           resource: ResourceType.gold,
-          mineAsset: Assets.goldMine,
-          revealCost: 0,
-          requiredSector: null,
+          unlockCost: 0,
+          requiredSite: null,
           requiredSurveyingLevel: 0,
-          buildCost: 50,
           baseRatePerSecond: 0.50,
           baseCapacity: 90,
           saleValuePerUnit: 4,
-          upgradeCosts: [80, 160, 320, 640],
-          anchor: MiningWorldAnchor(-72, 396),
+          nodes: [
+            MiningNodeDefinition(
+              id: MiningNodeId.n1,
+              requiredSurveyingLevel: 0,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n2,
+              requiredSurveyingLevel: 0,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n3,
+              requiredSurveyingLevel: 1,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n4,
+              requiredSurveyingLevel: 2,
+            ),
+          ],
+          cavernAsset: 'assets/images/mining/caverns/gold.png',
+          nodeAsset: 'assets/images/mining/nodes/gold.png',
+          cardAsset: 'assets/images/mining/sites/landing_basin.png',
         ),
-        MiningSectorDefinition(
-          id: MiningSectorId.carbonRidge,
+        MiningSiteDefinition(
+          id: MiningSiteId.carbonRidge,
           name: 'Carbon Ridge',
           resource: ResourceType.coal,
-          mineAsset: Assets.coalMine,
-          revealCost: 250,
-          requiredSector: MiningSectorId.landingBasin,
+          unlockCost: 250,
+          requiredSite: MiningSiteId.landingBasin,
           requiredSurveyingLevel: 0,
-          buildCost: 100,
           baseRatePerSecond: 0.75,
           baseCapacity: 120,
           saleValuePerUnit: 3,
-          upgradeCosts: [150, 300, 600, 1200],
-          anchor: MiningWorldAnchor(-396, -72),
+          nodes: [
+            MiningNodeDefinition(
+              id: MiningNodeId.n1,
+              requiredSurveyingLevel: 0,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n2,
+              requiredSurveyingLevel: 1,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n3,
+              requiredSurveyingLevel: 2,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n4,
+              requiredSurveyingLevel: 3,
+            ),
+          ],
+          cavernAsset: 'assets/images/mining/caverns/coal.png',
+          nodeAsset: 'assets/images/mining/nodes/coal.png',
+          cardAsset: 'assets/images/mining/sites/carbon_ridge.png',
         ),
-        MiningSectorDefinition(
-          id: MiningSectorId.graniteCrater,
+        MiningSiteDefinition(
+          id: MiningSiteId.graniteCrater,
           name: 'Granite Crater',
           resource: ResourceType.stone,
-          mineAsset: Assets.quarry,
-          revealCost: 700,
-          requiredSector: MiningSectorId.carbonRidge,
+          unlockCost: 700,
+          requiredSite: MiningSiteId.carbonRidge,
           requiredSurveyingLevel: 0,
-          buildCost: 250,
           baseRatePerSecond: 0.60,
           baseCapacity: 120,
           saleValuePerUnit: 5,
-          upgradeCosts: [350, 700, 1400, 2800],
-          anchor: MiningWorldAnchor(324, -360),
+          nodes: [
+            MiningNodeDefinition(
+              id: MiningNodeId.n1,
+              requiredSurveyingLevel: 0,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n2,
+              requiredSurveyingLevel: 1,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n3,
+              requiredSurveyingLevel: 2,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n4,
+              requiredSurveyingLevel: 3,
+            ),
+          ],
+          cavernAsset: 'assets/images/mining/caverns/stone.png',
+          nodeAsset: 'assets/images/mining/nodes/stone.png',
+          cardAsset: 'assets/images/mining/sites/granite_crater.png',
         ),
       ],
     ),
     MiningPlanetId.lunarFrontier: MiningPlanetDefinition(
       id: MiningPlanetId.lunarFrontier,
       name: 'Lunar Frontier',
-      terrainSeed: 638,
-      tint: Color(0xFF151324),
       unlockRequiredMasteryPlanetId: MiningPlanetId.homeworld,
       unlockRequiredSurveyingLevel: 3,
       unlockCashCost: 2500,
       masteryRewardCash: 0,
-      sectors: [
-        MiningSectorDefinition(
-          id: MiningSectorId.frozenBasin,
+      rigSpawnCost: 500,
+      planetAsset: 'assets/images/mining/planets/lunar_frontier.png',
+      sites: [
+        MiningSiteDefinition(
+          id: MiningSiteId.frozenBasin,
           name: 'Frozen Basin',
           resource: ResourceType.waterIce,
-          mineAsset: Assets.waterTreatmentPlant,
-          revealCost: 0,
-          requiredSector: null,
+          unlockCost: 0,
+          requiredSite: null,
           requiredSurveyingLevel: 3,
-          buildCost: 500,
           baseRatePerSecond: 1.00,
           baseCapacity: 150,
           saleValuePerUnit: 6,
-          upgradeCosts: [700, 1400, 2800, 5600],
-          anchor: MiningWorldAnchor(-420, 320),
+          nodes: [
+            MiningNodeDefinition(
+              id: MiningNodeId.n1,
+              requiredSurveyingLevel: 3,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n2,
+              requiredSurveyingLevel: 3,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n3,
+              requiredSurveyingLevel: 4,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n4,
+              requiredSurveyingLevel: 5,
+            ),
+          ],
+          cavernAsset: 'assets/images/mining/caverns/water_ice.png',
+          nodeAsset: 'assets/images/mining/nodes/water_ice.png',
+          cardAsset: 'assets/images/mining/caverns/water_ice.png',
         ),
-        MiningSectorDefinition(
-          id: MiningSectorId.titaniumHighlands,
+        MiningSiteDefinition(
+          id: MiningSiteId.titaniumHighlands,
           name: 'Titanium Highlands',
           resource: ResourceType.titaniumOre,
-          mineAsset: Assets.grinderMill,
-          revealCost: 3000,
-          requiredSector: MiningSectorId.frozenBasin,
+          unlockCost: 3000,
+          requiredSite: MiningSiteId.frozenBasin,
           requiredSurveyingLevel: 4,
-          buildCost: 1200,
           baseRatePerSecond: 0.80,
           baseCapacity: 140,
           saleValuePerUnit: 12,
-          upgradeCosts: [1600, 3200, 6400, 12800],
-          anchor: MiningWorldAnchor(120, -80),
+          nodes: [
+            MiningNodeDefinition(
+              id: MiningNodeId.n1,
+              requiredSurveyingLevel: 4,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n2,
+              requiredSurveyingLevel: 4,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n3,
+              requiredSurveyingLevel: 5,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n4,
+              requiredSurveyingLevel: 5,
+            ),
+          ],
+          cavernAsset: 'assets/images/mining/caverns/titanium_ore.png',
+          nodeAsset: 'assets/images/mining/nodes/titanium_ore.png',
+          cardAsset: 'assets/images/mining/caverns/titanium_ore.png',
         ),
-        MiningSectorDefinition(
-          id: MiningSectorId.heliumMare,
+        MiningSiteDefinition(
+          id: MiningSiteId.heliumMare,
           name: 'Helium Mare',
           resource: ResourceType.helium3,
-          mineAsset: Assets.researchLab,
-          revealCost: 8000,
-          requiredSector: MiningSectorId.titaniumHighlands,
+          unlockCost: 8000,
+          requiredSite: MiningSiteId.titaniumHighlands,
           requiredSurveyingLevel: 5,
-          buildCost: 3000,
           baseRatePerSecond: 0.55,
           baseCapacity: 120,
           saleValuePerUnit: 30,
-          upgradeCosts: [4000, 8000, 16000, 32000],
-          anchor: MiningWorldAnchor(390, -410),
+          nodes: [
+            MiningNodeDefinition(
+              id: MiningNodeId.n1,
+              requiredSurveyingLevel: 5,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n2,
+              requiredSurveyingLevel: 5,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n3,
+              requiredSurveyingLevel: 5,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n4,
+              requiredSurveyingLevel: 5,
+            ),
+          ],
+          cavernAsset: 'assets/images/mining/caverns/helium_3.png',
+          nodeAsset: 'assets/images/mining/nodes/helium_3.png',
+          cardAsset: 'assets/images/mining/caverns/helium_3.png',
         ),
       ],
     ),
     MiningPlanetId.marsFrontier: MiningPlanetDefinition(
       id: MiningPlanetId.marsFrontier,
       name: 'Mars Frontier',
-      terrainSeed: 641,
-      tint: Color(0xFF2A1512),
       unlockRequiredMasteryPlanetId: MiningPlanetId.lunarFrontier,
       unlockRequiredSurveyingLevel: 5,
       unlockCashCost: 20000,
       masteryRewardCash: 25000,
-      sectors: [
-        MiningSectorDefinition(
-          id: MiningSectorId.ochreBasin,
+      rigSpawnCost: 5000,
+      planetAsset: 'assets/images/mining/planets/mars_frontier.png',
+      sites: [
+        MiningSiteDefinition(
+          id: MiningSiteId.ochreBasin,
           name: 'Ochre Basin',
           resource: ResourceType.ironOre,
-          mineAsset: Assets.woodFactory,
-          revealCost: 0,
-          requiredSector: null,
+          unlockCost: 0,
+          requiredSite: null,
           requiredSurveyingLevel: 5,
-          buildCost: 5000,
           baseRatePerSecond: 0.75,
           baseCapacity: 180,
           saleValuePerUnit: 32,
-          upgradeCosts: [7000, 14000, 28000, 56000],
-          anchor: MiningWorldAnchor(-360, 330),
+          nodes: [
+            MiningNodeDefinition(
+              id: MiningNodeId.n1,
+              requiredSurveyingLevel: 5,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n2,
+              requiredSurveyingLevel: 5,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n3,
+              requiredSurveyingLevel: 5,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n4,
+              requiredSurveyingLevel: 5,
+            ),
+          ],
+          cavernAsset: 'assets/images/mining/caverns/iron_ore.png',
+          nodeAsset: 'assets/images/mining/nodes/iron_ore.png',
+          cardAsset: 'assets/images/mining/caverns/iron_ore.png',
           facilityName: 'Iron Rig',
           discoveryText:
               'iron-rich regolith supports the first heavy extraction rig.',
         ),
-        MiningSectorDefinition(
-          id: MiningSectorId.silicaDunes,
+        MiningSiteDefinition(
+          id: MiningSiteId.silicaDunes,
           name: 'Silica Dunes',
           resource: ResourceType.silica,
-          mineAsset: Assets.riceHuller,
-          revealCost: 12000,
-          requiredSector: MiningSectorId.ochreBasin,
+          unlockCost: 12000,
+          requiredSite: MiningSiteId.ochreBasin,
           requiredSurveyingLevel: 5,
-          buildCost: 9000,
           baseRatePerSecond: 0.55,
           baseCapacity: 160,
           saleValuePerUnit: 55,
-          upgradeCosts: [12000, 24000, 48000, 96000],
-          anchor: MiningWorldAnchor(280, -60),
+          nodes: [
+            MiningNodeDefinition(
+              id: MiningNodeId.n1,
+              requiredSurveyingLevel: 5,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n2,
+              requiredSurveyingLevel: 5,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n3,
+              requiredSurveyingLevel: 5,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n4,
+              requiredSurveyingLevel: 5,
+            ),
+          ],
+          cavernAsset: 'assets/images/mining/caverns/silica.png',
+          nodeAsset: 'assets/images/mining/nodes/silica.png',
+          cardAsset: 'assets/images/mining/caverns/silica.png',
           facilityName: 'Silica Extractor',
           discoveryText:
               'glassy dune deposits trade lower throughput for stronger sale value.',
         ),
-        MiningSectorDefinition(
-          id: MiningSectorId.cobaltChasm,
+        MiningSiteDefinition(
+          id: MiningSiteId.cobaltChasm,
           name: 'Cobalt Chasm',
           resource: ResourceType.cobaltOre,
-          mineAsset: Assets.sawmill,
-          revealCost: 30000,
-          requiredSector: MiningSectorId.silicaDunes,
+          unlockCost: 30000,
+          requiredSite: MiningSiteId.silicaDunes,
           requiredSurveyingLevel: 5,
-          buildCost: 18000,
           baseRatePerSecond: 0.35,
           baseCapacity: 130,
           saleValuePerUnit: 110,
-          upgradeCosts: [24000, 48000, 96000, 192000],
-          anchor: MiningWorldAnchor(-80, -400),
+          nodes: [
+            MiningNodeDefinition(
+              id: MiningNodeId.n1,
+              requiredSurveyingLevel: 5,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n2,
+              requiredSurveyingLevel: 5,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n3,
+              requiredSurveyingLevel: 5,
+            ),
+            MiningNodeDefinition(
+              id: MiningNodeId.n4,
+              requiredSurveyingLevel: 5,
+            ),
+          ],
+          cavernAsset: 'assets/images/mining/caverns/cobalt_ore.png',
+          nodeAsset: 'assets/images/mining/nodes/cobalt_ore.png',
+          cardAsset: 'assets/images/mining/caverns/cobalt_ore.png',
           facilityName: 'Cobalt Drill',
           discoveryText:
               'deep cobalt seams are the final high-value Mars target.',
@@ -380,39 +534,47 @@ class MiningContentRegistry {
 
   MiningPlanetDefinition planet(MiningPlanetId id) => planets[id]!;
 
-  MiningSectorDefinition sector(MiningSectorId id) => planets.values
-      .expand((planet) => planet.sectors)
-      .singleWhere((sector) => sector.id == id);
+  MiningSiteDefinition site(MiningSiteId id) => planets.values
+      .expand((planet) => planet.sites)
+      .singleWhere((site) => site.id == id);
 
-  MiningPlanetId planetForSector(MiningSectorId id) => planets.entries
-      .singleWhere(
-        (entry) => entry.value.sectors.any((sector) => sector.id == id),
-      )
+  MiningPlanetId planetForSite(MiningSiteId id) => planets.entries
+      .singleWhere((entry) => entry.value.sites.any((site) => site.id == id))
       .key;
 
-  double rateFor(MiningSectorId id, int level) =>
-      sector(id).baseRatePerSecond * rateMultipliers[level - 1];
+  double rigRateMultiplier(RigTier tier) => rateMultipliers[tier.index];
 
-  double capacityFor(MiningSectorId id, int level) =>
-      sector(id).baseCapacity * capacityMultipliers[level - 1];
+  double rigCapacityMultiplier(RigTier tier) => capacityMultipliers[tier.index];
 
-  double effectiveRate(MiningSectorId id, int level, int extraction) =>
-      rateFor(id, level) * extractionRateMultipliers[extraction];
+  double effectiveSiteRate(
+    MiningSiteId id,
+    Iterable<RigTier> rigs,
+    int extraction,
+  ) =>
+      site(id).baseRatePerSecond *
+      rigs.fold<double>(0, (sum, tier) => sum + rigRateMultiplier(tier)) *
+      extractionRateMultipliers[extraction];
 
-  double effectiveCapacity(MiningSectorId id, int level, int logistics) =>
-      capacityFor(id, level) * logisticsCapacityMultipliers[logistics];
+  double effectiveSiteCapacity(
+    MiningSiteId id,
+    Iterable<RigTier> rigs,
+    int logistics,
+  ) =>
+      site(id).baseCapacity *
+      rigs.fold<double>(0, (sum, tier) => sum + rigCapacityMultiplier(tier)) *
+      logisticsCapacityMultipliers[logistics];
 
   Duration offlineCapFor(int logistics) => offlineCapsByLogistics[logistics];
 
-  /// Planet mastery: every mine on [planetId] exists. Takes only sector ids so
-  /// content never imports mining state.
+  /// Planet mastery: every site on [planetId] is commissioned. Takes only
+  /// site ids so content never imports mining state.
   bool isPlanetMastered(
     MiningPlanetId planetId,
-    Iterable<MiningSectorId> minedSectorIds,
+    Iterable<MiningSiteId> commissionedSiteIds,
   ) {
-    final mined = minedSectorIds.toSet();
+    final commissioned = commissionedSiteIds.toSet();
     return planet(
       planetId,
-    ).sectors.every((sector) => mined.contains(sector.id));
+    ).sites.every((site) => commissioned.contains(site.id));
   }
 }
