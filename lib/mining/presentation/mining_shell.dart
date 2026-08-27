@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:horologium/game/audio_manager.dart';
 import 'package:horologium/mining/fleet_dock_view.dart';
+import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_controller.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
@@ -12,6 +14,7 @@ import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_settings_sheet.dart';
+import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/offline_return_sheet.dart';
 import 'package:horologium/mining/presentation/site_deck_screen.dart';
 import 'package:horologium/mining/presentation/technology_sheet.dart';
@@ -56,6 +59,7 @@ class _MiningShellState extends State<MiningShell>
   bool _reducedMotion = false;
   bool _recoverySnackBarScheduled = false;
   DockBayId? _selectedBayId;
+  MiningSiteId? _openSiteId;
 
   @override
   void initState() {
@@ -227,12 +231,81 @@ class _MiningShellState extends State<MiningShell>
   void _enterSite(MiningSiteId id) {
     if (!_initialized || _controller.isBusy) return;
     unawaited(_audioManager.maybeStartBgm());
-    _showResult('${_content.site(id).name} selected.');
+    setState(() => _openSiteId = id);
+  }
+
+  void _leaveSite() {
+    if (!mounted) return;
+    setState(() => _openSiteId = null);
+  }
+
+  void _handleSiteNodeTap(MiningNodeId nodeId) {
+    final siteId = _openSiteId;
+    if (!_initialized || _controller.isBusy || siteId == null) return;
+    final view = MineSiteView.from(
+      state: _controller.state,
+      content: _content,
+      siteId: siteId,
+      selectedBayId: _selectedBayId,
+      isBusy: false,
+    );
+    final node = view.node(nodeId);
+    final selectedBayId = _selectedBayId;
+    if (node.canDeploy && selectedBayId != null) {
+      _runSheetAction(
+        () => _controller.deployRig(selectedBayId, siteId, nodeId),
+        successMessage: 'Rig deployed.',
+      );
+    } else if (node.canRecall) {
+      _runSheetAction(
+        () => _controller.recallRig(siteId, nodeId),
+        successMessage: 'Rig recalled.',
+      );
+    } else if (node.disabledReason != null) {
+      _showResult(node.disabledReason!);
+    }
+  }
+
+  void _sellCargo() {
+    if (!_initialized || _controller.isBusy) return;
+    final pendingOperation = _controller.sellAllCargo();
+    _refreshPresentation();
+    unawaited(
+      pendingOperation
+          .then((result) {
+            if (!mounted) return;
+            _preserveDockSelection();
+            _refreshPresentation();
+            if (result.isSuccess) {
+              unawaited(HapticFeedback.lightImpact());
+            }
+            _showResult(
+              result.isSuccess
+                  ? 'Sold ${result.revenue} cash.'
+                  : result.message ?? 'Sale failed.',
+            );
+          })
+          .catchError((_) {
+            if (!mounted) return;
+            _refreshPresentation();
+            _showResult('Sale failed.');
+          }),
+    );
+  }
+
+  void _preserveDockSelection() {
+    final selectedBayId = _selectedBayId;
+    if (selectedBayId == null) return;
+    final dock = _controller.state.docks[_controller.state.activePlanetId];
+    if (dock == null || dock[selectedBayId] == null) {
+      _selectedBayId = null;
+    }
   }
 
   void _handleNavigation(MiningNavigationDestination destination) {
     switch (destination) {
       case MiningNavigationDestination.siteDeck:
+        if (_openSiteId != null) _leaveSite();
         break;
       case MiningNavigationDestination.technology:
         openTechnology();
@@ -255,7 +328,11 @@ class _MiningShellState extends State<MiningShell>
     try {
       final result = await pendingOperation;
       if (!mounted) return;
+      _preserveDockSelection();
       _refreshPresentation();
+      if (result.isSuccess) {
+        unawaited(HapticFeedback.lightImpact());
+      }
       _showResult(
         result.isSuccess
             ? result.message ?? successMessage
@@ -355,16 +432,40 @@ class _MiningShellState extends State<MiningShell>
         selectedBayId: _selectedBayId,
         isBusy: _controller.isBusy,
       );
-      surface = SiteDeckScreen(
-        view: siteDeck,
-        fleetDock: fleetDock,
-        cash: _displayState.cash,
-        onEnterSite: _enterSite,
-        onUnlockSite: _unlockSite,
-        onBayTap: _handleDockBayTap,
-        onSpawnRig: _spawnRig,
-        onDestinationSelected: _handleNavigation,
-      );
+      final siteId = _openSiteId;
+      if (siteId == null) {
+        surface = SiteDeckScreen(
+          view: siteDeck,
+          fleetDock: fleetDock,
+          cash: _displayState.cash,
+          onEnterSite: _enterSite,
+          onUnlockSite: _unlockSite,
+          onBayTap: _handleDockBayTap,
+          onSpawnRig: _spawnRig,
+          onDestinationSelected: _handleNavigation,
+        );
+      } else {
+        final mineSite = MineSiteView.from(
+          state: _displayState,
+          content: _content,
+          siteId: siteId,
+          selectedBayId: _selectedBayId,
+          isBusy: _controller.isBusy,
+        );
+        surface = MineSiteScreen(
+          view: mineSite,
+          fleetDock: fleetDock,
+          cash: _displayState.cash,
+          reducedMotion: _reducedMotion,
+          onNodeTap: _handleSiteNodeTap,
+          onBayTap: _handleDockBayTap,
+          onSpawnRig: _spawnRig,
+          onSellCargo: _sellCargo,
+          onBack: _leaveSite,
+          onSettings: openSettings,
+          onDestinationSelected: _handleNavigation,
+        );
+      }
     }
     return Scaffold(
       backgroundColor: const Color(0xFF07111E),
