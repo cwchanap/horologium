@@ -1,25 +1,25 @@
 import 'package:flutter/material.dart';
 
-class MiningStatusBar extends StatelessWidget {
-  const MiningStatusBar({
+class MiningHud extends StatelessWidget {
+  const MiningHud({
     super.key,
     required this.planetName,
     required this.cash,
-    required this.revealedSectors,
-    required this.totalSectors,
+    required this.commissionedSites,
+    required this.totalSites,
     required this.cargoValue,
   });
 
   final String planetName;
   final int cash;
-  final int revealedSectors;
-  final int totalSectors;
+  final int commissionedSites;
+  final int totalSites;
   final int cargoValue;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      key: const Key('mining-status-bar'),
+      key: const Key('mining-hud'),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xE6162133),
@@ -28,7 +28,7 @@ class MiningStatusBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _Metric(label: planetName, value: '$revealedSectors/$totalSectors'),
+          _Metric(label: planetName, value: '$commissionedSites/$totalSites'),
           _Metric(label: 'CASH', value: '$cash'),
           _Metric(label: 'CARGO VALUE', value: '$cargoValue'),
         ],

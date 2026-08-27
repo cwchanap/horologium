@@ -1,24 +1,17 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/main_menu.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
-import 'package:horologium/mining/presentation/mining_screen.dart';
+import 'package:horologium/mining/mining_state.dart';
+import 'package:horologium/mining/presentation/mining_shell.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _menuViewports = [Size(360, 640), Size(430, 932)];
-const _validMiningSave =
-    '{"cash":100,"lastAccruedAtUtc":"2026-08-18T12:00:00.000Z",'
-    '"technology":{"extraction":0,"logistics":0,"surveying":0},'
-    '"unlockedPlanetIds":["homeworld"],"activePlanetId":"homeworld",'
-    '"sectors":{"landingBasin":{"revealed":true,"mine":null},'
-    '"carbonRidge":{"revealed":false,"mine":null},'
-    '"graniteCrater":{"revealed":false,"mine":null},'
-    '"frozenBasin":{"revealed":false,"mine":null},'
-    '"titaniumHighlands":{"revealed":false,"mine":null},'
-    '"heliumMare":{"revealed":false,"mine":null},'
-    '"ochreBasin":{"revealed":false,"mine":null},'
-    '"silicaDunes":{"revealed":false,"mine":null},'
-    '"cobaltChasm":{"revealed":false,"mine":null}}}';
+final _validMiningSave = jsonEncode(
+  MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 18, 12)).toJson(),
+);
 const _cityActions = [
   'START EXPEDITION',
   'MINING MVP',
@@ -109,14 +102,14 @@ void main() {
     });
   }
 
-  testWidgets('the primary mining CTA opens MiningScreen', (tester) async {
+  testWidgets('the primary mining CTA opens MiningShell', (tester) async {
     await pumpMenu(tester, _menuViewports.first);
 
     await tester.tap(find.text('START MINING'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.byType(MiningScreen), findsOneWidget);
+    expect(find.byType(MiningShell), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -128,12 +121,12 @@ void main() {
       await tester.tap(find.text('START MINING'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
-      expect(find.byType(MiningScreen), findsOneWidget);
+      expect(find.byType(MiningShell), findsOneWidget);
 
       // Pop without performing any action. MiningController.initialize()
       // persists the freshly constructed initial state, so the save key
       // exists before the menu rechecks hasSave().
-      final screenContext = tester.element(find.byType(MiningScreen));
+      final screenContext = tester.element(find.byType(MiningShell));
       Navigator.of(screenContext).pop();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
