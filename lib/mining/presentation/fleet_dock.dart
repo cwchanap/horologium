@@ -30,35 +30,59 @@ class FleetDock extends StatelessWidget {
         border: Border.all(color: MiningTheme.accent.withAlpha(90)),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _DockHeader(view: view, onSpawnRig: onSpawnRig),
-          const SizedBox(height: 6),
-          Flex(
-            direction: axis == FleetDockAxis.horizontal
-                ? Axis.horizontal
-                : Axis.vertical,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              for (final bayId in DockBayId.values)
-                Flexible(
-                  child: Padding(
-                    padding: axis == FleetDockAxis.horizontal
-                        ? const EdgeInsets.symmetric(horizontal: 3)
-                        : const EdgeInsets.symmetric(vertical: 3),
-                    child: _BayButton(
-                      view: view.bay(bayId),
-                      onTap: () => onBayTap(bayId),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
+      child: axis == FleetDockAxis.vertical
+          ? SizedBox.expand(child: Column(children: _dockChildren()))
+          : Column(mainAxisSize: MainAxisSize.min, children: _dockChildren()),
     );
   }
+
+  List<Widget> _dockChildren() => [
+    if (axis == FleetDockAxis.vertical)
+      SizedBox(
+        height: 48,
+        child: _DockHeader(view: view, onSpawnRig: onSpawnRig),
+      )
+    else
+      _DockHeader(view: view, onSpawnRig: onSpawnRig),
+    const SizedBox(height: 6),
+    if (axis == FleetDockAxis.vertical)
+      Expanded(
+        child: Flex(
+          direction: Axis.vertical,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            for (final bayId in DockBayId.values)
+              Flexible(
+                fit: FlexFit.loose,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: _BayButton(
+                    view: view.bay(bayId),
+                    onTap: () => onBayTap(bayId),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      )
+    else
+      Flex(
+        direction: Axis.horizontal,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          for (final bayId in DockBayId.values)
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: _BayButton(
+                  view: view.bay(bayId),
+                  onTap: () => onBayTap(bayId),
+                ),
+              ),
+            ),
+        ],
+      ),
+  ];
 }
 
 class _DockHeader extends StatelessWidget {

@@ -57,6 +57,27 @@ MiningSave deployedLandingBasin(DateTime now) {
   return base.copyWith(sites: sites);
 }
 
+MiningSave deployedLandingState(DateTime now, {double cargo = 0}) {
+  final base = MiningSave.initial(nowUtc: now);
+  final landing = base.sites[MiningSiteId.landingBasin]!;
+  final sites = <MiningSiteId, SiteProgress>{...base.sites};
+  sites[MiningSiteId.landingBasin] = landing.copyWith(
+    commissioned: true,
+    storedAmount: cargo,
+    rigByNode: {...landing.rigByNode, MiningNodeId.n1: RigTier.t1},
+  );
+  return base.copyWith(
+    sites: sites,
+    docks: {
+      ...base.docks,
+      MiningPlanetId.homeworld: {
+        ...base.docks[MiningPlanetId.homeworld]!,
+        DockBayId.b1: null,
+      },
+    },
+  );
+}
+
 Future<void> pumpShell(
   WidgetTester tester, {
   MiningSaveRepository? repository,
@@ -148,6 +169,7 @@ void main() {
       controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b2],
       RigTier.t2,
     );
+    expect(find.text('Rigs merged.'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
     await tester.pump(const Duration(milliseconds: 300));
@@ -159,7 +181,63 @@ void main() {
 
     await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
     await tester.pump();
-    expect(find.text('Landing Basin selected.'), findsOneWidget);
+    expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('mine-site-back')));
+    await tester.pump();
+    expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+  });
+
+  testWidgets('Mine Site deploys and recalls through the controller', (
+    tester,
+  ) async {
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingState(_start));
+    await pumpShell(tester, repository: repository);
+
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('mine-site-node-n1')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    var state = shellHandles(tester).controller.state;
+    expect(
+      state.sites[MiningSiteId.landingBasin]!.rigByNode[MiningNodeId.n1],
+      isNull,
+    );
+    expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b1], RigTier.t1);
+    expect(find.text('Rig recalled.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey<String>('b1')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('mine-site-node-n1')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    state = shellHandles(tester).controller.state;
+    expect(
+      state.sites[MiningSiteId.landingBasin]!.rigByNode[MiningNodeId.n1],
+      RigTier.t1,
+    );
+    expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b1], isNull);
+    expect(find.text('Rig deployed.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Mine Site sells active-planet cargo and reports revenue', (
+    tester,
+  ) async {
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingState(_start, cargo: 10));
+    await pumpShell(tester, repository: repository);
+
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('mine-site-sell')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final state = shellHandles(tester).controller.state;
+    expect(state.cash, 140);
+    expect(state.sites[MiningSiteId.landingBasin]!.storedAmount, 0);
+    expect(find.text('Sold 40 cash.'), findsOneWidget);
   });
 
   testWidgets('Site Deck unlocks an eligible site through the controller', (
