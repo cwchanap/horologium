@@ -10,15 +10,14 @@ class TechnologyTrackView {
     required this.currentEffect,
     required this.nextEffect,
     required this.cost,
-    String? gateSiteName,
-    String? gateSectorName,
+    required this.gateSiteName,
     required this.isGateSatisfied,
     required this.isAffordable,
     required this.isMaxLevel,
     required this.disabledReason,
     this.nodeAvailability,
     this.nextNodeAvailability,
-  }) : gateSiteName = gateSiteName ?? gateSectorName;
+  });
 
   final TechnologyTrack track;
   final String name;
@@ -33,9 +32,6 @@ class TechnologyTrackView {
   final String? disabledReason;
   final String? nodeAvailability;
   final String? nextNodeAvailability;
-
-  /// Kept as a source-compatible alias while the presentation cutover lands.
-  String? get gateSectorName => gateSiteName;
 
   bool get canPurchase => !isMaxLevel && isGateSatisfied && isAffordable;
 
