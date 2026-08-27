@@ -328,17 +328,44 @@ class _MiningShellState extends State<MiningShell>
   @override
   Widget build(BuildContext context) {
     _reducedMotion = MediaQuery.of(context).disableAnimations;
-    final siteDeck = SiteDeckView.from(
-      state: _displayState,
-      content: _content,
-      isBusy: _controller.isBusy,
-    );
-    final fleetDock = FleetDockView.from(
-      state: _displayState,
-      content: _content,
-      selectedBayId: _selectedBayId,
-      isBusy: _controller.isBusy,
-    );
+    final Widget surface;
+    if (!_initialized) {
+      surface = ColoredBox(
+        key: Key('mining-shell-loading'),
+        color: Color(0xFF07111E),
+        child: SafeArea(
+          child: Center(
+            child: Semantics(
+              liveRegion: true,
+              label: 'Loading mining operation',
+              child: CircularProgressIndicator(color: Colors.cyanAccent),
+            ),
+          ),
+        ),
+      );
+    } else {
+      final siteDeck = SiteDeckView.from(
+        state: _displayState,
+        content: _content,
+        isBusy: _controller.isBusy,
+      );
+      final fleetDock = FleetDockView.from(
+        state: _displayState,
+        content: _content,
+        selectedBayId: _selectedBayId,
+        isBusy: _controller.isBusy,
+      );
+      surface = SiteDeckScreen(
+        view: siteDeck,
+        fleetDock: fleetDock,
+        cash: _displayState.cash,
+        onEnterSite: _enterSite,
+        onUnlockSite: _unlockSite,
+        onBayTap: _handleDockBayTap,
+        onSpawnRig: _spawnRig,
+        onDestinationSelected: _handleNavigation,
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xFF07111E),
       body: Listener(
@@ -346,16 +373,7 @@ class _MiningShellState extends State<MiningShell>
         onPointerDown: (_) {
           if (_initialized) unawaited(_audioManager.maybeStartBgm());
         },
-        child: SiteDeckScreen(
-          view: siteDeck,
-          fleetDock: fleetDock,
-          cash: _displayState.cash,
-          onEnterSite: _enterSite,
-          onUnlockSite: _unlockSite,
-          onBayTap: _handleDockBayTap,
-          onSpawnRig: _spawnRig,
-          onDestinationSelected: _handleNavigation,
-        ),
+        child: surface,
       ),
     );
   }

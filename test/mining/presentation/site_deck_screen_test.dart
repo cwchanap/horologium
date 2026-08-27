@@ -175,22 +175,65 @@ void main() {
   testWidgets('keeps four bay controls and interactive targets accessible', (
     tester,
   ) async {
-    final state = _stateWith();
+    final initial = MiningSave.initial(nowUtc: _start);
+    final state = initial.copyWith(
+      cash: 2_000,
+      sites: {
+        for (final entry in initial.sites.entries)
+          entry.key: entry.value.copyWith(unlocked: true),
+      },
+    );
     await _pumpDeck(tester, view: _deckView(state), dock: _dockView(state));
 
+    final bayControls = find.byWidgetPredicate((widget) {
+      final key = widget.key;
+      return widget is InkWell &&
+          key is ValueKey<String> &&
+          key.value.startsWith('b');
+    });
+    expect(DockBayId.values, hasLength(4));
+    expect(bayControls, findsNWidgets(4));
     for (final bay in DockBayId.values) {
       final control = find.byKey(ValueKey<String>(bay.name));
       expect(control, findsOneWidget);
-      expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
+      final size = tester.getSize(control);
+      expect(size.width, greaterThanOrEqualTo(48));
+      expect(size.height, greaterThanOrEqualTo(48));
       expect(
         find.bySemanticsLabel(RegExp('Dock bay ${bay.name.toUpperCase()}')),
         findsOneWidget,
       );
     }
+
+    final spawn = find.byKey(const Key('fleet-dock-spawn'));
+    final spawnSize = tester.getSize(spawn);
+    expect(spawnSize.width, greaterThanOrEqualTo(48));
+    expect(spawnSize.height, greaterThanOrEqualTo(48));
+
+    final scroll = find.byKey(const Key('site-deck-scroll'));
+    for (final card in _deckView(state).sites) {
+      final action = find.byKey(Key('site-card-${card.id.name}-enter'));
+      for (
+        var attempt = 0;
+        attempt < 8 && action.evaluate().isEmpty;
+        attempt++
+      ) {
+        await tester.drag(scroll, const Offset(0, -320));
+        await tester.pump();
+      }
+      expect(action, findsOneWidget);
+      await tester.ensureVisible(action);
+      final size = tester.getSize(action);
+      expect(size.width, greaterThanOrEqualTo(48));
+      expect(size.height, greaterThanOrEqualTo(48));
+    }
+
     for (final destination in MiningNavigationDestination.values) {
       final control = find.byKey(Key('mining-nav-${destination.name}'));
       expect(control, findsOneWidget);
-      expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
+      final size = tester.getSize(control);
+      expect(size.width, greaterThanOrEqualTo(48));
+      expect(size.height, greaterThanOrEqualTo(48));
     }
   });
 
