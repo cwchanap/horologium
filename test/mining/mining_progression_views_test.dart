@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/mining_state.dart';
+import 'package:horologium/mining/site_deck_view.dart';
 
 SiteProgress progress({bool unlocked = false, bool commissioned = false}) =>
     SiteProgress(
@@ -358,5 +359,59 @@ void main() {
       expect(mars.isActive, isFalse);
       expect(mars.canUnlock, isFalse);
     });
+
+    test('reports planet totals, requirements, indicators, and busy state', () {
+      final view = StellarMapView.from(
+        state: stateWith(
+          now: now,
+          cash: 200,
+          sites: {
+            MiningSiteId.landingBasin: progress(
+              unlocked: true,
+              commissioned: true,
+            ),
+          },
+        ),
+        content: content,
+        isBusy: true,
+      );
+
+      final homeworld = view.planet(MiningPlanetId.homeworld);
+      expect(homeworld.isBusy, isTrue);
+      expect(homeworld.commissionedCount, 1);
+      expect(homeworld.siteIndicators, hasLength(3));
+      expect(homeworld.siteIndicators.first.state, MiningSiteCardState.idle);
+      expect(homeworld.cargo, 0);
+      expect(homeworld.capacity, 0);
+      expect(homeworld.rate, 0);
+      expect(homeworld.projectedValue, 0);
+      expect(homeworld.requirements, isEmpty);
+      expect(
+        () => homeworld.siteIndicators.add(homeworld.siteIndicators.first),
+        throwsUnsupportedError,
+      );
+      expect(() => view.planets.add(homeworld), throwsUnsupportedError);
+    });
+
+    test(
+      'locked planet requirements use commissioned mastery, surveying, and cash',
+      () {
+        final view = StellarMapView.from(
+          state: stateWith(now: now, cash: 100),
+          content: content,
+        );
+        final lunar = view.planet(MiningPlanetId.lunarFrontier);
+
+        expect(
+          lunar.requirements.map((requirement) => requirement.isSatisfied),
+          [false, false, false],
+        );
+        expect(lunar.requirements.map((requirement) => requirement.label), [
+          'Homeworld sites 0/3',
+          'Surveying 3',
+          '2500 cash',
+        ]);
+      },
+    );
   });
 }

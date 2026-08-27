@@ -1,5 +1,6 @@
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
+import 'package:horologium/mining/site_deck_view.dart';
 
 class TechnologyTrackView {
   const TechnologyTrackView({
@@ -15,6 +16,8 @@ class TechnologyTrackView {
     required this.isAffordable,
     required this.isMaxLevel,
     required this.disabledReason,
+    this.nodeAvailability,
+    this.nextNodeAvailability,
   }) : gateSiteName = gateSiteName ?? gateSectorName;
 
   final TechnologyTrack track;
@@ -28,11 +31,15 @@ class TechnologyTrackView {
   final bool isAffordable;
   final bool isMaxLevel;
   final String? disabledReason;
+  final String? nodeAvailability;
+  final String? nextNodeAvailability;
 
   /// Kept as a source-compatible alias while the presentation cutover lands.
   String? get gateSectorName => gateSiteName;
 
   bool get canPurchase => !isMaxLevel && isGateSatisfied && isAffordable;
+
+  String? get surveyingNodeAvailability => nodeAvailability;
 }
 
 class TechnologySheetView {
@@ -47,10 +54,10 @@ class TechnologySheetView {
     required MiningSave state,
     required MiningContentRegistry content,
   }) => TechnologySheetView(
-    tracks: [
+    tracks: List<TechnologyTrackView>.unmodifiable([
       for (final track in TechnologyTrack.values)
         _trackView(state, content, track),
-    ],
+    ]),
   );
 
   static TechnologyTrackView _trackView(
@@ -74,6 +81,10 @@ class TechnologySheetView {
         isAffordable: true,
         isMaxLevel: true,
         disabledReason: 'Technology is at max level.',
+        nodeAvailability: track == TechnologyTrack.surveying
+            ? _nodeAvailability(state, content, level)
+            : null,
+        nextNodeAvailability: null,
       );
     }
 
@@ -97,6 +108,12 @@ class TechnologySheetView {
           ? 'Commission the ${content.site(gateSite).name} site first.'
           : !affordable
           ? 'Need $cost cash.'
+          : null,
+      nodeAvailability: track == TechnologyTrack.surveying
+          ? _nodeAvailability(state, content, level)
+          : null,
+      nextNodeAvailability: track == TechnologyTrack.surveying
+          ? _nodeAvailability(state, content, level + 1)
           : null,
     );
   }
@@ -130,6 +147,64 @@ class TechnologySheetView {
         return '$revealable of $total sites revealable';
     }
   }
+
+  static String _nodeAvailability(
+    MiningSave state,
+    MiningContentRegistry content,
+    int level,
+  ) {
+    var available = 0;
+    var total = 0;
+    for (final planet in content.planets.values) {
+      if (!state.unlockedPlanetIds.contains(planet.id)) continue;
+      for (final site in planet.sites) {
+        for (final node in site.nodes) {
+          total++;
+          if (node.requiredSurveyingLevel <= level) available++;
+        }
+      }
+    }
+    return '$available of $total nodes available';
+  }
+}
+
+class StellarMapRequirementView {
+  const StellarMapRequirementView({
+    required this.label,
+    required this.isSatisfied,
+  });
+
+  final String label;
+  final bool isSatisfied;
+
+  bool get satisfied => isSatisfied;
+}
+
+class StellarMapSiteIndicatorView {
+  const StellarMapSiteIndicatorView({
+    required this.id,
+    required this.name,
+    required this.state,
+    required this.isUnlocked,
+    required this.isCommissioned,
+    required this.cargo,
+    required this.capacity,
+    required this.rate,
+    required this.projectedValue,
+  });
+
+  final MiningSiteId id;
+  final String name;
+  final MiningSiteCardState state;
+  final bool isUnlocked;
+  final bool isCommissioned;
+  final double cargo;
+  final double capacity;
+  final double rate;
+  final int projectedValue;
+
+  double get storedAmount => cargo;
+  bool get isOperational => state == MiningSiteCardState.operational;
 }
 
 class StellarMapPlanetView {
@@ -148,6 +223,13 @@ class StellarMapPlanetView {
     required this.hasSurveying,
     required this.unlockCashCost,
     required this.hasCash,
+    this.cargo = 0,
+    this.capacity = 0,
+    this.rate = 0,
+    this.projectedValue = 0,
+    this.siteIndicators = const [],
+    this.requirements = const [],
+    this.isBusy = false,
   }) : sitesCommissioned = sitesCommissioned ?? minesBuilt ?? 0,
        siteTotal = siteTotal ?? mineTotal ?? 0;
 
@@ -163,10 +245,29 @@ class StellarMapPlanetView {
   final bool hasSurveying;
   final int unlockCashCost;
   final bool hasCash;
+  final double cargo;
+  final double capacity;
+  final double rate;
+  final int projectedValue;
+  final List<StellarMapSiteIndicatorView> siteIndicators;
+  final List<StellarMapRequirementView> requirements;
+  final bool isBusy;
 
   /// Kept as source-compatible aliases while Stellar Map presentation moves.
   int get minesBuilt => sitesCommissioned;
   int get mineTotal => siteTotal;
+  int get commissionedCount => sitesCommissioned;
+  int get totalSites => siteTotal;
+  double get totalCargo => cargo;
+  double get totalCapacity => capacity;
+  double get productionRate => rate;
+  int get projectedSale => projectedValue;
+  List<StellarMapSiteIndicatorView> get indicators => siteIndicators;
+
+  StellarMapSiteIndicatorView siteIndicator(MiningSiteId id) =>
+      siteIndicators.singleWhere((indicator) => indicator.id == id);
+
+  List<StellarMapRequirementView> get requirementIndicators => requirements;
 
   bool get canUnlock =>
       !isUnlocked &&
@@ -187,6 +288,7 @@ class StellarMapView {
   static StellarMapView from({
     required MiningSave state,
     required MiningContentRegistry content,
+    bool isBusy = false,
   }) {
     final unlockedPlanetIds = state.unlockedPlanetIds;
     final commissionedSiteIds = state.sites.entries
@@ -194,11 +296,17 @@ class StellarMapView {
         .map((entry) => entry.key);
 
     return StellarMapView(
-      planets: [
+      planets: List<StellarMapPlanetView>.unmodifiable([
         for (final definition in content.planets.values)
           if (_isVisible(definition, unlockedPlanetIds))
-            _planetView(state, content, definition, commissionedSiteIds),
-      ],
+            _planetView(
+              state,
+              content,
+              definition,
+              commissionedSiteIds,
+              isBusy: isBusy,
+            ),
+      ]),
     );
   }
 
@@ -217,8 +325,9 @@ class StellarMapView {
     MiningSave state,
     MiningContentRegistry content,
     MiningPlanetDefinition definition,
-    Iterable<MiningSiteId> commissionedSiteIds,
-  ) {
+    Iterable<MiningSiteId> commissionedSiteIds, {
+    required bool isBusy,
+  }) {
     final requiredMasteryPlanetId = definition.unlockRequiredMasteryPlanetId;
     final hasRequiredMastery =
         requiredMasteryPlanetId == null ||
@@ -226,6 +335,88 @@ class StellarMapView {
     final sitesCommissioned = definition.sites
         .where((site) => state.sites[site.id]?.commissioned == true)
         .length;
+    final indicators = <StellarMapSiteIndicatorView>[];
+    var cargo = 0.0;
+    var capacity = 0.0;
+    var rate = 0.0;
+    var projectedValue = 0.0;
+    for (final site in definition.sites) {
+      final progress = state.sites[site.id]!;
+      final deployedRigs = progress.rigByNode.values
+          .whereType<RigTier>()
+          .toList();
+      final hasRigs = deployedRigs.isNotEmpty;
+      final siteCapacity = hasRigs
+          ? content.effectiveSiteCapacity(
+              site.id,
+              deployedRigs,
+              state.technology.logistics,
+            )
+          : 0.0;
+      final siteRate = hasRigs
+          ? content.effectiveSiteRate(
+              site.id,
+              deployedRigs,
+              state.technology.extraction,
+            )
+          : 0.0;
+      final siteState = !progress.unlocked
+          ? MiningSiteCardState.locked
+          : !progress.commissioned
+          ? MiningSiteCardState.available
+          : hasRigs
+          ? MiningSiteCardState.operational
+          : MiningSiteCardState.idle;
+      indicators.add(
+        StellarMapSiteIndicatorView(
+          id: site.id,
+          name: site.name,
+          state: siteState,
+          isUnlocked: progress.unlocked,
+          isCommissioned: progress.commissioned,
+          cargo: progress.storedAmount,
+          capacity: siteCapacity,
+          rate: siteRate,
+          projectedValue: (progress.storedAmount * site.saleValuePerUnit)
+              .floor(),
+        ),
+      );
+      cargo += progress.storedAmount;
+      capacity += siteCapacity;
+      rate += siteRate;
+      projectedValue += progress.storedAmount * site.saleValuePerUnit;
+    }
+    final requirements = <StellarMapRequirementView>[];
+    if (requiredMasteryPlanetId != null) {
+      final requiredPlanet = content.planet(requiredMasteryPlanetId);
+      final requiredCommissioned = requiredPlanet.sites
+          .where((site) => state.sites[site.id]?.commissioned == true)
+          .length;
+      requirements.add(
+        StellarMapRequirementView(
+          label:
+              '${requiredPlanet.name} sites '
+              '$requiredCommissioned/${requiredPlanet.sites.length}',
+          isSatisfied: hasRequiredMastery,
+        ),
+      );
+      requirements.add(
+        StellarMapRequirementView(
+          label: 'Surveying ${definition.unlockRequiredSurveyingLevel}',
+          isSatisfied:
+              state.technology.surveying >=
+              definition.unlockRequiredSurveyingLevel,
+        ),
+      );
+    }
+    if (requiredMasteryPlanetId != null && definition.unlockCashCost > 0) {
+      requirements.add(
+        StellarMapRequirementView(
+          label: '${definition.unlockCashCost} cash',
+          isSatisfied: state.cash >= definition.unlockCashCost,
+        ),
+      );
+    }
 
     return StellarMapPlanetView(
       id: definition.id,
@@ -241,6 +432,15 @@ class StellarMapView {
           state.technology.surveying >= definition.unlockRequiredSurveyingLevel,
       unlockCashCost: definition.unlockCashCost,
       hasCash: state.cash >= definition.unlockCashCost,
+      cargo: cargo,
+      capacity: capacity,
+      rate: rate,
+      projectedValue: projectedValue.floor(),
+      siteIndicators: List<StellarMapSiteIndicatorView>.unmodifiable(
+        indicators,
+      ),
+      requirements: List<StellarMapRequirementView>.unmodifiable(requirements),
+      isBusy: isBusy,
     );
   }
 }
