@@ -303,7 +303,7 @@ void main() {
 
     await pumpShell(tester, audioManager: audioManager, pumpCycles: 1);
     await audioManager.loadStarted.future;
-    await tester.tap(find.byKey(const Key('site-deck-scroll')));
+    await tester.tap(find.byKey(const Key('mining-shell-loading')));
     await tester.pump();
     expect(player.playedAssets, isEmpty);
 
@@ -311,6 +311,29 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(audioManager.musicEnabled, isFalse);
+  });
+
+  testWidgets('pre-initialization renders no enabled mining actions', (
+    tester,
+  ) async {
+    final audioManager = DelayedAudioPrefsManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+    );
+
+    await pumpShell(tester, audioManager: audioManager, pumpCycles: 1);
+    await audioManager.loadStarted.future;
+
+    expect(find.byKey(const Key('mining-shell-loading')), findsOneWidget);
+    expect(find.byKey(const Key('site-deck-scroll')), findsNothing);
+    expect(find.byKey(const Key('fleet-dock-spawn')), findsNothing);
+    expect(find.byKey(const Key('mining-bottom-navigation')), findsNothing);
+    expect(find.byType(OutlinedButton), findsNothing);
+
+    audioManager.allowLoad.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+    expect(shellHandles(tester).controller.state.cash, 100);
   });
 
   testWidgets('settings keeps the injected AudioManager preferences', (
