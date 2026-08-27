@@ -16,9 +16,10 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
   foreground refresh, lifecycle checkpoints, audio, reduced-motion
   propagation, and Flutter navigation/action sheets.
 - `MiningController` is the sole public mutation boundary. Unlock, spawn,
-  merge, deploy, recall, sale, technology, planet unlock/travel, refresh, and
+  merge, deploy, recall, sale, technology, planet unlock/travel, and lifecycle
   checkpoint operations accrue current state, mutate in order, and persist
-  through the repository.
+  through the repository. `refresh()` accrues and publishes the current state
+  in memory for the foreground timer; it does not persist per second.
 - `MiningSimulation` is deterministic economy logic. It accrues one supplied
   UTC window over every unlocked planet, applies technology and rig effects,
   fills site cargo to capacity, and reports per-planet production plus flat
