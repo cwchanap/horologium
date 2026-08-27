@@ -3,16 +3,19 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:horologium/game/audio_manager.dart';
+import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_controller.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_state.dart';
-import 'package:horologium/mining/presentation/mining_hud.dart';
+import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_settings_sheet.dart';
 import 'package:horologium/mining/presentation/offline_return_sheet.dart';
+import 'package:horologium/mining/presentation/site_deck_screen.dart';
 import 'package:horologium/mining/presentation/technology_sheet.dart';
+import 'package:horologium/mining/site_deck_view.dart';
 
 class MiningShell extends StatefulWidget {
   const MiningShell({
@@ -52,6 +55,7 @@ class _MiningShellState extends State<MiningShell>
   bool _initialized = false;
   bool _reducedMotion = false;
   bool _recoverySnackBarScheduled = false;
+  DockBayId? _selectedBayId;
 
   @override
   void initState() {
@@ -176,6 +180,71 @@ class _MiningShellState extends State<MiningShell>
     );
   }
 
+  void _unlockSite(MiningSiteId id) {
+    _runSheetAction(
+      () => _controller.unlockSite(id),
+      successMessage: 'Site unlocked.',
+    );
+  }
+
+  void _spawnRig() {
+    _runSheetAction(_controller.spawnRig, successMessage: 'T1 rig spawned.');
+  }
+
+  void _handleDockBayTap(DockBayId bayId) {
+    if (!_initialized || _controller.isBusy) return;
+    final dockView = FleetDockView.from(
+      state: _controller.state,
+      content: _content,
+      selectedBayId: _selectedBayId,
+      isBusy: false,
+    );
+    final tappedBay = dockView.bay(bayId);
+    if (tappedBay.rig == null) {
+      setState(() => _selectedBayId = null);
+      _showResult('Select an occupied rig bay.');
+      return;
+    }
+
+    final selectedBayId = _selectedBayId;
+    if (selectedBayId == null || selectedBayId == bayId) {
+      setState(() => _selectedBayId = selectedBayId == bayId ? null : bayId);
+      return;
+    }
+
+    if (tappedBay.canMergeWithSelection) {
+      setState(() => _selectedBayId = null);
+      _runSheetAction(
+        () => _controller.mergeDockRigs(selectedBayId, bayId),
+        successMessage: 'Rigs merged.',
+      );
+      return;
+    }
+
+    setState(() => _selectedBayId = bayId);
+  }
+
+  void _enterSite(MiningSiteId id) {
+    if (!_initialized || _controller.isBusy) return;
+    unawaited(_audioManager.maybeStartBgm());
+    _showResult('${_content.site(id).name} selected.');
+  }
+
+  void _handleNavigation(MiningNavigationDestination destination) {
+    switch (destination) {
+      case MiningNavigationDestination.siteDeck:
+        break;
+      case MiningNavigationDestination.technology:
+        openTechnology();
+        break;
+      case MiningNavigationDestination.stellarMap:
+        break;
+      case MiningNavigationDestination.settings:
+        openSettings();
+        break;
+    }
+  }
+
   Future<void> _runSheetAction(
     Future<MiningActionResult> Function() operation, {
     required String successMessage,
@@ -213,27 +282,6 @@ class _MiningShellState extends State<MiningShell>
     _startRefreshTimer();
     if (summary != null) await _showOfflineReturn(summary);
   }
-
-  int _commissionedSiteCount() => _activePlanet.sites
-      .where(
-        (definition) =>
-            _displayState.sites[definition.id]?.commissioned ?? false,
-      )
-      .length;
-
-  int _cargoValue() {
-    var value = 0.0;
-    for (final definition in _activePlanet.sites) {
-      final site = _displayState.sites[definition.id];
-      if (site != null) {
-        value += site.storedAmount * definition.saleValuePerUnit;
-      }
-    }
-    return value.floor();
-  }
-
-  MiningPlanetDefinition get _activePlanet =>
-      _content.planet(_displayState.activePlanetId);
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -280,30 +328,33 @@ class _MiningShellState extends State<MiningShell>
   @override
   Widget build(BuildContext context) {
     _reducedMotion = MediaQuery.of(context).disableAnimations;
+    final siteDeck = SiteDeckView.from(
+      state: _displayState,
+      content: _content,
+      isBusy: _controller.isBusy,
+    );
+    final fleetDock = FleetDockView.from(
+      state: _displayState,
+      content: _content,
+      selectedBayId: _selectedBayId,
+      isBusy: _controller.isBusy,
+    );
     return Scaffold(
+      backgroundColor: const Color(0xFF07111E),
       body: Listener(
         behavior: HitTestBehavior.opaque,
         onPointerDown: (_) {
           if (_initialized) unawaited(_audioManager.maybeStartBgm());
         },
-        child: SafeArea(
-          child: Column(
-            children: [
-              MiningHud(
-                planetName: _activePlanet.name,
-                cash: _displayState.cash,
-                commissionedSites: _commissionedSiteCount(),
-                totalSites: _activePlanet.sites.length,
-                cargoValue: _cargoValue(),
-              ),
-              const Expanded(
-                child: Center(
-                  key: Key('mining-shell-placeholder'),
-                  child: Text('Mining operation ready'),
-                ),
-              ),
-            ],
-          ),
+        child: SiteDeckScreen(
+          view: siteDeck,
+          fleetDock: fleetDock,
+          cash: _displayState.cash,
+          onEnterSite: _enterSite,
+          onUnlockSite: _unlockSite,
+          onBayTap: _handleDockBayTap,
+          onSpawnRig: _spawnRig,
+          onDestinationSelected: _handleNavigation,
         ),
       ),
     );

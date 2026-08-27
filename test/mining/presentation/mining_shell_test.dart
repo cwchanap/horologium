@@ -106,13 +106,12 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('renders the thin safe-area shell and active-planet HUD', (
-    tester,
-  ) async {
+  testWidgets('renders the Site Deck and active-planet HUD', (tester) async {
     await pumpShell(tester);
 
-    expect(find.byKey(const Key('mining-shell-placeholder')), findsOneWidget);
-    expect(find.text('Mining operation ready'), findsOneWidget);
+    expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+    expect(find.byKey(const Key('fleet-dock')), findsOneWidget);
+    expect(find.byKey(const Key('mining-bottom-navigation')), findsOneWidget);
     expect(find.byKey(const Key('mining-hud')), findsOneWidget);
     expect(find.text('Homeworld'), findsOneWidget);
     expect(find.text('0/3'), findsOneWidget);
@@ -127,6 +126,68 @@ void main() {
 
     expect(repository.saveCount, 1);
     expect(shellHandles(tester).controller.state.cash, 100);
+  });
+
+  testWidgets('Site Deck wires bay selection, merge, spawn, and site entry', (
+    tester,
+  ) async {
+    final repository = CountingMiningSaveRepository();
+    await repository.save(MiningSave.initial(nowUtc: _start));
+    await pumpShell(tester, repository: repository);
+
+    await tester.tap(find.byKey(const ValueKey<String>('b1')));
+    await tester.tap(find.byKey(const ValueKey<String>('b2')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final controller = shellHandles(tester).controller;
+    expect(
+      controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b1],
+      isNull,
+    );
+    expect(
+      controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b2],
+      RigTier.t2,
+    );
+
+    await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b1],
+      RigTier.t1,
+    );
+    expect(controller.state.cash, 75);
+
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+    expect(find.text('Landing Basin selected.'), findsOneWidget);
+  });
+
+  testWidgets('Site Deck unlocks an eligible site through the controller', (
+    tester,
+  ) async {
+    final initial = MiningSave.initial(nowUtc: _start);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(
+      initial.copyWith(
+        cash: 300,
+        sites: {
+          ...initial.sites,
+          MiningSiteId.landingBasin: initial.sites[MiningSiteId.landingBasin]!
+              .copyWith(unlocked: true),
+        },
+      ),
+    );
+    await pumpShell(tester, repository: repository);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('site-card-carbonRidge-unlock')),
+    );
+    await tester.tap(find.byKey(const Key('site-card-carbonRidge-unlock')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final controller = shellHandles(tester).controller;
+    expect(controller.state.sites[MiningSiteId.carbonRidge]!.unlocked, isTrue);
+    expect(controller.state.cash, 50);
   });
 
   testWidgets(
@@ -225,7 +286,7 @@ void main() {
     final audioManager = AudioManager(backgroundMusicPlayer: player);
     await pumpShell(tester, audioManager: audioManager);
 
-    await tester.tap(find.byKey(const Key('mining-shell-placeholder')));
+    await tester.tap(find.byKey(const Key('site-deck-scroll')));
     await tester.pump();
 
     expect(player.playedAssets, <String>['audio/background.mp3']);
@@ -242,7 +303,7 @@ void main() {
 
     await pumpShell(tester, audioManager: audioManager, pumpCycles: 1);
     await audioManager.loadStarted.future;
-    await tester.tap(find.byKey(const Key('mining-shell-placeholder')));
+    await tester.tap(find.byKey(const Key('site-deck-scroll')));
     await tester.pump();
     expect(player.playedAssets, isEmpty);
 
