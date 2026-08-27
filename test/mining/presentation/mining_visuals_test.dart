@@ -50,10 +50,10 @@ void main() {
     expect(MiningTheme.warning, Colors.orangeAccent);
   });
 
-  testWidgets('resolves supplied Homeworld and common bundle assets', (
-    tester,
-  ) async {
-    for (final site in content.planet(MiningPlanetId.homeworld).sites) {
+  testWidgets('every site cavern node and card resolves', (tester) async {
+    for (final site in content.planets.values.expand(
+      (planet) => planet.sites,
+    )) {
       await rootBundle.load(site.cavernAsset);
       await rootBundle.load(site.nodeAsset);
       await rootBundle.load(site.cardAsset);
