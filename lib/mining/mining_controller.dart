@@ -43,8 +43,6 @@ class MiningController {
   }) : _nowUtc = nowUtc,
        simulation = MiningSimulation(content);
 
-  static const int _maxMineLevel = 5;
-
   final MiningContentRegistry content;
   final MiningSaveRepository repository;
   final MiningSimulation simulation;
@@ -116,107 +114,198 @@ class MiningController {
     return completer.future;
   }
 
-  MiningActionResult? _activePlanetSectorFailure(
-    MiningSectorId id,
+  MiningActionResult? _activePlanetSiteFailure(
+    MiningSiteId id,
     MiningSave state,
   ) {
-    if (content.planetForSector(id) != state.activePlanetId) {
+    if (content.planetForSite(id) != state.activePlanetId) {
       return const MiningActionResult.failure(
-        'Sector is not on the active planet.',
+        'Site is not on the active planet.',
       );
     }
     return null;
   }
 
-  Future<MiningActionResult> revealSector(MiningSectorId id) =>
-      _enqueueMutation(() async {
-        final candidate = simulation.accrue(_state, _nowUtc().toUtc());
-        final activePlanetFailure = _activePlanetSectorFailure(
-          id,
-          candidate.state,
+  Set<MiningSiteId> _commissionedSiteIds(MiningSave state) => state
+      .sites
+      .entries
+      .where((entry) => entry.value.commissioned)
+      .map((entry) => entry.key)
+      .toSet();
+
+  Future<MiningActionResult> unlockSite(MiningSiteId id) => _enqueueMutation(
+    () async {
+      final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+      final activePlanetFailure = _activePlanetSiteFailure(id, candidate.state);
+      if (activePlanetFailure != null) return activePlanetFailure;
+
+      final definition = content.site(id);
+      final progress = candidate.state.sites[id]!;
+      if (progress.unlocked) {
+        return const MiningActionResult.failure('Site already unlocked.');
+      }
+      final requiredSite = definition.requiredSite;
+      if (requiredSite != null &&
+          !candidate.state.sites[requiredSite]!.unlocked) {
+        return const MiningActionResult.failure(
+          'Unlock the previous site first.',
         );
-        if (activePlanetFailure != null) return activePlanetFailure;
-
-        final definition = content.sector(id);
-        final progress = candidate.state.sectors[id]!;
-
-        if (progress.revealed) {
-          return const MiningActionResult.failure('Sector already revealed.');
-        }
-        final requiredSector = definition.requiredSector;
-        if (requiredSector != null &&
-            !candidate.state.sectors[requiredSector]!.revealed) {
-          return const MiningActionResult.failure(
-            'Reveal the previous sector first.',
-          );
-        }
-        if (candidate.state.technology.surveying <
-            definition.requiredSurveyingLevel) {
-          return MiningActionResult.failure(
-            'Requires Surveying ${definition.requiredSurveyingLevel}.',
-          );
-        }
-        if (candidate.state.cash < definition.revealCost) {
-          return const MiningActionResult.failure('Not enough cash.');
-        }
-
-        final sectors = <MiningSectorId, SectorProgress>{
-          ...candidate.state.sectors,
-        };
-        sectors[id] = progress.copyWith(revealed: true);
-        final next = candidate.state.copyWith(
-          cash: candidate.state.cash - definition.revealCost,
-          sectors: sectors,
+      }
+      if (candidate.state.technology.surveying <
+          definition.requiredSurveyingLevel) {
+        return MiningActionResult.failure(
+          'Requires Surveying ${definition.requiredSurveyingLevel}.',
         );
-        await repository.save(next);
-        _state = next;
-        return const MiningActionResult.success();
-      });
+      }
+      if (candidate.state.cash < definition.unlockCost) {
+        return const MiningActionResult.failure('Not enough cash.');
+      }
 
-  Future<MiningActionResult> buildMine(
-    MiningSectorId id,
-  ) => _enqueueMutation(() async {
+      final sites = <MiningSiteId, SiteProgress>{...candidate.state.sites};
+      sites[id] = progress.copyWith(unlocked: true);
+      final next = candidate.state.copyWith(
+        cash: candidate.state.cash - definition.unlockCost,
+        sites: sites,
+      );
+      await repository.save(next);
+      _state = next;
+      return const MiningActionResult.success();
+    },
+  );
+
+  Future<MiningActionResult> spawnRig() => _enqueueMutation(() async {
     final candidate = simulation.accrue(_state, _nowUtc().toUtc());
-    final activePlanetFailure = _activePlanetSectorFailure(id, candidate.state);
-    if (activePlanetFailure != null) return activePlanetFailure;
-
-    final definition = content.sector(id);
-    final planetId = content.planetForSector(id);
-    final planet = content.planet(planetId);
-    final progress = candidate.state.sectors[id]!;
-    final minedSectorIds = candidate.state.sectors.entries
-        .where((entry) => entry.value.mine != null)
-        .map((entry) => entry.key);
-    final wasMastered = content.isPlanetMastered(planetId, minedSectorIds);
-
-    if (!progress.revealed) {
-      return const MiningActionResult.failure('Sector is not revealed.');
+    final planetId = candidate.state.activePlanetId;
+    final planetDocks = candidate.state.docks[planetId]!;
+    DockBayId? emptyBay;
+    for (final bayId in DockBayId.values) {
+      if (planetDocks[bayId] == null) {
+        emptyBay = bayId;
+        break;
+      }
     }
-    if (progress.mine != null) {
-      return const MiningActionResult.failure('Mine already built.');
+    if (emptyBay == null) {
+      return const MiningActionResult.failure('Dock is full.');
     }
-    if (candidate.state.cash < definition.buildCost) {
+
+    final cost = content.planet(planetId).rigSpawnCost;
+    if (candidate.state.cash < cost) {
       return const MiningActionResult.failure('Not enough cash.');
     }
 
-    final sectors = <MiningSectorId, SectorProgress>{
-      ...candidate.state.sectors,
+    final docks = <MiningPlanetId, Map<DockBayId, RigTier?>>{
+      for (final entry in candidate.state.docks.entries)
+        entry.key: <DockBayId, RigTier?>{...entry.value},
     };
-    sectors[id] = progress.copyWith(mine: MineState(level: 1, storedAmount: 0));
+    docks[planetId]![emptyBay] = RigTier.t1;
+    final next = candidate.state.copyWith(
+      cash: candidate.state.cash - cost,
+      docks: docks,
+    );
+    await repository.save(next);
+    _state = next;
+    return const MiningActionResult.success();
+  });
+
+  Future<MiningActionResult> mergeDockRigs(
+    DockBayId sourceBay,
+    DockBayId targetBay,
+  ) => _enqueueMutation(() async {
+    final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+    if (sourceBay == targetBay) {
+      return const MiningActionResult.failure(
+        'Choose two different dock bays.',
+      );
+    }
+    final planetId = candidate.state.activePlanetId;
+    final planetDocks = candidate.state.docks[planetId]!;
+    final sourceTier = planetDocks[sourceBay];
+    final targetTier = planetDocks[targetBay];
+    if (sourceTier == null) {
+      return const MiningActionResult.failure('Source dock bay is empty.');
+    }
+    if (targetTier == null) {
+      return const MiningActionResult.failure('Target dock bay is empty.');
+    }
+    if (sourceTier != targetTier) {
+      return const MiningActionResult.failure('Rigs must be the same tier.');
+    }
+    if (sourceTier == RigTier.t5) {
+      return const MiningActionResult.failure('T5 rigs cannot merge.');
+    }
+
+    final docks = <MiningPlanetId, Map<DockBayId, RigTier?>>{
+      for (final entry in candidate.state.docks.entries)
+        entry.key: <DockBayId, RigTier?>{...entry.value},
+    };
+    docks[planetId]![sourceBay] = null;
+    docks[planetId]![targetBay] = RigTier.values[sourceTier.index + 1];
+    final next = candidate.state.copyWith(docks: docks);
+    await repository.save(next);
+    _state = next;
+    return const MiningActionResult.success();
+  });
+
+  Future<MiningActionResult> deployRig(
+    DockBayId sourceBay,
+    MiningSiteId siteId,
+    MiningNodeId nodeId,
+  ) => _enqueueMutation(() async {
+    final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+    final activePlanetFailure = _activePlanetSiteFailure(
+      siteId,
+      candidate.state,
+    );
+    if (activePlanetFailure != null) return activePlanetFailure;
+
+    final planetId = candidate.state.activePlanetId;
+    final planetDocks = candidate.state.docks[planetId]!;
+    final sourceTier = planetDocks[sourceBay];
+    if (sourceTier == null) {
+      return const MiningActionResult.failure('Dock bay is empty.');
+    }
+    final definition = content.site(siteId);
+    final progress = candidate.state.sites[siteId]!;
+    if (!progress.unlocked) {
+      return const MiningActionResult.failure('Unlock this site first.');
+    }
+    final node = definition.nodes.singleWhere((node) => node.id == nodeId);
+    if (candidate.state.technology.surveying < node.requiredSurveyingLevel) {
+      return MiningActionResult.failure(
+        'Requires Surveying ${node.requiredSurveyingLevel}.',
+      );
+    }
+    if (progress.rigByNode[nodeId] != null) {
+      return const MiningActionResult.failure('Node is already occupied.');
+    }
+
+    final docks = <MiningPlanetId, Map<DockBayId, RigTier?>>{
+      for (final entry in candidate.state.docks.entries)
+        entry.key: <DockBayId, RigTier?>{...entry.value},
+    };
+    docks[planetId]![sourceBay] = null;
+    final rigByNode = <MiningNodeId, RigTier?>{...progress.rigByNode};
+    rigByNode[nodeId] = sourceTier;
+    final sites = <MiningSiteId, SiteProgress>{...candidate.state.sites};
+    sites[siteId] = progress.copyWith(commissioned: true, rigByNode: rigByNode);
+    final wasMastered = content.isPlanetMastered(
+      planetId,
+      _commissionedSiteIds(candidate.state),
+    );
     final isMastered = content.isPlanetMastered(
       planetId,
-      sectors.entries
-          .where((entry) => entry.value.mine != null)
+      sites.entries
+          .where((entry) => entry.value.commissioned)
           .map((entry) => entry.key),
     );
+    final planet = content.planet(planetId);
     final masteryReward =
         !wasMastered && isMastered && planet.masteryRewardCash > 0;
     final next = candidate.state.copyWith(
       cash:
-          candidate.state.cash -
-          definition.buildCost +
-          (masteryReward ? planet.masteryRewardCash : 0),
-      sectors: sectors,
+          candidate.state.cash + (masteryReward ? planet.masteryRewardCash : 0),
+      docks: docks,
+      sites: sites,
     );
     await repository.save(next);
     _state = next;
@@ -228,36 +317,60 @@ class MiningController {
     );
   });
 
-  Future<MiningActionResult> upgradeMine(
-    MiningSectorId id,
+  Future<MiningActionResult> recallRig(
+    MiningSiteId siteId,
+    MiningNodeId nodeId,
   ) => _enqueueMutation(() async {
     final candidate = simulation.accrue(_state, _nowUtc().toUtc());
-    final activePlanetFailure = _activePlanetSectorFailure(id, candidate.state);
+    final activePlanetFailure = _activePlanetSiteFailure(
+      siteId,
+      candidate.state,
+    );
     if (activePlanetFailure != null) return activePlanetFailure;
 
-    final definition = content.sector(id);
-    final progress = candidate.state.sectors[id]!;
-    final mine = progress.mine;
-
-    if (mine == null) {
-      return const MiningActionResult.failure('Build the mine first.');
+    final planetId = candidate.state.activePlanetId;
+    final planetDocks = candidate.state.docks[planetId]!;
+    DockBayId? emptyBay;
+    for (final bayId in DockBayId.values) {
+      if (planetDocks[bayId] == null) {
+        emptyBay = bayId;
+        break;
+      }
     }
-    if (mine.level >= _maxMineLevel) {
-      return const MiningActionResult.failure('Mine is at max level.');
-    }
-    final cost = definition.upgradeCosts[mine.level - 1];
-    if (candidate.state.cash < cost) {
-      return const MiningActionResult.failure('Not enough cash.');
+    if (emptyBay == null) {
+      return const MiningActionResult.failure('Dock is full.');
     }
 
-    final sectors = <MiningSectorId, SectorProgress>{
-      ...candidate.state.sectors,
-    };
-    sectors[id] = progress.copyWith(mine: mine.copyWith(level: mine.level + 1));
-    final next = candidate.state.copyWith(
-      cash: candidate.state.cash - cost,
-      sectors: sectors,
+    final progress = candidate.state.sites[siteId]!;
+    final tier = progress.rigByNode[nodeId];
+    if (tier == null) {
+      return const MiningActionResult.failure('Node is empty.');
+    }
+    final remainingRigs = progress.rigByNode.entries
+        .where((entry) => entry.key != nodeId)
+        .map((entry) => entry.value)
+        .whereType<RigTier>();
+    final postRecallCapacity = content.effectiveSiteCapacity(
+      siteId,
+      remainingRigs,
+      candidate.state.technology.logistics,
     );
+    if (progress.storedAmount > postRecallCapacity) {
+      return const MiningActionResult.failure(
+        'Sell cargo before recalling this rig.',
+      );
+    }
+
+    final docks = <MiningPlanetId, Map<DockBayId, RigTier?>>{
+      for (final entry in candidate.state.docks.entries)
+        entry.key: <DockBayId, RigTier?>{...entry.value},
+    };
+    docks[planetId]![emptyBay] = tier;
+    final rigByNode = <MiningNodeId, RigTier?>{...progress.rigByNode};
+    rigByNode[nodeId] = null;
+    final sites = <MiningSiteId, SiteProgress>{...candidate.state.sites};
+    sites[siteId] = progress.copyWith(rigByNode: rigByNode);
+    final next = candidate.state.copyWith(docks: docks, sites: sites);
     await repository.save(next);
     _state = next;
     return const MiningActionResult.success();
@@ -272,10 +385,10 @@ class MiningController {
     if (currentLevel >= MiningContentRegistry.maxTechnologyLevel) {
       return const MiningActionResult.failure('Technology is at max level.');
     }
-    final gateSector = MiningContentRegistry.technologyMineGates[currentLevel];
-    if (candidate.state.sectors[gateSector]!.mine == null) {
+    final gateSite = MiningContentRegistry.technologySiteGates[currentLevel];
+    if (!candidate.state.sites[gateSite]!.commissioned) {
       return MiningActionResult.failure(
-        'Build the ${content.sector(gateSector).name} mine first.',
+        'Commission the ${content.site(gateSite).name} site first.',
       );
     }
     final cost = MiningContentRegistry.technologyCosts[currentLevel];
@@ -292,47 +405,62 @@ class MiningController {
     return const MiningActionResult.success();
   });
 
-  Future<MiningActionResult> unlockPlanet(
-    MiningPlanetId id,
-  ) => _enqueueMutation(() async {
-    final candidate = simulation.accrue(_state, _nowUtc().toUtc());
-    final definition = content.planet(id);
+  Future<MiningActionResult> unlockPlanet(MiningPlanetId id) =>
+      _enqueueMutation(() async {
+        final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+        final definition = content.planet(id);
 
-    if (candidate.state.unlockedPlanetIds.contains(id)) {
-      return const MiningActionResult.failure('Planet already unlocked.');
-    }
-    final requiredMasteryPlanetId = definition.unlockRequiredMasteryPlanetId;
-    if (requiredMasteryPlanetId == null) {
-      return const MiningActionResult.failure('Planet cannot be unlocked.');
-    }
-    final minedSectorIds = candidate.state.sectors.entries
-        .where((entry) => entry.value.mine != null)
-        .map((entry) => entry.key);
-    if (!content.isPlanetMastered(requiredMasteryPlanetId, minedSectorIds)) {
-      return MiningActionResult.failure(
-        'Build every ${content.planet(requiredMasteryPlanetId).name} '
-        'mine first.',
-      );
-    }
-    if (candidate.state.technology.surveying <
-        definition.unlockRequiredSurveyingLevel) {
-      return MiningActionResult.failure(
-        'Requires Surveying ${definition.unlockRequiredSurveyingLevel}.',
-      );
-    }
-    if (candidate.state.cash < definition.unlockCashCost) {
-      return const MiningActionResult.failure('Not enough cash.');
-    }
+        if (candidate.state.unlockedPlanetIds.contains(id)) {
+          return const MiningActionResult.failure('Planet already unlocked.');
+        }
+        final requiredMasteryPlanetId =
+            definition.unlockRequiredMasteryPlanetId;
+        if (requiredMasteryPlanetId == null) {
+          return const MiningActionResult.failure('Planet cannot be unlocked.');
+        }
+        if (!content.isPlanetMastered(
+          requiredMasteryPlanetId,
+          _commissionedSiteIds(candidate.state),
+        )) {
+          return MiningActionResult.failure(
+            'Commission every ${content.planet(requiredMasteryPlanetId).name} '
+            'site first.',
+          );
+        }
+        if (candidate.state.technology.surveying <
+            definition.unlockRequiredSurveyingLevel) {
+          return MiningActionResult.failure(
+            'Requires Surveying ${definition.unlockRequiredSurveyingLevel}.',
+          );
+        }
+        if (candidate.state.cash < definition.unlockCashCost) {
+          return const MiningActionResult.failure('Not enough cash.');
+        }
 
-    final next = candidate.state.copyWith(
-      cash: candidate.state.cash - definition.unlockCashCost,
-      unlockedPlanetIds: {...candidate.state.unlockedPlanetIds, id},
-      activePlanetId: id,
-    );
-    await repository.save(next);
-    _state = next;
-    return const MiningActionResult.success();
-  });
+        final docks = <MiningPlanetId, Map<DockBayId, RigTier?>>{
+          for (final entry in candidate.state.docks.entries)
+            entry.key: <DockBayId, RigTier?>{...entry.value},
+        };
+        docks[id] = {
+          DockBayId.b1: RigTier.t1,
+          DockBayId.b2: RigTier.t1,
+          DockBayId.b3: null,
+          DockBayId.b4: null,
+        };
+        final sites = <MiningSiteId, SiteProgress>{...candidate.state.sites};
+        final firstSite = definition.sites.first;
+        sites[firstSite.id] = sites[firstSite.id]!.copyWith(unlocked: true);
+        final next = candidate.state.copyWith(
+          cash: candidate.state.cash - definition.unlockCashCost,
+          unlockedPlanetIds: {...candidate.state.unlockedPlanetIds, id},
+          activePlanetId: id,
+          docks: docks,
+          sites: sites,
+        );
+        await repository.save(next);
+        _state = next;
+        return const MiningActionResult.success();
+      });
 
   Future<MiningActionResult> switchPlanet(MiningPlanetId id) =>
       _enqueueMutation(() async {
@@ -356,26 +484,21 @@ class MiningController {
     var totalCargo = 0.0;
     var grossValue = 0.0;
     final sold = <ResourceType, double>{};
-    final sectors = <MiningSectorId, SectorProgress>{
-      ...candidate.state.sectors,
-    };
+    final sites = <MiningSiteId, SiteProgress>{...candidate.state.sites};
 
     for (final definition
-        in content.planet(candidate.state.activePlanetId).sectors) {
-      final progress = sectors[definition.id]!;
-      final mine = progress.mine;
-      if (mine == null || mine.storedAmount <= 0) continue;
+        in content.planet(candidate.state.activePlanetId).sites) {
+      final progress = sites[definition.id]!;
+      if (progress.storedAmount <= 0) continue;
 
-      totalCargo += mine.storedAmount;
-      grossValue += mine.storedAmount * definition.saleValuePerUnit;
+      totalCargo += progress.storedAmount;
+      grossValue += progress.storedAmount * definition.saleValuePerUnit;
       sold.update(
         definition.resource,
-        (value) => value + mine.storedAmount,
-        ifAbsent: () => mine.storedAmount,
+        (value) => value + progress.storedAmount,
+        ifAbsent: () => progress.storedAmount,
       );
-      sectors[definition.id] = progress.copyWith(
-        mine: mine.copyWith(storedAmount: 0),
-      );
+      sites[definition.id] = progress.copyWith(storedAmount: 0);
     }
 
     if (totalCargo <= 0) {
@@ -385,7 +508,7 @@ class MiningController {
     final revenue = grossValue.floor();
     final next = candidate.state.copyWith(
       cash: candidate.state.cash + revenue,
-      sectors: sectors,
+      sites: sites,
     );
     await repository.save(next);
     _state = next;

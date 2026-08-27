@@ -39,9 +39,7 @@ class ThrowingFirstSaveRepository extends MiningSaveRepository {
   @override
   Future<void> save(MiningSave state) async {
     saveCount++;
-    if (saveCount == 1) {
-      throw StateError('disk full');
-    }
+    if (saveCount == 1) throw StateError('disk full');
     if (saveCount == 2) {
       secondSaveStarted.complete();
       await allowSecondSave.future;
@@ -70,11 +68,42 @@ class CountingMiningSaveRepository extends MiningSaveRepository {
   }
 }
 
+Map<DockBayId, RigTier?> dock({
+  RigTier? b1,
+  RigTier? b2,
+  RigTier? b3,
+  RigTier? b4,
+}) => {DockBayId.b1: b1, DockBayId.b2: b2, DockBayId.b3: b3, DockBayId.b4: b4};
+
+Map<MiningNodeId, RigTier?> nodes({
+  RigTier? n1,
+  RigTier? n2,
+  RigTier? n3,
+  RigTier? n4,
+}) => {
+  MiningNodeId.n1: n1,
+  MiningNodeId.n2: n2,
+  MiningNodeId.n3: n3,
+  MiningNodeId.n4: n4,
+};
+
+SiteProgress site({
+  bool unlocked = false,
+  bool commissioned = false,
+  double storedAmount = 0,
+  Map<MiningNodeId, RigTier?>? rigByNode,
+}) => SiteProgress(
+  unlocked: unlocked,
+  commissioned: commissioned,
+  storedAmount: storedAmount,
+  rigByNode: rigByNode ?? nodes(),
+);
+
 MiningSave seededSave(
   DateTime now, {
   int cash = 100,
-  Map<MiningSectorId, MineState> mines = const {},
-  Set<MiningSectorId> revealedSectors = const {},
+  Map<MiningPlanetId, Map<DockBayId, RigTier?>>? docks,
+  Map<MiningSiteId, SiteProgress>? sites,
   TechnologyLevels technology = const TechnologyLevels(),
   Set<MiningPlanetId> unlockedPlanets = const {MiningPlanetId.homeworld},
   MiningPlanetId activePlanet = MiningPlanetId.homeworld,
@@ -85,1094 +114,889 @@ MiningSave seededSave(
     technology: technology,
     unlockedPlanetIds: unlockedPlanets,
     activePlanetId: activePlanet,
-    sectors: {
-      for (final entry in base.sectors.entries)
-        entry.key: entry.value.copyWith(
-          revealed:
-              entry.value.revealed ||
-              revealedSectors.contains(entry.key) ||
-              mines[entry.key] != null,
-          mine: mines[entry.key],
-        ),
-    },
+    docks: docks ?? base.docks,
+    sites: sites ?? base.sites,
   );
 }
 
-const Map<MiningSectorId, MineState> masteryMines = {
-  MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
-  MiningSectorId.carbonRidge: MineState(level: 1, storedAmount: 0),
-  MiningSectorId.graniteCrater: MineState(level: 1, storedAmount: 0),
+Map<MiningPlanetId, Map<DockBayId, RigTier?>> docksFor({
+  Map<DockBayId, RigTier?>? homeworld,
+  Map<DockBayId, RigTier?>? lunar,
+  Map<DockBayId, RigTier?>? mars,
+}) => {
+  MiningPlanetId.homeworld: homeworld ?? dock(),
+  MiningPlanetId.lunarFrontier: lunar ?? dock(),
+  MiningPlanetId.marsFrontier: mars ?? dock(),
 };
 
-const Map<MiningSectorId, MineState> lunarMasteryMines = {
-  MiningSectorId.frozenBasin: MineState(level: 1, storedAmount: 0),
-  MiningSectorId.titaniumHighlands: MineState(level: 1, storedAmount: 0),
-  MiningSectorId.heliumMare: MineState(level: 1, storedAmount: 0),
-};
+Map<MiningSiteId, SiteProgress> sitesFor({
+  SiteProgress? landing,
+  SiteProgress? carbon,
+  SiteProgress? granite,
+  SiteProgress? frozen,
+  SiteProgress? titanium,
+  SiteProgress? helium,
+  SiteProgress? ochre,
+  SiteProgress? silica,
+  SiteProgress? cobalt,
+}) {
+  final base = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 18, 12)).sites;
+  return {
+    ...base,
+    if (landing != null) MiningSiteId.landingBasin: landing,
+    if (carbon != null) MiningSiteId.carbonRidge: carbon,
+    if (granite != null) MiningSiteId.graniteCrater: granite,
+    if (frozen != null) MiningSiteId.frozenBasin: frozen,
+    if (titanium != null) MiningSiteId.titaniumHighlands: titanium,
+    if (helium != null) MiningSiteId.heliumMare: helium,
+    if (ochre != null) MiningSiteId.ochreBasin: ochre,
+    if (silica != null) MiningSiteId.silicaDunes: silica,
+    if (cobalt != null) MiningSiteId.cobaltChasm: cobalt,
+  };
+}
 
-const Set<MiningPlanetId> bothPlanets = {
-  MiningPlanetId.homeworld,
-  MiningPlanetId.lunarFrontier,
-};
+MiningSave deployedLandingBasinState(
+  DateTime now, {
+  double storedAmount = 0,
+  Map<MiningNodeId, RigTier?>? rigByNode,
+}) => seededSave(
+  now,
+  docks: docksFor(homeworld: dock()),
+  sites: sitesFor(
+    landing: site(
+      unlocked: true,
+      commissioned: true,
+      storedAmount: storedAmount,
+      rigByNode: rigByNode ?? nodes(n1: RigTier.t1),
+    ),
+  ),
+);
 
-const Set<MiningPlanetId> allPlanets = {
-  MiningPlanetId.homeworld,
-  MiningPlanetId.lunarFrontier,
-  MiningPlanetId.marsFrontier,
-};
+MiningSave landingWithTwoT1RigsAndCargo(
+  DateTime now, {
+  double storedAmount = 150,
+}) => deployedLandingBasinState(
+  now,
+  storedAmount: storedAmount,
+  rigByNode: nodes(n1: RigTier.t1, n2: RigTier.t1),
+);
+
+MiningSave homeworldMasteredState(
+  DateTime now, {
+  int cash = 5000,
+  TechnologyLevels technology = const TechnologyLevels(surveying: 3),
+  Set<MiningPlanetId> unlockedPlanets = const {MiningPlanetId.homeworld},
+  MiningPlanetId activePlanet = MiningPlanetId.homeworld,
+}) => seededSave(
+  now,
+  cash: cash,
+  technology: technology,
+  unlockedPlanets: unlockedPlanets,
+  activePlanet: activePlanet,
+  docks: docksFor(homeworld: dock()),
+  sites: sitesFor(
+    landing: site(unlocked: true, commissioned: true),
+    carbon: site(unlocked: true, commissioned: true),
+    granite: site(unlocked: true, commissioned: true),
+  ),
+);
+
+MiningSave lunarMasteredState(
+  DateTime now, {
+  int cash = 20000,
+  TechnologyLevels technology = const TechnologyLevels(surveying: 5),
+  Set<MiningPlanetId> unlockedPlanets = const {
+    MiningPlanetId.homeworld,
+    MiningPlanetId.lunarFrontier,
+  },
+  MiningPlanetId activePlanet = MiningPlanetId.lunarFrontier,
+}) => seededSave(
+  now,
+  cash: cash,
+  technology: technology,
+  unlockedPlanets: unlockedPlanets,
+  activePlanet: activePlanet,
+  docks: docksFor(homeworld: dock(), lunar: dock()),
+  sites: sitesFor(
+    landing: site(unlocked: true, commissioned: true),
+    carbon: site(unlocked: true, commissioned: true),
+    granite: site(unlocked: true, commissioned: true),
+    frozen: site(unlocked: true, commissioned: true),
+    titanium: site(unlocked: true, commissioned: true),
+    helium: site(unlocked: true, commissioned: true),
+  ),
+);
 
 void main() {
   late TestClock clock;
-  late MiningController controller;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     clock = TestClock(DateTime.utc(2026, 8, 18, 12));
-    controller = MiningController(
-      content: MiningContentRegistry.stellarMining(),
-      repository: MiningSaveRepository(),
-      nowUtc: clock.call,
-    );
-    await controller.initialize();
   });
 
   Future<MiningController> controllerOver(
     MiningSaveRepository repository, {
     MiningSave? seed,
   }) async {
-    // Always seed so initialize() loads an existing key and does not persist.
-    // Tests that use delayed/failing repos rely on the first repository.save()
-    // being the first mutation, not the init persistence.
     await MiningSaveRepository().save(
       seed ?? MiningSave.initial(nowUtc: clock.now),
     );
-    final seededController = MiningController(
+    final controller = MiningController(
       content: MiningContentRegistry.stellarMining(),
       repository: repository,
       nowUtc: clock.call,
     );
-    await seededController.initialize();
-    return seededController;
+    await controller.initialize();
+    return controller;
   }
 
-  group('initialization persistence', () {
-    test(
-      'survives a failed initial-save on a missing save and retains state',
-      () async {
-        SharedPreferences.setMockInitialValues({});
-        final repository = AlwaysFailingSaveRepository();
-        final fresh = MiningController(
-          content: MiningContentRegistry.stellarMining(),
-          repository: repository,
-          nowUtc: clock.call,
-        );
+  group('initialization and refresh', () {
+    test('failed initial persistence does not lose a fresh state', () async {
+      final repository = AlwaysFailingSaveRepository();
+      final controller = MiningController(
+        content: MiningContentRegistry.stellarMining(),
+        repository: repository,
+        nowUtc: clock.call,
+      );
 
-        await fresh.initialize();
+      await controller.initialize();
 
-        expect(fresh.state.cash, 100);
-        expect(fresh.recoveredFromInvalidSave, isFalse);
-        expect(repository.saveCount, 1);
-      },
-    );
+      expect(controller.state.cash, 100);
+      expect(controller.recoveredFromInvalidSave, isFalse);
+      expect(repository.saveCount, 1);
+    });
 
     test(
-      'survives a failed initial-save on a recovered save and retains state',
+      'failed initial persistence does not lose a recovered state',
       () async {
-        // Seed a malformed save so load() recovers with a fresh initial state
-        // and initialize() attempts the best-effort persistence.
         SharedPreferences.setMockInitialValues({
-          MiningSaveRepository.saveKey: '{not valid json',
+          MiningSaveRepository.saveKey: '{invalid',
         });
         final repository = AlwaysFailingSaveRepository();
-        final recovered = MiningController(
+        final controller = MiningController(
           content: MiningContentRegistry.stellarMining(),
           repository: repository,
           nowUtc: clock.call,
         );
 
-        await recovered.initialize();
+        await controller.initialize();
 
-        expect(recovered.state.cash, 100);
-        expect(recovered.recoveredFromInvalidSave, isTrue);
+        expect(controller.state.cash, 100);
+        expect(controller.recoveredFromInvalidSave, isTrue);
         expect(repository.saveCount, 1);
       },
     );
+
+    test('refresh accrues in memory without persisting', () async {
+      final repository = CountingMiningSaveRepository();
+      final controller = await controllerOver(
+        repository,
+        seed: deployedLandingBasinState(clock.now),
+      );
+      final savesBefore = repository.saveCount;
+      clock.now = clock.now.add(const Duration(seconds: 10));
+
+      controller.refresh();
+
+      expect(
+        controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+        5.0,
+      );
+      expect(repository.saveCount, savesBefore);
+    });
+
+    test('refresh does not publish while a save is in flight', () async {
+      final repository = DelayedMiningSaveRepository();
+      final controller = await controllerOver(repository);
+      final spawn = controller.spawnRig();
+      await repository.saveStarted.future;
+      clock.now = clock.now.add(const Duration(seconds: 10));
+
+      final accrual = controller.refresh();
+
+      expect(controller.isBusy, isTrue);
+      expect(accrual.summary.totalProduced, 0);
+      expect(controller.state.cash, 100);
+      repository.allowFirstSave.complete();
+      expect((await spawn).isSuccess, isTrue);
+    });
   });
 
-  group('actions', () {
-    test('build validates before changing state', () async {
-      final before = controller.state.toJson();
-      final result = await controller.buildMine(MiningSectorId.carbonRidge);
-      expect(result.isSuccess, isFalse);
-      expect(controller.state.toJson(), before);
-    });
+  group('spawn and merge', () {
+    test(
+      'spawn uses the first empty active-planet bay and charges its planet cost',
+      () async {
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(
+            clock.now,
+            cash: 30,
+            docks: docksFor(
+              homeworld: dock(b1: RigTier.t1, b2: RigTier.t1),
+            ),
+          ),
+        );
 
-    test('gold build deducts once and creates level one mine', () async {
-      final result = await controller.buildMine(MiningSectorId.landingBasin);
-      expect(result.isSuccess, isTrue);
-      expect(controller.state.cash, 50);
-      expect(
-        controller.state.sectors[MiningSectorId.landingBasin]!.mine!.level,
-        1,
-      );
-    });
+        final result = await controller.spawnRig();
 
-    test('reveal fails when cash is insufficient', () async {
-      final before = controller.state.toJson();
-      final result = await controller.revealSector(MiningSectorId.carbonRidge);
-      expect(result.isSuccess, isFalse);
-      expect(controller.state.toJson(), before);
-    });
+        expect(result.isSuccess, isTrue);
+        expect(controller.state.cash, 5);
+        expect(controller.state.docks[MiningPlanetId.homeworld], {
+          DockBayId.b1: RigTier.t1,
+          DockBayId.b2: RigTier.t1,
+          DockBayId.b3: RigTier.t1,
+          DockBayId.b4: null,
+        });
+      },
+    );
 
-    test('reveal deducts the reveal cost and marks the sector', () async {
-      final rich = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(clock.now, cash: 1000),
-      );
-      final result = await rich.revealSector(MiningSectorId.carbonRidge);
-      expect(result.isSuccess, isTrue);
-      expect(rich.state.cash, 750);
-      expect(rich.state.sectors[MiningSectorId.carbonRidge]!.revealed, isTrue);
-    });
-
-    test('reveal respects the required sector chain', () async {
-      final rich = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(clock.now, cash: 2000),
-      );
-      final result = await rich.revealSector(MiningSectorId.graniteCrater);
-      expect(result.isSuccess, isFalse);
-      expect(
-        rich.state.sectors[MiningSectorId.graniteCrater]!.revealed,
-        isFalse,
-      );
-      expect(rich.state.cash, 2000);
-    });
-
-    test('reveal of an already revealed sector fails', () async {
-      final result = await controller.revealSector(MiningSectorId.landingBasin);
-      expect(result.isSuccess, isFalse);
-      expect(controller.state.cash, 100);
-    });
-
-    test('duplicate build fails without a second deduction', () async {
-      final first = await controller.buildMine(MiningSectorId.landingBasin);
-      final second = await controller.buildMine(MiningSectorId.landingBasin);
-      expect(first.isSuccess, isTrue);
-      expect(second.isSuccess, isFalse);
-      expect(controller.state.cash, 50);
-    });
-
-    test('upgrade fails without a mine', () async {
-      final before = controller.state.toJson();
-      final result = await controller.upgradeMine(MiningSectorId.landingBasin);
-      expect(result.isSuccess, isFalse);
-      expect(controller.state.toJson(), before);
-    });
-
-    test('upgrade fails when cash is insufficient', () async {
-      await controller.buildMine(MiningSectorId.landingBasin);
-      final result = await controller.upgradeMine(MiningSectorId.landingBasin);
-      expect(result.isSuccess, isFalse);
-      expect(controller.state.cash, 50);
-    });
-
-    test('upgrade deducts the tier cost and raises the level', () async {
-      final rich = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(clock.now, cash: 1000),
-      );
-      await rich.buildMine(MiningSectorId.landingBasin);
-      final result = await rich.upgradeMine(MiningSectorId.landingBasin);
-      expect(result.isSuccess, isTrue);
-      expect(rich.state.cash, 870);
-      expect(rich.state.sectors[MiningSectorId.landingBasin]!.mine!.level, 2);
-    });
-
-    test('upgrade fails at max level', () async {
-      final maxed = await controllerOver(
+    test('spawn uses Lunar cost and respects insufficient cash', () async {
+      final controller = await controllerOver(
         MiningSaveRepository(),
         seed: seededSave(
           clock.now,
-          cash: 5000,
-          mines: {
-            MiningSectorId.landingBasin: MineState(level: 5, storedAmount: 0),
+          cash: 499,
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
           },
+          activePlanet: MiningPlanetId.lunarFrontier,
+          docks: docksFor(
+            homeworld: dock(b1: RigTier.t1, b2: RigTier.t1),
+            lunar: dock(b1: RigTier.t1, b2: RigTier.t1),
+          ),
+          sites: sitesFor(frozen: site(unlocked: true)),
         ),
       );
-      final result = await maxed.upgradeMine(MiningSectorId.landingBasin);
-      expect(result.isSuccess, isFalse);
-      expect(maxed.state.cash, 5000);
-      expect(maxed.state.sectors[MiningSectorId.landingBasin]!.mine!.level, 5);
-    });
-
-    test('sell with zero cargo fails without changing state', () async {
       final before = controller.state.toJson();
-      final result = await controller.sellAllCargo();
+
+      final result = await controller.spawnRig();
+
       expect(result.isSuccess, isFalse);
-      expect(result.message, 'No cargo to sell.');
+      expect(result.message, 'Not enough cash.');
       expect(controller.state.toJson(), before);
     });
 
-    test('sell adds revenue and zeroes cargo', () async {
-      await controller.buildMine(MiningSectorId.landingBasin);
-      clock.now = clock.now.add(const Duration(seconds: 10));
-      final result = await controller.sellAllCargo();
-      expect(result.isSuccess, isTrue);
-      expect(result.revenue, 20);
-      expect(result.sold, {ResourceType.gold: 5.0});
-      expect(controller.state.cash, 70);
-      expect(
-        controller
-            .state
-            .sectors[MiningSectorId.landingBasin]!
-            .mine!
-            .storedAmount,
-        0,
-      );
-    });
-
-    test('sell floors the total once, not per sector', () async {
-      final seller = await controllerOver(
+    test('spawn rejects a full dock', () async {
+      final controller = await controllerOver(
         MiningSaveRepository(),
         seed: seededSave(
           clock.now,
           cash: 1000,
-          mines: {
-            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0.9),
-            MiningSectorId.carbonRidge: MineState(level: 1, storedAmount: 0.9),
-            MiningSectorId.graniteCrater: MineState(
-              level: 1,
-              storedAmount: 0.9,
+          docks: docksFor(
+            homeworld: dock(
+              b1: RigTier.t1,
+              b2: RigTier.t1,
+              b3: RigTier.t2,
+              b4: RigTier.t3,
             ),
-          },
+          ),
         ),
       );
-      final result = await seller.sellAllCargo();
+
+      final result = await controller.spawnRig();
+
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Dock is full.');
+    });
+
+    test(
+      'merge moves the next tier to the target and empties the source',
+      () async {
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(
+            clock.now,
+            docks: docksFor(
+              homeworld: dock(b1: RigTier.t1, b2: RigTier.t1),
+            ),
+          ),
+        );
+
+        final result = await controller.mergeDockRigs(
+          DockBayId.b1,
+          DockBayId.b2,
+        );
+
+        expect(result.isSuccess, isTrue);
+        expect(controller.state.docks[MiningPlanetId.homeworld], {
+          DockBayId.b1: null,
+          DockBayId.b2: RigTier.t2,
+          DockBayId.b3: null,
+          DockBayId.b4: null,
+        });
+      },
+    );
+
+    test('merge rejects same bay, empty, and mismatched rigs', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          docks: docksFor(
+            homeworld: dock(b1: RigTier.t1, b2: RigTier.t2, b3: RigTier.t5),
+          ),
+        ),
+      );
+
+      expect(
+        (await controller.mergeDockRigs(DockBayId.b1, DockBayId.b1)).message,
+        'Choose two different dock bays.',
+      );
+      expect(
+        (await controller.mergeDockRigs(DockBayId.b4, DockBayId.b1)).message,
+        'Source dock bay is empty.',
+      );
+      expect(
+        (await controller.mergeDockRigs(DockBayId.b1, DockBayId.b2)).message,
+        'Rigs must be the same tier.',
+      );
+    });
+
+    test('merge rejects T5 rigs', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          docks: docksFor(
+            homeworld: dock(b1: RigTier.t5, b2: RigTier.t5),
+          ),
+        ),
+      );
+
+      final result = await controller.mergeDockRigs(DockBayId.b1, DockBayId.b2);
+
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'T5 rigs cannot merge.');
+    });
+
+    test(
+      'queued duplicate merges settle against the committed state',
+      () async {
+        final repository = DelayedMiningSaveRepository();
+        final controller = await controllerOver(
+          repository,
+          seed: seededSave(
+            clock.now,
+            docks: docksFor(
+              homeworld: dock(b1: RigTier.t1, b2: RigTier.t1, b3: RigTier.t1),
+            ),
+          ),
+        );
+        final first = controller.mergeDockRigs(DockBayId.b1, DockBayId.b2);
+        await repository.saveStarted.future;
+        final second = controller.mergeDockRigs(DockBayId.b1, DockBayId.b2);
+        repository.allowFirstSave.complete();
+
+        expect((await first).isSuccess, isTrue);
+        expect((await second).isSuccess, isFalse);
+        expect(
+          controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b2],
+          RigTier.t2,
+        );
+      },
+    );
+  });
+
+  group('site unlock, deployment, and recall', () {
+    test(
+      'unlockSite enforces active planet, prerequisite, Surveying, and cash',
+      () async {
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(clock.now, cash: 900),
+        );
+
+        final prerequisite = await controller.unlockSite(
+          MiningSiteId.graniteCrater,
+        );
+        expect(prerequisite.message, 'Unlock the previous site first.');
+
+        final carbon = await controller.unlockSite(MiningSiteId.carbonRidge);
+        expect(carbon.isSuccess, isTrue);
+        expect(controller.state.cash, 650);
+
+        final poor = await controller.unlockSite(MiningSiteId.graniteCrater);
+        expect(poor.message, 'Not enough cash.');
+      },
+    );
+
+    test(
+      'deploy moves a docked rig and commissions the first deployment',
+      () async {
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(
+            clock.now,
+            docks: docksFor(
+              homeworld: dock(b1: RigTier.t1, b2: RigTier.t1),
+            ),
+            sites: sitesFor(landing: site(unlocked: true)),
+          ),
+        );
+
+        final result = await controller.deployRig(
+          DockBayId.b1,
+          MiningSiteId.landingBasin,
+          MiningNodeId.n1,
+        );
+
+        expect(result.isSuccess, isTrue);
+        expect(
+          controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b1],
+          isNull,
+        );
+        final landing = controller.state.sites[MiningSiteId.landingBasin]!;
+        expect(landing.commissioned, isTrue);
+        expect(landing.rigByNode[MiningNodeId.n1], RigTier.t1);
+      },
+    );
+
+    test(
+      'deploy rejects inactive sites, occupied nodes, and unavailable nodes',
+      () async {
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(
+            clock.now,
+            technology: const TechnologyLevels(),
+            unlockedPlanets: {
+              MiningPlanetId.homeworld,
+              MiningPlanetId.lunarFrontier,
+            },
+            activePlanet: MiningPlanetId.homeworld,
+            docks: docksFor(
+              homeworld: dock(b1: RigTier.t1, b2: RigTier.t1),
+              lunar: dock(b1: RigTier.t1, b2: RigTier.t1),
+            ),
+            sites: sitesFor(
+              frozen: site(unlocked: true),
+              landing: site(
+                unlocked: true,
+                commissioned: true,
+                rigByNode: nodes(n1: RigTier.t1),
+              ),
+            ),
+          ),
+        );
+
+        expect(
+          (await controller.deployRig(
+            DockBayId.b1,
+            MiningSiteId.frozenBasin,
+            MiningNodeId.n1,
+          )).message,
+          'Site is not on the active planet.',
+        );
+        expect(
+          (await controller.deployRig(
+            DockBayId.b1,
+            MiningSiteId.landingBasin,
+            MiningNodeId.n1,
+          )).message,
+          'Node is already occupied.',
+        );
+        expect(
+          (await controller.deployRig(
+            DockBayId.b1,
+            MiningSiteId.landingBasin,
+            MiningNodeId.n3,
+          )).message,
+          'Requires Surveying 1.',
+        );
+      },
+    );
+
+    test('deploy rejects an empty bay and an unavailable site', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(clock.now),
+      );
+
+      expect(
+        (await controller.deployRig(
+          DockBayId.b4,
+          MiningSiteId.landingBasin,
+          MiningNodeId.n1,
+        )).message,
+        'Dock bay is empty.',
+      );
+      expect(
+        (await controller.deployRig(
+          DockBayId.b1,
+          MiningSiteId.carbonRidge,
+          MiningNodeId.n1,
+        )).message,
+        'Unlock this site first.',
+      );
+    });
+
+    test(
+      'recall rejects cargo above post-recall capacity, then succeeds after sale',
+      () async {
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: landingWithTwoT1RigsAndCargo(clock.now),
+        );
+
+        final blocked = await controller.recallRig(
+          MiningSiteId.landingBasin,
+          MiningNodeId.n2,
+        );
+
+        expect(blocked.isSuccess, isFalse);
+        expect(blocked.message, 'Sell cargo before recalling this rig.');
+        expect(
+          controller
+              .state
+              .sites[MiningSiteId.landingBasin]!
+              .rigByNode[MiningNodeId.n2],
+          RigTier.t1,
+        );
+
+        final sale = await controller.sellAllCargo();
+        expect(sale.isSuccess, isTrue);
+        final recalled = await controller.recallRig(
+          MiningSiteId.landingBasin,
+          MiningNodeId.n2,
+        );
+        expect(recalled.isSuccess, isTrue);
+        expect(
+          controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b1],
+          RigTier.t1,
+        );
+      },
+    );
+
+    test('recall uses an empty bay and rejects a full dock', () async {
+      final full = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          docks: docksFor(
+            homeworld: dock(
+              b1: null,
+              b2: RigTier.t1,
+              b3: RigTier.t2,
+              b4: RigTier.t3,
+            ),
+          ),
+          sites: sitesFor(
+            landing: site(
+              unlocked: true,
+              commissioned: true,
+              rigByNode: nodes(n1: RigTier.t1),
+            ),
+          ),
+        ),
+      );
+      final result = await full.recallRig(
+        MiningSiteId.landingBasin,
+        MiningNodeId.n1,
+      );
       expect(result.isSuccess, isTrue);
-      // floor(0.9 * 4 + 0.9 * 3 + 0.9 * 5) == floor(10.8) == 10, not 9.
+      expect(
+        full.state.docks[MiningPlanetId.homeworld]![DockBayId.b1],
+        RigTier.t1,
+      );
+
+      final noBay = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          docks: docksFor(
+            homeworld: dock(
+              b1: RigTier.t1,
+              b2: RigTier.t2,
+              b3: RigTier.t3,
+              b4: RigTier.t4,
+            ),
+          ),
+          sites: sitesFor(
+            landing: site(
+              unlocked: true,
+              commissioned: true,
+              rigByNode: nodes(n1: RigTier.t1),
+            ),
+          ),
+        ),
+      );
+      final blocked = await noBay.recallRig(
+        MiningSiteId.landingBasin,
+        MiningNodeId.n1,
+      );
+      expect(blocked.isSuccess, isFalse);
+      expect(blocked.message, 'Dock is full.');
+    });
+  });
+
+  group('technology, travel, and sale', () {
+    test('technology gates use commissioned sites', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(clock.now, cash: 500),
+      );
+
+      final blocked = await controller.purchaseTechnology(
+        TechnologyTrack.extraction,
+      );
+      expect(blocked.message, 'Commission the Landing Basin site first.');
+
+      final commissioned = await controllerOver(
+        MiningSaveRepository(),
+        seed: deployedLandingBasinState(clock.now).copyWith(cash: 500),
+      );
+      final purchased = await commissioned.purchaseTechnology(
+        TechnologyTrack.extraction,
+      );
+      expect(purchased.isSuccess, isTrue);
+      expect(commissioned.state.technology.extraction, 1);
+      expect(commissioned.state.cash, 200);
+    });
+
+    test(
+      'planet unlock seeds two rigs, first site, and active planet',
+      () async {
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: homeworldMasteredState(clock.now),
+        );
+
+        final result = await controller.unlockPlanet(
+          MiningPlanetId.lunarFrontier,
+        );
+
+        expect(result.isSuccess, isTrue);
+        expect(controller.state.cash, 2500);
+        expect(controller.state.activePlanetId, MiningPlanetId.lunarFrontier);
+        expect(controller.state.docks[MiningPlanetId.lunarFrontier], {
+          DockBayId.b1: RigTier.t1,
+          DockBayId.b2: RigTier.t1,
+          DockBayId.b3: null,
+          DockBayId.b4: null,
+        });
+        expect(
+          controller.state.sites[MiningSiteId.frozenBasin]!.unlocked,
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'travel accrues all unlocked planets before changing active planet',
+      () async {
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(
+            clock.now,
+            cash: 1000,
+            technology: const TechnologyLevels(surveying: 3),
+            unlockedPlanets: {
+              MiningPlanetId.homeworld,
+              MiningPlanetId.lunarFrontier,
+            },
+            activePlanet: MiningPlanetId.lunarFrontier,
+            docks: docksFor(
+              homeworld: dock(),
+              lunar: dock(b1: RigTier.t1, b2: RigTier.t1),
+            ),
+            sites: sitesFor(
+              landing: site(
+                unlocked: true,
+                commissioned: true,
+                rigByNode: nodes(n1: RigTier.t1),
+              ),
+              frozen: site(
+                unlocked: true,
+                commissioned: true,
+                rigByNode: nodes(n1: RigTier.t1),
+              ),
+            ),
+          ),
+        );
+        clock.now = clock.now.add(const Duration(seconds: 10));
+
+        final result = await controller.switchPlanet(MiningPlanetId.homeworld);
+
+        expect(result.isSuccess, isTrue);
+        expect(controller.state.activePlanetId, MiningPlanetId.homeworld);
+        expect(
+          controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+          5,
+        );
+        expect(
+          controller.state.sites[MiningSiteId.frozenBasin]!.storedAmount,
+          10,
+        );
+        expect(controller.state.lastAccruedAtUtc, clock.now);
+      },
+    );
+
+    test('sale clears active planet cargo and floors aggregate once', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          cash: 1000,
+          technology: const TechnologyLevels(surveying: 3),
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+          activePlanet: MiningPlanetId.homeworld,
+          sites: sitesFor(
+            landing: site(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 0.9,
+              rigByNode: nodes(n1: RigTier.t1),
+            ),
+            carbon: site(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 0.9,
+              rigByNode: nodes(n1: RigTier.t1),
+            ),
+            granite: site(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 0.9,
+              rigByNode: nodes(n1: RigTier.t1),
+            ),
+            frozen: site(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 10,
+              rigByNode: nodes(n1: RigTier.t1),
+            ),
+          ),
+        ),
+      );
+
+      final result = await controller.sellAllCargo();
+
       expect(result.revenue, 10);
       expect(result.sold, {
         ResourceType.gold: 0.9,
         ResourceType.coal: 0.9,
         ResourceType.stone: 0.9,
       });
-      expect(seller.state.cash, 1010);
+      expect(controller.state.cash, 1010);
+      expect(
+        controller.state.sites[MiningSiteId.frozenBasin]!.storedAmount,
+        10,
+      );
     });
+  });
 
-    test('checkpoint persists the accrued state', () async {
-      await controller.buildMine(MiningSectorId.landingBasin);
-      clock.now = clock.now.add(const Duration(seconds: 30));
+  group('mastery and save ordering', () {
+    test(
+      'final first Mars commission pays exactly once across recall and redeploy',
+      () async {
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(
+            clock.now,
+            cash: 50000,
+            technology: const TechnologyLevels(surveying: 5),
+            unlockedPlanets: {
+              MiningPlanetId.homeworld,
+              MiningPlanetId.lunarFrontier,
+              MiningPlanetId.marsFrontier,
+            },
+            activePlanet: MiningPlanetId.marsFrontier,
+            docks: docksFor(
+              mars: dock(b1: RigTier.t1, b2: RigTier.t1),
+            ),
+            sites: sitesFor(
+              landing: site(unlocked: true),
+              frozen: site(unlocked: true),
+              ochre: site(unlocked: true, commissioned: true),
+              silica: site(unlocked: true, commissioned: true),
+              cobalt: site(unlocked: true),
+            ),
+          ),
+        );
+
+        final first = await controller.deployRig(
+          DockBayId.b1,
+          MiningSiteId.cobaltChasm,
+          MiningNodeId.n1,
+        );
+        expect(first.message, 'Mars mastered — +25,000 cash.');
+        expect(controller.state.cash, 75000);
+
+        final recall = await controller.recallRig(
+          MiningSiteId.cobaltChasm,
+          MiningNodeId.n1,
+        );
+        expect(recall.isSuccess, isTrue);
+        final redeploy = await controller.deployRig(
+          DockBayId.b1,
+          MiningSiteId.cobaltChasm,
+          MiningNodeId.n1,
+        );
+        expect(redeploy.isSuccess, isTrue);
+        expect(redeploy.message, isNull);
+        expect(controller.state.cash, 75000);
+      },
+    );
+
+    test(
+      'failed save leaves rig movement unpublished and later action can proceed',
+      () async {
+        final repository = ThrowingFirstSaveRepository();
+        final controller = await controllerOver(
+          repository,
+          seed: seededSave(clock.now),
+        );
+        final before = controller.state.toJson();
+        final first = controller.spawnRig();
+        final second = controller.spawnRig();
+
+        await expectLater(first, throwsStateError);
+        await repository.secondSaveStarted.future;
+        expect(controller.state.toJson(), before);
+        repository.allowSecondSave.complete();
+        expect((await second).isSuccess, isTrue);
+        expect(
+          controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b3],
+          RigTier.t1,
+        );
+      },
+    );
+
+    test('checkpoint persists flat docks and sites after accrual', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: deployedLandingBasinState(clock.now),
+      );
+      clock.now = clock.now.add(const Duration(seconds: 10));
+
       await controller.checkpoint();
 
       final prefs = await SharedPreferences.getInstance();
       final raw =
           jsonDecode(prefs.getString(MiningSaveRepository.saveKey)!)
               as Map<String, Object?>;
-      expect(raw['cash'], 50);
+      expect(raw['cash'], 100);
       expect(raw['lastAccruedAtUtc'], clock.now.toIso8601String());
-      expect((raw['sectors']! as Map<String, Object?>)['landingBasin'], {
-        'revealed': true,
-        'mine': {'level': 1, 'storedAmount': 15.0},
-      });
+      final landing = (raw['sites']! as Map<String, Object?>)['landingBasin'];
+      expect((landing! as Map<String, Object?>)['storedAmount'], 5.0);
     });
 
-    test('resume returns the offline summary exactly once', () async {
-      await controller.buildMine(MiningSectorId.landingBasin);
-      clock.now = clock.now.add(const Duration(seconds: 100));
-      final summary = await controller.resume();
-      expect(summary, isNotNull);
-      expect(summary!.produced[ResourceType.gold], 50);
-      expect(
-        controller
-            .state
-            .sectors[MiningSectorId.landingBasin]!
-            .mine!
-            .storedAmount,
-        50,
+    test('resume returns the pending summary only once', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: deployedLandingBasinState(clock.now),
       );
+      clock.now = clock.now.add(const Duration(seconds: 10));
+
+      final summary = await controller.resume();
+
+      expect(summary!.produced[ResourceType.gold], 5.0);
       expect(await controller.resume(), isNull);
     });
-  });
-
-  group('technology purchase', () {
-    test('purchase increments only the purchased track', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 1000,
-          mines: {
-            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
-          },
-        ),
-      );
-      final result = await controller.purchaseTechnology(
-        TechnologyTrack.extraction,
-      );
-      expect(result.isSuccess, isTrue);
-      expect(controller.state.technology.extraction, 1);
-      expect(controller.state.technology.logistics, 0);
-      expect(controller.state.technology.surveying, 0);
-      expect(controller.state.cash, 700);
-    });
-
-    test('purchase fails when cash is insufficient', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 299,
-          mines: {
-            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
-          },
-        ),
-      );
-      final before = controller.state.toJson();
-      final result = await controller.purchaseTechnology(
-        TechnologyTrack.extraction,
-      );
-      expect(result.isSuccess, isFalse);
-      expect(result.message, 'Not enough cash.');
-      expect(controller.state.toJson(), before);
-    });
-
-    test('purchase fails when the tier mine gate is unmet', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 5000,
-          technology: const TechnologyLevels(extraction: 1),
-          mines: {
-            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
-          },
-        ),
-      );
-      final result = await controller.purchaseTechnology(
-        TechnologyTrack.extraction,
-      );
-      expect(result.isSuccess, isFalse);
-      expect(result.message, 'Build the Carbon Ridge mine first.');
-      expect(controller.state.technology.extraction, 1);
-      expect(controller.state.cash, 5000);
-    });
-
-    test('purchase fails at max level', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 99999,
-          technology: const TechnologyLevels(surveying: 5),
-          mines: {
-            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
-          },
-        ),
-      );
-      final result = await controller.purchaseTechnology(
-        TechnologyTrack.surveying,
-      );
-      expect(result.isSuccess, isFalse);
-      expect(result.message, 'Technology is at max level.');
-      expect(controller.state.cash, 99999);
-      expect(controller.state.technology.surveying, 5);
-    });
-  });
-
-  group('planet unlock and travel', () {
-    test('unlock fails without Homeworld mastery', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 5000,
-          technology: const TechnologyLevels(surveying: 3),
-          mines: {
-            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
-            MiningSectorId.carbonRidge: MineState(level: 1, storedAmount: 0),
-          },
-        ),
-      );
-      final before = controller.state.toJson();
-      final result = await controller.unlockPlanet(
-        MiningPlanetId.lunarFrontier,
-      );
-      expect(result.isSuccess, isFalse);
-      expect(result.message, 'Build every Homeworld mine first.');
-      expect(controller.state.toJson(), before);
-    });
-
-    test('unlock fails at Surveying 2', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 5000,
-          technology: const TechnologyLevels(surveying: 2),
-          mines: masteryMines,
-        ),
-      );
-      final before = controller.state.toJson();
-      final result = await controller.unlockPlanet(
-        MiningPlanetId.lunarFrontier,
-      );
-      expect(result.isSuccess, isFalse);
-      expect(result.message, 'Requires Surveying 3.');
-      expect(controller.state.toJson(), before);
-    });
-
-    test('unlock fails at 2,499 cash', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 2499,
-          technology: const TechnologyLevels(surveying: 3),
-          mines: masteryMines,
-        ),
-      );
-      final before = controller.state.toJson();
-      final result = await controller.unlockPlanet(
-        MiningPlanetId.lunarFrontier,
-      );
-      expect(result.isSuccess, isFalse);
-      expect(result.message, 'Not enough cash.');
-      expect(controller.state.toJson(), before);
-    });
-
-    test('unlock deducts cash, unlocks, and activates atomically', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 5000,
-          technology: const TechnologyLevels(surveying: 3),
-          mines: masteryMines,
-        ),
-      );
-      final result = await controller.unlockPlanet(
-        MiningPlanetId.lunarFrontier,
-      );
-      expect(result.isSuccess, isTrue);
-      expect(controller.state.cash, 2500);
-      expect(controller.state.unlockedPlanetIds, bothPlanets);
-      expect(controller.state.activePlanetId, MiningPlanetId.lunarFrontier);
-    });
-
-    test('Mars unlock fails without Lunar mastery', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 20000,
-          technology: const TechnologyLevels(surveying: 5),
-          unlockedPlanets: bothPlanets,
-          activePlanet: MiningPlanetId.lunarFrontier,
-        ),
-      );
-
-      final result = await controller.unlockPlanet(MiningPlanetId.marsFrontier);
-
-      expect(result.isSuccess, isFalse);
-      expect(result.message, 'Build every Lunar Frontier mine first.');
-    });
-
-    test('Mars unlock fails below Surveying 5', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 20000,
-          technology: const TechnologyLevels(surveying: 4),
-          unlockedPlanets: bothPlanets,
-          activePlanet: MiningPlanetId.lunarFrontier,
-          mines: lunarMasteryMines,
-        ),
-      );
-
-      final result = await controller.unlockPlanet(MiningPlanetId.marsFrontier);
-
-      expect(result.isSuccess, isFalse);
-      expect(result.message, 'Requires Surveying 5.');
-    });
-
-    test('Mars unlock fails below 20,000 cash', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 19999,
-          technology: const TechnologyLevels(surveying: 5),
-          unlockedPlanets: bothPlanets,
-          activePlanet: MiningPlanetId.lunarFrontier,
-          mines: lunarMasteryMines,
-        ),
-      );
-
-      final result = await controller.unlockPlanet(MiningPlanetId.marsFrontier);
-
-      expect(result.isSuccess, isFalse);
-      expect(result.message, 'Not enough cash.');
-    });
-
-    test(
-      'Mars unlock accrues first, charges 20,000, activates, and saves once',
-      () async {
-        final repository = CountingMiningSaveRepository();
-        final controller = await controllerOver(
-          repository,
-          seed: seededSave(
-            clock.now,
-            cash: 20000,
-            technology: const TechnologyLevels(surveying: 5),
-            unlockedPlanets: bothPlanets,
-            activePlanet: MiningPlanetId.lunarFrontier,
-            mines: lunarMasteryMines,
-          ),
-        );
-        clock.now = clock.now.add(const Duration(seconds: 10));
-
-        final result = await controller.unlockPlanet(
-          MiningPlanetId.marsFrontier,
-        );
-
-        expect(result.isSuccess, isTrue);
-        expect(controller.state.cash, 0);
-        expect(
-          controller
-              .state
-              .sectors[MiningSectorId.frozenBasin]!
-              .mine!
-              .storedAmount,
-          10,
-        );
-        expect(controller.state.unlockedPlanetIds, {
-          MiningPlanetId.homeworld,
-          MiningPlanetId.lunarFrontier,
-          MiningPlanetId.marsFrontier,
-        });
-        expect(controller.state.activePlanetId, MiningPlanetId.marsFrontier);
-        expect(repository.saveCount, 1);
-      },
-    );
-
-    test('Homeworld cannot be unlocked', () async {
-      final before = controller.state.toJson();
-
-      final result = await controller.unlockPlanet(MiningPlanetId.homeworld);
-
-      expect(result.isSuccess, isFalse);
-      expect(controller.state.toJson(), before);
-    });
-
-    group('planet mastery reward', () {
-      const allMarsSectors = {
-        MiningSectorId.ochreBasin,
-        MiningSectorId.silicaDunes,
-        MiningSectorId.cobaltChasm,
-      };
-
-      test('first and second Mars mines grant no completion reward', () async {
-        final controller = await controllerOver(
-          MiningSaveRepository(),
-          seed: seededSave(
-            clock.now,
-            cash: 100000,
-            technology: const TechnologyLevels(surveying: 5),
-            unlockedPlanets: allPlanets,
-            activePlanet: MiningPlanetId.marsFrontier,
-            revealedSectors: allMarsSectors,
-          ),
-        );
-
-        final first = await controller.buildMine(MiningSectorId.ochreBasin);
-        final second = await controller.buildMine(MiningSectorId.silicaDunes);
-
-        expect(first.isSuccess, isTrue);
-        expect(first.message, isNull);
-        expect(second.isSuccess, isTrue);
-        expect(second.message, isNull);
-        expect(controller.state.cash, 86000);
-      });
-
-      test('final Mars mine pays 25,000 after its normal build cost', () async {
-        final controller = await controllerOver(
-          MiningSaveRepository(),
-          seed: seededSave(
-            clock.now,
-            cash: 50000,
-            technology: const TechnologyLevels(surveying: 5),
-            unlockedPlanets: allPlanets,
-            activePlanet: MiningPlanetId.marsFrontier,
-            mines: {
-              MiningSectorId.ochreBasin: MineState(level: 1, storedAmount: 0),
-              MiningSectorId.silicaDunes: MineState(level: 1, storedAmount: 0),
-            },
-            revealedSectors: {MiningSectorId.cobaltChasm},
-          ),
-        );
-
-        final result = await controller.buildMine(MiningSectorId.cobaltChasm);
-
-        expect(result.isSuccess, isTrue);
-        expect(result.message, 'Mars mastered — +25,000 cash.');
-        expect(controller.state.cash, 57000);
-        expect(
-          controller.state.sectors[MiningSectorId.cobaltChasm]!.mine,
-          isNotNull,
-        );
-      });
-
-      test('Homeworld and Lunar builds have no mastery reward', () async {
-        final homeworld = await controllerOver(
-          MiningSaveRepository(),
-          seed: seededSave(clock.now, cash: 100),
-        );
-        final lunar = await controllerOver(
-          MiningSaveRepository(),
-          seed: seededSave(
-            clock.now,
-            cash: 1000,
-            technology: const TechnologyLevels(surveying: 5),
-            unlockedPlanets: allPlanets,
-            activePlanet: MiningPlanetId.lunarFrontier,
-            revealedSectors: {MiningSectorId.frozenBasin},
-          ),
-        );
-
-        final homeworldResult = await homeworld.buildMine(
-          MiningSectorId.landingBasin,
-        );
-        final lunarResult = await lunar.buildMine(MiningSectorId.frozenBasin);
-
-        expect(homeworldResult.isSuccess, isTrue);
-        expect(homeworldResult.message, isNull);
-        expect(homeworld.state.cash, 50);
-        expect(lunarResult.isSuccess, isTrue);
-        expect(lunarResult.message, isNull);
-        expect(lunar.state.cash, 500);
-      });
-
-      test('retrying a built Mars sector cannot reward again', () async {
-        final controller = await controllerOver(
-          MiningSaveRepository(),
-          seed: seededSave(
-            clock.now,
-            cash: 50000,
-            technology: const TechnologyLevels(surveying: 5),
-            unlockedPlanets: allPlanets,
-            activePlanet: MiningPlanetId.marsFrontier,
-            mines: {
-              MiningSectorId.ochreBasin: MineState(level: 1, storedAmount: 0),
-              MiningSectorId.silicaDunes: MineState(level: 1, storedAmount: 0),
-            },
-            revealedSectors: {MiningSectorId.cobaltChasm},
-          ),
-        );
-
-        final first = await controller.buildMine(MiningSectorId.cobaltChasm);
-        final cashAfterMastery = controller.state.cash;
-        final retry = await controller.buildMine(MiningSectorId.cobaltChasm);
-
-        expect(first.isSuccess, isTrue);
-        expect(retry.isSuccess, isFalse);
-        expect(retry.message, 'Mine already built.');
-        expect(controller.state.cash, cashAfterMastery);
-      });
-    });
-
-    test('switch accrues before changing the active planet', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 1000,
-          unlockedPlanets: bothPlanets,
-          mines: {
-            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
-          },
-        ),
-      );
-      clock.now = clock.now.add(const Duration(seconds: 10));
-      final result = await controller.switchPlanet(
-        MiningPlanetId.lunarFrontier,
-      );
-      expect(result.isSuccess, isTrue);
-      expect(controller.state.activePlanetId, MiningPlanetId.lunarFrontier);
-      expect(
-        controller
-            .state
-            .sectors[MiningSectorId.landingBasin]!
-            .mine!
-            .storedAmount,
-        5.0,
-      );
-      expect(controller.state.lastAccruedAtUtc, clock.now);
-    });
-
-    test('switch rejects a locked planet without mutation', () async {
-      final before = controller.state.toJson();
-      final result = await controller.switchPlanet(
-        MiningPlanetId.lunarFrontier,
-      );
-      expect(result.isSuccess, isFalse);
-      expect(result.message, 'Planet is locked.');
-      expect(controller.state.toJson(), before);
-    });
-
-    test('switch rejects the already active planet', () async {
-      final result = await controller.switchPlanet(MiningPlanetId.homeworld);
-      expect(result.isSuccess, isFalse);
-      expect(result.message, 'Planet is already active.');
-    });
-  });
-
-  group('active-planet selling and surveying gates', () {
-    test('reveal rejects a sector on a locked inactive planet', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 5000,
-          technology: const TechnologyLevels(surveying: 3),
-        ),
-      );
-      final before = controller.state.toJson();
-
-      final result = await controller.revealSector(MiningSectorId.frozenBasin);
-
-      expect(result.isSuccess, isFalse);
-      expect(result.message, 'Sector is not on the active planet.');
-      expect(controller.state.toJson(), before);
-    });
-
-    test('sell clears and credits only the active planet cargo', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 1000,
-          unlockedPlanets: bothPlanets,
-          mines: {
-            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 10),
-            MiningSectorId.frozenBasin: MineState(level: 1, storedAmount: 10),
-          },
-        ),
-      );
-      final result = await controller.sellAllCargo();
-      expect(result.isSuccess, isTrue);
-      expect(result.revenue, 40);
-      expect(result.sold, {ResourceType.gold: 10.0});
-      expect(controller.state.cash, 1040);
-      expect(
-        controller
-            .state
-            .sectors[MiningSectorId.landingBasin]!
-            .mine!
-            .storedAmount,
-        0,
-      );
-      expect(
-        controller
-            .state
-            .sectors[MiningSectorId.frozenBasin]!
-            .mine!
-            .storedAmount,
-        10.0,
-      );
-    });
-
-    test('reveal rejects an insufficient Surveying level', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 5000,
-          unlockedPlanets: bothPlanets,
-          activePlanet: MiningPlanetId.lunarFrontier,
-        ),
-      );
-      final before = controller.state.toJson();
-      final result = await controller.revealSector(MiningSectorId.frozenBasin);
-      expect(result.isSuccess, isFalse);
-      expect(result.message, 'Requires Surveying 3.');
-      expect(controller.state.toJson(), before);
-    });
-
-    test('reveal succeeds once Surveying meets the requirement', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 5000,
-          technology: const TechnologyLevels(surveying: 3),
-          unlockedPlanets: bothPlanets,
-          activePlanet: MiningPlanetId.lunarFrontier,
-        ),
-      );
-      final result = await controller.revealSector(MiningSectorId.frozenBasin);
-      expect(result.isSuccess, isTrue);
-      expect(
-        controller.state.sectors[MiningSectorId.frozenBasin]!.revealed,
-        isTrue,
-      );
-      expect(controller.state.cash, 5000);
-    });
-  });
-
-  group('passive refresh', () {
-    test('accrues in memory without persisting', () async {
-      await controller.buildMine(MiningSectorId.landingBasin);
-      final prefs = await SharedPreferences.getInstance();
-      final payloadBefore = prefs.getString(MiningSaveRepository.saveKey);
-
-      clock.now = clock.now.add(const Duration(seconds: 10));
-      final result = controller.refresh();
-
-      expect(result.summary.produced[ResourceType.gold], 5.0);
-      expect(
-        controller
-            .state
-            .sectors[MiningSectorId.landingBasin]!
-            .mine!
-            .storedAmount,
-        5.0,
-      );
-      expect(prefs.getString(MiningSaveRepository.saveKey), payloadBefore);
-    });
-
-    test('while a blocked save is in flight does not change state', () async {
-      final repository = DelayedMiningSaveRepository();
-      final busyController = await controllerOver(repository);
-
-      final buildFuture = busyController.buildMine(MiningSectorId.landingBasin);
-      await repository.saveStarted.future;
-      clock.now = clock.now.add(const Duration(seconds: 10));
-
-      final result = busyController.refresh();
-
-      expect(busyController.isBusy, isTrue);
-      expect(busyController.state.cash, 100);
-      expect(result.summary.totalProduced, 0);
-
-      repository.allowFirstSave.complete();
-      await buildFuture;
-      expect(busyController.state.cash, 50);
-    });
-  });
-
-  group('serialization', () {
-    test(
-      'build then sell issued without awaiting cannot erase the build',
-      () async {
-        SharedPreferences.setMockInitialValues({});
-        final repository = DelayedMiningSaveRepository();
-        // Seed so initialize() loads an existing key and does not persist;
-        // the first repository.save() must be the build mutation, which
-        // gates on allowFirstSave.
-        await MiningSaveRepository().save(
-          MiningSave.initial(nowUtc: clock.now),
-        );
-        final controller = MiningController(
-          content: MiningContentRegistry.stellarMining(),
-          repository: repository,
-          nowUtc: clock.call,
-        );
-        await controller.initialize();
-
-        final buildFuture = controller.buildMine(MiningSectorId.landingBasin);
-        await repository.saveStarted.future;
-        final sellFuture = controller.sellAllCargo();
-
-        expect(controller.isBusy, isTrue);
-        repository.allowFirstSave.complete();
-
-        expect((await buildFuture).isSuccess, isTrue);
-        expect(
-          (await sellFuture).isSuccess,
-          isFalse,
-        ); // built mine has zero cargo
-        expect(
-          controller.state.sectors[MiningSectorId.landingBasin]!.mine,
-          isNotNull,
-        );
-        expect(controller.state.cash, 50);
-      },
-    );
-
-    test('double reveal queues and deducts exactly once', () async {
-      final seeded = MiningSave.initial(nowUtc: clock.now).copyWith(cash: 1000);
-      await MiningSaveRepository().save(seeded);
-      final repository = DelayedMiningSaveRepository();
-      final controller = MiningController(
-        content: MiningContentRegistry.stellarMining(),
-        repository: repository,
-        nowUtc: clock.call,
-      );
-      await controller.initialize();
-
-      final first = controller.revealSector(MiningSectorId.carbonRidge);
-      await repository.saveStarted.future;
-      final second = controller.revealSector(MiningSectorId.carbonRidge);
-      repository.allowFirstSave.complete();
-
-      expect((await first).isSuccess, isTrue);
-      expect((await second).isSuccess, isFalse);
-      expect(controller.state.cash, 750);
-      expect(
-        controller.state.sectors[MiningSectorId.carbonRidge]!.revealed,
-        isTrue,
-      );
-    });
-
-    test('isBusy flips synchronously when a mutation is enqueued', () async {
-      final repository = DelayedMiningSaveRepository();
-      final busyController = await controllerOver(repository);
-
-      final future = busyController.buildMine(MiningSectorId.landingBasin);
-      expect(busyController.isBusy, isTrue); // before the first save completes
-
-      repository.allowFirstSave.complete();
-      await future;
-      expect(busyController.isBusy, isFalse);
-    });
-
-    test(
-      'a failed save does not publish state or poison later queued actions',
-      () async {
-        final repository = ThrowingFirstSaveRepository();
-        final stubborn = await controllerOver(repository);
-        final before = stubborn.state.toJson();
-
-        final first = stubborn.buildMine(MiningSectorId.landingBasin);
-        final second = stubborn.buildMine(MiningSectorId.landingBasin);
-        await expectLater(first, throwsStateError);
-        await repository.secondSaveStarted.future;
-        expect(stubborn.state.toJson(), before);
-        expect(stubborn.isBusy, isTrue);
-
-        repository.allowSecondSave.complete();
-        expect((await second).isSuccess, isTrue);
-        expect(stubborn.isBusy, isFalse);
-        expect(stubborn.state.cash, 50);
-        expect(
-          stubborn.state.sectors[MiningSectorId.landingBasin]!.mine,
-          isNotNull,
-        );
-      },
-    );
-
-    test('a queued sell starts from the committed switch state', () async {
-      final repository = DelayedMiningSaveRepository();
-      final controller = await controllerOver(
-        repository,
-        seed: seededSave(
-          clock.now,
-          cash: 1000,
-          unlockedPlanets: bothPlanets,
-          activePlanet: MiningPlanetId.lunarFrontier,
-          mines: {
-            MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 10),
-            MiningSectorId.frozenBasin: MineState(level: 1, storedAmount: 10),
-          },
-        ),
-      );
-
-      final switchFuture = controller.switchPlanet(MiningPlanetId.homeworld);
-      await repository.saveStarted.future;
-      final sellFuture = controller.sellAllCargo();
-      expect(controller.isBusy, isTrue);
-      repository.allowFirstSave.complete();
-
-      expect((await switchFuture).isSuccess, isTrue);
-      final sale = await sellFuture;
-      expect(sale.isSuccess, isTrue);
-      // The sell saw the committed switch: Homeworld cargo sold, Lunar kept.
-      expect(sale.revenue, 40);
-      expect(sale.sold, {ResourceType.gold: 10.0});
-      expect(controller.state.activePlanetId, MiningPlanetId.homeworld);
-      expect(controller.state.cash, 1040);
-      expect(
-        controller
-            .state
-            .sectors[MiningSectorId.landingBasin]!
-            .mine!
-            .storedAmount,
-        0,
-      );
-      expect(
-        controller
-            .state
-            .sectors[MiningSectorId.frozenBasin]!
-            .mine!
-            .storedAmount,
-        10.0,
-      );
-    });
-
-    test(
-      'a queued sector action rejects the old planet after a committed switch',
-      () async {
-        final repository = DelayedMiningSaveRepository();
-        final controller = await controllerOver(
-          repository,
-          seed: seededSave(clock.now, cash: 1000, unlockedPlanets: bothPlanets),
-        );
-
-        final switchFuture = controller.switchPlanet(
-          MiningPlanetId.lunarFrontier,
-        );
-        await repository.saveStarted.future;
-        final revealFuture = controller.revealSector(
-          MiningSectorId.carbonRidge,
-        );
-        repository.allowFirstSave.complete();
-
-        expect((await switchFuture).isSuccess, isTrue);
-        final reveal = await revealFuture;
-        expect(reveal.isSuccess, isFalse);
-        expect(reveal.message, 'Sector is not on the active planet.');
-        expect(controller.state.activePlanetId, MiningPlanetId.lunarFrontier);
-        expect(
-          controller.state.sectors[MiningSectorId.carbonRidge]!.revealed,
-          isFalse,
-        );
-      },
-    );
-
-    test(
-      'a queued technology purchase starts from the committed switch state',
-      () async {
-        final repository = DelayedMiningSaveRepository();
-        final controller = await controllerOver(
-          repository,
-          seed: seededSave(
-            clock.now,
-            cash: 1000,
-            unlockedPlanets: bothPlanets,
-            activePlanet: MiningPlanetId.lunarFrontier,
-            mines: {
-              MiningSectorId.landingBasin: MineState(level: 1, storedAmount: 0),
-            },
-          ),
-        );
-
-        final switchFuture = controller.switchPlanet(MiningPlanetId.homeworld);
-        await repository.saveStarted.future;
-        final purchaseFuture = controller.purchaseTechnology(
-          TechnologyTrack.extraction,
-        );
-        expect(controller.isBusy, isTrue);
-        repository.allowFirstSave.complete();
-
-        expect((await switchFuture).isSuccess, isTrue);
-        expect((await purchaseFuture).isSuccess, isTrue);
-        // The purchase saw the committed switch: Homeworld is active again.
-        expect(controller.state.activePlanetId, MiningPlanetId.homeworld);
-        expect(controller.state.technology.extraction, 1);
-        expect(controller.state.cash, 700);
-      },
-    );
   });
 }
