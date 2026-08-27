@@ -88,6 +88,26 @@ no matches in `lib`, `test`, and `pubspec.yaml`.
 - The temporary placeholder is intentionally non-functional and is replaced by
   Site Deck in Task 7. The old full action integration journey was therefore
   retired at this cutover and retained only as a shell-entry smoke.
-- Terrain processor scripts/docs and the unrelated `Assets` constants file were
-  left untouched because they are not part of the named zero-consumer runtime
-  closure.
+- Terrain processor scripts/docs and the remaining shared `Assets` constants
+  were left untouched because they are not part of the named zero-consumer
+  runtime closure; the six deleted-terrain constants were removed in Fix round
+  1 as a review follow-up.
+
+## Fix round 1
+
+- Updated `test/mining/presentation/mining_shell_test.dart` so the keyed shell
+  identity test rebuilds after changing the test view from portrait 360x640 to
+  landscape 640x360, then asserts the same controller and audio manager. A
+  `try`/`finally` restores the prior physical size and pumps the view.
+- Removed the dead terrain comment and six deleted-terrain constants from
+  `lib/constants/assets_path.dart`; the remaining shared `Assets` utility is
+  unchanged.
+- `rtk flutter test test/mining/presentation/mining_shell_test.dart` — passed;
+  10 tests.
+- `rtk dart format lib/constants/assets_path.dart
+  test/mining/presentation/mining_shell_test.dart` — passed; 2 files formatted,
+  1 changed.
+- `rtk dart format --output=none --set-exit-if-changed .` — passed; 32 files,
+  0 changed.
+- `rtk flutter analyze --fatal-infos` — passed; no issues found.
+- `rtk flutter test` — passed; 162 tests.
