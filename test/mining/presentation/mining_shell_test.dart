@@ -140,6 +140,72 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('bottom navigation opens the full-screen Stellar Map locally', (
+    tester,
+  ) async {
+    await pumpShell(tester);
+
+    await tester.tap(find.byKey(const Key('mining-nav-stellarMap')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('stellar-map-screen')), findsOneWidget);
+    expect(find.byKey(const Key('site-deck-scroll')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('mining-nav-siteDeck')));
+    await tester.pump();
+    expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+  });
+
+  testWidgets(
+    'Stellar Map unlock and travel settle through serialized actions',
+    (tester) async {
+      final initial = MiningSave.initial(nowUtc: _start);
+      final sites = <MiningSiteId, SiteProgress>{...initial.sites};
+      for (final site
+          in MiningContentRegistry.stellarMining()
+              .planet(MiningPlanetId.homeworld)
+              .sites) {
+        sites[site.id] = site.id == MiningSiteId.landingBasin
+            ? sites[site.id]!.copyWith(unlocked: true, commissioned: true)
+            : sites[site.id]!.copyWith(unlocked: true, commissioned: true);
+      }
+      final repository = CountingMiningSaveRepository();
+      await repository.save(
+        initial.copyWith(
+          cash: 3_000,
+          technology: const TechnologyLevels(surveying: 3),
+          sites: sites,
+        ),
+      );
+      await pumpShell(tester, repository: repository);
+
+      await tester.tap(find.byKey(const Key('mining-nav-stellarMap')));
+      await tester.pump();
+      final unlock = find.byKey(
+        const Key('mining-stellar-map-unlock-lunarFrontier'),
+      );
+      await tester.ensureVisible(unlock);
+      await tester.tap(unlock);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final controller = shellHandles(tester).controller;
+      expect(controller.state.activePlanetId, MiningPlanetId.lunarFrontier);
+      expect(
+        controller.state.unlockedPlanetIds,
+        contains(MiningPlanetId.lunarFrontier),
+      );
+
+      final travel = find.byKey(
+        const Key('mining-stellar-map-travel-homeworld'),
+      );
+      await tester.ensureVisible(travel);
+      await tester.tap(travel);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(controller.state.activePlanetId, MiningPlanetId.homeworld);
+      expect(repository.saveCount, greaterThanOrEqualTo(3));
+    },
+  );
+
   testWidgets('missing save attempts initial persistence', (tester) async {
     final repository = CountingMiningSaveRepository();
 
