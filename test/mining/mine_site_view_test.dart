@@ -102,8 +102,8 @@ void main() {
   test('projects active-planet cargo and sale across two sites', () {
     final view = MineSiteView.from(
       state: stateWith(
-        landing: progress(commissioned: true, storedAmount: 7),
-        carbon: progress(commissioned: true, storedAmount: 11),
+        landing: progress(commissioned: true, storedAmount: 1.125),
+        carbon: progress(commissioned: true, storedAmount: 0.5),
       ),
       content: content,
       siteId: MiningSiteId.landingBasin,
@@ -111,8 +111,10 @@ void main() {
       isBusy: false,
     );
 
-    expect(view.activePlanetCargo, 18);
-    expect(view.activePlanetProjectedSale, 61);
+    expect(view.activePlanetCargo, 1.625);
+    // Landing Basin is 4.5 cash and Carbon Ridge is 1.5 cash; flooring the
+    // combined gross value gives 6, while flooring each site first gives 5.
+    expect(view.activePlanetProjectedSale, 6);
     expect(view.canSell, isTrue);
   });
 
