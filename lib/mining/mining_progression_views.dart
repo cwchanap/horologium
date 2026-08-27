@@ -9,12 +9,13 @@ class TechnologyTrackView {
     required this.currentEffect,
     required this.nextEffect,
     required this.cost,
-    required this.gateSectorName,
+    String? gateSiteName,
+    String? gateSectorName,
     required this.isGateSatisfied,
     required this.isAffordable,
     required this.isMaxLevel,
     required this.disabledReason,
-  });
+  }) : gateSiteName = gateSiteName ?? gateSectorName;
 
   final TechnologyTrack track;
   final String name;
@@ -22,11 +23,14 @@ class TechnologyTrackView {
   final String currentEffect;
   final String? nextEffect;
   final int? cost;
-  final String? gateSectorName;
+  final String? gateSiteName;
   final bool isGateSatisfied;
   final bool isAffordable;
   final bool isMaxLevel;
   final String? disabledReason;
+
+  /// Kept as a source-compatible alias while the presentation cutover lands.
+  String? get gateSectorName => gateSiteName;
 
   bool get canPurchase => !isMaxLevel && isGateSatisfied && isAffordable;
 }
@@ -65,7 +69,7 @@ class TechnologySheetView {
         currentEffect: _effect(state, content, track, level),
         nextEffect: null,
         cost: null,
-        gateSectorName: null,
+        gateSiteName: null,
         isGateSatisfied: true,
         isAffordable: true,
         isMaxLevel: true,
@@ -73,8 +77,8 @@ class TechnologySheetView {
       );
     }
 
-    final gateSector = MiningContentRegistry.technologyMineGates[level];
-    final gateSatisfied = state.sectors[gateSector]?.mine != null;
+    final gateSite = MiningContentRegistry.technologySiteGates[level];
+    final gateSatisfied = state.sites[gateSite]?.commissioned == true;
     final cost = MiningContentRegistry.technologyCosts[level];
     final affordable = state.cash >= cost;
 
@@ -85,12 +89,12 @@ class TechnologySheetView {
       currentEffect: _effect(state, content, track, level),
       nextEffect: _effect(state, content, track, level + 1),
       cost: cost,
-      gateSectorName: content.sector(gateSector).name,
+      gateSiteName: content.site(gateSite).name,
       isGateSatisfied: gateSatisfied,
       isAffordable: affordable,
       isMaxLevel: false,
       disabledReason: !gateSatisfied
-          ? 'Build the ${content.sector(gateSector).name} mine first.'
+          ? 'Commission the ${content.site(gateSite).name} site first.'
           : !affordable
           ? 'Need $cost cash.'
           : null,
@@ -118,12 +122,12 @@ class TechnologySheetView {
         final unlockedPlanets = content.planets.values.where(
           (planet) => state.unlockedPlanetIds.contains(planet.id),
         );
-        final total = unlockedPlanets.expand((planet) => planet.sectors).length;
+        final total = unlockedPlanets.expand((planet) => planet.sites).length;
         final revealable = unlockedPlanets
-            .expand((planet) => planet.sectors)
-            .where((sector) => sector.requiredSurveyingLevel <= level)
+            .expand((planet) => planet.sites)
+            .where((site) => site.requiredSurveyingLevel <= level)
             .length;
-        return '$revealable of $total sectors revealable';
+        return '$revealable of $total sites revealable';
     }
   }
 }
@@ -134,28 +138,35 @@ class StellarMapPlanetView {
     required this.name,
     required this.isUnlocked,
     required this.isActive,
-    required this.minesBuilt,
-    required this.mineTotal,
+    int? sitesCommissioned,
+    int? siteTotal,
+    int? minesBuilt,
+    int? mineTotal,
     required this.requiredMasteryPlanetId,
     required this.hasRequiredMastery,
     required this.requiredSurveyingLevel,
     required this.hasSurveying,
     required this.unlockCashCost,
     required this.hasCash,
-  });
+  }) : sitesCommissioned = sitesCommissioned ?? minesBuilt ?? 0,
+       siteTotal = siteTotal ?? mineTotal ?? 0;
 
   final MiningPlanetId id;
   final String name;
   final bool isUnlocked;
   final bool isActive;
-  final int minesBuilt;
-  final int mineTotal;
+  final int sitesCommissioned;
+  final int siteTotal;
   final MiningPlanetId? requiredMasteryPlanetId;
   final bool hasRequiredMastery;
   final int requiredSurveyingLevel;
   final bool hasSurveying;
   final int unlockCashCost;
   final bool hasCash;
+
+  /// Kept as source-compatible aliases while Stellar Map presentation moves.
+  int get minesBuilt => sitesCommissioned;
+  int get mineTotal => siteTotal;
 
   bool get canUnlock =>
       !isUnlocked &&
@@ -178,15 +189,15 @@ class StellarMapView {
     required MiningContentRegistry content,
   }) {
     final unlockedPlanetIds = state.unlockedPlanetIds;
-    final minedSectorIds = state.sectors.entries
-        .where((entry) => entry.value.mine != null)
+    final commissionedSiteIds = state.sites.entries
+        .where((entry) => entry.value.commissioned)
         .map((entry) => entry.key);
 
     return StellarMapView(
       planets: [
         for (final definition in content.planets.values)
           if (_isVisible(definition, unlockedPlanetIds))
-            _planetView(state, content, definition, minedSectorIds),
+            _planetView(state, content, definition, commissionedSiteIds),
       ],
     );
   }
@@ -206,14 +217,14 @@ class StellarMapView {
     MiningSave state,
     MiningContentRegistry content,
     MiningPlanetDefinition definition,
-    Iterable<MiningSectorId> minedSectorIds,
+    Iterable<MiningSiteId> commissionedSiteIds,
   ) {
     final requiredMasteryPlanetId = definition.unlockRequiredMasteryPlanetId;
     final hasRequiredMastery =
         requiredMasteryPlanetId == null ||
-        content.isPlanetMastered(requiredMasteryPlanetId, minedSectorIds);
-    final minesBuilt = definition.sectors
-        .where((sector) => state.sectors[sector.id]?.mine != null)
+        content.isPlanetMastered(requiredMasteryPlanetId, commissionedSiteIds);
+    final sitesCommissioned = definition.sites
+        .where((site) => state.sites[site.id]?.commissioned == true)
         .length;
 
     return StellarMapPlanetView(
@@ -221,8 +232,8 @@ class StellarMapView {
       name: definition.name,
       isUnlocked: state.unlockedPlanetIds.contains(definition.id),
       isActive: state.activePlanetId == definition.id,
-      minesBuilt: minesBuilt,
-      mineTotal: definition.sectors.length,
+      sitesCommissioned: sitesCommissioned,
+      siteTotal: definition.sites.length,
       requiredMasteryPlanetId: requiredMasteryPlanetId,
       hasRequiredMastery: hasRequiredMastery,
       requiredSurveyingLevel: definition.unlockRequiredSurveyingLevel,
