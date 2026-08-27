@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_simulation.dart';
+import 'package:horologium/mining/presentation/mining_theme.dart';
+import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 class OfflineReturnSheet extends StatelessWidget {
   const OfflineReturnSheet({
@@ -38,9 +40,34 @@ class OfflineReturnSheet extends StatelessWidget {
               const Text(
                 'Offline return',
                 style: TextStyle(
-                  color: Colors.cyanAccent,
+                  color: MiningTheme.accent,
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.asset(
+                  MiningVisuals.offlineHero,
+                  key: const Key('offline-return-hero'),
+                  width: double.infinity,
+                  height: 128,
+                  fit: BoxFit.cover,
+                  semanticLabel: 'Mining fleet returning from offline work',
+                  errorBuilder: (context, error, stackTrace) => const SizedBox(
+                    height: 128,
+                    child: ColoredBox(
+                      color: MiningTheme.hudPanel,
+                      child: Center(
+                        child: Icon(
+                          Icons.rocket_launch_rounded,
+                          color: MiningTheme.accent,
+                          size: 44,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 4),

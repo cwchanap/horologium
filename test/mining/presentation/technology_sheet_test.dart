@@ -80,6 +80,7 @@ void main() {
       expect(find.textContaining('Level 0'), findsWidgets);
       expect(find.text('Mining rate ×1.00'), findsOneWidget);
       expect(find.text('Next: Mining rate ×1.10'), findsOneWidget);
+      expect(find.text('Gate: Landing Basin commissioned'), findsNWidgets(2));
 
       // Unmet gate reason flows straight from the view model.
       expect(

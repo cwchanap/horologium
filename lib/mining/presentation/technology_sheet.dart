@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
+import 'package:horologium/mining/presentation/mining_theme.dart';
 
 /// Render surface for [TechnologySheetView]. It renders the pre-computed
 /// affordances and forwards purchase taps; it never calculates eligibility.
@@ -43,7 +44,7 @@ class TechnologySheet extends StatelessWidget {
                 const Text(
                   'Technology',
                   style: TextStyle(
-                    color: Colors.cyanAccent,
+                    color: MiningTheme.accent,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
@@ -52,7 +53,7 @@ class TechnologySheet extends StatelessWidget {
                 const Text(
                   'Upgrade the operation. Each level needs its gate mine and '
                   'cash.',
-                  style: TextStyle(color: Colors.white70),
+                  style: TextStyle(color: MiningTheme.secondaryText),
                 ),
                 const SizedBox(height: 10),
                 for (final track in view.tracks)
@@ -101,7 +102,10 @@ class _TechnologyTrackRow extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             track.currentEffect,
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
+            style: const TextStyle(
+              color: MiningTheme.secondaryText,
+              fontSize: 13,
+            ),
           ),
           if (track.nextEffect != null)
             Text(
@@ -111,11 +115,41 @@ class _TechnologyTrackRow extends StatelessWidget {
                 fontSize: 13,
               ),
             ),
+          if (track.gateSiteName != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    track.isGateSatisfied
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: track.isGateSatisfied
+                        ? MiningTheme.accent
+                        : MiningTheme.warning,
+                    size: 16,
+                    semanticLabel: track.isGateSatisfied
+                        ? 'Gate satisfied'
+                        : 'Gate required',
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Gate: ${track.gateSiteName} commissioned',
+                      style: const TextStyle(
+                        color: MiningTheme.secondaryText,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           if (!track.canPurchase && track.disabledReason != null) ...[
             const SizedBox(height: 4),
             Text(
               track.disabledReason!,
-              style: const TextStyle(color: Colors.orangeAccent, fontSize: 12),
+              style: const TextStyle(color: MiningTheme.warning, fontSize: 12),
             ),
           ],
           const SizedBox(height: 8),

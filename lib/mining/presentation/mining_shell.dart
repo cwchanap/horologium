@@ -17,6 +17,7 @@ import 'package:horologium/mining/presentation/mining_settings_sheet.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/offline_return_sheet.dart';
 import 'package:horologium/mining/presentation/site_deck_screen.dart';
+import 'package:horologium/mining/presentation/stellar_map_screen.dart';
 import 'package:horologium/mining/presentation/technology_sheet.dart';
 import 'package:horologium/mining/site_deck_view.dart';
 
@@ -60,6 +61,8 @@ class _MiningShellState extends State<MiningShell>
   bool _recoverySnackBarScheduled = false;
   DockBayId? _selectedBayId;
   MiningSiteId? _openSiteId;
+  MiningNavigationDestination _selectedDestination =
+      MiningNavigationDestination.siteDeck;
 
   @override
   void initState() {
@@ -184,6 +187,20 @@ class _MiningShellState extends State<MiningShell>
     );
   }
 
+  void _unlockPlanet(MiningPlanetId id) {
+    _runSheetAction(
+      () => _controller.unlockPlanet(id),
+      successMessage: '${_content.planet(id).name} unlocked.',
+    );
+  }
+
+  void _travelToPlanet(MiningPlanetId id) {
+    _runSheetAction(
+      () => _controller.switchPlanet(id),
+      successMessage: 'Traveled to ${_content.planet(id).name}.',
+    );
+  }
+
   void _unlockSite(MiningSiteId id) {
     _runSheetAction(
       () => _controller.unlockSite(id),
@@ -305,17 +322,26 @@ class _MiningShellState extends State<MiningShell>
   void _handleNavigation(MiningNavigationDestination destination) {
     switch (destination) {
       case MiningNavigationDestination.siteDeck:
-        if (_openSiteId != null) _leaveSite();
+        _showPrimarySurface(destination);
         break;
       case MiningNavigationDestination.technology:
         openTechnology();
         break;
       case MiningNavigationDestination.stellarMap:
+        _showPrimarySurface(destination);
         break;
       case MiningNavigationDestination.settings:
         openSettings();
         break;
     }
+  }
+
+  void _showPrimarySurface(MiningNavigationDestination destination) {
+    if (!_initialized) return;
+    setState(() {
+      _selectedDestination = destination;
+      _openSiteId = null;
+    });
   }
 
   Future<void> _runSheetAction(
@@ -438,7 +464,19 @@ class _MiningShellState extends State<MiningShell>
         isBusy: _controller.isBusy,
       );
       final siteId = _openSiteId;
-      if (siteId == null) {
+      if (_selectedDestination == MiningNavigationDestination.stellarMap) {
+        surface = StellarMapScreen(
+          view: StellarMapView.from(
+            state: _displayState,
+            content: _content,
+            isBusy: _controller.isBusy,
+          ),
+          content: _content,
+          onUnlock: _unlockPlanet,
+          onTravel: _travelToPlanet,
+          onDestinationSelected: _handleNavigation,
+        );
+      } else if (siteId == null) {
         surface = SiteDeckScreen(
           view: siteDeck,
           fleetDock: fleetDock,

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:horologium/game/audio_manager.dart';
+import 'package:horologium/mining/presentation/mining_theme.dart';
 
 class MiningSettingsSheet extends StatefulWidget {
   const MiningSettingsSheet({super.key, required this.audioManager});
@@ -19,7 +20,7 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
     return SafeArea(
       child: Material(
         key: const Key('mining-settings-sheet'),
-        color: const Color(0xF20E1828),
+        color: MiningTheme.panel,
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
           child: Column(
@@ -30,7 +31,7 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
                   width: 42,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.cyanAccent.withAlpha(180),
+                    color: MiningTheme.accent.withAlpha(180),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -38,12 +39,12 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
               const SizedBox(height: 14),
               const Row(
                 children: [
-                  Icon(Icons.music_note, color: Colors.white70),
+                  Icon(Icons.music_note, color: MiningTheme.secondaryText),
                   SizedBox(width: 8),
                   Text(
                     'Audio',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: MiningTheme.primaryText,
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),
@@ -57,7 +58,7 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
                 contentPadding: EdgeInsets.zero,
                 title: const Text(
                   'Music',
-                  style: TextStyle(color: Colors.white70),
+                  style: TextStyle(color: MiningTheme.secondaryText),
                 ),
                 value: audioManager.musicEnabled,
                 onChanged: (value) {
@@ -72,11 +73,11 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
                   children: [
                     const Text(
                       'Volume',
-                      style: TextStyle(color: Colors.white70),
+                      style: TextStyle(color: MiningTheme.secondaryText),
                     ),
                     Text(
                       '${(audioManager.musicVolume * 100).round()}%',
-                      style: const TextStyle(color: Colors.white54),
+                      style: const TextStyle(color: MiningTheme.mutedText),
                     ),
                   ],
                 ),
@@ -95,11 +96,11 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
                       }
                     : null,
               ),
-              const Divider(color: Colors.grey, height: 20),
+              const Divider(color: Colors.white24, height: 20),
               const Text(
                 'Accessibility',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: MiningTheme.primaryText,
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
                 ),
@@ -107,7 +108,7 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
               const SizedBox(height: 8),
               const Text(
                 'Reduced motion follows system setting',
-                style: TextStyle(color: Colors.white70),
+                style: TextStyle(color: MiningTheme.secondaryText),
               ),
             ],
           ),

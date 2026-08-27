@@ -4,6 +4,7 @@ import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/presentation/offline_return_sheet.dart';
+import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 void main() {
   testWidgets('renders one section per producing planet with catalog-resolved '
@@ -46,6 +47,11 @@ void main() {
       ),
     );
     await tester.pump();
+
+    expect(
+      tester.widget<Image>(find.byKey(const Key('offline-return-hero'))).image,
+      isA<AssetImage>(),
+    );
 
     final homeworld = find.byKey(const Key('offline-return-planet-homeworld'));
     final lunar = find.byKey(const Key('offline-return-planet-lunarFrontier'));
@@ -167,5 +173,43 @@ void main() {
       find.text('Offline production was capped at 8 hours.'),
       findsNothing,
     );
+  });
+
+  testWidgets('keeps the continue action reachable at phone text scale', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 932);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    const summary = OfflineProductionSummary(
+      elapsedUsed: Duration(minutes: 30),
+      produced: {ResourceType.gold: 1},
+      productionByPlanet: {
+        MiningPlanetId.homeworld: {ResourceType.gold: 1},
+      },
+      fullSites: {},
+      wasOfflineCapped: false,
+    );
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
+        child: MaterialApp(
+          home: Scaffold(
+            body: OfflineReturnSheet(
+              summary: summary,
+              content: MiningContentRegistry.stellarMining(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    final dismiss = find.byKey(const Key('offline-return-dismiss'));
+    expect(tester.getSize(dismiss).height, greaterThanOrEqualTo(48));
+    expect(MiningVisuals.offlineHero, isNotEmpty);
+    expect(tester.takeException(), isNull);
   });
 }
