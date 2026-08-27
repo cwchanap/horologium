@@ -190,5 +190,3 @@ class MineSiteView {
     );
   }
 }
-
-typedef MineSiteNodeAvailabilityView = MineSiteNodeView;
