@@ -62,76 +62,79 @@ class TechnologyLevels {
   int get hashCode => Object.hash(extraction, logistics, surveying);
 }
 
-class MineState {
-  const MineState({required this.level, required this.storedAmount});
-  final int level;
+class SiteProgress {
+  const SiteProgress({
+    required this.unlocked,
+    required this.commissioned,
+    required this.storedAmount,
+    required this.rigByNode,
+  });
+
+  final bool unlocked;
+  final bool commissioned;
   final double storedAmount;
+  final Map<MiningNodeId, RigTier?> rigByNode;
 
-  MineState copyWith({int? level, double? storedAmount}) => MineState(
-    level: level ?? this.level,
+  SiteProgress copyWith({
+    bool? unlocked,
+    bool? commissioned,
+    double? storedAmount,
+    Map<MiningNodeId, RigTier?>? rigByNode,
+  }) => SiteProgress(
+    unlocked: unlocked ?? this.unlocked,
+    commissioned: commissioned ?? this.commissioned,
     storedAmount: storedAmount ?? this.storedAmount,
+    rigByNode: Map<MiningNodeId, RigTier?>.unmodifiable(
+      rigByNode ?? this.rigByNode,
+    ),
   );
 
   Map<String, Object?> toJson() => {
-    'level': level,
+    'unlocked': unlocked,
+    'commissioned': commissioned,
     'storedAmount': storedAmount,
+    'rigByNode': rigByNode.map((id, tier) => MapEntry(id.name, tier?.name)),
   };
 
   @override
   bool operator ==(Object other) =>
-      other is MineState &&
-      level == other.level &&
-      storedAmount == other.storedAmount;
+      other is SiteProgress &&
+      unlocked == other.unlocked &&
+      commissioned == other.commissioned &&
+      storedAmount == other.storedAmount &&
+      _mapsEqual(rigByNode, other.rigByNode);
 
   @override
-  int get hashCode => Object.hash(level, storedAmount);
-}
-
-class SectorProgress {
-  const SectorProgress({required this.revealed, this.mine});
-  final bool revealed;
-  final MineState? mine;
-
-  SectorProgress copyWith({
-    bool? revealed,
-    MineState? mine,
-    bool clearMine = false,
-  }) => SectorProgress(
-    revealed: revealed ?? this.revealed,
-    mine: clearMine ? null : mine ?? this.mine,
+  int get hashCode => Object.hash(
+    unlocked,
+    commissioned,
+    storedAmount,
+    Object.hashAllUnordered(
+      rigByNode.entries.map((entry) => Object.hash(entry.key, entry.value)),
+    ),
   );
-
-  Map<String, Object?> toJson() => {
-    'revealed': revealed,
-    'mine': mine?.toJson(),
-  };
-
-  @override
-  bool operator ==(Object other) =>
-      other is SectorProgress &&
-      revealed == other.revealed &&
-      mine == other.mine;
-
-  @override
-  int get hashCode => Object.hash(revealed, mine);
 }
 
 class MiningSave {
-  const MiningSave({
+  MiningSave({
     required this.cash,
     required this.lastAccruedAtUtc,
     required this.technology,
-    required this.unlockedPlanetIds,
+    required Set<MiningPlanetId> unlockedPlanetIds,
     required this.activePlanetId,
-    required this.sectors,
-  });
+    required Map<MiningPlanetId, Map<DockBayId, RigTier?>> docks,
+    required Map<MiningSiteId, SiteProgress> sites,
+  }) : unlockedPlanetIds = Set.unmodifiable(unlockedPlanetIds),
+       docks = _copyDocks(docks),
+       sites = _copySites(sites);
 
   final int cash;
   final DateTime lastAccruedAtUtc;
   final TechnologyLevels technology;
   final Set<MiningPlanetId> unlockedPlanetIds;
   final MiningPlanetId activePlanetId;
-  final Map<MiningSectorId, SectorProgress> sectors;
+  final Map<MiningPlanetId, Map<DockBayId, RigTier?>> docks;
+  final Map<MiningSiteId, SiteProgress> sites;
 
   factory MiningSave.initial({required DateTime nowUtc}) => MiningSave(
     cash: 100,
@@ -139,10 +142,26 @@ class MiningSave {
     technology: const TechnologyLevels(),
     unlockedPlanetIds: const {MiningPlanetId.homeworld},
     activePlanetId: MiningPlanetId.homeworld,
-    sectors: Map.unmodifiable({
-      for (final id in MiningSectorId.values)
-        id: SectorProgress(revealed: id == MiningSectorId.landingBasin),
-    }),
+    docks: {
+      for (final planet in MiningPlanetId.values)
+        planet: {
+          for (final bay in DockBayId.values)
+            bay:
+                planet == MiningPlanetId.homeworld &&
+                    (bay == DockBayId.b1 || bay == DockBayId.b2)
+                ? RigTier.t1
+                : null,
+        },
+    },
+    sites: {
+      for (final id in MiningSiteId.values)
+        id: SiteProgress(
+          unlocked: id == MiningSiteId.landingBasin,
+          commissioned: false,
+          storedAmount: 0,
+          rigByNode: {for (final node in MiningNodeId.values) node: null},
+        ),
+    },
   );
 
   MiningSave copyWith({
@@ -151,16 +170,16 @@ class MiningSave {
     TechnologyLevels? technology,
     Set<MiningPlanetId>? unlockedPlanetIds,
     MiningPlanetId? activePlanetId,
-    Map<MiningSectorId, SectorProgress>? sectors,
+    Map<MiningPlanetId, Map<DockBayId, RigTier?>>? docks,
+    Map<MiningSiteId, SiteProgress>? sites,
   }) => MiningSave(
     cash: cash ?? this.cash,
     lastAccruedAtUtc: lastAccruedAtUtc ?? this.lastAccruedAtUtc,
     technology: technology ?? this.technology,
-    unlockedPlanetIds: Set.unmodifiable(
-      unlockedPlanetIds ?? this.unlockedPlanetIds,
-    ),
+    unlockedPlanetIds: unlockedPlanetIds ?? this.unlockedPlanetIds,
     activePlanetId: activePlanetId ?? this.activePlanetId,
-    sectors: Map.unmodifiable(sectors ?? this.sectors),
+    docks: docks ?? this.docks,
+    sites: sites ?? this.sites,
   );
 
   Map<String, Object?> toJson() => {
@@ -172,8 +191,14 @@ class MiningSave {
         .map((id) => id.name)
         .toList(),
     'activePlanetId': activePlanetId.name,
-    'sectors': sectors.map(
-      (id, progress) => MapEntry(id.name, progress.toJson()),
+    'docks': docks.map(
+      (planetId, bays) => MapEntry(
+        planetId.name,
+        bays.map((bayId, tier) => MapEntry(bayId.name, tier?.name)),
+      ),
+    ),
+    'sites': sites.map(
+      (siteId, progress) => MapEntry(siteId.name, progress.toJson()),
     ),
   };
 
@@ -185,12 +210,14 @@ class MiningSave {
         technology != other.technology ||
         activePlanetId != other.activePlanetId ||
         unlockedPlanetIds.length != other.unlockedPlanetIds.length ||
-        sectors.length != other.sectors.length) {
+        docks.length != other.docks.length ||
+        sites.length != other.sites.length) {
       return false;
     }
-    if (!unlockedPlanetIds.containsAll(other.unlockedPlanetIds)) return false;
-    for (final entry in sectors.entries) {
-      if (other.sectors[entry.key] != entry.value) return false;
+    if (!unlockedPlanetIds.containsAll(other.unlockedPlanetIds) ||
+        !_nestedMapsEqual(docks, other.docks) ||
+        !_mapsEqual(sites, other.sites)) {
+      return false;
     }
     return true;
   }
@@ -203,7 +230,60 @@ class MiningSave {
     activePlanetId,
     Object.hashAllUnordered(unlockedPlanetIds),
     Object.hashAllUnordered(
-      sectors.entries.map((entry) => Object.hash(entry.key, entry.value)),
+      docks.entries.map(
+        (entry) => Object.hash(
+          entry.key,
+          Object.hashAllUnordered(
+            entry.value.entries.map((bay) => Object.hash(bay.key, bay.value)),
+          ),
+        ),
+      ),
+    ),
+    Object.hashAllUnordered(
+      sites.entries.map((entry) => Object.hash(entry.key, entry.value)),
     ),
   );
+}
+
+Map<MiningPlanetId, Map<DockBayId, RigTier?>> _copyDocks(
+  Map<MiningPlanetId, Map<DockBayId, RigTier?>> source,
+) => Map<MiningPlanetId, Map<DockBayId, RigTier?>>.unmodifiable({
+  for (final entry in source.entries)
+    entry.key: Map<DockBayId, RigTier?>.unmodifiable(entry.value),
+});
+
+Map<MiningSiteId, SiteProgress> _copySites(
+  Map<MiningSiteId, SiteProgress> source,
+) => Map<MiningSiteId, SiteProgress>.unmodifiable({
+  for (final entry in source.entries)
+    entry.key: SiteProgress(
+      unlocked: entry.value.unlocked,
+      commissioned: entry.value.commissioned,
+      storedAmount: entry.value.storedAmount,
+      rigByNode: Map<MiningNodeId, RigTier?>.unmodifiable(
+        entry.value.rigByNode,
+      ),
+    ),
+});
+
+bool _mapsEqual<K, V>(Map<K, V> first, Map<K, V> second) {
+  if (first.length != second.length) return false;
+  for (final entry in first.entries) {
+    if (!second.containsKey(entry.key) || second[entry.key] != entry.value) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool _nestedMapsEqual<K, L, V>(
+  Map<K, Map<L, V>> first,
+  Map<K, Map<L, V>> second,
+) {
+  if (first.length != second.length) return false;
+  for (final entry in first.entries) {
+    final other = second[entry.key];
+    if (other == null || !_mapsEqual(entry.value, other)) return false;
+  }
+  return true;
 }
