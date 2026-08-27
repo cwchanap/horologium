@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the one-mine-per-sector Flame runtime with one production-ready mobile merge-mining loop spanning Site Deck, responsive Mine Site, full-screen Stellar Map, deterministic offline production, and all three authored planets.
+**Goal:** Remodel the existing mining runtime in place into one production-ready mobile merge-mining loop spanning Site Deck, responsive Mine Site, full-screen Stellar Map, deterministic live/offline production, and all three authored planets.
 
-**Architecture:** Add the final replacement domain under `lib/mining/domain/` and pure projections under `lib/mining/views/` while the old route remains green, then build Flutter surfaces, cut `MainMenu` over to one `MiningShell`, and delete the retired flat domain/Flame world in the same PR. `MiningShell` is the only runtime owner; `MiningController` is the only serialized mutation boundary; widgets render immutable projections and forward actions.
+**Architecture:** Modify the existing `lib/mining/mining_*.dart` domain files in place so there is never a second `MiningContentRegistry`, `MiningSave`, `MiningSimulation`, `MiningSaveRepository`, or `MiningController`. Keep globally unique site IDs in one flat save map, add per-planet docks, extend the current progression projections, then rename/evolve `MiningScreen` into the sole `MiningShell` and delete Flame only after import closure.
 
 **Tech Stack:** Flutter/Dart, SharedPreferences, audioplayers, Flutter widget tests, deterministic pure-Dart tests, existing GitHub Actions/build targets.
 
@@ -13,121 +13,140 @@
 ## Global Constraints
 
 - Deliver planning, implementation, review, cutover, cleanup, and verification on this one HPA-285 branch and PR.
-- Use the manually attached HPA-285 prototype ZIP as visual/interaction reference; repository catalog names and the spec remain authoritative.
+- Modify the existing mining domain in place; do not create `lib/mining/domain/` or duplicate catalog/state/controller types.
 - Use one `MiningShell`, controller, simulation, repository, audio manager, timer, and lifecycle observer.
 - Use Flutter for all new surfaces; do not build a replacement Flame world.
 - Use `horologium.mergeMining.save`; ignore `horologium.mining.save`; add no migration/version/compatibility path.
-- Keep four planet-local dock bays, four nodes per site, and T1-T5 multipliers `1.00, 1.50, 2.25, 3.25, 4.50`.
+- Keep globally unique `MiningSiteId` values, a flat `sites` save map, and a separate `docks` map keyed by planet.
+- Keep four planet-local dock bays, four nodes per site, and reuse the existing `MiningContentRegistry.rateMultipliers` values `1.00, 1.50, 2.25, 3.25, 4.50` for T1-T5 throughput.
 - Seed two T1 rigs and the first site when a planet first becomes unlocked.
-- Preserve deterministic elapsed-time production, active-planet selling, technology, current planet requirements, and the 25,000 Mars reward.
-- Do not add finite depletion, drag-and-drop, rig IDs, workers, crafting, processing, dynamic prices, another currency, retention systems, server/account/cloud features, state-management packages, routing packages, or generic frameworks.
-- Keep targets at least 48x48; support 360x640, 402x874, 430x932, 874x402, text scale 1.3, reduced motion, muted audio, and safe areas.
+- Rig count/tier affect rate only. Site capacity is `baseCapacity * logisticsCapacityMultiplier`; Logistics is the only multiplicative capacity progression.
+- Preserve deterministic elapsed-time production, `MiningController.refresh()`, initial missing/recovered-save persistence, active-planet selling, technology, planet requirements, and the 25,000 Mars reward.
+- Do not add finite depletion, drag-and-drop, rig IDs, workers, crafting, processing, dynamic prices, another currency, retention systems, server/account/cloud features, state-management packages, routing packages, repository interfaces, or generic frameworks.
+- Keep controls at least 48x48; support 360x640, 402x874, 430x932, 874x402, text scale 1.3, reduced motion, muted audio, and safe areas.
 - Use system typography; remove undeclared Orbitron.
-- Final production has no Lunar/Mars fallback, old save consumer, or Flame mining runtime.
+- The coding task must not invent the twelve missing Lunar/Mars cavern/node PNGs. They are an external input gate.
+- Final production has no Lunar/Mars fallback, old save consumer, old action sheet, Flame mining runtime, or duplicate domain.
+- Intermediate in-place domain commits may make the old Flame route fail to compile. Run focused tests for those tasks; the full Flutter suite is mandatory from the production cutover task onward.
 
 ---
 
-## File Map
-
-Final production ownership:
+## Final File Map
 
 ```text
-lib/mining/domain/
+lib/mining/
   mining_content.dart
   mining_state.dart
   mining_simulation.dart
   mining_save_repository.dart
   mining_controller.dart
-lib/mining/views/
   fleet_dock_view.dart
   site_deck_view.dart
   mine_site_view.dart
-  progression_views.dart
-lib/mining/presentation/
-  mining_shell.dart
-  mining_theme.dart
-  mining_visuals.dart
-  mining_navigation.dart
-  mining_hud.dart
-  fleet_dock.dart
-  site_deck_screen.dart
-  mine_site_screen.dart
-  stellar_map_screen.dart
-  technology_sheet.dart
-  mining_settings_sheet.dart
-  offline_return_sheet.dart
+  mining_progression_views.dart
+  presentation/
+    mining_shell.dart
+    mining_theme.dart
+    mining_visuals.dart
+    mining_navigation.dart
+    mining_hud.dart
+    fleet_dock.dart
+    site_deck_screen.dart
+    mine_site_screen.dart
+    stellar_map_screen.dart
+    technology_sheet.dart
+    mining_settings_sheet.dart
+    offline_return_sheet.dart
 ```
 
-Final focused tests mirror `domain/`, `views/`, and `presentation/`, plus `test/integration/merge_mining_journey_test.dart` and shared fixtures under `test/support/`.
+Existing file names are retained wherever they still own the same job. `mining_screen.dart` is renamed to `mining_shell.dart` only when the new presentation is cut over.
 
 ---
 
-### Task 1: Define Closed Content and Immutable Merge-Mining State
+### Task 1: Remodel the Existing Catalog and State In Place
 
 **Files:**
-- Create: `lib/mining/domain/mining_content.dart`
-- Create: `lib/mining/domain/mining_state.dart`
-- Create: `test/mining/domain/mining_content_test.dart`
-- Create: `test/mining/domain/mining_state_test.dart`
+- Modify: `lib/mining/mining_content.dart`
+- Modify: `lib/mining/mining_state.dart`
+- Modify: `test/mining/mining_content_test.dart`
+- Modify: `test/mining/mining_state_test.dart`
 
 **Interfaces:**
-- Consumes: `ResourceType` from `lib/game/resources/resource_type.dart`.
-- Produces: all closed IDs, authored definitions/helpers, `TechnologyLevels`, `SiteProgress`, `PlanetMiningProgress`, and `MiningSave`.
+- Produces: `MiningSiteId`, `MiningNodeId`, `RigTier`, updated site/planet definitions, flat `MiningSave.sites`, and `MiningSave.docks`.
+- Preserves: `MiningPlanetId`, `TechnologyTrack`, `TechnologyLevels`, technology/offline tables, planet requirements, resource identities.
 
-- [ ] **Step 1: Write failing catalog tests**
+- [ ] **Step 1: Rename the closed site identity in tests and freeze authored values**
+
+Update catalog tests from `MiningSectorId` to `MiningSiteId` and assert all nine current resource/rate/capacity/sale/unlock values remain unchanged.
+
+Add exact assertions:
 
 ```dart
-test('authors three planets, nine sites, four nodes, and spawn costs', () {
-  final content = MiningContentRegistry.stellarMining();
-  expect(content.planets.keys, MiningPlanetId.values.toSet());
-  expect(content.planets.values.expand((p) => p.sites), hasLength(9));
-  for (final site in content.planets.values.expand((p) => p.sites)) {
-    expect(site.nodes.map((n) => n.id), MiningNodeId.values);
-  }
-  expect(content.planet(MiningPlanetId.homeworld).rigSpawnCost, 25);
-  expect(content.planet(MiningPlanetId.lunarFrontier).rigSpawnCost, 500);
-  expect(content.planet(MiningPlanetId.marsFrontier).rigSpawnCost, 5000);
-});
-
-test('uses the frozen rig multiplier ladder', () {
-  final content = MiningContentRegistry.stellarMining();
+test('reuses the current rate multiplier table as the rig ladder', () {
   expect(
-    RigTier.values.map(content.rigMultiplier).toList(),
+    MiningContentRegistry.rateMultipliers,
     [1.0, 1.5, 2.25, 3.25, 4.5],
   );
 });
+
+test('authors four Surveying-gated nodes on every site', () {
+  final content = MiningContentRegistry.stellarMining();
+  for (final site in content.planets.values.expand((p) => p.sites)) {
+    expect(site.nodes.map((node) => node.id), MiningNodeId.values);
+  }
+});
 ```
 
-Add exact assertions for every site prerequisite, Surveying requirement, unlock cash, base rate, capacity, sale value, node Surveying table, technology costs/gates, planet requirements, and Mars reward from the spec.
+Freeze the node Surveying table from the spec and per-planet spawn costs 25 / 500 / 5000.
 
-- [ ] **Step 2: Run tests and confirm missing types**
+- [ ] **Step 2: Run the catalog test and confirm the old types fail**
 
-Run: `flutter test test/mining/domain/mining_content_test.dart`
+Run: `flutter test test/mining/mining_content_test.dart`
 
-Expected: FAIL because `lib/mining/domain/mining_content.dart` does not exist.
+Expected: FAIL because `MiningSiteId`, nodes, and spawn costs do not exist yet.
 
-- [ ] **Step 3: Implement closed IDs and authored definitions**
+- [ ] **Step 3: Remodel `mining_content.dart` rather than copying it**
+
+Rename:
 
 ```dart
-enum MiningPlanetId { homeworld, lunarFrontier, marsFrontier }
+MiningSectorId -> MiningSiteId
+MiningSectorDefinition -> MiningSiteDefinition
+requiredSector -> requiredSite
+revealCost -> unlockCost
+sector(...) -> site(...)
+planetForSector(...) -> planetForSite(...)
+isPlanetMastered(... minedSectorIds) -> isPlanetMastered(... commissionedSiteIds)
+```
+
+Add:
+
+```dart
 enum MiningNodeId { n1, n2, n3, n4 }
 enum RigTier { t1, t2, t3, t4, t5 }
-enum TechnologyTrack { extraction, logistics, surveying }
 
-enum MiningSiteId {
-  landingBasin,
-  carbonRidge,
-  graniteCrater,
-  frozenBasin,
-  titaniumHighlands,
-  heliumMare,
-  ochreBasin,
-  silicaDunes,
-  cobaltChasm,
+class MiningNodeDefinition {
+  const MiningNodeDefinition({
+    required this.id,
+    required this.requiredSurveyingLevel,
+  });
+  final MiningNodeId id;
+  final int requiredSurveyingLevel;
 }
 ```
 
-Use concrete `MiningNodeDefinition`, `MiningSiteDefinition`, and `MiningPlanetDefinition` classes. `MiningContentRegistry` must provide:
+Each `MiningPlanetDefinition` gains only:
+
+```dart
+final int rigSpawnCost;
+final List<MiningSiteDefinition> sites;
+```
+
+Keep the existing `rateMultipliers` constant and use ordinal tier indexing against it. Keep `extractionRateMultipliers`, `logisticsCapacityMultipliers`, `offlineCapsByLogistics`, technology costs/gates, unlock requirements, and mastery reward.
+
+Remove `capacityMultipliers` because tier no longer scales storage. Remove build/upgrade costs and Flame-only world metadata when current consumers are updated within this task or a following cutover step.
+
+Required helpers:
 
 ```dart
 MiningPlanetDefinition planet(MiningPlanetId id);
@@ -139,10 +158,7 @@ double effectiveSiteRate(
   Iterable<RigTier> deployedRigs,
   int extractionLevel,
 );
-double effectiveSiteCapacity(
-  MiningSiteId siteId,
-  int logisticsLevel,
-);
+double effectiveSiteCapacity(MiningSiteId siteId, int logisticsLevel);
 Duration offlineCapFor(int logisticsLevel);
 bool isPlanetMastered(
   MiningPlanetId planetId,
@@ -150,28 +166,36 @@ bool isPlanetMastered(
 );
 ```
 
-- [ ] **Step 4: Write failing initial-state tests**
+`effectiveSiteCapacity` must use only `baseCapacity * logisticsCapacityMultipliers[logisticsLevel]`.
+
+- [ ] **Step 4: Replace old mine state tests with flat docks/sites tests**
+
+Add tests equivalent to:
 
 ```dart
-test('fresh state seeds only Homeworld and two T1 rigs', () {
+test('fresh state is flat and seeds only Homeworld', () {
   final now = DateTime.utc(2026, 8, 26, 12);
   final state = MiningSave.initial(nowUtc: now);
+
   expect(state.cash, 100);
   expect(state.unlockedPlanetIds, {MiningPlanetId.homeworld});
   expect(state.activePlanetId, MiningPlanetId.homeworld);
   expect(
-    state.planets[MiningPlanetId.homeworld]!.dock,
+    state.docks[MiningPlanetId.homeworld],
     [RigTier.t1, RigTier.t1, null, null],
   );
-  expect(state.site(MiningSiteId.landingBasin).unlocked, isTrue);
-  expect(state.site(MiningSiteId.landingBasin).commissioned, isFalse);
-  expect(state.planets[MiningPlanetId.lunarFrontier]!.dock, everyElement(isNull));
+  expect(state.docks[MiningPlanetId.lunarFrontier], everyElement(isNull));
+  expect(state.sites, hasLength(MiningSiteId.values.length));
+  expect(state.sites[MiningSiteId.landingBasin]!.unlocked, isTrue);
+  expect(state.sites[MiningSiteId.landingBasin]!.commissioned, isFalse);
 });
 ```
 
-Also assert all sites contain exactly n1-n4, locked planets are pristine, `copyWith` does not alias lists/maps, and equality/hash include nested state.
+Also assert every site has exactly n1-n4, all maps/lists are unmodifiable copies, equality/hash include docks/sites, and locked planet sites are pristine.
 
-- [ ] **Step 5: Implement immutable state**
+- [ ] **Step 5: Remodel `mining_state.dart` in place**
+
+Delete `MineState` and replace `SectorProgress` with:
 
 ```dart
 class SiteProgress {
@@ -181,81 +205,124 @@ class SiteProgress {
     required this.storedAmount,
     required this.rigByNode,
   });
+
   final bool unlocked;
   final bool commissioned;
   final double storedAmount;
   final Map<MiningNodeId, RigTier?> rigByNode;
 }
+```
 
-class PlanetMiningProgress {
-  const PlanetMiningProgress({required this.dock, required this.sites});
-  final List<RigTier?> dock;
+`MiningSave` becomes:
+
+```dart
+class MiningSave {
+  final int cash;
+  final DateTime lastAccruedAtUtc;
+  final TechnologyLevels technology;
+  final Set<MiningPlanetId> unlockedPlanetIds;
+  final MiningPlanetId activePlanetId;
+  final Map<MiningPlanetId, List<RigTier?>> docks;
   final Map<MiningSiteId, SiteProgress> sites;
 }
 ```
 
-`MiningSave` stores cash, UTC timestamp, technology, unlocked planets, active planet, and all three planet-progress records. Use unmodifiable copies at every constructor/copy boundary and expose `site(MiningSiteId)` as a read-only convenience.
+Use defensive unmodifiable copies in constructors/copy paths. Keep `TechnologyLevels` unchanged.
 
-- [ ] **Step 6: Run focused tests**
+- [ ] **Step 6: Run focused state/catalog tests**
 
-Run: `flutter test test/mining/domain/mining_content_test.dart test/mining/domain/mining_state_test.dart`
+```sh
+flutter test test/mining/mining_content_test.dart test/mining/mining_state_test.dart
+```
 
-Expected: PASS.
+Expected: PASS. Do not run the full suite yet; old presentation/controller imports may still use the removed mine model.
 
 - [ ] **Step 7: Commit**
 
 ```sh
-git add lib/mining/domain/mining_content.dart \
-  lib/mining/domain/mining_state.dart \
-  test/mining/domain/mining_content_test.dart \
-  test/mining/domain/mining_state_test.dart
-git commit -m "feat(mining): define merge-mining domain state"
+git add lib/mining/mining_content.dart lib/mining/mining_state.dart \
+  test/mining/mining_content_test.dart test/mining/mining_state_test.dart
+git commit -m "feat(mining): remodel mining state for merge rigs"
 ```
 
 ---
 
-### Task 2: Add the Fresh Strict Save Repository
+### Task 2: Retarget the Existing Strict Save Repository
 
 **Files:**
-- Create: `lib/mining/domain/mining_save_repository.dart`
-- Create: `test/mining/domain/mining_save_repository_test.dart`
+- Modify: `lib/mining/mining_save_repository.dart`
+- Modify: `test/mining/mining_save_repository_test.dart`
 
 **Interfaces:**
-- Consumes: Task 1 state/content.
-- Produces: `MiningLoadResult`, `hasSave`, strict load/save, and new-key recovery.
+- Consumes: Task 1 flat state/content.
+- Produces: strict `horologium.mergeMining.save` load/save and current recovery semantics.
 
-- [ ] **Step 1: Write failing presence and round-trip tests**
+- [ ] **Step 1: Replace the old-key/payload tests before implementation**
+
+Add:
 
 ```dart
-test('uses only the merge-mining key', () async {
+test('presence ignores the retired save key', () async {
   SharedPreferences.setMockInitialValues({'horologium.mining.save': '{}'});
   final repository = MiningSaveRepository();
   expect(MiningSaveRepository.saveKey, 'horologium.mergeMining.save');
   expect(await repository.hasSave(), isFalse);
 });
-
-test('round-trips nested docks, sites, nodes, and technology', () async {
-  SharedPreferences.setMockInitialValues({});
-  final repository = MiningSaveRepository();
-  final state = progressedMiningState();
-  await repository.save(state);
-  final loaded = await repository.load(nowUtc: DateTime.utc(2026, 8, 27));
-  expect(loaded.state, state);
-  expect(loaded.recoveredFromInvalidSave, isFalse);
-});
 ```
 
-- [ ] **Step 2: Add structural-invalidity tests**
+Define a local `_progressedState(DateTime now)` in this test file **before** the round-trip test. Build it from `MiningSave.initial()` with immutable `copyWith` operations; do not reference a fixture introduced by a later task.
 
-Cover exact-key rejection, malformed JSON, wrong types, invalid UTC/cash/technology, dock length, tier names, active/unlocked invariants, locked planet/site contamination, prerequisite order, first-site invariant, unavailable-node deployment, negative cargo, and unknown/duplicate IDs. Add a valid over-capacity test that clamps cargo without recovery.
+The progressed payload must contain:
 
-- [ ] **Step 3: Run and confirm repository is missing**
+- Homeworld + Lunar unlocked;
+- active Lunar;
+- non-empty Homeworld/Lunar docks;
+- commissioned Landing Basin and Frozen Basin;
+- one deployed rig;
+- non-zero cargo;
+- non-zero technology levels.
 
-Run: `flutter test test/mining/domain/mining_save_repository_test.dart`
+- [ ] **Step 2: Add exact structural tests for the flat document**
 
-Expected: FAIL.
+The root key set is exactly:
 
-- [ ] **Step 4: Implement repository boundary**
+```text
+cash
+lastAccruedAtUtc
+technology
+unlockedPlanetIds
+activePlanetId
+docks
+sites
+```
+
+Test:
+
+- docks contain exactly all three planet names;
+- each dock is exactly four nullable valid tiers;
+- sites contain exactly all nine site names;
+- each site contains exactly `unlocked`, `commissioned`, `storedAmount`, `rigByNode`;
+- `rigByNode` contains exactly n1-n4;
+- locked planet docks/sites must be pristine;
+- first site must be unlocked for each unlocked planet;
+- later-site prerequisite order is valid;
+- commissioned implies unlocked;
+- locked site has zero cargo/no rigs;
+- deployed node satisfies saved Surveying;
+- active planet is unlocked/Homeworld is unlocked;
+- malformed/raw-type/UTC/cash/technology/enum/negative-cargo failures recover cleanly.
+
+Add one valid over-capacity test proving cargo clamps with no recovery and uses `effectiveSiteCapacity`, not rig tier/count.
+
+- [ ] **Step 3: Run repository tests and confirm the old decoder fails**
+
+Run: `flutter test test/mining/mining_save_repository_test.dart`
+
+Expected: FAIL on key/document shape.
+
+- [ ] **Step 4: Modify the existing repository in place**
+
+Keep the current concrete class and helpers:
 
 ```dart
 class MiningSaveRepository {
@@ -267,181 +334,238 @@ class MiningSaveRepository {
 }
 ```
 
-Decode one closed document containing every planet, each authored site, exactly four dock entries, and exactly n1-n4. Read the raw preference generically before type-checking. Missing data creates fresh state; invalid data returns fresh state with recovery; valid cargo clamps through `effectiveSiteCapacity`.
+Preserve:
+
+- generic `prefs.get(saveKey)` before String validation;
+- `hasExactKeys` strictness;
+- `wasMissing` and `recoveredFromInvalidSave` semantics;
+- clean initial-state recovery;
+- write rejection error behavior.
+
+Replace `_decodeSectors`/`_decodeMine` with `_decodeDocks` and `_decodeSites` without adding a schema version or compatibility branch.
 
 - [ ] **Step 5: Run repository tests**
 
-Run: `flutter test test/mining/domain/mining_save_repository_test.dart`
+Run: `flutter test test/mining/mining_save_repository_test.dart`
 
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```sh
-git add lib/mining/domain/mining_save_repository.dart \
-  test/mining/domain/mining_save_repository_test.dart
-git commit -m "feat(mining): persist strict merge-mining saves"
+git add lib/mining/mining_save_repository.dart test/mining/mining_save_repository_test.dart
+git commit -m "feat(mining): persist flat merge-mining saves"
 ```
 
 ---
 
-### Task 3: Simulate Production from Deployed Rigs
+### Task 3: Retarget Deterministic Accrual to Deployed Rigs
 
 **Files:**
-- Create: `lib/mining/domain/mining_simulation.dart`
-- Create: `test/mining/domain/mining_simulation_test.dart`
+- Modify: `lib/mining/mining_simulation.dart`
+- Modify: `test/mining/mining_simulation_test.dart`
 
 **Interfaces:**
-- Consumes: Task 1 content/state.
-- Produces: `OfflineProductionSummary`, `AccrualResult`, and pure `accrue`.
+- Preserves: `AccrualResult`, `OfflineProductionSummary`, deterministic elapsed-time window behavior.
+- Changes: `fullSectors -> fullSites`; production source is deployed rigs rather than `MineState`.
 
-- [ ] **Step 1: Write failing production tests**
+- [ ] **Step 1: Replace old mine-rate tests with deployed-rig tests**
+
+Add:
 
 ```dart
-test('only deployed rigs produce and rates sum by tier', () {
-  final state = stateWithRigs(
-    MiningSiteId.landingBasin,
-    {MiningNodeId.n1: RigTier.t1, MiningNodeId.n2: RigTier.t2},
+test('deployed tiers sum throughput while docked rigs do nothing', () {
+  final state = stateWithSiteRigs(
+    siteId: MiningSiteId.landingBasin,
+    rigs: {
+      MiningNodeId.n1: RigTier.t1,
+      MiningNodeId.n2: RigTier.t2,
+    },
   );
   final result = MiningSimulation(content).accrue(
     state,
     state.lastAccruedAtUtc.add(const Duration(seconds: 10)),
   );
+
   expect(
-    result.state.site(MiningSiteId.landingBasin).storedAmount,
+    result.state.sites[MiningSiteId.landingBasin]!.storedAmount,
     closeTo((0.50 * 1.0 + 0.50 * 1.5) * 10, 0.0001),
   );
 });
 ```
 
-Add tests for docked rigs, Extraction, Logistics capacity, inactive unlocked planets, full-site reporting, offline cap, negative/zero elapsed time, and deterministic repeated inputs.
+Add coverage for:
 
-- [ ] **Step 2: Run and verify missing simulation**
+- four T5 rigs + Extraction 5 rate;
+- capacity unaffected by rig tiers/count;
+- Logistics capacity only;
+- inactive unlocked planet accrual;
+- locked/empty site no production;
+- full-site reporting;
+- zero/negative elapsed behavior;
+- offline cap;
+- deterministic equal-input result.
 
-Run: `flutter test test/mining/domain/mining_simulation_test.dart`
+- [ ] **Step 2: Run and confirm the old simulation model fails**
 
-Expected: FAIL.
+Run: `flutter test test/mining/mining_simulation_test.dart`
 
-- [ ] **Step 3: Implement summary and accrual**
+Expected: FAIL because it still reads `SectorProgress.mine`.
+
+- [ ] **Step 3: Modify the current simulation loop**
+
+For each unlocked planet in content order, iterate `planet.sites`, resolve flat `state.sites[site.id]`, collect non-null `rigByNode.values`, and calculate:
 
 ```dart
-class OfflineProductionSummary {
-  const OfflineProductionSummary({
-    required this.elapsedUsed,
-    required this.produced,
-    required this.productionByPlanet,
-    required this.fullSites,
-    required this.wasOfflineCapped,
-  });
-  final Duration elapsedUsed;
-  final Map<ResourceType, double> produced;
-  final Map<MiningPlanetId, Map<ResourceType, double>> productionByPlanet;
-  final Set<MiningSiteId> fullSites;
-  final bool wasOfflineCapped;
-}
-
-class MiningSimulation {
-  const MiningSimulation(this.content);
-  final MiningContentRegistry content;
-  AccrualResult accrue(MiningSave state, DateTime nowUtc);
-}
+final rate = content.effectiveSiteRate(
+  definition.id,
+  deployedRigs,
+  state.technology.extraction,
+);
+final capacity = content.effectiveSiteCapacity(
+  definition.id,
+  state.technology.logistics,
+);
 ```
 
-Iterate content order across unlocked planets/sites. Collect non-null deployed tiers, calculate rate through content, clamp to remaining capacity, update immutable site state, and advance timestamp to `nowUtc` after a positive elapsed window.
+Keep current elapsed-window, rollback, clamp, timestamp, production-by-resource, and production-by-planet behavior. Rename the summary set to `fullSites`.
 
-- [ ] **Step 4: Run tests**
+- [ ] **Step 4: Run simulation tests**
 
-Run: `flutter test test/mining/domain/mining_simulation_test.dart`
-
-Expected: PASS.
-
-- [ ] **Step 5: Run all replacement-domain tests**
-
-Run: `flutter test test/mining/domain`
+Run: `flutter test test/mining/mining_simulation_test.dart`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```sh
-git add lib/mining/domain/mining_simulation.dart \
-  test/mining/domain/mining_simulation_test.dart
+git add lib/mining/mining_simulation.dart test/mining/mining_simulation_test.dart
 git commit -m "feat(mining): accrue deployed rig production"
 ```
 
 ---
 
-### Task 4: Serialize Spawn, Merge, Site Unlock, Deploy, and Recall
+### Task 4: Remodel the Existing Controller Without Losing Refresh or Initial Persistence
 
 **Files:**
-- Create: `lib/mining/domain/mining_controller.dart`
-- Create: `test/mining/domain/mining_controller_test.dart`
-- Create: `test/support/merge_mining_fixtures.dart`
+- Modify: `lib/mining/mining_controller.dart`
+- Modify: `test/mining/mining_controller_test.dart`
 
 **Interfaces:**
-- Consumes: repository, simulation, content, injected UTC clock.
-- Produces: controller queue, typed results, fleet/site mutations, checkpoint/resume.
+- Preserves: one `_enqueueMutation`, `initialize`, `refresh`, `takePendingReturnSummary`, technology, planet unlock/travel, sell, checkpoint, resume.
+- Replaces: reveal/build/upgrade with site unlock/spawn/merge/deploy/recall.
 
-- [ ] **Step 1: Create deterministic controller fixtures**
+- [ ] **Step 1: Reuse the existing controller-test seams**
+
+Keep and rename only as needed:
 
 ```dart
-final class MutableTestClock {
-  MutableTestClock(this.now);
+class TestClock {
+  TestClock(this.now);
   DateTime now;
   DateTime call() => now;
 }
 
-final class MemoryMiningSaveRepository implements MiningSaveRepository {
-  MemoryMiningSaveRepository({required this.current});
-  MiningSave current;
-  Object? saveError;
-  @override Future<MiningLoadResult> load({required DateTime nowUtc}) async =>
-      MiningLoadResult(
-        state: current,
-        recoveredFromInvalidSave: false,
-        wasMissing: false,
-      );
-  @override Future<void> save(MiningSave state) async {
-    if (saveError != null) throw saveError!;
-    current = state;
-  }
-}
+class DelayedMiningSaveRepository extends MiningSaveRepository { ... }
+class ThrowingFirstSaveRepository extends MiningSaveRepository { ... }
+class AlwaysFailingSaveRepository extends MiningSaveRepository { ... }
+class CountingMiningSaveRepository extends MiningSaveRepository { ... }
 ```
 
-Add `ControllerHarness.fromState` that wires real content/simulation/controller to these fakes.
+Do **not** add `MemoryMiningSaveRepository implements MiningSaveRepository` and do not create a repository interface. Seed SharedPreferences through the concrete repository just as the current `controllerOver` helper does.
 
-- [ ] **Step 2: Write failing spawn/merge tests**
+Replace `seededSave` with a flat-state helper that can set cash, technology, docks, sites, unlocked planets, and active planet.
 
-Cover first-empty spawn, cash deduction, full dock, insufficient cash, same-tier merge destination, different-tier rejection, same-index rejection, empty source/target, and T5 rejection.
+- [ ] **Step 2: Preserve initialization and live refresh with explicit regression tests**
+
+Keep the existing missing/recovered-save tests and update only their expected new payload.
+
+Add:
 
 ```dart
-test('merges into tapped destination and empties source', () async {
-  final harness = ControllerHarness.fresh();
-  await harness.controller.initialize();
-  final result = await harness.controller.mergeDockRigs(0, 1);
-  expect(result.isSuccess, isTrue);
-  expect(
-    harness.controller.state.activePlanet.dock,
-    [null, RigTier.t2, null, null],
+test('refresh accrues in memory without saving', () async {
+  final repository = CountingMiningSaveRepository();
+  final live = await controllerOver(
+    repository,
+    seed: deployedLandingBasinState(clock.now),
   );
+  final savesBefore = repository.saveCount;
+  clock.now = clock.now.add(const Duration(seconds: 10));
+
+  live.refresh();
+
+  expect(live.state.sites[MiningSiteId.landingBasin]!.storedAmount, 5.0);
+  expect(repository.saveCount, savesBefore);
 });
 ```
 
-- [ ] **Step 3: Write failing unlock/deploy/recall tests**
+Initialization must still best-effort save when `loaded.wasMissing || loaded.recoveredFromInvalidSave`, even if that convenience save fails.
 
-Cover prerequisite/Surveying/cash site unlocks, active-planet ownership, unavailable/occupied nodes, empty source bay, first deployment setting `commissioned`, recall to first empty bay, full-dock recall failure, and recall preserving commission.
+- [ ] **Step 3: Write failing spawn/merge tests**
 
-- [ ] **Step 4: Write queue and failed-save tests**
+Cover:
 
-Use a delayed repository to prove duplicate queued spawn/merge/deploy actions revalidate after the first state publishes. Set `saveError` and prove controller state plus repository state remain unchanged.
+- spawn into first empty active-planet bay;
+- exact per-planet cost deduction;
+- full dock / insufficient cash;
+- same-tier merge into tapped destination;
+- distinct-index requirement;
+- empty/mismatched/T5 rejection;
+- delayed duplicate action revalidates after first publish;
+- save failure leaves controller state unchanged.
 
-- [ ] **Step 5: Run and verify controller is missing**
+- [ ] **Step 4: Write failing site unlock/deploy/recall tests**
 
-Run: `flutter test test/mining/domain/mining_controller_test.dart`
+Cover:
 
-Expected: FAIL.
+- prerequisite, Surveying, cash, and active-planet ownership for `unlockSite`;
+- deploy moves one dock rig into one empty Surveying-available node;
+- first deploy flips `commissioned` once;
+- unavailable/occupied node and empty source fail unchanged;
+- recall moves to first empty active dock bay;
+- full dock recall fails unchanged;
+- recall never clears `commissioned`.
 
-- [ ] **Step 6: Implement controller queue and actions**
+- [ ] **Step 5: Retarget progression/sale/mastery tests**
+
+Technology tests gate on commissioned sites rather than mine existence.
+
+Planet tests prove Lunar/Mars unlock seed `[T1, T1, null, null]` and their first site, retain current Surveying/cash/mastery rules, and travel accrues before switching.
+
+Sale tests preserve active-planet-only clearing and floor-once revenue.
+
+Mars reward test:
+
+```dart
+test('final first commission grants Mars reward exactly once', () async {
+  final mars = await controllerOver(
+    MiningSaveRepository(),
+    seed: marsWithOnlyCobaltUncommissioned(clock.now),
+  );
+
+  final first = await mars.deployRig(
+    0,
+    MiningSiteId.cobaltChasm,
+    MiningNodeId.n1,
+  );
+  expect(first.isSuccess, isTrue);
+  expect(mars.state.cash, startingCash + 25000);
+
+  await mars.recallRig(MiningSiteId.cobaltChasm, MiningNodeId.n1);
+  await mars.deployRig(0, MiningSiteId.cobaltChasm, MiningNodeId.n1);
+  expect(mars.state.cash, startingCash + 25000);
+});
+```
+
+- [ ] **Step 6: Run and confirm the old controller API fails**
+
+Run: `flutter test test/mining/mining_controller_test.dart`
+
+Expected: FAIL until actions/state access are retargeted.
+
+- [ ] **Step 7: Modify `MiningController` in place**
+
+Required public actions:
 
 ```dart
 Future<MiningActionResult> unlockSite(MiningSiteId siteId);
@@ -456,157 +580,123 @@ Future<MiningActionResult> recallRig(
   MiningSiteId siteId,
   MiningNodeId nodeId,
 );
-Future<void> checkpoint({bool accrue = true});
-Future<OfflineProductionSummary?> resume();
-```
-
-Use one `_enqueueMutation<T>` future chain. Increment pending count synchronously; inside each operation accrue, validate, create one next state, await one save, then publish. Never mutate dock lists or nested maps in place.
-
-- [ ] **Step 7: Run controller tests**
-
-Run: `flutter test test/mining/domain/mining_controller_test.dart`
-
-Expected: PASS.
-
-- [ ] **Step 8: Commit**
-
-```sh
-git add lib/mining/domain/mining_controller.dart \
-  test/mining/domain/mining_controller_test.dart \
-  test/support/merge_mining_fixtures.dart
-git commit -m "feat(mining): serialize merge-mining actions"
-```
-
----
-
-### Task 5: Preserve Technology, Planet Progression, Selling, and Mars Mastery
-
-**Files:**
-- Modify: `lib/mining/domain/mining_controller.dart`
-- Modify: `test/mining/domain/mining_controller_test.dart`
-
-**Interfaces:**
-- Consumes: Task 4 queue/actions.
-- Produces: complete progression and economy mutations.
-
-- [ ] **Step 1: Add a commissioned-site state helper**
-
-Add `stateWithCommissionedSites(MiningSave state, Set<MiningSiteId> ids)` to shared fixtures using immutable planet/site copies.
-
-- [ ] **Step 2: Write failing technology tests**
-
-Prove commissioned Landing Basin permits level 1, unlocked-but-uncommissioned does not, costs/effects remain current, max level rejects, insufficient cash rejects, and queued purchases do not double-spend.
-
-- [ ] **Step 3: Write failing planet unlock/travel tests**
-
-```dart
-test('Lunar unlock seeds first site and two T1 rigs', () async {
-  final harness = ControllerHarness.fromState(homeworldMasteredState());
-  await harness.controller.initialize();
-  final result = await harness.controller.unlockPlanet(
-    MiningPlanetId.lunarFrontier,
-  );
-  expect(result.isSuccess, isTrue);
-  expect(harness.controller.state.activePlanetId, MiningPlanetId.lunarFrontier);
-  expect(
-    harness.controller.state.planets[MiningPlanetId.lunarFrontier]!.dock,
-    [RigTier.t1, RigTier.t1, null, null],
-  );
-  expect(harness.controller.state.site(MiningSiteId.frozenBasin).unlocked, isTrue);
-});
-```
-
-Also cover mastery, Surveying, cash, locked travel, current-location travel, inactive production accrued before travel, and save failure.
-
-- [ ] **Step 4: Write failing sale and Mars reward tests**
-
-Cover active-planet-only cargo, floor-once aggregate revenue, zero cargo, fractional projected revenue, final Cobalt first deployment granting exactly 25,000, recall/redeploy never paying again, and save failure not publishing reward/commission.
-
-- [ ] **Step 5: Run and confirm missing methods**
-
-Run: `flutter test test/mining/domain/mining_controller_test.dart`
-
-Expected: FAIL on progression/sale methods.
-
-- [ ] **Step 6: Implement progression methods**
-
-```dart
 Future<MiningActionResult> purchaseTechnology(TechnologyTrack track);
 Future<MiningActionResult> unlockPlanet(MiningPlanetId id);
 Future<MiningActionResult> switchPlanet(MiningPlanetId id);
 Future<MiningSaleResult> sellAllCargo();
+Future<void> checkpoint({bool accrue = true});
+Future<OfflineProductionSummary?> resume();
 ```
 
-Calculate Mars reward inside `deployRig` by comparing mastery before and after the first commission in the same next state. Use commissioned gate sites for technology.
+Keep the current `_enqueueMutation` implementation shape. Each persisted action accrues candidate -> validates -> copies one next state -> saves once -> publishes.
 
-- [ ] **Step 7: Run replacement-domain tests**
+Keep `refresh()` non-queued/non-persisting and skip advancement while busy exactly as current behavior.
 
-Run: `flutter test test/mining/domain`
+Move the current mastery-reward false->true logic from `buildMine` into the first-commission branch inside `deployRig`.
+
+- [ ] **Step 8: Run controller tests**
+
+Run: `flutter test test/mining/mining_controller_test.dart`
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```sh
-git add lib/mining/domain/mining_controller.dart \
-  test/mining/domain/mining_controller_test.dart \
-  test/support/merge_mining_fixtures.dart
-git commit -m "feat(mining): preserve progression in merge domain"
+git add lib/mining/mining_controller.dart test/mining/mining_controller_test.dart
+git commit -m "feat(mining): serialize merge-rig actions"
 ```
 
 ---
 
-### Task 6: Derive Fleet, Site Deck, Mine Site, Technology, and Stellar Map Views
+### Task 5: Add New Views and Extend the Existing Progression Projections
 
 **Files:**
-- Create: `lib/mining/views/fleet_dock_view.dart`
-- Create: `lib/mining/views/site_deck_view.dart`
-- Create: `lib/mining/views/mine_site_view.dart`
-- Create: `lib/mining/views/progression_views.dart`
-- Create: matching tests under `test/mining/views/`
-- Modify: `test/support/merge_mining_fixtures.dart`
+- Create: `lib/mining/fleet_dock_view.dart`
+- Create: `lib/mining/site_deck_view.dart`
+- Create: `lib/mining/mine_site_view.dart`
+- Modify: `lib/mining/mining_progression_views.dart`
+- Create: `test/mining/fleet_dock_view_test.dart`
+- Create: `test/mining/site_deck_view_test.dart`
+- Create: `test/mining/mine_site_view_test.dart`
+- Modify: `test/mining/mining_progression_views_test.dart`
 
 **Interfaces:**
-- Consumes: replacement state/content plus busy/selection inputs.
-- Produces: presentation-ready immutable values; widgets calculate no rules.
+- Produces: presentation-ready fleet/site/node/planet/technology state; widgets calculate no game rules.
+- Preserves: current `StellarMapView._isVisible` progressive disclosure.
 
-- [ ] **Step 1: Write failing Fleet Dock tests**
+- [ ] **Step 1: Write Fleet Dock projection tests**
+
+Freeze:
 
 ```dart
-test('marks same-tier destination as merge eligible', () {
-  final view = FleetDockView.from(
-    state: MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 26)),
-    content: MiningContentRegistry.stellarMining(),
-    selectedBayIndex: 0,
-    isBusy: false,
-  );
-  expect(view.bays[0].isSelected, isTrue);
-  expect(view.bays[1].canMergeWithSelection, isTrue);
-  expect(view.spawnCost, 25);
-});
+final view = FleetDockView.from(
+  state: MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 26)),
+  content: MiningContentRegistry.stellarMining(),
+  selectedBayIndex: 0,
+  isBusy: false,
+);
+expect(view.bays, hasLength(4));
+expect(view.bays[0].isSelected, isTrue);
+expect(view.bays[1].canMergeWithSelection, isTrue);
+expect(view.spawnCost, 25);
 ```
 
-Also freeze full/poor/busy reasons and the four state-derived hints.
+Also cover full/poor/busy spawn reasons and state-derived hints:
 
-- [ ] **Step 2: Write failing Site Deck tests**
+- `Tap two matching rigs to merge`
+- `Tap an open node to deploy`
+- `Merge or deploy a rig to free a bay`
+- `Tap cargo to sell`
 
-Assert Landing Basin idle on fresh state, Carbon locked, affordable Carbon available, deployed Landing operational, and all cash/progress/cargo/value/rate/tier/action/reason fields.
+- [ ] **Step 2: Write Site Deck projection tests**
 
-- [ ] **Step 3: Write failing Mine Site tests**
+`MiningSiteCardState` is exactly:
 
-Assert Landing n1/n2 available and n3/n4 locked at Surveying 0, node tier/rate, selected-rig deployability, full-dock recall reason, site cargo separately from active-planet sale totals, zero/fractional sale reasons, and floor-once projected revenue.
+```dart
+enum MiningSiteCardState { locked, available, idle, operational }
+```
 
-- [ ] **Step 4: Write failing progression tests**
+Assert fresh Landing Basin idle, Carbon locked, affordable Carbon available, deployed Landing operational, and active-planet totals for commissioned count, cargo, capacity, projected sale value, and production rate.
 
-Assert commissioned-site technology gates/copy, Surveying node count, fresh map Homeworld+Lunar, Mars disclosure after Lunar unlock, all planet totals/indicators/requirements/actions, and exact `Mars Frontier` copy.
+- [ ] **Step 3: Write Mine Site projection tests**
 
-- [ ] **Step 5: Run and verify views are missing**
+Assert:
 
-Run: `flutter test test/mining/views`
+- Landing n1/n2 available at Surveying 0 and n3/n4 gated;
+- node tier/rate/semantic label;
+- selected rig deployability;
+- occupied node recallability/full-dock reason;
+- site cargo/capacity separate from active-planet sale total;
+- projected sale floor-once behavior.
 
-Expected: FAIL.
+- [ ] **Step 4: Retarget the existing progression view tests**
 
-- [ ] **Step 6: Implement exact view factories**
+Modify `test/mining/mining_progression_views_test.dart`, do not replace it with a second module.
+
+Technology assertions use commissioned gate sites.
+
+Stellar Map assertions keep current disclosure:
+
+```text
+fresh save: Homeworld + Lunar visible
+Lunar unlocked: Homeworld + Lunar + Mars visible
+```
+
+Add commissioned site progress, active planet rate/cargo/capacity/value, site indicators, requirements, busy reason, and exact `Mars Frontier` copy.
+
+- [ ] **Step 5: Run projection tests and confirm missing/old behavior**
+
+```sh
+flutter test test/mining/fleet_dock_view_test.dart \
+  test/mining/site_deck_view_test.dart \
+  test/mining/mine_site_view_test.dart \
+  test/mining/mining_progression_views_test.dart
+```
+
+Expected: FAIL until views are implemented/retargeted.
+
+- [ ] **Step 6: Implement the three new flat view files**
 
 Required factories:
 
@@ -632,54 +722,33 @@ MineSiteView.from({
   required int? selectedBayIndex,
   required bool isBusy,
 });
-
-TechnologySheetView.from({
-  required MiningSave state,
-  required MiningContentRegistry content,
-});
-
-StellarMapView.from({
-  required MiningSave state,
-  required MiningContentRegistry content,
-  required bool isBusy,
-});
 ```
 
-`FleetBayView` exposes index/tier/selected/merge-eligible. `MiningSiteCardView` exposes id/name/resource/resource name/state/status/commissioned/deployed tiers/rate/cargo/capacity/action/enabled/reason. `MiningNodeView` exposes id/Surveying/availability/tier/rate/deploy/recall/reason/semantic label. Planet views expose active/unlocked/progress/rate/cargo/value/three site indicators/requirements/action/reason.
+Use `MiningContentRegistry` helpers for rates/capacities and controller-equivalent eligibility ordering; do not duplicate formulas in widgets.
 
-- [ ] **Step 7: Add concrete widget fixtures**
+- [ ] **Step 7: Extend `mining_progression_views.dart` in place**
 
-Add:
-
-```dart
-SiteDeckView mixedSiteDeckView();
-MineSiteView operationalMineSiteView();
-StellarMapView lunarUnlockedStellarMapView();
-MiningSave progressedMiningState({
-  int cash = 100000,
-  int surveying = 5,
-  MiningPlanetId activePlanetId = MiningPlanetId.homeworld,
-});
-```
-
-The fixtures must call real projection factories rather than constructing view objects by hand.
+Retarget `TechnologySheetView` and `StellarMapView` to `MiningSiteId` / commissioned state. Preserve `_isVisible` semantics from the current file.
 
 - [ ] **Step 8: Run projection tests**
 
-Run: `flutter test test/mining/views`
+Run the four commands from Step 5.
 
 Expected: PASS.
 
 - [ ] **Step 9: Commit**
 
 ```sh
-git add lib/mining/views test/mining/views test/support/merge_mining_fixtures.dart
-git commit -m "feat(mining): derive merge-mining presentation views"
+git add lib/mining/fleet_dock_view.dart lib/mining/site_deck_view.dart \
+  lib/mining/mine_site_view.dart lib/mining/mining_progression_views.dart \
+  test/mining/fleet_dock_view_test.dart test/mining/site_deck_view_test.dart \
+  test/mining/mine_site_view_test.dart test/mining/mining_progression_views_test.dart
+git commit -m "feat(mining): derive mobile mining views"
 ```
 
 ---
 
-### Task 7: Import Final Art and Create the Visual Catalog
+### Task 6: Import Prototype Art and Enforce the Lunar/Mars Input Gate
 
 **Files:**
 - Create: `assets/images/mining/{caverns,nodes,rigs,planets,sites,icons,effects,offline}/`
@@ -689,32 +758,64 @@ git commit -m "feat(mining): derive merge-mining presentation views"
 - Modify: `pubspec.yaml`, `pubspec.lock`
 
 **Interfaces:**
-- Consumes: attached prototype ZIP and closed IDs.
-- Produces: complete nine-site asset lookup, shared anchors, theme tokens.
+- Produces: complete nine-site visual lookup and the shared theme/anchor constants used by Task 7.
+- Hard dependency: twelve externally authored Lunar/Mars PNGs listed below.
 
-- [ ] **Step 1: Copy supplied prototype assets**
+- [ ] **Step 1: Extract only the supplied production assets from the manually attached ZIP**
 
-Map supplied gold/coal/stone caverns and nodes, T1-T5 rigs, three planets, three Homeworld cards, cash/cargo/merge/technology icons, merge burst, and offline hero into their final `assets/images/mining/` subdirectories. Preserve PNG source quality.
-
-- [ ] **Step 2: Produce the twelve missing final files**
-
-Create 800x1200 caverns and 512x512 transparent nodes at:
+Copy these source groups and no duplicate `uploads/` copies/HTML/scripts:
 
 ```text
-caverns/water_ice.png      nodes/water_ice.png
-caverns/titanium_ore.png   nodes/titanium_ore.png
-caverns/helium_3.png       nodes/helium_3.png
-caverns/iron_ore.png       nodes/iron_ore.png
-caverns/silica.png         nodes/silica.png
-caverns/cobalt_ore.png     nodes/cobalt_ore.png
+art-cavern-gold.png   -> caverns/gold.png
+art-cavern-coal.png   -> caverns/coal.png
+art-cavern-stone.png  -> caverns/stone.png
+art-node-gold.png     -> nodes/gold.png
+art-node-coal.png     -> nodes/coal.png
+art-node-stone.png    -> nodes/stone.png
+art-site-basin.png    -> sites/landing_basin.png
+art-site-ridge.png    -> sites/carbon_ridge.png
+art-site-crater.png   -> sites/granite_crater.png
+art-planet-home.png   -> planets/homeworld.png
+art-planet-lunar.png  -> planets/lunar_frontier.png
+art-planet-mars.png   -> planets/mars_frontier.png
+art-worker-t1.png     -> rigs/t1.png
+art-worker-t2.png     -> rigs/t2.png
+art-worker-t3.png     -> rigs/t3.png
+art-worker-t4.png     -> rigs/t4.png
+art-worker-t5.png     -> rigs/t5.png
+art-icon-cash.png, art-icon-cargo.png, art-icon-merge.png,
+art-icon-extraction.png, art-icon-logistics.png, art-icon-surveying.png
+art-merge-burst.png
+art-offline-hero.png
 ```
 
-Use consistent sci-fi cavern perspective, dark readable center, four uncluttered shared-anchor zones, no text/UI/rigs. Resource identity is material/color only.
+Use explicit `git add` paths later; never add the unpacked ZIP wholesale.
 
-- [ ] **Step 3: Write failing asset-resolution tests**
+- [ ] **Step 2: Hard-stop if any externally authored Lunar/Mars input is missing**
+
+Before completing the visual catalog, require these files to exist as real committed PNGs from the art workflow:
+
+```text
+assets/images/mining/caverns/water_ice.png      # 800x1200
+assets/images/mining/nodes/water_ice.png        # 512x512 RGBA
+assets/images/mining/caverns/titanium_ore.png   # 800x1200
+assets/images/mining/nodes/titanium_ore.png     # 512x512 RGBA
+assets/images/mining/caverns/helium_3.png       # 800x1200
+assets/images/mining/nodes/helium_3.png         # 512x512 RGBA
+assets/images/mining/caverns/iron_ore.png        # 800x1200
+assets/images/mining/nodes/iron_ore.png          # 512x512 RGBA
+assets/images/mining/caverns/silica.png          # 800x1200
+assets/images/mining/nodes/silica.png            # 512x512 RGBA
+assets/images/mining/caverns/cobalt_ore.png      # 800x1200
+assets/images/mining/nodes/cobalt_ore.png        # 512x512 RGBA
+```
+
+If any is absent, stop this task. Do not generate it in Dart, use an old mine sprite, or commit a placeholder. Other non-visual review work may continue, but Task 7 cannot declare three-planet presentation complete and the PR cannot merge.
+
+- [ ] **Step 3: Write asset-resolution tests after the gate is satisfied**
 
 ```dart
-testWidgets('every authored site and rig resolves assets', (tester) async {
+testWidgets('every authored site and rig resolves final assets', (tester) async {
   final visuals = MiningVisualCatalog.standard();
   for (final id in MiningSiteId.values) {
     final site = visuals.site(id);
@@ -730,9 +831,25 @@ testWidgets('every authored site and rig resolves assets', (tester) async {
 });
 ```
 
-Also resolve planet, HUD, technology, effect, and offline assets.
+For Lunar/Mars `cardAsset`, reuse the corresponding cavern path; Site Deck crops with `BoxFit.cover`.
 
-- [ ] **Step 4: Register every concrete asset subdirectory**
+- [ ] **Step 4: Lift existing UI tokens and define the visual catalog**
+
+`MiningTheme` takes its cyan/panel/warning values from the current status/offline surfaces. Do not introduce a second palette.
+
+`MiningSiteVisuals` contains:
+
+```dart
+final String cavernAsset;
+final String nodeAsset;
+final String cardAsset;
+final List<Alignment> portraitNodeAnchors;
+final List<Alignment> landscapeNodeAnchors;
+```
+
+Use one shared portrait anchor list and one shared landscape anchor list for all sites, with at most one explicit site override if a real supplied composition proves necessary. No anchor framework.
+
+- [ ] **Step 5: Register only concrete mining asset directories**
 
 ```yaml
 flutter:
@@ -747,427 +864,165 @@ flutter:
     - assets/images/mining/offline/
 ```
 
-- [ ] **Step 5: Implement concrete theme and visual catalog**
+Run `flutter pub get`.
 
-```dart
-abstract final class MiningTheme {
-  static const visorAccent = Color(0xFF18FFFF);
-  static const panelBackground = Color(0xF20E1828);
-  static const panelBorder = Color(0x8053D4E8);
-  static const warning = Colors.orangeAccent;
-}
+- [ ] **Step 6: Run visual tests**
 
-class MiningSiteVisuals {
-  const MiningSiteVisuals({
-    required this.cavernAsset,
-    required this.nodeAsset,
-    required this.cardAsset,
-    required this.portraitNodeAnchors,
-    required this.landscapeNodeAnchors,
-  });
-  final String cavernAsset;
-  final String nodeAsset;
-  final String cardAsset;
-  final List<Alignment> portraitNodeAnchors;
-  final List<Alignment> landscapeNodeAnchors;
-}
-```
+Run: `flutter test test/mining/presentation/mining_visuals_test.dart`
 
-`MiningVisualCatalog.standard()` contains exactly nine site entries, five rigs, three planets, three technology icons, cash/cargo/merge icons, merge burst, and offline hero. Lunar/Mars cards use their cavern path with `BoxFit.cover`. Use shared anchors from the spec.
+Expected: PASS only when all final inputs resolve.
 
-- [ ] **Step 6: Run asset tests**
+- [ ] **Step 7: Commit explicit files**
 
 ```sh
-flutter pub get
-flutter test test/mining/presentation/mining_visuals_test.dart
-```
-
-Expected: PASS.
-
-- [ ] **Step 7: Commit**
-
-```sh
-git add assets/images/mining lib/mining/presentation/mining_theme.dart \
+git add assets/images/mining/ \
+  lib/mining/presentation/mining_theme.dart \
   lib/mining/presentation/mining_visuals.dart \
   test/mining/presentation/mining_visuals_test.dart \
   pubspec.yaml pubspec.lock
-git commit -m "feat(mining): add mobile merge-mining visuals"
+git commit -m "feat(mining): add final mobile mining visuals"
 ```
 
 ---
 
-### Task 8: Build Shared HUD, Navigation, Fleet Dock, and Site Deck
+### Task 7: Evolve MiningScreen into MiningShell and Cut Production Over
 
 **Files:**
+- Rename/modify: `lib/mining/presentation/mining_screen.dart` -> `lib/mining/presentation/mining_shell.dart`
 - Create: `lib/mining/presentation/mining_hud.dart`
 - Create: `lib/mining/presentation/mining_navigation.dart`
 - Create: `lib/mining/presentation/fleet_dock.dart`
 - Create: `lib/mining/presentation/site_deck_screen.dart`
-- Create: `test/mining/presentation/site_deck_screen_test.dart`
-
-**Interfaces:**
-- Consumes: Task 6 projections and Task 7 theme/catalog.
-- Produces: stateless Site Deck and shared controls.
-
-- [ ] **Step 1: Write failing action-forwarding test**
-
-```dart
-testWidgets('renders site states and forwards actions', (tester) async {
-  final calls = <String>[];
-  await tester.pumpWidget(MaterialApp(
-    home: SiteDeckScreen(
-      view: mixedSiteDeckView(),
-      visuals: MiningVisualCatalog.standard(),
-      onSitePressed: (id) => calls.add('site:${id.name}'),
-      onUnlockSite: (id) => calls.add('unlock:${id.name}'),
-      onFleetBayPressed: (i) => calls.add('bay:$i'),
-      onSpawnRig: () => calls.add('spawn'),
-      onNavigation: (d) => calls.add(d.name),
-    ),
-  ));
-  await tester.tap(find.byKey(const Key('fleet-bay-0')));
-  await tester.tap(find.byKey(const Key('site-card-action-carbonRidge')));
-  expect(calls, containsAll(['bay:0', 'unlock:carbonRidge']));
-});
-```
-
-- [ ] **Step 2: Add geometry/semantics/text-scale tests**
-
-Pump 360x640 and 430x932 with text scale 1.3. Assert each bay/control is at least 48x48, cash/spawn have semantic labels, no overflow occurs, and bottom navigation does not overlap fleet dock or final card action using `tester.getRect`.
-
-- [ ] **Step 3: Run and verify widgets are missing**
-
-Run: `flutter test test/mining/presentation/site_deck_screen_test.dart`
-
-Expected: FAIL.
-
-- [ ] **Step 4: Implement shared controls**
-
-Create `MiningCashShard`, `MiningCargoControl`, `MiningPlanetProgressHeader`, and `MiningRateBadge`. They format supplied values and semantics only; they calculate no economy state.
-
-Create:
-
-```dart
-enum MiningPrimarySurface { siteDeck, stellarMap }
-enum MiningNavigationDestination { siteDeck, technology, stellarMap, settings }
-enum FleetDockAxis { horizontal, vertical }
-```
-
-`MiningNavigationBar` has four visible 48x48-or-larger destinations. `FleetDock` renders exactly four keyed bays and one spawn control, supports horizontal/vertical axes, uses `AnimatedSwitcher`, and changes to opacity-only under reduced motion.
-
-- [ ] **Step 5: Implement Site Deck**
-
-Use `SafeArea` plus scroll content: top cash/planet/rate/cargo HUD, one card per view, horizontal fleet dock, and bottom navigation. Cards consume `MiningSiteCardView`; direct callbacks separate enter from unlock.
-
-- [ ] **Step 6: Run Site Deck tests**
-
-Run: `flutter test test/mining/presentation/site_deck_screen_test.dart`
-
-Expected: PASS.
-
-- [ ] **Step 7: Commit**
-
-```sh
-git add lib/mining/presentation/mining_hud.dart \
-  lib/mining/presentation/mining_navigation.dart \
-  lib/mining/presentation/fleet_dock.dart \
-  lib/mining/presentation/site_deck_screen.dart \
-  test/mining/presentation/site_deck_screen_test.dart
-git commit -m "feat(mining): build the mobile site deck"
-```
-
----
-
-### Task 9: Build One Responsive Mine Site
-
-**Files:**
 - Create: `lib/mining/presentation/mine_site_screen.dart`
-- Create: `test/mining/presentation/mine_site_screen_test.dart`
-
-**Interfaces:**
-- Consumes: `MineSiteView`, visual catalog, shared HUD/fleet dock.
-- Produces: one stateless responsive surface and action callbacks.
-
-- [ ] **Step 1: Write failing interaction tests**
-
-```dart
-testWidgets('forwards bay, node, sale, back, and settings taps', (tester) async {
-  final calls = <String>[];
-  await tester.pumpWidget(MaterialApp(
-    home: MineSiteScreen(
-      view: operationalMineSiteView(),
-      visuals: MiningVisualCatalog.standard(),
-      onFleetBayPressed: (i) => calls.add('bay:$i'),
-      onSpawnRig: () => calls.add('spawn'),
-      onNodePressed: (id) => calls.add('node:${id.name}'),
-      onSell: () => calls.add('sell'),
-      onBack: () => calls.add('back'),
-      onSettings: () => calls.add('settings'),
-    ),
-  ));
-  await tester.tap(find.byKey(const Key('fleet-bay-0')));
-  await tester.tap(find.byKey(const Key('mine-node-n1')));
-  await tester.tap(find.byKey(const Key('mine-site-cargo-control')));
-  expect(calls, containsAll(['bay:0', 'node:n1', 'sell']));
-});
-```
-
-- [ ] **Step 2: Add portrait geometry tests**
-
-At 360x640, 402x874, and 430x932 assert cavern/dock/navigation do not overlap, all node centers lie within cavern, all nodes are at least 48x48, and no exception/overflow occurs.
-
-- [ ] **Step 3: Add landscape rail tests**
-
-At 874x402 assert cavern and cargo end at or before the right rail, vertical dock exists inside the rail, compact navigation stays left, and no system inset overlaps.
-
-- [ ] **Step 4: Add reduced-motion/selected-state tests**
-
-Pump `MediaQueryData(disableAnimations: true)` and prove tier/feedback settles without translation/scale. Selected and merge-eligible bays must expose text/semantics in addition to color.
-
-- [ ] **Step 5: Run and verify screen is missing**
-
-Run: `flutter test test/mining/presentation/mine_site_screen_test.dart`
-
-Expected: FAIL.
-
-- [ ] **Step 6: Implement one responsive public widget**
-
-```dart
-class MineSiteScreen extends StatelessWidget {
-  const MineSiteScreen({
-    super.key,
-    required this.view,
-    required this.visuals,
-    required this.onFleetBayPressed,
-    required this.onSpawnRig,
-    required this.onNodePressed,
-    required this.onSell,
-    required this.onBack,
-    required this.onSettings,
-    this.feedback,
-  });
-  final MineSiteView view;
-  final MiningVisualCatalog visuals;
-  final ValueChanged<int> onFleetBayPressed;
-  final VoidCallback onSpawnRig;
-  final ValueChanged<MiningNodeId> onNodePressed;
-  final VoidCallback onSell;
-  final VoidCallback onBack;
-  final VoidCallback onSettings;
-  final MiningSiteFeedback? feedback;
-}
-```
-
-`LayoutBuilder` selects private portrait/landscape compositions with the same fields/callbacks. Portrait: top HUD, expanded cavern stack, horizontal dock, compact controls. Landscape: expanded cavern plus fixed 152-pixel right rail containing cargo, vertical dock, spawn, settings. Node widgets consume only node view state.
-
-- [ ] **Step 7: Implement feedback**
-
-```dart
-enum MiningSiteFeedbackKind { merge, deploy, recall, sale }
-
-class MiningSiteFeedback {
-  const MiningSiteFeedback({
-    required this.sequence,
-    required this.kind,
-    this.nodeId,
-    this.bayIndex,
-  });
-  final int sequence;
-  final MiningSiteFeedbackKind kind;
-  final MiningNodeId? nodeId;
-  final int? bayIndex;
-}
-```
-
-Normal feedback <=550 ms; reduced-motion feedback <=200 ms opacity; never persist it.
-
-- [ ] **Step 8: Run tests**
-
-Run: `flutter test test/mining/presentation/mine_site_screen_test.dart`
-
-Expected: PASS.
-
-- [ ] **Step 9: Commit**
-
-```sh
-git add lib/mining/presentation/mine_site_screen.dart \
-  test/mining/presentation/mine_site_screen_test.dart
-git commit -m "feat(mining): build responsive mine site"
-```
-
----
-
-### Task 10: Build the Full-Screen Stellar Map
-
-**Files:**
 - Create: `lib/mining/presentation/stellar_map_screen.dart`
-- Create: `test/mining/presentation/stellar_map_screen_test.dart`
-
-**Interfaces:**
-- Consumes: `StellarMapView`, visuals, shared navigation.
-- Produces: full-screen cards and direct unlock/travel callbacks.
-
-- [ ] **Step 1: Write failing visibility/action test**
-
-```dart
-testWidgets('renders progressive planets and forwards travel/unlock', (tester) async {
-  final calls = <String>[];
-  await tester.pumpWidget(MaterialApp(
-    home: StellarMapScreen(
-      view: lunarUnlockedStellarMapView(),
-      visuals: MiningVisualCatalog.standard(),
-      onUnlock: (id) => calls.add('unlock:${id.name}'),
-      onTravel: (id) => calls.add('travel:${id.name}'),
-      onNavigation: (d) => calls.add(d.name),
-    ),
-  ));
-  expect(find.byKey(const Key('stellar-map-planet-homeworld')), findsOneWidget);
-  expect(find.byKey(const Key('stellar-map-planet-marsFrontier')), findsOneWidget);
-  await tester.tap(find.byKey(const Key('stellar-map-action-homeworld')));
-  expect(calls, contains('travel:homeworld'));
-});
-```
-
-- [ ] **Step 2: Add locked/active/geometry/accessibility tests**
-
-Assert card progress/rate/cargo/site indicators, locked requirement rows, disabled reasons, busy state, 360x640 and 430x932 geometry, text scale 1.3, 48x48 actions, and `Mars Frontier` copy.
-
-- [ ] **Step 3: Run and verify screen is missing**
-
-Run: `flutter test test/mining/presentation/stellar_map_screen_test.dart`
-
-Expected: FAIL.
-
-- [ ] **Step 4: Implement full-screen map**
-
-Use `SafeArea` plus scroll cards and shared bottom navigation. Cards render projections only. Active cards show current location; unlocked inactive cards travel; locked cards show mastery/Surveying/cash and unlock state.
-
-- [ ] **Step 5: Run tests**
-
-Run: `flutter test test/mining/presentation/stellar_map_screen_test.dart`
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
-
-```sh
-git add lib/mining/presentation/stellar_map_screen.dart \
-  test/mining/presentation/stellar_map_screen_test.dart
-git commit -m "feat(mining): promote stellar map to full screen"
-```
-
----
-
-### Task 11: Cut Production Over to MiningShell and Retarget Secondary Surfaces
-
-**Files:**
-- Create: `lib/mining/presentation/mining_shell.dart`
+- Modify: `lib/mining/presentation/technology_sheet.dart`
+- Modify: `lib/mining/presentation/mining_settings_sheet.dart`
+- Modify: `lib/mining/presentation/offline_return_sheet.dart`
 - Modify: `lib/main.dart`, `lib/main_menu.dart`
-- Rewrite: `technology_sheet.dart`, `offline_return_sheet.dart`
-- Modify: `mining_settings_sheet.dart`
-- Delete: old `mining_screen.dart`, action/status/map sheet, `mining_sheet_view.dart`, and corresponding presentation tests
-- Create/modify: shell, menu, app, and secondary-surface tests
+- Rename/modify: `test/mining/presentation/mining_screen_test.dart` -> `test/mining/presentation/mining_shell_test.dart`
+- Create: `test/mining/presentation/site_deck_screen_test.dart`
+- Create: `test/mining/presentation/mine_site_screen_test.dart`
+- Create: `test/mining/presentation/stellar_map_screen_test.dart`
+- Modify: existing technology/settings/offline tests
+- Delete: `lib/mining/mining_sheet_view.dart`, `test/mining/mining_sheet_view_test.dart`
+- Delete after replacement: old action/status/Stellar Map sheet files and corresponding presentation tests
 
 **Interfaces:**
-- Consumes: all replacement domain/views/screens.
-- Produces: only production route and lifecycle/audio/action orchestration.
+- Produces: the only production route and one responsive Flutter UI.
+- Preserves: controller/audio/lifecycle/timer ownership and existing test handle identity contract.
 
-- [ ] **Step 1: Write failing Main Menu key tests**
+- [ ] **Step 1: Write stateless Site Deck tests**
 
-```dart
-testWidgets('old key does not show Continue', (tester) async {
-  SharedPreferences.setMockInitialValues({'horologium.mining.save': '{}'});
-  await tester.pumpWidget(const HorologiumApp());
-  await tester.pumpAndSettle();
-  expect(find.text('START MINING'), findsOneWidget);
-});
+Use real projections and assert:
 
-testWidgets('new key shows Continue', (tester) async {
-  SharedPreferences.setMockInitialValues({MiningSaveRepository.saveKey: '{}'});
-  await tester.pumpWidget(const HorologiumApp());
-  await tester.pumpAndSettle();
-  expect(find.text('CONTINUE MINING'), findsOneWidget);
-});
-```
+- locked/available/idle/operational cards;
+- four dock bays and spawn action;
+- bay/site/navigation callbacks;
+- 360x640 and 430x932 geometry;
+- text scale 1.3;
+- 48x48 actions and semantics;
+- no navigation/dock/card overlap.
 
-- [ ] **Step 2: Write failing shell ownership/lifecycle tests**
+- [ ] **Step 2: Implement shared HUD/navigation/fleet and Site Deck**
 
-Expose read-only test handles:
+Create only presentation primitives that format supplied values. They calculate no eligibility/rates/costs.
 
-```dart
-abstract class MiningShellHandles implements State<MiningShell> {
-  MiningController get controller;
-  AudioManager get audioManager;
-}
-```
+`SiteDeckScreen` is `SafeArea` + scroll content + bottom navigation and consumes one `SiteDeckView`.
 
-Assert one controller/audio survives Site Deck -> Mine Site -> rotation -> Stellar Map; initialization order; first-gesture BGM; pause checkpoint/timer stop; resume accrual/offline sheet; invalid-new-save recovery; busy disables callbacks; selection is cleared only when invalid after a settled action.
+- [ ] **Step 3: Write Mine Site portrait/landscape tests**
 
-- [ ] **Step 3: Write a failing fresh player-flow test**
+At 360x640, 402x874, and 430x932 assert node targets fit the cavern and horizontal dock/navigation do not overlap.
 
-```dart
-testWidgets('fresh shell merges, enters site, and deploys', (tester) async {
-  final harness = await pumpMiningShell(tester);
-  await tester.tap(find.byKey(const Key('fleet-bay-0')));
-  await tester.tap(find.byKey(const Key('fleet-bay-1')));
-  await harness.settle(tester);
-  await tester.tap(find.byKey(const Key('site-card-action-landingBasin')));
-  await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const Key('fleet-bay-1')));
-  await tester.tap(find.byKey(const Key('mine-node-n1')));
-  await harness.settle(tester);
-  expect(find.bySemanticsLabel(RegExp('T2 rig')), findsOneWidget);
-});
-```
+At 874x402 assert cavern/cargo stop before a fixed right rail, the vertical dock/spawn are inside the rail, and compact back/settings controls stay left.
 
-- [ ] **Step 4: Run and verify cutover is missing**
+Add tap forwarding for bay, node, sale, back, settings; reduced-motion settled feedback; semantic selected/merge states.
 
-```sh
-flutter test test/main_menu_test.dart \
-  test/mining/presentation/mining_shell_test.dart
-```
+- [ ] **Step 4: Implement one `MineSiteScreen`**
 
-Expected: FAIL.
+Use `LayoutBuilder` to select private portrait/landscape composition with the same `MineSiteView` and callbacks. Do not create two public screens.
 
-- [ ] **Step 5: Implement MiningShell ownership**
+Node widgets use shared `Alignment` constants from `MiningVisualCatalog`. Feedback is transient and non-persisted.
+
+- [ ] **Step 5: Write and implement full-screen Stellar Map tests**
+
+Verify current progressive visibility, active/unlocked/locked cards, commissioned progress, rate/cargo/capacity, three site indicators, requirements, busy actions, travel/unlock callbacks, `Mars Frontier`, geometry, and 48x48 actions.
+
+Implement `StellarMapScreen` using the existing `StellarMapView` projection and shared navigation.
+
+- [ ] **Step 6: Rename/evolve the owner and its test handles**
+
+Rename:
 
 ```dart
-class MiningShell extends StatefulWidget {
-  const MiningShell({
-    super.key,
-    this.content,
-    this.repository,
-    this.nowUtc,
-    this.audioManager,
-    this.visuals,
+MiningScreen -> MiningShell
+MiningScreenHandles -> MiningShellHandles
+```
+
+Keep one controller and one `AudioManager` constructed exactly once in `initState`.
+
+The timer must preserve the current live accrual sequence:
+
+```dart
+void _startRefreshTimer() {
+  _refreshTimer?.cancel();
+  _refreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    if (!_controller.isBusy) {
+      _controller.refresh();
+      _refreshPresentation();
+    }
   });
-  final MiningContentRegistry? content;
-  final MiningSaveRepository? repository;
-  final DateTime Function()? nowUtc;
-  final AudioManager? audioManager;
-  final MiningVisualCatalog? visuals;
 }
 ```
 
-State owns controller/audio/visuals/display save/timer/primary surface/open site/selected bay/feedback/initialized. Derive all child views in one `_refreshPresentation()`. Child widgets never receive controller references.
+`_refreshPresentation()` derives `FleetDockView`, `SiteDeckView`, `MineSiteView`, `TechnologySheetView`, and `StellarMapView` from the current controller state; it does not accrue itself.
 
-- [ ] **Step 6: Implement shell orchestration**
+- [ ] **Step 7: Retarget shell action orchestration**
 
-Add handlers for bay select-or-merge, spawn, unlock site, node deploy-or-recall, sell, site entry/back, navigation, technology purchase, planet unlock/travel, settings, checkpoint/resume, and generic typed action settlement. After success refresh, clear invalid selection, set feedback/haptic, and show concise snackbar.
+Implement local handlers for:
 
-- [ ] **Step 7: Retarget secondary surfaces**
+- select-or-merge dock bay;
+- spawn;
+- unlock/enter site;
+- node deploy-or-recall;
+- sale;
+- back to Site Deck;
+- navigation;
+- technology purchase;
+- planet unlock/travel;
+- settings;
+- checkpoint/resume.
 
-Technology consumes replacement projections and commissioned-site copy. Settings keeps the same `AudioManager` and preference keys while using new theme. Offline Return consumes `fullSites`, shows hero art, and preserves per-planet/resource/cap/storage warning/next action.
+After a settled persisted action: refresh presentation, clear only invalid selection, emit concise haptic/visual feedback, and show result copy. Child widgets never receive controller/repository references.
 
-- [ ] **Step 8: Change Main Menu and app theme**
+- [ ] **Step 8: Preserve initialization/lifecycle/audio behavior in shell tests**
 
-Route Start/Continue to `const MiningShell()`, import only the new repository, and remove undeclared `fontFamily: 'Orbitron'`.
+Retarget current `mining_screen_test.dart` cases rather than writing a second owner harness.
 
-- [ ] **Step 9: Delete old presentation files/tests**
+Explicitly prove:
 
-Delete exact retired screen/action/status/map/sheet-view files. Keep old flat domain/world temporarily until final cleanup so intermediate full-suite commits remain green.
+- `initialize()` persists a missing new-key save before the user can immediately return to Main Menu;
+- recovered new-key save also attempts best-effort persistence;
+- timer advances cargo via `refresh()` without writing every second;
+- one controller/audio identity survives Site Deck -> Mine Site -> rotation -> Stellar Map;
+- first gesture BGM, pause checkpoint/timer stop, resume/offline summary, reduced motion, settings prefs remain intact.
 
-- [ ] **Step 10: Run shell/menu/secondary tests**
+- [ ] **Step 9: Retarget secondary surfaces and Main Menu**
+
+Technology uses commissioned-site projections/copy. Offline Return uses `fullSites` and prototype hero. Settings keeps the same audio preference keys.
+
+Main Menu checks only `MiningSaveRepository.saveKey` and routes to `const MiningShell()`.
+
+Remove `fontFamily: 'Orbitron'` from `lib/main.dart`.
+
+- [ ] **Step 10: Delete retired presentation/view files and all corresponding tests**
+
+Delete `MiningSheetView` and `test/mining/mining_sheet_view_test.dart`.
+
+Delete old action/status/Stellar Map sheet files once their new surfaces own those responsibilities. Delete/retarget their presentation tests in the same commit.
+
+`test/mining/mining_progression_views_test.dart` stays and must already be green from Task 5.
+
+- [ ] **Step 11: Run focused presentation tests, then restore the full-suite gate**
 
 ```sh
 flutter test test/main_menu_test.dart test/widget_test.dart \
@@ -1181,170 +1036,149 @@ flutter test test/main_menu_test.dart test/widget_test.dart \
 flutter test
 ```
 
-Expected: PASS.
+Expected: PASS. From this point onward every task runs the full suite.
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 12: Commit without broad ZIP staging**
 
 ```sh
-git add -A
+git add lib/main.dart lib/main_menu.dart lib/mining/ test/main_menu_test.dart \
+  test/widget_test.dart test/mining/
 git commit -m "feat(mining): cut over to the mobile mining shell"
 ```
 
 ---
 
-### Task 12: Replace the Integration Journey and Tune the Three-Planet Economy
+### Task 8: Remove Flame, Validate the Three-Planet Economy, and Finish Guidance
 
 **Files:**
+- Delete: `lib/mining/world/**`, `test/mining/world/**`
+- Delete after closure proof: unused `lib/game/terrain/**`, `test/game/terrain/**`, zero-consumer terrain assets
+- Delete/retarget: `test/integration/mining_mvp_journey_test.dart`
 - Create: `test/integration/merge_mining_journey_test.dart`
-- Create: `test/support/merge_mining_journey_harness.dart`
-- Delete: `test/integration/mining_mvp_journey_test.dart`
-- Add after observed pass: `docs/playtests/2026-08-26-hpa-285-three-planet-merge-mining.md`
-- Modify content/tests only when evidence requires tuning
-
-**Interfaces:**
-- Consumes: final routed domain/shell.
-- Produces: deterministic fresh-to-Mars proof and recorded balance/device gate.
-
-- [ ] **Step 1: Implement a public-action-only journey harness**
-
-```dart
-final class MergeMiningJourneyHarness {
-  MergeMiningJourneyHarness({required DateTime startUtc});
-  MiningSave get state => controller.state;
-  Future<void> initialize();
-  Future<void> merge(int sourceBay, int targetBay);
-  Future<void> deploy(
-    MiningSiteId siteId,
-    MiningNodeId nodeId, {
-    required int bay,
-  });
-  Future<void> accrueAndSell(Duration elapsed);
-  Future<void> unlockAndCommission(MiningSiteId siteId);
-  Future<void> raiseSurveyingTo(int target);
-  Future<void> unlockPlanet(MiningPlanetId planetId);
-  Future<void> commissionLunarFrontier();
-  Future<void> commissionMarsFrontier();
-  Future<void> reload();
-  bool isMastered(MiningPlanetId planetId);
-}
-```
-
-Helpers may advance the injected clock and choose public spawn/merge/deploy/sell order. They must not edit controller/repository state directly after initialization.
-
-- [ ] **Step 2: Write the fresh journey**
-
-```dart
-test('fresh save reaches Mars mastery through merge-mining', () async {
-  final journey = MergeMiningJourneyHarness(
-    startUtc: DateTime.utc(2026, 8, 26, 12),
-  );
-  await journey.initialize();
-  await journey.merge(0, 1);
-  await journey.deploy(MiningSiteId.landingBasin, MiningNodeId.n1, bay: 1);
-  await journey.accrueAndSell(const Duration(minutes: 10));
-  await journey.unlockAndCommission(MiningSiteId.carbonRidge);
-  await journey.unlockAndCommission(MiningSiteId.graniteCrater);
-  await journey.raiseSurveyingTo(3);
-  await journey.unlockPlanet(MiningPlanetId.lunarFrontier);
-  await journey.commissionLunarFrontier();
-  await journey.raiseSurveyingTo(5);
-  await journey.unlockPlanet(MiningPlanetId.marsFrontier);
-  await journey.commissionMarsFrontier();
-  expect(journey.isMastered(MiningPlanetId.marsFrontier), isTrue);
-  expect(journey.marsMasteryRewardCount, 1);
-});
-```
-
-- [ ] **Step 3: Add inactive-planet and reload proof**
-
-Leave Homeworld rigs deployed, travel to Lunar, advance time, assert Homeworld cargo grows, recreate controller from saved repository, and assert active planet, docks, nodes, commissions, cargo, technology, unlocks, and offline summary survive.
-
-- [ ] **Step 4: Run journey without fixture cheats**
-
-Run: `flutter test test/integration/merge_mining_journey_test.dart`
-
-Expected: PASS or a concrete affordability/repetition failure using authored values. Do not bypass with state edits.
-
-- [ ] **Step 5: Perform representative mobile playtest and write observed evidence**
-
-After the pass, create the playtest document with actual commit/device or simulator, four target sizes, text scale, reduced motion, muted audio, all three planets, sell/return-cycle counts, and a Keep-or-change balance decision. Commit no blank template or placeholder fields.
-
-- [ ] **Step 6: Tune only authorized authored numbers when evidence requires**
-
-Allowed: spawn costs, site unlock costs, site rate/capacity/sale value, current technology costs/modifiers. Record before/after evidence and update exact content tests. Add no mechanic.
-
-- [ ] **Step 7: Run journey and replacement suites**
-
-```sh
-flutter test test/integration/merge_mining_journey_test.dart
-flutter test test/mining/domain test/mining/views test/mining/presentation
-```
-
-Expected: PASS.
-
-- [ ] **Step 8: Commit**
-
-```sh
-git add test/integration test/support/merge_mining_journey_harness.dart \
-  docs/playtests lib/mining/domain/mining_content.dart \
-  test/mining/domain/mining_content_test.dart
-git commit -m "test(mining): validate three-planet merge journey"
-```
-
----
-
-### Task 13: Retire the Old Runtime, Dependencies, and Guidance
-
-**Files:**
-- Delete: old flat `lib/mining/mining_*.dart`, `lib/mining/world/**`, corresponding tests
-- Delete after closure proof: mining-only `lib/game/terrain/**`, tests, and terrain assets
+- Create after observed playtest: `docs/playtests/2026-08-26-hpa-285-three-planet-merge-mining.md`
+- Modify only if evidence requires: `lib/mining/mining_content.dart`, its tests
 - Modify: `lib/constants/assets_path.dart`, `pubspec.yaml`, `pubspec.lock`, `README.md`, `CLAUDE.md`
 
 **Interfaces:**
-- Consumes: fully routed replacement and green integration journey.
-- Produces: one authoritative architecture with no compatibility stack.
+- Consumes: fully routed shell/domain.
+- Produces: public-action-only progression proof, observed balance decision, and one final architecture.
 
-- [ ] **Step 1: Prove no replacement import uses retired code**
+- [ ] **Step 1: Prove Flame/terrain import closure before deletion**
 
 ```sh
-rg "package:horologium/mining/(mining_|world/)" lib test
-rg "MiningGame|MiningSectorComponent|ParallaxTerrain" lib test
+rg "MiningGame|MiningSectorComponent|ParallaxTerrain|package:flame" lib test
+```
+
+Expected: matches only retired world/terrain files/tests. If any new production consumer appears, fix that consumer before deleting anything.
+
+- [ ] **Step 2: Delete retired world/terrain closure and dependency**
+
+Delete old mining world code/tests. Search every `lib/game/terrain` consumer and remove that closure only if zero-consumer.
+
+Then:
+
+```sh
 rg "package:flame" lib test
 ```
 
-Expected: matches only exact retired files/tests and terrain closure. Fix any replacement import first.
+When empty, remove `flame: ^1.30.0` and run `flutter pub get`.
 
-- [ ] **Step 2: Delete old flat domain/world/tests**
+Remove old building/terrain asset constants/directories only when `rg` proves zero consumers. Keep `ResourceType` and audio.
 
-Remove old content/state/simulation/repository/controller/progression views, world components, and matching tests. Leave no exports, typedefs, flags, or shims.
+- [ ] **Step 3: Replace the integration journey with public actions only**
 
-- [ ] **Step 3: Delete mining-only terrain closure**
+The new journey may advance the injected `TestClock` and call public controller actions. It must not mutate repository/controller state after initialization.
 
-Search every file under `lib/game/terrain/`, `test/game/terrain/`, and `assets/images/terrain/`; delete the closure only after no new consumer remains.
+The sequence must cover:
 
-- [ ] **Step 4: Remove unused constants/assets and Flame**
-
-```sh
-rg "Assets\." lib test
-rg "assets/images/(building|terrain|resource)" lib test pubspec.yaml
+```text
+fresh two T1 rigs
+-> merge/deploy Landing Basin
+-> accrue/sell/spawn/merge as needed
+-> unlock + commission Carbon Ridge
+-> unlock + commission Granite Crater
+-> buy Surveying 3
+-> unlock Lunar (starter rigs/site seeded)
+-> commission all Lunar sites
+-> buy Surveying 5
+-> unlock Mars
+-> commission all Mars sites
+-> verify one 25,000 mastery reward
+-> reload from save
 ```
 
-Remove only zero-consumer declarations/directories. Keep audio and `ResourceType`. Delete `flame: ^1.30.0`, run `flutter pub get`, and verify lockfile no longer contains Flame.
+Also leave Homeworld production deployed while active planet is Lunar, advance time, and prove inactive Homeworld cargo grows.
 
-- [ ] **Step 5: Update active documentation**
+- [ ] **Step 4: Run the fresh journey with current authored numbers**
 
-README describes Site Deck -> spawn/merge -> deploy/recall -> deterministic cargo -> sell -> Technology/Stellar Map. CLAUDE documents `MainMenu -> MiningShell -> controller -> simulation/repository -> Flutter surfaces`, new key, nested planet/site/node state, planet-local docks, commissioned mastery, projections, asset paths, and new tests. Remove active guidance that makes Flame/terrain/flat sectors authoritative.
+Run: `flutter test test/integration/merge_mining_journey_test.dart`
 
-- [ ] **Step 6: Run final legacy greps**
+Expected: PASS or a concrete affordability/cadence failure. Do not bypass a failing economy with state edits.
+
+- [ ] **Step 5: Perform the representative playtest and record throughput/cadence evidence**
+
+Create the playtest document only after observing real results. It must record concrete values for:
+
+- device/simulator and commit;
+- 360x640, 402x874, 430x932, 874x402;
+- text scale 1.3, reduced motion, muted audio;
+- representative early/mid/late site fill time;
+- sell cadence / frequency of hitting cap;
+- spawn/merge/sell cycles needed for Homeworld -> Lunar and Lunar -> Mars;
+- fresh-to-Mars completion result;
+- Keep or numeric-change decision.
+
+Do not commit a blank template.
+
+- [ ] **Step 6: Tune existing authored values only when evidence requires**
+
+If fills are unreasonably short, change `baseCapacity` and/or `logisticsCapacityMultipliers` first and rerun exact content/simulation/journey tests.
+
+Other permitted numeric tuning: spawn costs, site unlock costs, base rates, sale values, existing technology costs/effects.
+
+No new mechanic, sink, currency, depletion, processing, contract, or prestige system is authorized.
+
+Document before/after values in the playtest note.
+
+- [ ] **Step 7: Update active architecture guidance**
+
+README: Site Deck -> spawn/merge -> deploy/recall -> deterministic cargo -> sell -> Technology/Stellar Map.
+
+CLAUDE:
+
+```text
+MainMenu -> MiningShell -> MiningController -> MiningSimulation/MiningSaveRepository
+                         -> Flutter Site Deck / Mine Site / Stellar Map
+```
+
+Document:
+
+- flat `sites` + planet `docks` save shape;
+- `horologium.mergeMining.save`;
+- `refresh()` live accrual and one-second timer;
+- missing/recovered initial persistence;
+- commissioned mastery;
+- final asset paths;
+- no Flame mining runtime.
+
+- [ ] **Step 8: Run final legacy greps**
 
 ```sh
 rg "horologium\.mining\.save|MiningGame|MiningSectorId|MineState|SectorProgress|package:flame|ParallaxTerrain" \
   lib test README.md CLAUDE.md pubspec.yaml
 ```
 
-Expected: no active runtime reference. Historical planning docs are excluded.
+Expected: no active runtime reference. Historical documents are excluded.
 
-- [ ] **Step 7: Run formatting, analysis, tests, and builds**
+Also verify there is only one current definition of each core type:
+
+```sh
+rg "class Mining(ContentRegistry|Save|Simulation|SaveRepository|Controller)" lib/mining
+```
+
+Expected: one definition per class.
+
+- [ ] **Step 9: Run final repository gates**
 
 ```sh
 dart format --output=none --set-exit-if-changed .
@@ -1356,40 +1190,54 @@ flutter build apk --debug
 flutter build web
 ```
 
-Where Xcode is available: `flutter build ios --simulator --debug`.
-
-- [ ] **Step 8: Verify final visual/device matrix**
-
-Confirm the playtest records 360x640, 402x874, 430x932, 874x402, text scale 1.3, reduced motion, muted audio, Homeworld/Lunar/Mars visuals, and Offline Return. Fix any issue in its owning widget and rerun the focused test.
-
-- [ ] **Step 9: Commit cleanup**
+Where Xcode is available:
 
 ```sh
-git add -A
-git commit -m "chore(mining): retire the Flame mining runtime"
+flutter build ios --simulator --debug
 ```
 
-- [ ] **Step 10: Verify one coherent branch/PR**
+- [ ] **Step 10: Commit cleanup/verification**
+
+Stage explicit code/docs paths first; use `git status --short` to inspect deletions before the final commit.
 
 ```sh
-git diff --stat main...HEAD
-git log --oneline main..HEAD
+git add lib test pubspec.yaml pubspec.lock README.md CLAUDE.md docs/playtests
+git status --short
+git commit -m "chore(mining): finish the mobile merge cutover"
 ```
-
-Expected: planning docs plus ordered implementation commits, no second architecture, no unrelated work, and one HPA-285 PR.
 
 ---
+
+## Plan Self-Review Checklist
+
+Before implementation begins, verify this document against the spec:
+
+- [ ] No `lib/mining/domain/` duplicate stack appears.
+- [ ] Save shape is flat `sites` + per-planet `docks`.
+- [ ] `rateMultipliers` is reused; no duplicate tier multiplier table is authored.
+- [ ] Rig tiers/count do not scale capacity.
+- [ ] `initialize()` missing/recovered persistence is explicitly tested and preserved.
+- [ ] Shell timer explicitly calls `controller.refresh()` before projection.
+- [ ] Existing `TestClock` / concrete repository subclasses are reused; no repository interface/fake implementation is introduced.
+- [ ] `mining_progression_views.dart` is extended in place and `_isVisible` behavior is tested.
+- [ ] `mining_sheet_view_test.dart` is explicitly deleted when its production file is removed.
+- [ ] Twelve missing Lunar/Mars assets are an external hard gate, not a generation step.
+- [ ] Prototype `art-worker-t*.png` mapping to rig tiers is explicit.
+- [ ] Playtest records fill time and sell cadence.
+- [ ] Risks in the spec cover art, refresh, initial persistence, catalog duplication, and fast fill cadence.
+- [ ] Full Flutter suite gate resumes at Task 7 and remains required through Task 8.
 
 ## Final PR Verification Checklist
 
 - [ ] HPA-285 is the only active implementation ticket.
-- [ ] This draft PR remains the single PR and targets `main`.
+- [ ] PR #19 remains the single PR and targets `main`.
 - [ ] Prototype ZIP is attached manually to HPA-285.
-- [ ] Spec and plan match final interfaces after review revisions.
-- [ ] Fresh-to-Mars and save/reload journeys pass.
-- [ ] All nine site visual mappings resolve.
+- [ ] One current mining catalog/state/simulation/repository/controller exists.
+- [ ] Fresh-to-Mars and save/reload journeys pass through public actions.
+- [ ] All nine final cavern/node mappings resolve; no Lunar/Mars fallback exists.
+- [ ] Foreground refresh and first-save persistence regressions are covered.
 - [ ] Portrait/landscape/text-scale/reduced-motion/muted-audio gates are recorded.
 - [ ] Old key is ignored, not migrated or deleted.
-- [ ] Old flat domain, Flame world, terrain closure, and dependency are gone.
+- [ ] Old action sheet, Flame world, unused terrain closure, and dependency are gone.
 - [ ] README and CLAUDE describe final architecture.
 - [ ] Formatting, analysis, tests, coverage, Chrome tests, APK, web, and available iOS build pass.
