@@ -33,6 +33,30 @@ MiningSave _stateWith({SiteProgress? landing, int? cash}) {
   );
 }
 
+MiningSave _stateWithTwoSites({
+  required double landingCargo,
+  required double carbonCargo,
+}) {
+  final initial = MiningSave.initial(nowUtc: _start);
+  return initial.copyWith(
+    sites: {
+      ...initial.sites,
+      MiningSiteId.landingBasin: SiteProgress(
+        unlocked: true,
+        commissioned: true,
+        storedAmount: landingCargo,
+        rigByNode: {for (final node in MiningNodeId.values) node: null},
+      ),
+      MiningSiteId.carbonRidge: SiteProgress(
+        unlocked: true,
+        commissioned: true,
+        storedAmount: carbonCargo,
+        rigByNode: {for (final node in MiningNodeId.values) node: null},
+      ),
+    },
+  );
+}
+
 MineSiteView _siteView(
   MiningSave state, {
   DockBayId? selectedBayId,
@@ -166,6 +190,24 @@ void main() {
       expect(size.width, greaterThanOrEqualTo(48));
       expect(size.height, greaterThanOrEqualTo(48));
     }
+  });
+
+  testWidgets('binds sale control to active-planet aggregate cargo and value', (
+    tester,
+  ) async {
+    final state = _stateWithTwoSites(landingCargo: 0, carbonCargo: 10);
+    await _pumpMineSite(tester, view: _siteView(state), dock: _dockView(state));
+
+    expect(
+      find.bySemanticsLabel(RegExp(r'Sell all cargo for 30 cash')),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<OutlinedButton>(find.byKey(const Key('mine-site-sell')))
+          .onPressed,
+      isNotNull,
+    );
   });
 
   testWidgets(

@@ -348,7 +348,12 @@ class _MiningShellState extends State<MiningShell>
   void _showResult(String message) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.removeCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    messenger.showSnackBar(
+      SnackBar(content: Text(message)),
+      snackBarAnimationStyle: _reducedMotion
+          ? AnimationStyle.noAnimation
+          : null,
+    );
   }
 
   Future<void> _resumeMining() async {

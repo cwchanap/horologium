@@ -693,7 +693,7 @@ class _MineCargoControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final saleLabel = view.canSell
-        ? 'Sell all cargo for ${view.projectedSale} cash.'
+        ? 'Sell all cargo for ${view.activePlanetProjectedSale} cash.'
         : 'No cargo to sell.';
     if (compact) {
       return Semantics(
@@ -728,7 +728,7 @@ class _MineCargoControl extends StatelessWidget {
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
-                    '${_amount(view.cargo)}\n/${_amount(view.capacity)}',
+                    '${_amount(view.activePlanetCargo)}\nTOTAL',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: MiningTheme.primaryText,
@@ -801,7 +801,7 @@ class _MineCargoControl extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${_amount(view.cargo)} / ${_amount(view.capacity)}  ·  +${view.projectedSale}',
+                    '${_amount(view.activePlanetCargo)} total  ·  +${view.activePlanetProjectedSale}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

@@ -44,6 +44,8 @@ class MineSiteView {
     required this.capacity,
     required this.cargo,
     required this.projectedSale,
+    required this.activePlanetCargo,
+    required this.activePlanetProjectedSale,
     required this.canSell,
     required this.isActivePlanet,
     required this.selectedBayId,
@@ -61,6 +63,8 @@ class MineSiteView {
   final double capacity;
   final double cargo;
   final int projectedSale;
+  final double activePlanetCargo;
+  final int activePlanetProjectedSale;
   final bool canSell;
   final bool isActivePlanet;
   final DockBayId? selectedBayId;
@@ -89,6 +93,14 @@ class MineSiteView {
     final planetId = content.planetForSite(siteId);
     final progress = state.sites[siteId]!;
     final active = planetId == state.activePlanetId;
+    var activePlanetCargo = 0.0;
+    var activePlanetGrossSale = 0.0;
+    for (final activeDefinition in content.planet(state.activePlanetId).sites) {
+      final activeProgress = state.sites[activeDefinition.id]!;
+      activePlanetCargo += activeProgress.storedAmount;
+      activePlanetGrossSale +=
+          activeProgress.storedAmount * activeDefinition.saleValuePerUnit;
+    }
     final dock = state.docks[state.activePlanetId]!;
     final selectedRig = selectedBayId == null ? null : dock[selectedBayId];
     final hasEmptyDockBay = DockBayId.values.any((id) => dock[id] == null);
@@ -182,7 +194,9 @@ class MineSiteView {
       projectedSale: active
           ? (progress.storedAmount * definition.saleValuePerUnit).floor()
           : 0,
-      canSell: active && progress.storedAmount > 0,
+      activePlanetCargo: activePlanetCargo,
+      activePlanetProjectedSale: activePlanetGrossSale.floor(),
+      canSell: active && activePlanetCargo > 0,
       isActivePlanet: active,
       selectedBayId: selectedBayId,
       selectedRig: selectedRig,
