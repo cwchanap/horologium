@@ -349,12 +349,18 @@ class _MiningShellState extends State<MiningShell>
     required String successMessage,
   }) async {
     if (!_initialized || _controller.isBusy) return;
+    final activePlanetBefore = _controller.state.activePlanetId;
     final pendingOperation = operation();
     _refreshPresentation();
     try {
       final result = await pendingOperation;
       if (!mounted) return;
-      _preserveDockSelection();
+      if (result.isSuccess &&
+          _controller.state.activePlanetId != activePlanetBefore) {
+        _selectedBayId = null;
+      } else {
+        _preserveDockSelection();
+      }
       _refreshPresentation();
       if (result.isSuccess) {
         unawaited(HapticFeedback.lightImpact());
