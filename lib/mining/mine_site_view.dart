@@ -3,9 +3,6 @@ import 'package:horologium/mining/mining_state.dart';
 
 enum MineSiteNodeState { locked, available, deployable, occupied }
 
-typedef MineSiteNodeAvailability = MineSiteNodeState;
-typedef MiningNodeAvailability = MineSiteNodeState;
-
 class MineSiteNodeView {
   const MineSiteNodeView({
     required this.id,

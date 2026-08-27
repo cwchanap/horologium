@@ -202,5 +202,3 @@ class SiteDeckView {
     return null;
   }
 }
-
-typedef SiteDeckCardView = MiningSiteCardView;

@@ -69,6 +69,19 @@ void main() {
     expect(view.cards[MiningSiteId.frozenBasin], isNull);
   });
 
+  test('projects an uncommissioned prerequisite site as locked', () {
+    final view = SiteDeckView.from(
+      state: stateWith(),
+      content: content,
+      isBusy: false,
+    );
+
+    final card = view.cards[MiningSiteId.carbonRidge]!;
+    expect(card.state, MiningSiteCardState.locked);
+    expect(card.isUnlocked, isFalse);
+    expect(card.unlockDisabledReason, 'Need 250 cash.');
+  });
+
   test('keeps card and site outputs immutable and busy', () {
     final view = SiteDeckView.from(
       state: MiningSave.initial(nowUtc: now),
