@@ -410,7 +410,7 @@ class _MineSiteMetrics extends StatelessWidget {
             label: 'CARGO',
             value: '${_amount(view.cargo)} / ${_amount(view.capacity)}',
           ),
-          _Metric(label: 'SALE', value: '+${view.projectedSale}'),
+          _Metric(label: 'SALE', value: '+${view.activePlanetProjectedSale}'),
         ],
       ),
     );

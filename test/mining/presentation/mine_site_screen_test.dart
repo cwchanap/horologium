@@ -202,6 +202,7 @@ void main() {
       find.bySemanticsLabel(RegExp(r'Sell all cargo for 30 cash')),
       findsOneWidget,
     );
+    expect(find.text('+30'), findsOneWidget);
     expect(
       tester
           .widget<OutlinedButton>(find.byKey(const Key('mine-site-sell')))
