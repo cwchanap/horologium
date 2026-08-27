@@ -240,6 +240,26 @@ void main() {
     expect(find.text('Sold 40 cash.'), findsOneWidget);
   });
 
+  testWidgets('reduced motion makes Mine Site sale feedback settle instantly', (
+    tester,
+  ) async {
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingState(_start, cargo: 10));
+    await pumpShell(tester, repository: repository, disableAnimations: true);
+
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('mine-site-sell')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+    expect(snackBar.animation, isA<AnimationController>());
+    expect(
+      (snackBar.animation! as AnimationController).duration,
+      Duration.zero,
+    );
+  });
+
   testWidgets('Site Deck unlocks an eligible site through the controller', (
     tester,
   ) async {

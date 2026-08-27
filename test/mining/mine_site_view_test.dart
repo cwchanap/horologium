@@ -15,12 +15,13 @@ SiteProgress progress({
   rigByNode: rigs ?? {for (final node in MiningNodeId.values) node: null},
 );
 
-MiningSave stateWith({SiteProgress? landing}) {
+MiningSave stateWith({SiteProgress? landing, SiteProgress? carbon}) {
   final initial = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 26));
   return initial.copyWith(
     sites: {
       ...initial.sites,
       if (landing != null) MiningSiteId.landingBasin: landing,
+      if (carbon != null) MiningSiteId.carbonRidge: carbon,
     },
   );
 }
@@ -95,6 +96,23 @@ void main() {
     expect(view.capacity, 90);
     expect(view.cargo, 10);
     expect(view.projectedSale, 40);
+    expect(view.canSell, isTrue);
+  });
+
+  test('projects active-planet cargo and sale across two sites', () {
+    final view = MineSiteView.from(
+      state: stateWith(
+        landing: progress(commissioned: true, storedAmount: 7),
+        carbon: progress(commissioned: true, storedAmount: 11),
+      ),
+      content: content,
+      siteId: MiningSiteId.landingBasin,
+      selectedBayId: null,
+      isBusy: false,
+    );
+
+    expect(view.activePlanetCargo, 18);
+    expect(view.activePlanetProjectedSale, 61);
     expect(view.canSell, isTrue);
   });
 
