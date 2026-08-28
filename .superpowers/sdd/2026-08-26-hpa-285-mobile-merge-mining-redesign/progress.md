@@ -189,3 +189,14 @@
 - Ruling: The cadence scripts used real five-minute waits and visible UI actions, with no save or clock mutation.
 - Ruling: The prior P2 viewport-caption finding is fully resolved.
 - Ruling: The simulator-only accessibility/device limitation is honestly scoped and is not an acceptance blocker under the written plan.
+
+### Final whole-branch review sequence
+
+- Initial final review found blocked pointer feedback, busy sale state/copy, and terminology.
+- Corrective commits `1da861d` and `7739f48` completed strict RED/GREEN cycles.
+- Final whole-branch reviewer verdict at commit `7739f48b76bfd15b69e20cb923e09e5b4c018a31`: Ready to merge Yes, Critical/Important/Minor none.
+- Ruling: Keeping disabled Semantics/styling while forwarding taps solely to explain disabled state is coherent.
+- Ruling: Skipping unused compatibility aliases and the legacy asset catalog is acceptable KISS/YAGNI scope control; they are not current behavior defects.
+- Ruling: Both remaining corrective findings are fully resolved.
+- Ruling: The delayed repository is justified test-seam code for proving a genuine in-flight action; it introduces no production abstraction.
+- Ruling: Lean already. Ship. Net: -0 lines possible.
