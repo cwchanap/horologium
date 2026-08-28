@@ -211,6 +211,34 @@ void main() {
     );
   });
 
+  testWidgets('busy sale semantics explain the pending action', (tester) async {
+    final state = _stateWith(
+      landing: _progress(commissioned: true, storedAmount: 10),
+    );
+    await _pumpMineSite(
+      tester,
+      view: _siteView(state, isBusy: true),
+      dock: _dockView(state),
+    );
+
+    final cargoSemantics = find
+        .ancestor(
+          of: find.byKey(const Key('mine-site-cargo')),
+          matching: find.byType(Semantics),
+        )
+        .first;
+    expect(
+      tester.widget<Semantics>(cargoSemantics).properties.label,
+      'Finishing previous action…',
+    );
+    expect(
+      tester
+          .widget<OutlinedButton>(find.byKey(const Key('mine-site-sell')))
+          .onPressed,
+      isNull,
+    );
+  });
+
   testWidgets(
     'exposes recall capacity rejection copy without enabling recall',
     (tester) async {

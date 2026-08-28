@@ -693,7 +693,9 @@ class _MineCargoControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final saleLabel = view.canSell
+    final saleLabel = view.isBusy
+        ? 'Finishing previous action…'
+        : view.canSell
         ? 'Sell all cargo for ${view.activePlanetProjectedSale} cash.'
         : 'No cargo to sell.';
     if (compact) {
