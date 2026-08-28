@@ -39,8 +39,8 @@ dimensions. Current-head captures were kept outside the repository in the
 
 | viewport | orientation | observed surface and result |
 | --- | --- | --- |
-| 360x640 | portrait | Current-head Site Deck screenshot: portrait actions, Landing Basin, and Fleet Dock visible without overflow |
-| 402x874 | portrait | Current-head Site Deck screenshot: portrait cards, dock, and bottom navigation remain visible and reachable |
+| 360x640 | portrait | Current-head Mars Frontier Cobalt Chasm Mine Site screenshot: portrait mine-site actions, cavern, nodes, cargo, and sell remain visible without overflow |
+| 402x874 | portrait | Current-head Mars Frontier Cobalt Chasm Mine Site screenshot: mine-site controls, cavern, nodes, cargo, and sell remain visible and reachable |
 | 430x932 | portrait | Current-head Site Deck/Mine Site screenshots: deployment controls, cavern, nodes, cargo, sell, and dock remain reachable |
 | 874x402 | landscape | Current-head screenshot: side rail is fully on-screen with sell action, spawn, four bays, back/settings, and nodes reachable; no dock/navigation overlap |
 
