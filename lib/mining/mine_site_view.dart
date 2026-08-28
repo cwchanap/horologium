@@ -1,5 +1,6 @@
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
+import 'package:horologium/mining/site_deck_view.dart';
 
 enum MineSiteNodeState { locked, available, deployable, occupied }
 
@@ -72,13 +73,6 @@ class MineSiteView {
   final bool isBusy;
 
   String get name => definition.name;
-  String get cavernAsset => definition.cavernAsset;
-  String get nodeAsset => definition.nodeAsset;
-  double get storedAmount => cargo;
-  int get projectedValue => projectedSale;
-  double get siteRate => rate;
-  double get siteCapacity => capacity;
-  bool get hasCargo => cargo > 0;
 
   MineSiteNodeView node(MiningNodeId id) => nodes[id]!;
 
@@ -104,24 +98,15 @@ class MineSiteView {
     final dock = state.docks[state.activePlanetId]!;
     final selectedRig = selectedBayId == null ? null : dock[selectedBayId];
     final hasEmptyDockBay = DockBayId.values.any((id) => dock[id] == null);
-    final deployedRigs = progress.rigByNode.values
-        .whereType<RigTier>()
-        .toList();
-    final hasRigs = deployedRigs.isNotEmpty;
-    final capacity = hasRigs
-        ? content.effectiveSiteCapacity(
-            siteId,
-            deployedRigs,
-            state.technology.logistics,
-          )
-        : 0.0;
-    final rate = hasRigs
-        ? content.effectiveSiteRate(
-            siteId,
-            deployedRigs,
-            state.technology.extraction,
-          )
-        : 0.0;
+    final metrics = SiteMetrics.of(
+      content: content,
+      site: definition,
+      progress: progress,
+      technology: state.technology,
+    );
+    final deployedRigs = metrics.deployedRigs;
+    final capacity = metrics.capacity;
+    final rate = metrics.rate;
     final nodeViews = <MiningNodeId, MineSiteNodeView>{};
     for (final nodeDefinition in definition.nodes) {
       final rig = progress.rigByNode[nodeDefinition.id];

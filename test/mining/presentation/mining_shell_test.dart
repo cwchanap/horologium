@@ -183,9 +183,10 @@ void main() {
           in MiningContentRegistry.stellarMining()
               .planet(MiningPlanetId.homeworld)
               .sites) {
-        sites[site.id] = site.id == MiningSiteId.landingBasin
-            ? sites[site.id]!.copyWith(unlocked: true, commissioned: true)
-            : sites[site.id]!.copyWith(unlocked: true, commissioned: true);
+        sites[site.id] = sites[site.id]!.copyWith(
+          unlocked: true,
+          commissioned: true,
+        );
       }
       final repository = CountingMiningSaveRepository();
       await repository.save(

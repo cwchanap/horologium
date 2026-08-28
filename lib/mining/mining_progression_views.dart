@@ -209,10 +209,8 @@ class StellarMapPlanetView {
     required this.name,
     required this.isUnlocked,
     required this.isActive,
-    int? sitesCommissioned,
-    int? siteTotal,
-    int? minesBuilt,
-    int? mineTotal,
+    required this.sitesCommissioned,
+    required this.siteTotal,
     required this.requiredMasteryPlanetId,
     required this.hasRequiredMastery,
     required this.requiredSurveyingLevel,
@@ -226,8 +224,7 @@ class StellarMapPlanetView {
     this.siteIndicators = const [],
     this.requirements = const [],
     this.isBusy = false,
-  }) : sitesCommissioned = sitesCommissioned ?? minesBuilt ?? 0,
-       siteTotal = siteTotal ?? mineTotal ?? 0;
+  });
 
   final MiningPlanetId id;
   final String name;
@@ -250,8 +247,6 @@ class StellarMapPlanetView {
   final bool isBusy;
 
   /// Kept as source-compatible aliases while Stellar Map presentation moves.
-  int get minesBuilt => sitesCommissioned;
-  int get mineTotal => siteTotal;
   int get commissionedCount => sitesCommissioned;
   int get totalSites => siteTotal;
   double get totalCargo => cargo;
@@ -338,48 +333,29 @@ class StellarMapView {
     var projectedValue = 0.0;
     for (final site in definition.sites) {
       final progress = state.sites[site.id]!;
-      final deployedRigs = progress.rigByNode.values
-          .whereType<RigTier>()
-          .toList();
-      final hasRigs = deployedRigs.isNotEmpty;
-      final siteCapacity = hasRigs
-          ? content.effectiveSiteCapacity(
-              site.id,
-              deployedRigs,
-              state.technology.logistics,
-            )
-          : 0.0;
-      final siteRate = hasRigs
-          ? content.effectiveSiteRate(
-              site.id,
-              deployedRigs,
-              state.technology.extraction,
-            )
-          : 0.0;
-      final siteState = !progress.unlocked
-          ? MiningSiteCardState.locked
-          : !progress.commissioned
-          ? MiningSiteCardState.available
-          : hasRigs
-          ? MiningSiteCardState.operational
-          : MiningSiteCardState.idle;
+      final metrics = SiteMetrics.of(
+        content: content,
+        site: site,
+        progress: progress,
+        technology: state.technology,
+      );
       indicators.add(
         StellarMapSiteIndicatorView(
           id: site.id,
           name: site.name,
-          state: siteState,
+          state: metrics.cardState,
           isUnlocked: progress.unlocked,
           isCommissioned: progress.commissioned,
           cargo: progress.storedAmount,
-          capacity: siteCapacity,
-          rate: siteRate,
+          capacity: metrics.capacity,
+          rate: metrics.rate,
           projectedValue: (progress.storedAmount * site.saleValuePerUnit)
               .floor(),
         ),
       );
       cargo += progress.storedAmount;
-      capacity += siteCapacity;
-      rate += siteRate;
+      capacity += metrics.capacity;
+      rate += metrics.rate;
       projectedValue += progress.storedAmount * site.saleValuePerUnit;
     }
     final requirements = <StellarMapRequirementView>[];

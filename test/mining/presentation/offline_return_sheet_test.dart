@@ -194,10 +194,10 @@ void main() {
       wasOfflineCapped: false,
     );
     await tester.pumpWidget(
-      MediaQuery(
-        data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
-        child: MaterialApp(
-          home: Scaffold(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
+          child: Scaffold(
             body: OfflineReturnSheet(
               summary: summary,
               content: MiningContentRegistry.stellarMining(),

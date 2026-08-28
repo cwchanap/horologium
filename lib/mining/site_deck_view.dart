@@ -40,13 +40,68 @@ class MiningSiteCardView {
 
   String get name => definition.name;
   String get cardAsset => definition.cardAsset;
-  double get storedAmount => cargo;
-  double get projectedSale => projectedValue.toDouble();
-  int get deployedRigCount => deployedRigs.length;
   bool get isOperational => state == MiningSiteCardState.operational;
-  String? get disabledReason => unlockDisabledReason;
   MiningSiteId? get requiredSite => definition.requiredSite;
   int get requiredSurveyingLevel => definition.requiredSurveyingLevel;
+}
+
+/// Shared per-site economy metrics derived from a [SiteProgress] under a
+/// [TechnologyLevels]. Site Deck, Mine Site, and Stellar Map projections all
+/// route deployed rigs, capacity, rate, and the four-way card state through
+/// this so the derivations cannot drift apart.
+class SiteMetrics {
+  const SiteMetrics({
+    required this.deployedRigs,
+    required this.capacity,
+    required this.rate,
+    required this.cardState,
+  });
+
+  final List<RigTier> deployedRigs;
+  final double capacity;
+  final double rate;
+  final MiningSiteCardState cardState;
+
+  bool get hasRigs => deployedRigs.isNotEmpty;
+
+  static SiteMetrics of({
+    required MiningContentRegistry content,
+    required MiningSiteDefinition site,
+    required SiteProgress progress,
+    required TechnologyLevels technology,
+  }) {
+    final deployedRigs = progress.rigByNode.values
+        .whereType<RigTier>()
+        .toList();
+    final hasRigs = deployedRigs.isNotEmpty;
+    final capacity = hasRigs
+        ? content.effectiveSiteCapacity(
+            site.id,
+            deployedRigs,
+            technology.logistics,
+          )
+        : 0.0;
+    final rate = hasRigs
+        ? content.effectiveSiteRate(
+            site.id,
+            deployedRigs,
+            technology.extraction,
+          )
+        : 0.0;
+    final cardState = !progress.unlocked
+        ? MiningSiteCardState.locked
+        : !progress.commissioned
+        ? MiningSiteCardState.available
+        : hasRigs
+        ? MiningSiteCardState.operational
+        : MiningSiteCardState.idle;
+    return SiteMetrics(
+      deployedRigs: deployedRigs,
+      capacity: capacity,
+      rate: rate,
+      cardState: cardState,
+    );
+  }
 }
 
 /// Presentation projection for the active planet's Site Deck.
@@ -102,33 +157,14 @@ class SiteDeckView {
 
     for (final definition in planet.sites) {
       final progress = state.sites[definition.id]!;
-      final deployedRigs = progress.rigByNode.values
-          .whereType<RigTier>()
-          .toList();
-      final hasRigs = deployedRigs.isNotEmpty;
-      final siteCapacity = hasRigs
-          ? content.effectiveSiteCapacity(
-              definition.id,
-              deployedRigs,
-              state.technology.logistics,
-            )
-          : 0.0;
-      final siteRate = hasRigs
-          ? content.effectiveSiteRate(
-              definition.id,
-              deployedRigs,
-              state.technology.extraction,
-            )
-          : 0.0;
+      final metrics = SiteMetrics.of(
+        content: content,
+        site: definition,
+        progress: progress,
+        technology: state.technology,
+      );
       final siteProjectedValue =
           (progress.storedAmount * definition.saleValuePerUnit).floor();
-      final cardState = !progress.unlocked
-          ? MiningSiteCardState.locked
-          : !progress.commissioned
-          ? MiningSiteCardState.available
-          : hasRigs
-          ? MiningSiteCardState.operational
-          : MiningSiteCardState.idle;
       final unlockDisabledReason = isBusy
           ? 'Finishing previous action…'
           : _unlockDisabledReason(
@@ -139,20 +175,20 @@ class SiteDeckView {
             );
       if (progress.commissioned) commissionedCount++;
       totalCargo += progress.storedAmount;
-      totalCapacity += siteCapacity;
-      totalRate += siteRate;
+      totalCapacity += metrics.capacity;
+      totalRate += metrics.rate;
       projectedValue += progress.storedAmount * definition.saleValuePerUnit;
       cardList.add(
         MiningSiteCardView(
           id: definition.id,
           definition: definition,
-          state: cardState,
+          state: metrics.cardState,
           isUnlocked: progress.unlocked,
           isCommissioned: progress.commissioned,
-          deployedRigs: List<RigTier>.unmodifiable(deployedRigs),
+          deployedRigs: List<RigTier>.unmodifiable(metrics.deployedRigs),
           cargo: progress.storedAmount,
-          capacity: siteCapacity,
-          rate: siteRate,
+          capacity: metrics.capacity,
+          rate: metrics.rate,
           projectedValue: siteProjectedValue,
           canEnter: progress.unlocked,
           canUnlock:

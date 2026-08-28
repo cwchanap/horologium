@@ -98,13 +98,13 @@ Future<void> _pumpMineSite(
     tester.view.resetDevicePixelRatio();
   });
   await tester.pumpWidget(
-    MediaQuery(
-      data: MediaQueryData(
-        disableAnimations: disableAnimations,
-        textScaler: TextScaler.linear(1.3),
-      ),
-      child: MaterialApp(
-        home: MineSiteScreen(
+    MaterialApp(
+      home: MediaQuery(
+        data: MediaQueryData(
+          disableAnimations: disableAnimations,
+          textScaler: TextScaler.linear(1.3),
+        ),
+        child: MineSiteScreen(
           view: view,
           fleetDock: dock,
           cash: 100,

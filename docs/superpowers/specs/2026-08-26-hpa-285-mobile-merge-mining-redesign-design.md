@@ -787,18 +787,19 @@ The implementation plan follows this dependency shape:
 
 ```text
 1. remodel catalog/state
-2. retarget repository/simulation
-3. retarget controller/progression
-4. isolate MiningScreen -> MiningShell ownership; remove old Flame/terrain/action runtime; restore full-suite green
-5. add projections + supplied Homeworld/common visuals
-6. ship Site Deck
-7. ship Mine Site
-8. ship Stellar Map + secondary surfaces
-9. satisfy final Lunar/Mars art gate
-10. journey/playtest/docs/final gates
+2. retarget repository
+3. retarget simulation/accrual
+4. retarget controller/progression
+5. isolate MiningScreen -> MiningShell ownership; remove old Flame/terrain/action runtime; restore full-suite green
+6. add projections + supplied Homeworld/common visuals
+7. ship Site Deck
+8. ship Mine Site
+9. ship Stellar Map + secondary surfaces
+10. satisfy final Lunar/Mars art gate
+11. economy validation, playtest, and final gates
 ```
 
-Tasks 4-8 land as independently green, reviewable commits. The external art dependency gates Task 9 rather than blocking shell/UI development.
+Tasks 5-9 land as independently green, reviewable commits. The external art dependency gates Task 10 rather than blocking shell/UI development.
 
 ## Risks and mitigations
 
