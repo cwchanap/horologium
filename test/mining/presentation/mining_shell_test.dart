@@ -21,6 +21,24 @@ class CountingMiningSaveRepository extends MiningSaveRepository {
   }
 }
 
+class DelayedMiningSaveRepository extends MiningSaveRepository {
+  final saveStarted = Completer<void>();
+  final allowSave = Completer<void>();
+  var saveCount = 0;
+  var delayNextSave = false;
+
+  @override
+  Future<void> save(MiningSave state) async {
+    saveCount++;
+    if (delayNextSave) {
+      delayNextSave = false;
+      saveStarted.complete();
+      await allowSave.future;
+    }
+    await super.save(state);
+  }
+}
+
 class DelayedAudioPrefsManager extends AudioManager {
   DelayedAudioPrefsManager({required super.backgroundMusicPlayer});
 
@@ -422,6 +440,34 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Sell cargo before recalling this rig.'), findsOneWidget);
+  });
+
+  testWidgets('busy node tap explains the pending action without mutating', (
+    tester,
+  ) async {
+    final repository = DelayedMiningSaveRepository();
+    await repository.save(MiningSave.initial(nowUtc: _start));
+    repository.delayNextSave = true;
+    await pumpShell(tester, repository: repository);
+
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
+    await repository.saveStarted.future;
+    await tester.pump();
+
+    expect(shellHandles(tester).controller.isBusy, isTrue);
+    expect(repository.saveCount, 2);
+    try {
+      await tester.tap(find.byKey(const Key('mine-site-node-n1')));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Finishing previous action…'), findsOneWidget);
+    } finally {
+      repository.allowSave.complete();
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+    expect(repository.saveCount, 2);
   });
 
   testWidgets('reduced motion makes Mine Site sale feedback settle instantly', (

@@ -258,13 +258,13 @@ class _MiningShellState extends State<MiningShell>
 
   void _handleSiteNodeTap(MiningNodeId nodeId) {
     final siteId = _openSiteId;
-    if (!_initialized || _controller.isBusy || siteId == null) return;
+    if (!_initialized || siteId == null) return;
     final view = MineSiteView.from(
       state: _controller.state,
       content: _content,
       siteId: siteId,
       selectedBayId: _selectedBayId,
-      isBusy: false,
+      isBusy: _controller.isBusy,
     );
     final node = view.node(nodeId);
     final selectedBayId = _selectedBayId;
