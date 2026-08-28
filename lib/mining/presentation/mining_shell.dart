@@ -54,6 +54,7 @@ class _MiningShellState extends State<MiningShell>
   late final MiningContentRegistry _content;
   late final MiningController _controller;
   late final AudioManager _audioManager;
+  late final bool _createdAudioManager;
   late MiningSave _displayState;
   Timer? _refreshTimer;
   bool _initialized = false;
@@ -67,6 +68,7 @@ class _MiningShellState extends State<MiningShell>
   @override
   void initState() {
     super.initState();
+    _createdAudioManager = widget.audioManager == null;
     _audioManager = widget.audioManager ?? AudioManager();
     _content = widget.content ?? MiningContentRegistry.stellarMining();
     final nowUtc = widget.nowUtc ?? () => DateTime.now().toUtc();
@@ -423,7 +425,7 @@ class _MiningShellState extends State<MiningShell>
     _refreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     if (_initialized) _checkpoint(accrue: false);
-    unawaited(_audioManager.dispose());
+    if (_createdAudioManager) unawaited(_audioManager.dispose());
     super.dispose();
   }
 
