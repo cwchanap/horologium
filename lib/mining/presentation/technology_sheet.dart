@@ -51,7 +51,7 @@ class TechnologySheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Upgrade the operation. Each level needs its gate mine and '
+                  'Upgrade the operation. Each level needs its gate site and '
                   'cash.',
                   style: TextStyle(color: MiningTheme.secondaryText),
                 ),

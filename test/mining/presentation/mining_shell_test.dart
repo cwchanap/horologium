@@ -246,7 +246,7 @@ void main() {
       await tester.tap(find.byKey(const Key('site-card-frozenBasin-enter')));
       await tester.pump();
       final node = find.byKey(const Key('mine-site-node-n1'));
-      expect(tester.widget<InkWell>(node).onTap, isNull);
+      expect(tester.widget<InkWell>(node).onTap, isNotNull);
       await tester.tap(node);
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -297,7 +297,7 @@ void main() {
     await tester.tap(find.byKey(const Key('site-card-frozenBasin-enter')));
     await tester.pump();
     final node = find.byKey(const Key('mine-site-node-n1'));
-    expect(tester.widget<InkWell>(node).onTap, isNull);
+    expect(tester.widget<InkWell>(node).onTap, isNotNull);
     await tester.tap(node);
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -407,6 +407,21 @@ void main() {
     expect(state.cash, 140);
     expect(state.sites[MiningSiteId.landingBasin]!.storedAmount, 0);
     expect(find.text('Sold 40 cash.'), findsOneWidget);
+  });
+
+  testWidgets('blocked occupied node tap shows its disabled reason', (
+    tester,
+  ) async {
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingState(_start, cargo: 150));
+    await pumpShell(tester, repository: repository);
+
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('mine-site-node-n1')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Sell cargo before recalling this rig.'), findsOneWidget);
   });
 
   testWidgets('reduced motion makes Mine Site sale feedback settle instantly', (
