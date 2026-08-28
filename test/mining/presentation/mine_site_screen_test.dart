@@ -237,7 +237,7 @@ void main() {
         tester
             .widget<InkWell>(find.byKey(const Key('mine-site-node-n1')))
             .onTap,
-        isNull,
+        isNotNull,
       );
     },
   );

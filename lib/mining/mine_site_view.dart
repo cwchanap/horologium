@@ -196,7 +196,7 @@ class MineSiteView {
           : 0,
       activePlanetCargo: activePlanetCargo,
       activePlanetProjectedSale: activePlanetGrossSale.floor(),
-      canSell: active && activePlanetCargo > 0,
+      canSell: !isBusy && active && activePlanetCargo > 0,
       isActivePlanet: active,
       selectedBayId: selectedBayId,
       selectedRig: selectedRig,

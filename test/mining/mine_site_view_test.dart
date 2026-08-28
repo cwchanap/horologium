@@ -118,6 +118,18 @@ void main() {
     expect(view.canSell, isTrue);
   });
 
+  test('does not expose sale while the shell is busy', () {
+    final view = MineSiteView.from(
+      state: stateWith(landing: progress(commissioned: true, storedAmount: 10)),
+      content: content,
+      siteId: MiningSiteId.landingBasin,
+      selectedBayId: null,
+      isBusy: true,
+    );
+
+    expect(view.canSell, isFalse);
+  });
+
   test('disables recall when cargo exceeds post-recall capacity', () {
     final view = MineSiteView.from(
       state: stateWith(

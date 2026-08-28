@@ -87,7 +87,7 @@ class OfflineReturnSheet extends StatelessWidget {
               ],
               const SizedBox(height: 12),
               const Text(
-                'Next: sell cargo or upgrade a mine to keep the operation moving.',
+                'Next: sell cargo or deploy a rig at a site to keep the operation moving.',
                 key: Key('offline-return-next-action'),
                 style: TextStyle(color: Colors.white70),
               ),

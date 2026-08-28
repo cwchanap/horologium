@@ -553,6 +553,7 @@ class _MineNodeButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = view.canDeploy || view.canRecall;
+    final canForwardDisabledTap = view.disabledReason != null;
     final label = _nodeLabel(view);
     return Semantics(
       button: true,
@@ -562,7 +563,7 @@ class _MineNodeButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           key: Key('mine-site-node-${view.id.name}'),
-          onTap: enabled ? onTap : null,
+          onTap: enabled || canForwardDisabledTap ? onTap : null,
           borderRadius: BorderRadius.circular(14),
           child: Container(
             width: 78,
