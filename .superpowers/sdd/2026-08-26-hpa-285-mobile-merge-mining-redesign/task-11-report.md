@@ -4,6 +4,8 @@
 
 - Validation source/playtest build: `63e3d01ee55a1e8c29d1f1047e9418843af0f9a8`
   (`feat(mining): complete Lunar and Mars visuals`).
+- Current-head live validation run: `b7b1c02f6b0793fefa4c0733e15c4484dd705afb`
+  (`fix(mining): bound journey earning loop`).
 - Original validation commit: `d971b38e611fb3e620c5b75b0a71dd4298613f90`
   (`test(mining): validate the mobile merge economy`).
 - This follow-up adds the responsive landscape layout and closes the browser
@@ -74,37 +76,51 @@ RELOAD active=marsFrontier surveying=5 marsCash=33300 marsSites=3/3 cargo=0.0
 
 ## Representative playtest
 
-The complete observed session and its limitations are in
+The complete current-head observed session is in
 `docs/playtests/2026-08-26-hpa-285-three-planet-merge-mining.md`.
 
-- Environment: Chrome `151.0.7922.174`, macOS Darwin 25.5 arm64, release
-  `build/web` served locally. The available iPad Pro 13-inch (M5), iOS 26.5
-  simulator was discovered but no representative iOS gameplay session was
-  run; the simulator debug build gate now passes.
-- Genuine viewport observations were made at 360x640 portrait, 402x874
-  portrait, 430x932 portrait, and 874x402 landscape. The live release capture
-  exposed the landscape Site Deck action under the fixed full-width Fleet Dock;
-  the follow-up responsive side rail reserves a 248px dock rail beside the
-  deck, and the focused 874x402/text-scale-1.3 geometry test proves the action
-  stays clear of both dock and navigation.
+- Environment: Chrome `151.0.7922.174`, macOS Darwin 25.5 arm64, current-head
+  release `build/web` served locally. The current-head Flutter simulator build
+  was also installed/launched on iPad Pro 13-inch (M5), iOS 26.5.
+- The web session used visible public actions from a fresh save with no save
+  import, storage edit, clock manipulation, or progression shortcut. Current
+  captures cover 360x640 portrait, 402x874 portrait, 430x932 portrait, and
+  874x402 landscape. The current landscape side rail kept sell, spawn, four
+  bays, back/settings, and nodes on-screen and reachable.
 - Music was disabled through the running Settings UI. Reduced motion was
-  enabled with browser `prefers-reduced-motion: reduce` emulation. A genuine
-  Flutter text-scale 1.3 setting was unavailable in this browser session and
-  is explicitly **BLOCKED**, not inferred from widget tests.
-- Early live evidence: fresh UI deployment to Landing Basin showed
-  `RATE 0.50/s`, `CARGO 0.8/90`, `SALE +3`; a near-cap read was `89.8/90`.
-  Selling showed `Sold 360 cash.`, cash `100->460`, and immediate cargo `1.0/90`.
-  Captures 24 seconds apart showed `1.0/90->13.1/90`, consistent with the
-  displayed rate. The 180-second one-rig fill interval (`90/0.50`) is a
-  readout-derived early estimate, not a timed full-cap observation.
-- Mid-game and late-game fill times, live sell/cap cadence beyond the early
-  cap, live merge/spawn cycles at both planet transitions, and live
-  fresh-to-Mars completion remain **BLOCKED**. Waiting for the authored economy
-  or injecting cash/clock state was not substituted for observation.
-- Balance decision: **KEEP** authored values. The public journey passes every
-  affordability gate and the live early rate/cap/sale readings agree; no
-  numeric change is evidence-required. Revisit mid/late cadence after a real
-  long-form representative run.
+  enabled with browser `prefers-reduced-motion: reduce` emulation. Chrome has
+  no direct Flutter text-scale control; the iOS simulator supplied Dynamic
+  Type `extra-extra-extra-large` (approximately 1.35, stricter than 1.3),
+  where fresh Site Deck, Mine Site, and Technology views were readable and
+  reachable without clipping.
+- Live cadence evidence: Homeworld reached `3/3` `T2/T2/T1`, `2.48/s`, cap
+  `435`; five real 5-minute sales were each `+1680`, cash `695->9095`
+  (`02:18:32Z..02:38:38Z`). Lunar starter Frozen T2 reached `1.50/s`, cap
+  `225`; three real 5-minute sales were each `+1350`, cash `4095->8145`
+  (`02:50:47Z..03:00:50Z`). Lunar expansion recorded six real 5-minute
+  combined sales at cap `365`, each `+3030`, cash `645->18825`
+  (`03:08:40Z..03:33:49Z`).
+- Lunar mastery recorded Surveying 5 cost `9000`, Helium unlock `8000` plus
+  T1 `5000`, then `3/3`, `2.85/s`, cap `485`; four real 5-minute sales were
+  each `+6630`, cash `1325->27845` (`03:41:44Z..03:56:49Z`). Mars unlock
+  visibly cost `20000`; inactive Homeworld and Lunar continued accruing.
+  Mars starter Ochre T2 reached `1.13/s`, cap `270`; two real 5-minute sales
+  were each `+8640`, cash `7845->25125` at `04:04:42Z` and `04:09:43Z`.
+- Mars expansion recorded Silica unlock `12000` plus T1 `5000`, then two real
+  5-minute combined sales at cap `430`, each `+17440`, cash `8125->43005`
+  at `04:17:01Z` and `04:22:03Z`. Cobalt unlock was `30000` plus T1 `5000`;
+  final deployment showed `Mars mastered — +25,000 cash.` and cash
+  `8005->33005` at `04:23:45Z`; final Mars was `3/3`, `2.02/s`, cap `560`.
+- The run observed fresh Homeworld, Lunar, and Mars merge cycles, both planet
+  transitions, inactive-planet production, and fresh-to-Mars completion. It
+  exceeded two real hours; the listed progression windows total at least 85
+  minutes. Normal reload offered `CONTINUE MINING`, showed a 34-second
+  all-planet offline-return modal, and resumed Mars at `3/3`, cash `33005`,
+  without a duplicate reward. A later sell/recall correctly showed `Sell cargo
+  before recalling this rig.` because resumed accrual had produced cargo.
+- Balance decision: **KEEP** authored values. Live early, mid, and late
+  cadence and every progression gate were internally consistent; no numeric
+  change is evidence-required.
 
 ## Architecture/docs and legacy proof
 
@@ -163,11 +179,11 @@ There is exactly one current declaration for each required class.
 | `flutter build ios --simulator --debug` | PASS | Exact escalated run completed; artifact `build/ios/iphonesimulator/Runner.app`. Generated native migration diffs were restored because native scaffold migration is outside this task's scope. |
 
 The prior cache-permission failures were cleared by the escalated build run.
-The remaining representative-playtest limitation is genuine live duration and
-browser text-scale control, not a source/test/build failure. The web-only
-asset-byte proof is retained and green on host/full/coverage; Chrome's runner
-cannot complete that one proof, so it is explicitly skipped rather than
-replaced with path-only assertions.
+The current-head representative run clears the live duration, progression,
+transition, and accessibility-scale evidence gates. The web-only asset-byte
+proof is retained and green on host/full/coverage; Chrome's runner cannot
+complete that one proof, so it is explicitly skipped rather than replaced with
+path-only assertions.
 
 ## Self-review checklist
 
@@ -191,18 +207,21 @@ replaced with path-only assertions.
 - [x] The 874x402 landscape Site Deck action is clear of the dock/navigation
   at text scale 1.3 with all tested controls retaining 48px minimum targets.
 - [x] Host format, fatal-info analysis, full tests, and coverage pass.
-- [ ] Full representative text-scale 1.3/mid-late/Mars run: blocked by available
-  browser/device controls and real-time duration; not faked.
+- [x] Current-head representative text-scale, mid/late cadence, both
+  transition merges, fresh-to-Mars completion, and normal reload were observed
+  live without save/clock/progression shortcuts.
 - [x] Full Chrome suite and APK/web/iOS exact builds were run and passed; the
   web-only byte-load proof is explicitly skipped because the Chrome runner
   stalls on its first request, while host/full/coverage keep the proof active.
-- [x] Generated `.playwright-cli/` browser artifact is removed before commit.
+- [ ] Existing `.playwright-cli/` live-session artifacts are preserved outside
+  this documentation-only commit per the follow-up scope.
 
 ## Concerns for follow-up
 
-1. Provide a representative device/browser harness that can set Flutter text
-  scale to 1.3 and wait through the authored mid/late economy for a real
-  fresh-to-Mars run.
+1. The accessibility run used the iPad Pro simulator rather than physical
+  hardware; direct raw Xcode invocation still has the known
+  `audioplayers_darwin` module issue, while the Flutter simulator build and
+  installed app session pass.
 2. Investigate the Flutter Chrome test runner's first `rootBundle` byte-load
-   stall if browser-side asset-byte coverage becomes a release requirement; the
-   host/full/coverage proof remains active and the browser skip is explicit.
+  stall if browser-side asset-byte coverage becomes a release requirement; the
+  host/full/coverage proof remains active and the browser skip is explicit.
