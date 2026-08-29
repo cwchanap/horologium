@@ -28,12 +28,7 @@ class MiningHud extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       key: const Key('mining-hud'),
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-      decoration: BoxDecoration(
-        color: MiningTheme.hudPanel,
-        border: Border.all(color: MiningTheme.accent.withAlpha(130)),
-        borderRadius: BorderRadius.circular(18),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
       child: Row(
         children: [
           MiningCashChip(cash: cash),
@@ -92,10 +87,12 @@ class MiningCashChip extends StatelessWidget {
         key: const Key('mining-cash-chip'),
         constraints: const BoxConstraints(minWidth: 64, minHeight: 48),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
+        decoration: ShapeDecoration(
           color: MiningTheme.warning.withAlpha(20),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: MiningTheme.warning.withAlpha(135)),
+          shape: BeveledRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: MiningTheme.warning.withAlpha(160)),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

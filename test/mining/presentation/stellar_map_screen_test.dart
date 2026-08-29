@@ -117,7 +117,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('renders full-strength planet globes on a spatial route', (
+  testWidgets('keeps each planet globe inside its compact card', (
     tester,
   ) async {
     final view = StellarMapView.from(
@@ -126,15 +126,7 @@ void main() {
     );
     await _pumpMap(tester, view: view, viewport: const Size(430, 932));
 
-    expect(find.byKey(const Key('stellar-map-route')), findsOneWidget);
-    expect(
-      find.byKey(const Key('stellar-map-orbit-homeworld')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('stellar-map-orbit-lunarFrontier')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('stellar-map-route')), findsNothing);
     final homeworldArt = tester.widget<Image>(
       find.byKey(const Key('mining-stellar-map-planet-homeworld-art')),
     );
@@ -146,8 +138,16 @@ void main() {
             find.byKey(const Key('mining-stellar-map-planet-homeworld-art')),
           )
           .shortestSide,
-      greaterThanOrEqualTo(140),
+      greaterThanOrEqualTo(96),
     );
+    final card = tester.getRect(
+      find.byKey(const Key('mining-stellar-map-planet-homeworld')),
+    );
+    final art = tester.getRect(
+      find.byKey(const Key('mining-stellar-map-planet-homeworld-art')),
+    );
+    expect(card.contains(art.center), isTrue);
+    expect(card.height, lessThanOrEqualTo(270));
     expect(
       find.byKey(const Key('stellar-map-planet-homeworld-summary')),
       findsOneWidget,

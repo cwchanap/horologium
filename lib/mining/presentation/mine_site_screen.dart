@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -124,45 +123,60 @@ class _PortraitMineSite extends StatelessWidget {
     return ColoredBox(
       key: const Key('mine-site-screen'),
       color: const Color(0xFF07111E),
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 4, 10, 3),
-              child: _MineSiteHeader(
-                view: view,
-                cash: cash,
-                onBack: onBack,
-                onSettings: onSettings,
-              ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: _CavernScene(
+              view: view,
+              anchors: MiningVisuals.portraitNodeAnchors,
+              reducedMotion: reducedMotion,
+              onNodeTap: onNodeTap,
+              onSellCargo: onSellCargo,
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
-                child: _CavernScene(
-                  view: view,
-                  anchors: MiningVisuals.portraitNodeAnchors,
-                  reducedMotion: reducedMotion,
-                  onNodeTap: onNodeTap,
-                  onSellCargo: onSellCargo,
-                ),
-              ),
+          ),
+          Positioned(top: 8, left: 8, child: MiningCashChip(cash: cash)),
+          Positioned(
+            top: 64,
+            left: 8,
+            child: _MineChromeButton(
+              key: const Key('mine-site-back'),
+              icon: Icons.arrow_back_rounded,
+              label: 'Back to Site Deck',
+              onPressed: onBack,
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 5),
-              child: FleetDock(
-                view: fleetDock,
-                axis: FleetDockAxis.horizontal,
-                onBayTap: onBayTap,
-                onSpawnRig: onSpawnRig,
-              ),
+          ),
+          Positioned(
+            top: 64,
+            right: 96,
+            child: _MineChromeButton(
+              key: const Key('mine-site-settings'),
+              icon: Icons.settings_rounded,
+              label: 'Settings',
+              onPressed: onSettings,
             ),
-            MiningNavigationBar(
+          ),
+          Positioned(
+            left: 8,
+            right: 8,
+            bottom: 64,
+            height: 116,
+            child: FleetDock(
+              view: fleetDock,
+              axis: FleetDockAxis.horizontal,
+              onBayTap: onBayTap,
+              onSpawnRig: onSpawnRig,
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: MiningNavigationBar(
               selected: MiningNavigationDestination.siteDeck,
               onDestinationSelected: _navigate,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -198,135 +212,43 @@ class _LandscapeMineSite extends StatelessWidget {
     return ColoredBox(
       key: const Key('mine-site-screen'),
       color: const Color(0xFF07111E),
-      child: SafeArea(
-        child: Row(
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 4, 8, 5),
-                child: Column(
-                  children: [
-                    _MineSiteHeader(
-                      view: view,
-                      cash: cash,
-                      showNavigation: false,
-                      onBack: onBack,
-                      onSettings: onSettings,
-                    ),
-                    const SizedBox(height: 4),
-                    Expanded(
-                      child: _CavernScene(
-                        view: view,
-                        anchors: MiningVisuals.landscapeNodeAnchors,
-                        reducedMotion: reducedMotion,
-                        onNodeTap: onNodeTap,
-                        onSellCargo: onSellCargo,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    _MineSiteToolbar(onBack: onBack, onSettings: onSettings),
-                  ],
-                ),
-              ),
-            ),
-            SizedBox(
-              key: const Key('mine-site-right-rail'),
-              width: 220,
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: SizedBox(
-                  height: 385,
-                  child: FleetDock(
-                    view: fleetDock,
-                    axis: FleetDockAxis.vertical,
-                    onBayTap: onBayTap,
-                    onSpawnRig: onSpawnRig,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MineSiteHeader extends StatelessWidget {
-  const _MineSiteHeader({
-    required this.view,
-    required this.cash,
-    required this.onBack,
-    required this.onSettings,
-    this.showNavigation = true,
-  });
-
-  final MineSiteView view;
-  final int cash;
-  final VoidCallback onBack;
-  final VoidCallback onSettings;
-  final bool showNavigation;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      key: const Key('mine-site-header'),
-      constraints: const BoxConstraints(minHeight: 54),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: MiningTheme.hudPanel,
-        border: Border.all(color: MiningTheme.accent.withAlpha(120)),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
+      child: Stack(
         children: [
-          if (showNavigation)
-            _MineChromeButton(
-              key: const Key('mine-site-back'),
-              icon: Icons.arrow_back_rounded,
-              label: 'Back to Site Deck',
-              onPressed: onBack,
+          Positioned(
+            left: 0,
+            top: 0,
+            right: 104,
+            bottom: 0,
+            child: _CavernScene(
+              view: view,
+              anchors: MiningVisuals.landscapeNodeAnchors,
+              reducedMotion: reducedMotion,
+              onNodeTap: onNodeTap,
+              onSellCargo: onSellCargo,
             ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 7),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    view.name.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: MiningTheme.primaryText,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  Text(
-                    '${_planetName(view.planetId)} · ${_resourceName(view.definition.resource)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: MiningTheme.secondaryText,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+          ),
+          Positioned(top: 8, left: 8, child: MiningCashChip(cash: cash)),
+          Positioned(
+            left: 8,
+            bottom: 8,
+            child: _MineSiteToolbar(onBack: onBack, onSettings: onSettings),
+          ),
+          Positioned(
+            key: const Key('mine-site-right-rail'),
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: 104,
+            child: ColoredBox(
+              color: const Color(0xF20E1828),
+              child: FleetDock(
+                view: fleetDock,
+                axis: FleetDockAxis.vertical,
+                onBayTap: onBayTap,
+                onSpawnRig: onSpawnRig,
               ),
             ),
           ),
-          MiningCashChip(cash: cash),
-          if (showNavigation)
-            _MineChromeButton(
-              key: const Key('mine-site-settings'),
-              icon: Icons.settings_rounded,
-              label: 'Settings',
-              onPressed: onSettings,
-            ),
         ],
       ),
     );
@@ -358,27 +280,6 @@ class _CavernScene extends StatelessWidget {
             anchors: anchors,
             reducedMotion: reducedMotion,
             onNodeTap: onNodeTap,
-          ),
-        ),
-        Positioned(
-          top: 10,
-          left: 10,
-          child: Container(
-            key: const Key('mine-site-rate-chip'),
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-            decoration: BoxDecoration(
-              color: MiningTheme.hudPanel,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: MiningTheme.accent.withAlpha(110)),
-            ),
-            child: Text(
-              '${view.rate.toStringAsFixed(2)}/s',
-              style: const TextStyle(
-                color: MiningTheme.accent,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
           ),
         ),
         Positioned(
@@ -418,18 +319,7 @@ class _MineCavern extends StatelessWidget {
     return Container(
       key: const Key('mine-site-cavern'),
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: const Color(0xFF101C2A),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: MiningTheme.accent.withAlpha(120)),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black54,
-            blurRadius: 12,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
+      decoration: const BoxDecoration(color: Color(0xFF101C2A)),
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -507,14 +397,14 @@ class _MineNodeButton extends StatelessWidget {
           onTap: enabled || canForwardDisabledTap ? onTap : null,
           borderRadius: BorderRadius.circular(14),
           child: Container(
-            width: 78,
-            height: 78,
+            width: 92,
+            height: 92,
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color: enabled
                   ? MiningTheme.accent.withAlpha(25)
                   : Colors.black.withAlpha(50),
-              borderRadius: BorderRadius.circular(14),
+              shape: BoxShape.circle,
               border: Border.all(
                 color: enabled ? MiningTheme.accent : Colors.white30,
                 width: enabled ? 1.5 : 1,
@@ -697,17 +587,3 @@ String _saleLabel(MineSiteView view) => view.isBusy
     : view.hasUnsellableCargo
     ? 'Keep mining until cargo is worth at least 1 cash.'
     : 'No cargo to sell.';
-
-String _planetName(MiningPlanetId id) {
-  switch (id) {
-    case MiningPlanetId.homeworld:
-      return 'Homeworld';
-    case MiningPlanetId.lunarFrontier:
-      return 'Lunar Frontier';
-    case MiningPlanetId.marsFrontier:
-      return 'Mars Frontier';
-  }
-}
-
-String _resourceName(ResourceType resource) =>
-    MiningContentRegistry.resourceSilhouettes[resource]!.name;
