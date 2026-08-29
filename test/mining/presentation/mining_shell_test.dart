@@ -6,6 +6,7 @@ import 'package:horologium/game/audio_manager.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
+import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_shell.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -151,9 +152,9 @@ void main() {
     expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
     expect(find.byKey(const Key('fleet-dock')), findsOneWidget);
     expect(find.byKey(const Key('mining-bottom-navigation')), findsOneWidget);
-    expect(find.byKey(const Key('mining-hud')), findsOneWidget);
+    expect(find.byKey(const Key('mining-cash-chip')), findsOneWidget);
+    expect(find.byKey(const Key('mining-cargo-gauge')), findsOneWidget);
     expect(find.text('HOMEWORLD'), findsOneWidget);
-    expect(find.text('0/3 ONLINE  ·  0.00/s'), findsOneWidget);
     expect(
       find.descendant(
         of: find.byKey(const Key('mining-cash-chip')),
@@ -562,8 +563,11 @@ void main() {
     clock.now = _start.add(const Duration(seconds: 2));
     await tester.pump(const Duration(seconds: 2));
 
-    final hud = find.byKey(const Key('mining-hud'));
-    expect(find.descendant(of: hud, matching: find.text('+4')), findsOneWidget);
+    final gauge = tester.widget<MiningCargoGauge>(
+      find.byKey(const Key('mining-cargo-gauge')),
+    );
+    expect(gauge.cargo, 1);
+    expect(gauge.projectedValue, 4);
     expect(repository.saveCount, savesBeforeTicks);
     expect(
       shellHandles(

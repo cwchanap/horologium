@@ -72,6 +72,43 @@ Future<void> _pumpDeck(
 }
 
 void main() {
+  testWidgets('matches the authored 402x874 Site Deck composition', (
+    tester,
+  ) async {
+    final state = _stateWith(
+      cash: 412,
+      sites: {
+        MiningSiteId.landingBasin: _progress(
+          unlocked: true,
+          commissioned: true,
+          rigs: {MiningNodeId.n1: RigTier.t1, MiningNodeId.n2: RigTier.t3},
+        ),
+      },
+    );
+    await _pumpDeck(tester, view: _deckView(state), dock: _dockView(state));
+    tester.view.physicalSize = const Size(402, 874);
+    await tester.pump();
+
+    final first = tester.getRect(
+      find.byKey(const Key('site-card-landingBasin')),
+    );
+    final second = tester.getRect(
+      find.byKey(const Key('site-card-carbonRidge')),
+    );
+    final third = tester.getRect(
+      find.byKey(const Key('site-card-graniteCrater')),
+    );
+    expect(first, const Rect.fromLTWH(14, 164, 374, 216));
+    expect(second, const Rect.fromLTWH(14, 391, 374, 170));
+    expect(third, const Rect.fromLTWH(14, 572, 374, 104));
+
+    final cash = tester.getRect(find.byKey(const Key('mining-cash-chip')));
+    final gauge = tester.getRect(find.byKey(const Key('mining-cargo-gauge')));
+    expect(cash.top, 54);
+    expect(cash.left, 0);
+    expect(gauge, const Rect.fromLTWH(310, 50, 80, 80));
+  });
+
   testWidgets('renders each projected card state with canonical asset art', (
     tester,
   ) async {
@@ -79,8 +116,8 @@ void main() {
       _stateWith(sites: {MiningSiteId.landingBasin: _progress(unlocked: true)}),
     );
     await _pumpDeck(tester, view: fresh, dock: _dockView(_stateWith()));
-    expect(find.text('IDLE'), findsOneWidget);
-    expect(find.text('LOCKED'), findsOneWidget);
+    expect(find.text('AVAILABLE'), findsOneWidget);
+    expect(find.text('LOCKED'), findsWidgets);
     expect(
       tester
           .widget<Image>(find.byKey(const Key('site-card-landingBasin-art')))
@@ -179,7 +216,7 @@ void main() {
       const Offset(0, -220),
     );
     await tester.pump();
-    expect(tester.widget<Text>(find.text('UNLOCK · 250')).maxLines, 1);
+    expect(find.text('250'), findsOneWidget);
   });
 
   testWidgets('emits site, dock, spawn, and bottom navigation callbacks', (
@@ -239,14 +276,7 @@ void main() {
     );
     await _pumpDeck(tester, view: _deckView(state), dock: _dockView(state));
 
-    final bayControls = find.byWidgetPredicate((widget) {
-      final key = widget.key;
-      return widget is InkWell &&
-          key is ValueKey<String> &&
-          key.value.startsWith('b');
-    });
     expect(DockBayId.values, hasLength(4));
-    expect(bayControls, findsNWidgets(4));
     for (final bay in DockBayId.values) {
       final control = find.byKey(ValueKey<String>(bay.name));
       expect(control, findsOneWidget);

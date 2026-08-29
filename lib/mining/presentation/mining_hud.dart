@@ -85,8 +85,8 @@ class MiningCashChip extends StatelessWidget {
       label: 'Cash $cash',
       child: Container(
         key: const Key('mining-cash-chip'),
-        constraints: const BoxConstraints(minWidth: 64, minHeight: 48),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        constraints: const BoxConstraints(minWidth: 76, minHeight: 46),
+        padding: const EdgeInsets.fromLTRB(14, 11, 22, 11),
         decoration: ShapeDecoration(
           color: MiningTheme.warning.withAlpha(20),
           shape: BeveledRectangleBorder(
@@ -115,7 +115,7 @@ class MiningCashChip extends StatelessWidget {
                   '$cash',
                   style: const TextStyle(
                     color: MiningTheme.warning,
-                    fontSize: 13,
+                    fontSize: 22,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -206,15 +206,6 @@ class MiningCargoGauge extends StatelessWidget {
                         color: MiningTheme.primaryText,
                         fontSize: size < 68 ? 9 : 11,
                         fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      '+$projectedValue',
-                      maxLines: 1,
-                      style: TextStyle(
-                        color: MiningTheme.warning,
-                        fontSize: size < 68 ? 8 : 9,
-                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
