@@ -76,6 +76,14 @@ class MineSiteView {
 
   MineSiteNodeView node(MiningNodeId id) => nodes[id]!;
 
+  /// Active-planet cargo is present but its floored aggregate sale value is
+  /// 0 cash, so selling would clear cargo without awarding any cash.
+  bool get hasUnsellableCargo =>
+      !isBusy &&
+      isActivePlanet &&
+      activePlanetCargo > 0 &&
+      activePlanetProjectedSale == 0;
+
   static MineSiteView from({
     required MiningSave state,
     required MiningContentRegistry content,
@@ -181,7 +189,7 @@ class MineSiteView {
           : 0,
       activePlanetCargo: activePlanetCargo,
       activePlanetProjectedSale: activePlanetGrossSale.floor(),
-      canSell: !isBusy && active && activePlanetCargo > 0,
+      canSell: !isBusy && active && activePlanetGrossSale.floor() > 0,
       isActivePlanet: active,
       selectedBayId: selectedBayId,
       selectedRig: selectedRig,

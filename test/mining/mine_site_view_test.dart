@@ -118,6 +118,24 @@ void main() {
     expect(view.canSell, isTrue);
   });
 
+  test('keeps sub-1-cash cargo unsellable while cargo is present', () {
+    // 0.1 Gold at Landing Basin (4 cash/unit) = 0.4 gross, which floors to 0.
+    final view = MineSiteView.from(
+      state: stateWith(
+        landing: progress(commissioned: true, storedAmount: 0.1),
+      ),
+      content: content,
+      siteId: MiningSiteId.landingBasin,
+      selectedBayId: null,
+      isBusy: false,
+    );
+
+    expect(view.activePlanetCargo, 0.1);
+    expect(view.activePlanetProjectedSale, 0);
+    expect(view.canSell, isFalse);
+    expect(view.hasUnsellableCargo, isTrue);
+  });
+
   test('does not expose sale while the shell is busy', () {
     final view = MineSiteView.from(
       state: stateWith(landing: progress(commissioned: true, storedAmount: 10)),
