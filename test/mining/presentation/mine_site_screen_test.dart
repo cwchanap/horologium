@@ -211,6 +211,29 @@ void main() {
     );
   });
 
+  testWidgets('keeps sub-1-cash cargo unsellable with keep-mining feedback', (
+    tester,
+  ) async {
+    // 0.1 Gold at Landing Basin (4 cash/unit) = 0.4 gross, which floors to 0.
+    final state = _stateWith(
+      landing: _progress(commissioned: true, storedAmount: 0.1),
+    );
+    await _pumpMineSite(tester, view: _siteView(state), dock: _dockView(state));
+
+    expect(
+      find.bySemanticsLabel(
+        RegExp(r'Keep mining until cargo is worth at least 1 cash'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<OutlinedButton>(find.byKey(const Key('mine-site-sell')))
+          .onPressed,
+      isNull,
+    );
+  });
+
   testWidgets('busy sale semantics explain the pending action', (tester) async {
     final state = _stateWith(
       landing: _progress(commissioned: true, storedAmount: 10),

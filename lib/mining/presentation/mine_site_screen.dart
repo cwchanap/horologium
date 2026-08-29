@@ -697,6 +697,8 @@ class _MineCargoControl extends StatelessWidget {
         ? 'Finishing previous action…'
         : view.canSell
         ? 'Sell all cargo for ${view.activePlanetProjectedSale} cash.'
+        : view.hasUnsellableCargo
+        ? 'Keep mining until cargo is worth at least 1 cash.'
         : 'No cargo to sell.';
     if (compact) {
       return Semantics(
