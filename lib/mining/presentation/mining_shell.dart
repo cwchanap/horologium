@@ -474,6 +474,10 @@ class _MiningShellState extends State<MiningShell>
       final siteId = _openSiteId;
       if (_selectedDestination == MiningNavigationDestination.stellarMap) {
         surface = StellarMapScreen(
+          cash: _displayState.cash,
+          cargo: siteDeck.totalCargo,
+          capacity: siteDeck.totalCapacity,
+          projectedValue: siteDeck.projectedValue,
           view: StellarMapView.from(
             state: _displayState,
             content: _content,

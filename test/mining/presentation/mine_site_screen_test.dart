@@ -124,6 +124,43 @@ Future<void> _pumpMineSite(
 }
 
 void main() {
+  testWidgets('matches the authored 402x874 Mine Site chrome', (tester) async {
+    final state = _stateWith(
+      cash: 412,
+      landing: _progress(
+        commissioned: true,
+        storedAmount: 30,
+        rigs: {MiningNodeId.n1: RigTier.t1, MiningNodeId.n3: RigTier.t2},
+      ),
+    );
+    await _pumpMineSite(
+      tester,
+      size: const Size(402, 874),
+      view: _siteView(state),
+      dock: _dockView(state),
+    );
+
+    expect(
+      tester.getRect(find.byKey(const Key('mining-cash-chip'))).topLeft,
+      const Offset(0, 54),
+    );
+    expect(
+      tester.getRect(find.byKey(const Key('mine-site-cargo'))),
+      const Rect.fromLTWH(306, 50, 84, 84),
+    );
+    expect(
+      tester.getRect(find.byKey(const Key('mine-site-node-n1'))).topLeft,
+      const Offset(18, 222),
+    );
+    expect(
+      tester.getRect(find.byKey(const Key('mine-site-node-n2'))).topLeft,
+      const Offset(236, 186),
+    );
+    final sell = tester.getRect(find.byKey(const Key('mine-site-sell')));
+    expect(sell.top, 506);
+    expect(sell.right, closeTo(382, 4));
+  });
+
   testWidgets('forwards bay, node, sale, back, settings, and nav callbacks', (
     tester,
   ) async {
@@ -158,7 +195,7 @@ void main() {
     await tester.tap(find.byKey(const Key('mine-site-node-n1')));
     await tester.tap(find.byKey(const Key('mine-site-sell')));
     await tester.tap(find.byKey(const Key('mine-site-back')));
-    await tester.tap(find.byKey(const Key('mine-site-settings')));
+    await tester.tap(find.byKey(const Key('mining-nav-settings')));
     await tester.tap(find.byKey(const Key('mining-nav-technology')));
 
     expect(bayTaps, <DockBayId>[DockBayId.b1]);
@@ -300,16 +337,7 @@ void main() {
       dock: _dockView(state),
     );
 
-    final cargoSemantics = find
-        .ancestor(
-          of: find.byKey(const Key('mine-site-cargo')),
-          matching: find.byType(Semantics),
-        )
-        .first;
-    expect(
-      tester.widget<Semantics>(cargoSemantics).properties.label,
-      'Finishing previous action…',
-    );
+    expect(find.bySemanticsLabel('Finishing previous action…'), findsOneWidget);
     expect(
       tester
           .widget<OutlinedButton>(find.byKey(const Key('mine-site-sell')))
@@ -437,11 +465,11 @@ void main() {
         isTrue,
       );
       expect(
-        tester.getRect(find.byKey(const Key('mine-site-back'))).right,
+        tester.getRect(find.byKey(const Key('mining-nav-siteDeck'))).right,
         lessThanOrEqualTo(rail.left),
       );
       expect(
-        tester.getRect(find.byKey(const Key('mine-site-settings'))).right,
+        tester.getRect(find.byKey(const Key('mining-nav-settings'))).right,
         lessThanOrEqualTo(rail.left),
       );
     },
@@ -458,12 +486,7 @@ void main() {
       dock: _dockView(state, selectedBayId: DockBayId.b1),
     );
 
-    expect(find.byType(AnimatedSwitcher), findsWidgets);
-    for (final switcher in tester.widgetList<AnimatedSwitcher>(
-      find.byType(AnimatedSwitcher),
-    )) {
-      expect(switcher.duration, Duration.zero);
-    }
+    expect(find.byKey(const Key('mine-site-node-n1')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

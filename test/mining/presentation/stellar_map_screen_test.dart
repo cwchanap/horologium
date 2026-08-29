@@ -70,14 +70,35 @@ Future<void> _pumpMap(
 }
 
 void main() {
-  testWidgets('fresh map progressively discloses Homeworld and Lunar', (
+  testWidgets('matches the authored 402x874 Stellar Map composition', (
     tester,
   ) async {
     final view = StellarMapView.from(
       state: MiningSave.initial(nowUtc: _start),
       content: _content,
     );
-    await _pumpMap(tester, view: view);
+    await _pumpMap(tester, view: view, viewport: const Size(402, 874));
+
+    expect(
+      tester.getRect(
+        find.byKey(const Key('mining-stellar-map-planet-homeworld')),
+      ),
+      const Rect.fromLTWH(14, 146, 374, 264),
+    );
+    expect(
+      tester.getRect(
+        find.byKey(const Key('mining-stellar-map-planet-homeworld-art')),
+      ),
+      const Rect.fromLTWH(242, 104, 172, 172),
+    );
+  });
+
+  testWidgets('fresh map includes the prototype Mars teaser', (tester) async {
+    final view = StellarMapView.from(
+      state: MiningSave.initial(nowUtc: _start),
+      content: _content,
+    );
+    await _pumpMap(tester, view: view, viewport: const Size(402, 874));
 
     expect(find.byKey(const Key('stellar-map-screen')), findsOneWidget);
     expect(find.byKey(const Key('stellar-map-scroll')), findsOneWidget);
@@ -93,7 +114,17 @@ void main() {
       find.byKey(const Key('mining-stellar-map-planet-marsFrontier')),
       findsNothing,
     );
-    expect(find.text('Mars Frontier'), findsNothing);
+    expect(
+      find.byKey(const Key('mining-stellar-map-teaser-marsFrontier')),
+      findsOneWidget,
+    );
+    expect(find.text('Mars Frontier'), findsOneWidget);
+    expect(
+      tester.getRect(
+        find.byKey(const Key('mining-stellar-map-teaser-marsFrontier')),
+      ),
+      const Rect.fromLTWH(14, 638, 374, 104),
+    );
     expect(
       find.byKey(const Key('stellar-map-site-homeworld-landingBasin')),
       findsOneWidget,
