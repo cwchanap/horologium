@@ -117,6 +117,50 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('renders full-strength planet globes on a spatial route', (
+    tester,
+  ) async {
+    final view = StellarMapView.from(
+      state: MiningSave.initial(nowUtc: _start),
+      content: _content,
+    );
+    await _pumpMap(tester, view: view, viewport: const Size(430, 932));
+
+    expect(find.byKey(const Key('stellar-map-route')), findsOneWidget);
+    expect(
+      find.byKey(const Key('stellar-map-orbit-homeworld')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('stellar-map-orbit-lunarFrontier')),
+      findsOneWidget,
+    );
+    final homeworldArt = tester.widget<Image>(
+      find.byKey(const Key('mining-stellar-map-planet-homeworld-art')),
+    );
+    expect(homeworldArt.fit, BoxFit.contain);
+    expect(homeworldArt.opacity?.value, anyOf(isNull, equals(1)));
+    expect(
+      tester
+          .getSize(
+            find.byKey(const Key('mining-stellar-map-planet-homeworld-art')),
+          )
+          .shortestSide,
+      greaterThanOrEqualTo(140),
+    );
+    expect(
+      find.byKey(const Key('stellar-map-planet-homeworld-summary')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('stellar-map-planet-homeworld-summary')),
+        matching: find.text('0.00/s · 0 cargo · +0'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('Lunar unlock shows exact Mars Frontier requirements and state', (
     tester,
   ) async {

@@ -152,9 +152,15 @@ void main() {
     expect(find.byKey(const Key('fleet-dock')), findsOneWidget);
     expect(find.byKey(const Key('mining-bottom-navigation')), findsOneWidget);
     expect(find.byKey(const Key('mining-hud')), findsOneWidget);
-    expect(find.text('Homeworld'), findsOneWidget);
-    expect(find.text('0/3'), findsOneWidget);
-    expect(find.text('100'), findsOneWidget);
+    expect(find.text('HOMEWORLD'), findsOneWidget);
+    expect(find.text('0/3 ONLINE  ·  0.00/s'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('mining-cash-chip')),
+        matching: find.text('100'),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -511,6 +517,11 @@ void main() {
     await tester.ensureVisible(
       find.byKey(const Key('site-card-carbonRidge-unlock')),
     );
+    await tester.drag(
+      find.byKey(const Key('site-deck-scroll')),
+      const Offset(0, -240),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('site-card-carbonRidge-unlock')));
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -552,7 +563,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
 
     final hud = find.byKey(const Key('mining-hud'));
-    expect(find.descendant(of: hud, matching: find.text('4')), findsOneWidget);
+    expect(find.descendant(of: hud, matching: find.text('+4')), findsOneWidget);
     expect(repository.saveCount, savesBeforeTicks);
     expect(
       shellHandles(

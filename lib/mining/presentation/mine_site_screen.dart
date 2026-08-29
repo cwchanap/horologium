@@ -4,6 +4,7 @@ import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/presentation/fleet_dock.dart';
+import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
@@ -135,24 +136,17 @@ class _PortraitMineSite extends StatelessWidget {
                 onSettings: onSettings,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
-              child: _MineSiteMetrics(view: view),
-            ),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
-                child: _MineCavern(
+                child: _CavernScene(
                   view: view,
                   anchors: MiningVisuals.portraitNodeAnchors,
                   reducedMotion: reducedMotion,
                   onNodeTap: onNodeTap,
+                  onSellCargo: onSellCargo,
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
-              child: _MineCargoControl(view: view, onSellCargo: onSellCargo),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 5),
@@ -221,11 +215,12 @@ class _LandscapeMineSite extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Expanded(
-                      child: _MineCavern(
+                      child: _CavernScene(
                         view: view,
                         anchors: MiningVisuals.landscapeNodeAnchors,
                         reducedMotion: reducedMotion,
                         onNodeTap: onNodeTap,
+                        onSellCargo: onSellCargo,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -239,27 +234,14 @@ class _LandscapeMineSite extends StatelessWidget {
               width: 220,
               child: Align(
                 alignment: Alignment.topCenter,
-                child: Stack(
-                  children: [
-                    SizedBox(
-                      height: 385,
-                      child: FleetDock(
-                        view: fleetDock,
-                        axis: FleetDockAxis.vertical,
-                        onBayTap: onBayTap,
-                        onSpawnRig: onSpawnRig,
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: _MineCargoControl(
-                        view: view,
-                        compact: true,
-                        onSellCargo: onSellCargo,
-                      ),
-                    ),
-                  ],
+                child: SizedBox(
+                  height: 385,
+                  child: FleetDock(
+                    view: fleetDock,
+                    axis: FleetDockAxis.vertical,
+                    onBayTap: onBayTap,
+                    onSpawnRig: onSpawnRig,
+                  ),
                 ),
               ),
             ),
@@ -337,7 +319,7 @@ class _MineSiteHeader extends StatelessWidget {
               ),
             ),
           ),
-          _HeaderCash(cash: cash),
+          MiningCashChip(cash: cash),
           if (showNavigation)
             _MineChromeButton(
               key: const Key('mine-site-settings'),
@@ -351,110 +333,69 @@ class _MineSiteHeader extends StatelessWidget {
   }
 }
 
-class _HeaderCash extends StatelessWidget {
-  const _HeaderCash({required this.cash});
-
-  final int cash;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Cash $cash',
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            MiningVisuals.cashIcon,
-            width: 20,
-            height: 20,
-            errorBuilder: (context, error, stackTrace) => const Icon(
-              Icons.monetization_on_rounded,
-              color: MiningTheme.accent,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 3),
-          Text(
-            '$cash',
-            style: const TextStyle(
-              color: MiningTheme.accent,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MineSiteMetrics extends StatelessWidget {
-  const _MineSiteMetrics({required this.view});
+class _CavernScene extends StatelessWidget {
+  const _CavernScene({
+    required this.view,
+    required this.anchors,
+    required this.reducedMotion,
+    required this.onNodeTap,
+    required this.onSellCargo,
+  });
 
   final MineSiteView view;
+  final List<Alignment> anchors;
+  final bool reducedMotion;
+  final ValueChanged<MiningNodeId> onNodeTap;
+  final VoidCallback onSellCargo;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      key: const Key('mine-site-metrics'),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Row(
-        children: [
-          _Metric(label: 'RATE', value: '${view.rate.toStringAsFixed(2)}/s'),
-          _Metric(
-            label: 'CARGO',
-            value: '${_amount(view.cargo)} / ${_amount(view.capacity)}',
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: _MineCavern(
+            view: view,
+            anchors: anchors,
+            reducedMotion: reducedMotion,
+            onNodeTap: onNodeTap,
           ),
-          _Metric(label: 'SALE', value: '+${view.activePlanetProjectedSale}'),
-        ],
-      ),
-    );
-  }
-}
-
-class _Metric extends StatelessWidget {
-  const _Metric({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: MiningTheme.mutedText,
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.1,
+        ),
+        Positioned(
+          top: 10,
+          left: 10,
+          child: Container(
+            key: const Key('mine-site-rate-chip'),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+            decoration: BoxDecoration(
+              color: MiningTheme.hudPanel,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: MiningTheme.accent.withAlpha(110)),
             ),
-          ),
-          const SizedBox(height: 2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
             child: Text(
-              value,
-              maxLines: 1,
+              '${view.rate.toStringAsFixed(2)}/s',
               style: const TextStyle(
                 color: MiningTheme.accent,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
               ),
             ),
           ),
-        ],
-      ),
+        ),
+        Positioned(
+          top: 10,
+          right: 10,
+          child: MiningCargoGauge(
+            containerKey: const Key('mine-site-cargo'),
+            buttonKey: const Key('mine-site-sell'),
+            cargo: view.cargo,
+            capacity: view.capacity,
+            projectedValue: view.activePlanetProjectedSale,
+            size: 78,
+            semanticLabel: _saleLabel(view),
+            onPressed: view.canSell ? onSellCargo : null,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -680,170 +621,6 @@ class _NodeArt extends StatelessWidget {
   }
 }
 
-class _MineCargoControl extends StatelessWidget {
-  const _MineCargoControl({
-    required this.view,
-    required this.onSellCargo,
-    this.compact = false,
-  });
-
-  final MineSiteView view;
-  final VoidCallback onSellCargo;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final saleLabel = view.isBusy
-        ? 'Finishing previous action…'
-        : view.canSell
-        ? 'Sell all cargo for ${view.activePlanetProjectedSale} cash.'
-        : view.hasUnsellableCargo
-        ? 'Keep mining until cargo is worth at least 1 cash.'
-        : 'No cargo to sell.';
-    if (compact) {
-      return Semantics(
-        button: true,
-        enabled: view.canSell,
-        label: saleLabel,
-        child: Container(
-          key: const Key('mine-site-cargo'),
-          width: 104,
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-          decoration: BoxDecoration(
-            color: MiningTheme.panel,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: MiningTheme.accent.withAlpha(100)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                MiningVisuals.cargoIcon,
-                width: 20,
-                height: 20,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.inventory_2_rounded,
-                  color: MiningTheme.accent,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 2),
-              SizedBox(
-                width: 20,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    '${_amount(view.activePlanetCargo)}\nTOTAL',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: MiningTheme.primaryText,
-                      fontSize: 8,
-                      height: 1.0,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 48,
-                height: 48,
-                child: IconButton(
-                  key: const Key('mine-site-sell'),
-                  tooltip: saleLabel,
-                  onPressed: view.canSell ? onSellCargo : null,
-                  icon: const Icon(Icons.sell_rounded, size: 20),
-                  color: MiningTheme.accent,
-                  disabledColor: MiningTheme.mutedText,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 48,
-                    minHeight: 48,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    return Semantics(
-      button: true,
-      enabled: view.canSell,
-      label: saleLabel,
-      child: Container(
-        key: const Key('mine-site-cargo'),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: MiningTheme.panel,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: MiningTheme.accent.withAlpha(100)),
-        ),
-        child: Row(
-          children: [
-            Image.asset(
-              MiningVisuals.cargoIcon,
-              width: 25,
-              height: 25,
-              errorBuilder: (context, error, stackTrace) => const Icon(
-                Icons.inventory_2_rounded,
-                color: MiningTheme.accent,
-                size: 25,
-              ),
-            ),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'CARGO HOLD',
-                    style: TextStyle(
-                      color: MiningTheme.mutedText,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  Text(
-                    '${_amount(view.activePlanetCargo)} total  ·  +${view.activePlanetProjectedSale}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: MiningTheme.primaryText,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 7),
-            OutlinedButton.icon(
-              key: const Key('mine-site-sell'),
-              onPressed: view.canSell ? onSellCargo : null,
-              icon: const Icon(Icons.sell_rounded, size: 17),
-              label: const Text('SELL ALL CARGO'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(48, 48),
-                padding: const EdgeInsets.symmetric(horizontal: 7),
-                foregroundColor: MiningTheme.accent,
-                disabledForegroundColor: MiningTheme.mutedText,
-                side: BorderSide(color: MiningTheme.accent.withAlpha(150)),
-                textStyle: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _MineSiteToolbar extends StatelessWidget {
   const _MineSiteToolbar({required this.onBack, required this.onSettings});
 
@@ -913,9 +690,13 @@ String _nodeLabel(MineSiteNodeView view) {
   return 'Node ${view.id.name.toUpperCase()}: $state.$rig${reason == null ? '' : ' $reason'}';
 }
 
-String _amount(double value) => value == value.roundToDouble()
-    ? value.toStringAsFixed(0)
-    : value.toStringAsFixed(1);
+String _saleLabel(MineSiteView view) => view.isBusy
+    ? 'Finishing previous action…'
+    : view.canSell
+    ? 'Sell all cargo for ${view.activePlanetProjectedSale} cash.'
+    : view.hasUnsellableCargo
+    ? 'Keep mining until cargo is worth at least 1 cash.'
+    : 'No cargo to sell.';
 
 String _planetName(MiningPlanetId id) {
   switch (id) {
