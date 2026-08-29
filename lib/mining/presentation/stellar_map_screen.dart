@@ -41,49 +41,20 @@ class StellarMapScreen extends StatelessWidget {
               child: SingleChildScrollView(
                 key: const Key('stellar-map-scroll'),
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                child: Stack(
-                  key: const Key('stellar-map-route'),
+                child: Column(
                   children: [
-                    Positioned.fill(
-                      child: Center(
-                        child: Container(
-                          width: 2,
-                          margin: const EdgeInsets.symmetric(vertical: 70),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                MiningTheme.accent.withAlpha(15),
-                                MiningTheme.accent.withAlpha(150),
-                                MiningTheme.warning.withAlpha(120),
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
+                    for (var index = 0; index < view.planets.length; index++)
+                      Padding(
+                        padding: EdgeInsets.only(
+                          bottom: index == view.planets.length - 1 ? 0 : 10,
+                        ),
+                        child: _PlanetCard(
+                          view: view.planets[index],
+                          content: content,
+                          onUnlock: onUnlock,
+                          onTravel: onTravel,
                         ),
                       ),
-                    ),
-                    Column(
-                      children: [
-                        for (
-                          var index = 0;
-                          index < view.planets.length;
-                          index++
-                        )
-                          Padding(
-                            padding: EdgeInsets.only(
-                              bottom: index == view.planets.length - 1 ? 0 : 18,
-                            ),
-                            child: _PlanetCard(
-                              view: view.planets[index],
-                              content: content,
-                              artLeading: index.isEven,
-                              onUnlock: onUnlock,
-                              onTravel: onTravel,
-                            ),
-                          ),
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -141,14 +112,12 @@ class _PlanetCard extends StatelessWidget {
   const _PlanetCard({
     required this.view,
     required this.content,
-    required this.artLeading,
     required this.onUnlock,
     required this.onTravel,
   });
 
   final StellarMapPlanetView view;
   final MiningContentRegistry content;
-  final bool artLeading;
   final ValueChanged<MiningPlanetId> onUnlock;
   final ValueChanged<MiningPlanetId> onTravel;
 
@@ -156,123 +125,97 @@ class _PlanetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final definition = content.planet(view.id);
     final stateLabel = _stateLabel(view);
-    return KeyedSubtree(
-      key: Key('stellar-map-orbit-${view.id.name}'),
-      child: Semantics(
-        container: true,
-        label: '${view.name}, ${stateLabel.toLowerCase()} planet',
-        child: Container(
-          key: Key('mining-stellar-map-planet-${view.id.name}'),
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  if (artLeading) _PlanetArt(definition: definition),
+    return Semantics(
+      container: true,
+      label: '${view.name}, ${stateLabel.toLowerCase()} planet',
+      child: Container(
+        key: Key('mining-stellar-map-planet-${view.id.name}'),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: MiningTheme.panel.withAlpha(235),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _borderColor(view)),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              view.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: MiningTheme.primaryText,
+                                fontSize: 19,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          _StateChip(label: stateLabel, view: view),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        '${view.sitesCommissioned}/${view.siteTotal} ONLINE',
+                        style: const TextStyle(
+                          color: MiningTheme.accent,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.7,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      _PlanetMetrics(view: view),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                _PlanetArt(definition: definition),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                for (final indicator in view.siteIndicators)
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Column(
-                        crossAxisAlignment: artLeading
-                            ? CrossAxisAlignment.end
-                            : CrossAxisAlignment.start,
-                        children: [
-                          _StateChip(label: stateLabel, view: view),
-                          const SizedBox(height: 8),
-                          Text(
-                            view.name,
-                            maxLines: 2,
-                            textAlign: artLeading
-                                ? TextAlign.right
-                                : TextAlign.left,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: MiningTheme.primaryText,
-                              fontSize: 21,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${view.sitesCommissioned}/${view.siteTotal} ONLINE',
-                            style: const TextStyle(
-                              color: MiningTheme.accent,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.7,
-                            ),
-                          ),
-                          const SizedBox(height: 9),
-                          _PlanetMetrics(view: view),
-                        ],
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: _SiteIndicator(
+                        key: Key(
+                          'stellar-map-site-${view.id.name}-${indicator.id.name}',
+                        ),
+                        indicator: indicator,
+                        content: content,
                       ),
                     ),
                   ),
-                  if (!artLeading) _PlanetArt(definition: definition),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
-                decoration: BoxDecoration(
-                  color: MiningTheme.panel.withAlpha(235),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: _borderColor(view)),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black38,
-                      blurRadius: 8,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        for (final indicator in view.siteIndicators)
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 2,
-                              ),
-                              child: _SiteIndicator(
-                                key: Key(
-                                  'stellar-map-site-${view.id.name}-${indicator.id.name}',
-                                ),
-                                indicator: indicator,
-                                content: content,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    if (view.requirements.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      for (final requirement in view.requirements)
-                        _RequirementRow(requirement: requirement),
-                    ],
-                    if (view.isBusy) ...[
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Finishing previous action…',
-                        style: TextStyle(
-                          color: MiningTheme.warning,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    _PlanetAction(
-                      view: view,
-                      onUnlock: onUnlock,
-                      onTravel: onTravel,
-                    ),
-                  ],
+              ],
+            ),
+            if (view.requirements.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              for (final requirement in view.requirements)
+                _RequirementRow(requirement: requirement),
+            ],
+            if (view.isBusy) ...[
+              const SizedBox(height: 4),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Finishing previous action…',
+                  style: TextStyle(color: MiningTheme.warning, fontSize: 11),
                 ),
               ),
             ],
-          ),
+            const SizedBox(height: 7),
+            _PlanetAction(view: view, onUnlock: onUnlock, onTravel: onTravel),
+          ],
         ),
       ),
     );
@@ -301,13 +244,13 @@ class _PlanetArt extends StatelessWidget {
     return Image.asset(
       definition.planetAsset,
       key: Key('mining-stellar-map-planet-${definition.id.name}-art'),
-      width: 160,
-      height: 160,
+      width: 104,
+      height: 104,
       fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) => const SizedBox(
-        width: 160,
-        height: 160,
-        child: Icon(Icons.public_rounded, color: Colors.white24, size: 90),
+        width: 104,
+        height: 104,
+        child: Icon(Icons.public_rounded, color: Colors.white24, size: 72),
       ),
     );
   }
@@ -401,8 +344,8 @@ class _SiteIndicator extends StatelessWidget {
       container: true,
       label: '${indicator.name}, ${_stateLabel(indicator.state).toLowerCase()}',
       child: Container(
-        constraints: const BoxConstraints(minHeight: 78),
-        padding: const EdgeInsets.fromLTRB(6, 7, 6, 6),
+        constraints: const BoxConstraints(minHeight: 62),
+        padding: const EdgeInsets.fromLTRB(4, 5, 4, 4),
         decoration: BoxDecoration(
           color: Colors.black26,
           borderRadius: BorderRadius.circular(10),
@@ -411,10 +354,10 @@ class _SiteIndicator extends StatelessWidget {
         child: Column(
           children: [
             Icon(silhouette?.icon ?? Icons.circle, color: color, size: 22),
-            const SizedBox(height: 3),
+            const SizedBox(height: 2),
             Text(
               indicator.name,
-              maxLines: 2,
+              maxLines: 1,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -423,7 +366,7 @@ class _SiteIndicator extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 1),
             Text(
               _stateLabel(indicator.state),
               maxLines: 1,

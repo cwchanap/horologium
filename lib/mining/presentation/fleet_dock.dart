@@ -24,12 +24,8 @@ class FleetDock extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       key: const Key('fleet-dock'),
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 7),
-      decoration: BoxDecoration(
-        color: MiningTheme.panel,
-        border: Border.all(color: MiningTheme.accent.withAlpha(90)),
-        borderRadius: BorderRadius.circular(14),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      color: Colors.transparent,
       child: axis == FleetDockAxis.vertical
           ? SizedBox.expand(child: Column(children: _dockChildren()))
           : Column(mainAxisSize: MainAxisSize.min, children: _dockChildren()),
@@ -39,12 +35,12 @@ class FleetDock extends StatelessWidget {
   List<Widget> _dockChildren() => [
     if (axis == FleetDockAxis.vertical)
       SizedBox(
-        height: 48,
+        height: 46,
         child: _DockHeader(view: view, onSpawnRig: onSpawnRig),
       )
     else
       _DockHeader(view: view, onSpawnRig: onSpawnRig),
-    const SizedBox(height: 6),
+    const SizedBox(height: 2),
     if (axis == FleetDockAxis.vertical)
       Expanded(
         child: Flex(
@@ -55,7 +51,7 @@ class FleetDock extends StatelessWidget {
               Flexible(
                 fit: FlexFit.loose,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  padding: const EdgeInsets.symmetric(vertical: 2),
                   child: _BayButton(
                     view: view.bay(bayId),
                     onTap: () => onBayTap(bayId),
@@ -73,7 +69,7 @@ class FleetDock extends StatelessWidget {
           for (final bayId in DockBayId.values)
             Flexible(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 2),
                 child: _BayButton(
                   view: view.bay(bayId),
                   onTap: () => onBayTap(bayId),
@@ -97,7 +93,7 @@ class _DockHeader extends StatelessWidget {
       children: [
         const Expanded(
           child: Text(
-            'FLEET DOCK',
+            'FLEET',
             style: TextStyle(
               color: MiningTheme.primaryText,
               fontSize: 11,
@@ -121,10 +117,10 @@ class _DockHeader extends StatelessWidget {
               errorBuilder: (context, error, stackTrace) =>
                   const Icon(Icons.add_rounded, size: 17),
             ),
-            label: Text('SPAWN · ${view.spawnCost}'),
+            label: Text('${view.spawnCost}'),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(48, 48),
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
               foregroundColor: MiningTheme.accent,
               disabledForegroundColor: MiningTheme.mutedText,
               side: BorderSide(color: MiningTheme.accent.withAlpha(150)),
@@ -156,24 +152,25 @@ class _BayButton extends StatelessWidget {
       enabled: !view.isBusy,
       label: 'Dock bay $bayName: ${view.hint}',
       child: Material(
-        color: Colors.transparent,
+        color: view.isSelected
+            ? MiningTheme.accent.withAlpha(35)
+            : const Color(0xD90E1828),
+        shape: BeveledRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: view.isSelected ? MiningTheme.accent : Colors.white24,
+            width: view.isSelected ? 1.5 : 1,
+          ),
+        ),
         child: InkWell(
           key: ValueKey<String>(view.id.name),
           onTap: view.isBusy ? null : onTap,
-          borderRadius: BorderRadius.circular(10),
+          customBorder: BeveledRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Container(
-            constraints: const BoxConstraints(minHeight: 64, minWidth: 48),
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-            decoration: BoxDecoration(
-              color: view.isSelected
-                  ? MiningTheme.accent.withAlpha(35)
-                  : Colors.white.withAlpha(8),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: view.isSelected ? MiningTheme.accent : Colors.white24,
-                width: view.isSelected ? 1.5 : 1,
-              ),
-            ),
+            constraints: const BoxConstraints(minHeight: 54, minWidth: 48),
+            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

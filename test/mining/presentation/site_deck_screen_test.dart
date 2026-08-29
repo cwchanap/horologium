@@ -161,6 +161,11 @@ void main() {
     );
     expect(artFrame.height, greaterThanOrEqualTo(120));
     expect(artFrame.height, greaterThan(card.height * 0.45));
+    final action = tester.getRect(
+      find.byKey(const Key('site-card-landingBasin-enter')),
+    );
+    expect(artFrame.contains(action.center), isTrue);
+    expect(card.height, lessThanOrEqualTo(artFrame.height + 4));
     expect(
       tester
           .widget<Image>(find.byKey(const Key('site-card-landingBasin-art')))

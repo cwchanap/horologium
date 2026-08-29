@@ -16,15 +16,14 @@ class MiningNavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       key: const Key('mining-bottom-navigation'),
-      height: 72,
-      decoration: const BoxDecoration(
-        color: Color(0xF20E1828),
-        border: Border(top: BorderSide(color: Colors.white12)),
-      ),
+      height: 64,
+      color: Colors.transparent,
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           for (final destination in MiningNavigationDestination.values)
-            Expanded(
+            SizedBox(
+              width: 68,
               child: _DestinationButton(
                 destination: destination,
                 selected: destination == selected,
@@ -56,42 +55,28 @@ class _DestinationButton extends StatelessWidget {
       selected: selected,
       label: label,
       child: Material(
-        color: Colors.transparent,
+        color: selected
+            ? Colors.cyanAccent.withAlpha(28)
+            : const Color(0xD90E1828),
+        shape: BeveledRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: selected ? Colors.cyanAccent : Colors.white24,
+          ),
+        ),
         child: InkWell(
           key: Key('mining-nav-${destination.name}'),
           onTap: onPressed,
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
-            decoration: BoxDecoration(
-              color: selected ? Colors.cyanAccent.withAlpha(24) : null,
-              borderRadius: BorderRadius.circular(10),
-              border: selected
-                  ? Border.all(color: Colors.cyanAccent.withAlpha(100))
-                  : null,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  _icon(destination),
-                  size: 23,
-                  color: selected ? Colors.cyanAccent : Colors.white60,
-                ),
-                const SizedBox(height: 3),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    style: TextStyle(
-                      color: selected ? Colors.cyanAccent : Colors.white70,
-                      fontSize: 10,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ),
-              ],
+          customBorder: BeveledRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: SizedBox(
+            height: 54,
+            child: Icon(
+              _icon(destination),
+              semanticLabel: label,
+              size: 25,
+              color: selected ? Colors.cyanAccent : Colors.white60,
             ),
           ),
         ),

@@ -219,6 +219,35 @@ void main() {
     expect(gauge.right, lessThanOrEqualTo(cavern.right));
   });
 
+  testWidgets('uses the cavern as the full-bleed portrait canvas', (
+    tester,
+  ) async {
+    final state = _stateWith();
+    await _pumpMineSite(
+      tester,
+      size: const Size(402, 874),
+      view: _siteView(state),
+      dock: _dockView(state),
+    );
+
+    final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
+    expect(cavern, const Rect.fromLTWH(0, 0, 402, 874));
+    expect(
+      cavern.contains(
+        tester.getRect(find.byKey(const Key('fleet-dock'))).center,
+      ),
+      isTrue,
+    );
+    expect(
+      cavern.contains(
+        tester
+            .getRect(find.byKey(const Key('mining-bottom-navigation')))
+            .center,
+      ),
+      isTrue,
+    );
+  });
+
   testWidgets('binds sale control to active-planet aggregate cargo and value', (
     tester,
   ) async {
@@ -386,6 +415,8 @@ void main() {
         find.byKey(const Key('mine-site-right-rail')),
       );
       final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
+      expect(cavern, const Rect.fromLTWH(0, 0, 770, 402));
+      expect(rail.width, 104);
       expect(cavern.right, lessThanOrEqualTo(rail.left));
       expect(
         tester.getRect(find.byKey(const Key('mine-site-cargo'))).right,

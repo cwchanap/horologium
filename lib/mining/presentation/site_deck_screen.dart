@@ -158,7 +158,11 @@ class _SiteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stateLabel = _stateLabel(card.state);
-    final artHeight = MediaQuery.sizeOf(context).height < 500 ? 104.0 : 150.0;
+    final artHeight = MediaQuery.sizeOf(context).height < 500
+        ? 148.0
+        : card.isUnlocked
+        ? 196.0
+        : 128.0;
     final silhouette =
         MiningContentRegistry.resourceSilhouettes[card.definition.resource];
     final status = !card.isUnlocked
@@ -190,173 +194,175 @@ class _SiteCard extends StatelessWidget {
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              key: Key('site-card-${card.id.name}-art-frame'),
-              height: artHeight,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.asset(
-                    card.cardAsset,
-                    key: Key('site-card-${card.id.name}-art'),
-                    fit: BoxFit.cover,
-                    opacity: card.state == MiningSiteCardState.locked
-                        ? const AlwaysStoppedAnimation(0.48)
-                        : null,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const SizedBox(),
+        child: SizedBox(
+          key: Key('site-card-${card.id.name}-art-frame'),
+          height: artHeight,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                card.cardAsset,
+                key: Key('site-card-${card.id.name}-art'),
+                fit: BoxFit.cover,
+                opacity: card.state == MiningSiteCardState.locked
+                    ? const AlwaysStoppedAnimation(0.48)
+                    : null,
+                errorBuilder: (context, error, stackTrace) => const SizedBox(),
+              ),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.transparent, Color(0xE607111E)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                   ),
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.transparent, Color(0xE607111E)],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: _StateChip(label: stateLabel, state: card.state),
-                  ),
-                  Positioned(
-                    left: 12,
-                    right: card.isUnlocked ? 82 : 12,
-                    bottom: 12,
-                    child: Row(
-                      children: [
-                        if (silhouette != null)
-                          Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: silhouette.color.withAlpha(45),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: silhouette.color.withAlpha(150),
-                              ),
-                            ),
-                            child: Icon(
-                              silhouette.icon,
-                              color: silhouette.color,
-                              size: 22,
-                              semanticLabel: silhouette.name,
-                            ),
-                          ),
-                        const SizedBox(width: 9),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                card.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: MiningTheme.primaryText,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              Text(
-                                silhouette?.name.toUpperCase() ?? 'RESOURCE',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color:
-                                      silhouette?.color ??
-                                      MiningTheme.secondaryText,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                            ],
+                ),
+              ),
+              Positioned(
+                top: 10,
+                right: 10,
+                child: _StateChip(label: stateLabel, state: card.state),
+              ),
+              Positioned(
+                left: 12,
+                right: card.isUnlocked ? 74 : 12,
+                bottom: 58,
+                child: Row(
+                  children: [
+                    if (silhouette != null)
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: silhouette.color.withAlpha(45),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: silhouette.color.withAlpha(150),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  if (card.isUnlocked)
-                    Positioned(
-                      right: 10,
-                      bottom: 9,
-                      child: MiningCargoGauge(
-                        key: Key('site-card-${card.id.name}-cargo-gauge'),
-                        cargo: card.cargo,
-                        capacity: card.capacity,
-                        projectedValue: card.projectedValue,
-                        size: 62,
+                        child: Icon(
+                          silhouette.icon,
+                          color: silhouette.color,
+                          size: 22,
+                          semanticLabel: silhouette.name,
+                        ),
                       ),
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 10, 10),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      status,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: MiningTheme.secondaryText,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 132,
-                    height: 48,
-                    child: card.isUnlocked
-                        ? OutlinedButton(
-                            key: Key('site-card-${card.id.name}-enter'),
-                            onPressed: card.canEnter && !card.isBusy
-                                ? onEnter
-                                : null,
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(48, 48),
-                              foregroundColor: MiningTheme.accent,
-                              disabledForegroundColor: MiningTheme.mutedText,
-                              side: BorderSide(
-                                color: MiningTheme.accent.withAlpha(160),
-                              ),
-                            ),
-                            child: const Text('ENTER SITE'),
-                          )
-                        : OutlinedButton(
-                            key: Key('site-card-${card.id.name}-unlock'),
-                            onPressed: card.canUnlock ? onUnlock : null,
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(48, 48),
-                              foregroundColor: MiningTheme.warning,
-                              disabledForegroundColor: MiningTheme.mutedText,
-                              side: BorderSide(
-                                color: MiningTheme.warning.withAlpha(160),
-                              ),
-                            ),
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                'UNLOCK · ${card.unlockCost}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            card.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: MiningTheme.primaryText,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
-                  ),
-                ],
+                          Text(
+                            silhouette?.name.toUpperCase() ?? 'RESOURCE',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color:
+                                  silhouette?.color ??
+                                  MiningTheme.secondaryText,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              if (card.isUnlocked)
+                Positioned(
+                  right: 10,
+                  bottom: 54,
+                  child: MiningCargoGauge(
+                    key: Key('site-card-${card.id.name}-cargo-gauge'),
+                    cargo: card.cargo,
+                    capacity: card.capacity,
+                    projectedValue: card.projectedValue,
+                    size: 62,
+                  ),
+                ),
+              Positioned(
+                left: 12,
+                right: 10,
+                bottom: 8,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        status,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: MiningTheme.secondaryText,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 132,
+                      height: 48,
+                      child: card.isUnlocked
+                          ? OutlinedButton(
+                              key: Key('site-card-${card.id.name}-enter'),
+                              onPressed: card.canEnter && !card.isBusy
+                                  ? onEnter
+                                  : null,
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(48, 48),
+                                foregroundColor: MiningTheme.accent,
+                                disabledForegroundColor: MiningTheme.mutedText,
+                                side: BorderSide(
+                                  color: MiningTheme.accent.withAlpha(160),
+                                ),
+                                shape: BeveledRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: const Icon(Icons.play_arrow_rounded),
+                            )
+                          : OutlinedButton(
+                              key: Key('site-card-${card.id.name}-unlock'),
+                              onPressed: card.canUnlock ? onUnlock : null,
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(48, 48),
+                                foregroundColor: MiningTheme.warning,
+                                disabledForegroundColor: MiningTheme.mutedText,
+                                side: BorderSide(
+                                  color: MiningTheme.warning.withAlpha(160),
+                                ),
+                                shape: BeveledRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'UNLOCK · ${card.unlockCost}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
