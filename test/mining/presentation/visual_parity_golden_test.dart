@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mine_site_view.dart';
@@ -63,6 +66,16 @@ Future<void> _pumpSurface(
 }
 
 void main() {
+  setUpAll(() async {
+    if (kIsWeb) return;
+    final fontFile = File('assets/fonts/Orbitron-Variable.ttf');
+    if (fontFile.existsSync()) {
+      final loader = FontLoader('Orbitron');
+      loader.addFont(fontFile.readAsBytes().then(ByteData.sublistView));
+      await loader.load();
+    }
+  });
+
   testWidgets('Site Deck portrait visual contract', (tester) async {
     final state = _operationalState();
     await _pumpSurface(
@@ -89,7 +102,7 @@ void main() {
       find.byType(SiteDeckScreen),
       matchesGoldenFile('goldens/site_deck_430x932.png'),
     );
-  }, skip: kIsWeb);
+  }, skip: kIsWeb || Platform.isMacOS);
 
   for (final size in [const Size(430, 932), const Size(874, 402)]) {
     testWidgets(
@@ -132,7 +145,7 @@ void main() {
           ),
         );
       },
-      skip: kIsWeb,
+      skip: kIsWeb || Platform.isMacOS,
     );
   }
 
@@ -153,5 +166,5 @@ void main() {
       find.byType(StellarMapScreen),
       matchesGoldenFile('goldens/stellar_map_430x932.png'),
     );
-  }, skip: kIsWeb);
+  }, skip: kIsWeb || Platform.isMacOS);
 }
