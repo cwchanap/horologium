@@ -46,7 +46,12 @@ Future<void> _pumpSurface(
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
   });
-  await tester.pumpWidget(MaterialApp(home: child));
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+      home: child,
+    ),
+  );
   final context = tester.element(find.byType(MaterialApp));
   final images = tester.widgetList<Image>(find.byType(Image)).toList();
   await tester.runAsync(() async {

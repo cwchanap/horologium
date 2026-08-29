@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
+import 'package:horologium/mining/presentation/mining_theme.dart';
+import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 enum MiningNavigationDestination { siteDeck, technology, stellarMap, settings }
 
@@ -61,34 +63,51 @@ class _DestinationButton extends StatelessWidget {
       selected: selected,
       child: MiningHex(
         fill: selected
-            ? Colors.cyanAccent.withAlpha(28)
-            : const Color(0xD90E1828),
-        border: selected ? Colors.cyanAccent : Colors.cyan.withAlpha(76),
+            ? const Color.fromRGBO(24, 255, 255, .16)
+            : const Color.fromRGBO(6, 10, 16, .86),
+        border: selected
+            ? MiningTheme.highlight
+            : const Color.fromRGBO(83, 212, 232, .3),
         onTap: onPressed,
         semanticLabel: label,
         child: SizedBox.expand(
           key: Key('mining-nav-${destination.name}'),
-          child: Icon(
-            _icon(destination),
-            semanticLabel: label,
-            size: 25,
-            color: selected ? Colors.cyanAccent : Colors.white60,
-          ),
+          child: _graphic(destination, selected, label),
         ),
       ),
     );
   }
 
-  static IconData _icon(MiningNavigationDestination destination) {
+  static Widget _graphic(
+    MiningNavigationDestination destination,
+    bool selected,
+    String label,
+  ) {
+    final color = selected ? MiningTheme.highlight : Colors.white54;
     switch (destination) {
       case MiningNavigationDestination.siteDeck:
-        return Icons.dashboard_rounded;
+        return Icon(
+          Icons.grid_view_rounded,
+          semanticLabel: label,
+          size: 25,
+          color: color,
+        );
       case MiningNavigationDestination.technology:
-        return Icons.biotech_rounded;
+        return Image.asset(MiningVisuals.extractionIcon, width: 26, height: 26);
       case MiningNavigationDestination.stellarMap:
-        return Icons.public_rounded;
+        return Image.asset(
+          'assets/images/mining/planets/lunar_frontier.png',
+          width: 28,
+          height: 28,
+          opacity: selected ? null : const AlwaysStoppedAnimation(.62),
+        );
       case MiningNavigationDestination.settings:
-        return Icons.settings_rounded;
+        return Icon(
+          Icons.tune_rounded,
+          semanticLabel: label,
+          size: 25,
+          color: color,
+        );
     }
   }
 

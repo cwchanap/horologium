@@ -33,6 +33,7 @@ class HorologiumApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         primarySwatch: Colors.blue,
+        fontFamily: 'Orbitron',
         textTheme: const TextTheme(
           displayLarge: TextStyle(
             fontSize: 32,

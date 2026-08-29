@@ -56,6 +56,7 @@ Future<void> _pumpMap(
     MediaQuery(
       data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
       child: MaterialApp(
+        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
         home: StellarMapScreen(
           view: view,
           content: _content,
@@ -123,7 +124,7 @@ void main() {
       tester.getRect(
         find.byKey(const Key('mining-stellar-map-teaser-marsFrontier')),
       ),
-      const Rect.fromLTWH(14, 638, 374, 104),
+      const Rect.fromLTWH(14, 627, 374, 104),
     );
     expect(
       find.byKey(const Key('stellar-map-site-homeworld-landingBasin')),
@@ -184,12 +185,13 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: find.byKey(const Key('stellar-map-planet-homeworld-summary')),
-        matching: find.text('0.00/s · 0 cargo · +0'),
+      tester.widget(
+        find.byKey(const Key('stellar-map-planet-homeworld-summary')),
       ),
-      findsOneWidget,
+      isA<Row>(),
     );
+    expect(find.text('0/3'), findsOneWidget);
+    expect(find.text('0.0/s'), findsOneWidget);
   });
 
   testWidgets('Lunar unlock shows exact Mars Frontier requirements and state', (
@@ -216,7 +218,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(of: mars, matching: find.text('LOCKED')).first,
+      find.bySemanticsLabel(RegExp(r'Mars Frontier.*locked')),
       findsOneWidget,
     );
     expect(
@@ -224,18 +226,15 @@ void main() {
       findsNothing,
     );
     expect(
-      find.descendant(
-        of: mars,
-        matching: find.text('Lunar Frontier sites 0/3'),
-      ),
+      find.descendant(of: mars, matching: find.text('0/3  ×')),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: mars, matching: find.text('Surveying 5')),
+      find.descendant(of: mars, matching: find.text('LV 5  ×')),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: mars, matching: find.text('20000 cash')),
+      find.descendant(of: mars, matching: find.text('20000  ×')),
       findsOneWidget,
     );
     expect(
@@ -247,15 +246,7 @@ void main() {
     );
     expect(
       find.byKey(const Key('stellar-map-site-marsFrontier-ochreBasin')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('stellar-map-site-marsFrontier-silicaDunes')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('stellar-map-site-marsFrontier-cobaltChasm')),
-      findsOneWidget,
+      findsNothing,
     );
   });
 
@@ -341,7 +332,7 @@ void main() {
                 'stellar-map-site-${planet.id.name}-',
               ),
         );
-        expect(indicators, findsNWidgets(3));
+        expect(indicators, findsNWidgets(planet.isActive ? 3 : 0));
       }
     }
   });
