@@ -3,6 +3,7 @@ import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/presentation/fleet_dock.dart';
+import 'package:horologium/mining/presentation/mining_dashed_border.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
@@ -128,7 +129,7 @@ class _PortraitMineSite extends StatelessWidget {
   Widget build(BuildContext context) {
     return ColoredBox(
       key: const Key('mine-site-screen'),
-      color: const Color(0xFF07111E),
+      color: const Color(0xFF0A1218),
       child: Stack(
         children: [
           Positioned.fill(
@@ -145,16 +146,15 @@ class _PortraitMineSite extends StatelessWidget {
             left: 14,
             child: _MineChromeButton(
               key: const Key('mine-site-back'),
-              icon: Icons.arrow_back_rounded,
+              icon: Icons.chevron_left_rounded,
               label: 'Back to Site Deck',
               onPressed: onBack,
             ),
           ),
           Positioned(
-            left: 8,
-            right: 8,
-            bottom: 96,
-            height: 116,
+            left: 12,
+            right: 12,
+            bottom: 100,
             child: FleetDock(
               view: fleetDock,
               axis: FleetDockAxis.horizontal,
@@ -233,7 +233,11 @@ class _LandscapeMineSite extends StatelessWidget {
               onSellCargo: onSellCargo,
             ),
           ),
-          Positioned(top: 52, left: 0, child: MiningCashChip(cash: cash)),
+          Positioned(
+            top: 52,
+            left: 0,
+            child: MiningCashChip(cash: cash, compact: true),
+          ),
           Positioned(
             left: 12,
             bottom: 16,
@@ -254,8 +258,13 @@ class _LandscapeMineSite extends StatelessWidget {
             right: 0,
             bottom: 0,
             width: 104,
-            child: ColoredBox(
-              color: const Color(0xF20E1828),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Color.fromRGBO(6, 10, 16, .92),
+                border: Border(
+                  left: BorderSide(color: Color.fromRGBO(83, 212, 232, .24)),
+                ),
+              ),
               child: FleetDock(
                 view: fleetDock,
                 axis: FleetDockAxis.vertical,
@@ -307,16 +316,18 @@ class _CavernScene extends StatelessWidget {
                 capacity: view.capacity,
                 projectedValue: view.activePlanetProjectedSale,
                 size: landscape ? 74 : 84,
+                rate: view.rate,
               ),
             ),
             Positioned(
               left: landscape ? 236 : null,
               right: landscape ? null : 18,
               top: landscape
-                  ? 286
+                  ? null
                   : constraints.maxHeight < 750
                   ? constraints.maxHeight - 310
                   : 506,
+              bottom: landscape ? 78 : null,
               child: _SellControl(
                 view: view,
                 compact: landscape,
@@ -372,15 +383,63 @@ class _MineCavern extends StatelessWidget {
               ),
             ),
           ),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.black38, Colors.transparent, Colors.black45],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+          if (!landscape) ...[
+            const Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              height: 180,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color.fromRGBO(6, 10, 16, .85),
+                      Color.fromRGBO(6, 10, 16, .3),
+                      Color.fromRGBO(6, 10, 16, 0),
+                    ],
+                    stops: [0, .66, 1],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
               ),
             ),
-          ),
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 290,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color.fromRGBO(6, 10, 16, .95),
+                      Color.fromRGBO(6, 10, 16, .62),
+                      Color.fromRGBO(6, 10, 16, 0),
+                    ],
+                    stops: [0, .48, 1],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                  ),
+                ),
+              ),
+            ),
+          ] else
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color.fromRGBO(6, 10, 16, .9),
+                    Color.fromRGBO(6, 10, 16, .28),
+                    Color.fromRGBO(6, 10, 16, .32),
+                    Color.fromRGBO(6, 10, 16, .92),
+                  ],
+                  stops: [0, .24, .62, 1],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+              ),
+            ),
           for (var index = 0; index < view.nodeList.length; index++)
             Positioned(
               left: _nodeLeft(index, landscape),
@@ -464,10 +523,11 @@ class _MineNodeButton extends StatelessWidget {
                                 width: rigSize,
                                 height: rigSize,
                               ),
+                              const SizedBox(height: 3),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 5,
-                                  vertical: 2,
+                                  vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
                                   color: MiningTheme.accent,
@@ -488,16 +548,24 @@ class _MineNodeButton extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    SizedBox(
+                    Container(
                       width: nodeSize * .86,
-                      child: ClipRRect(
+                      height: 7,
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        color: const Color.fromRGBO(0, 0, 0, .6),
                         borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          minHeight: 7,
-                          value: progress,
-                          color: MiningTheme.warning,
-                          backgroundColor: Colors.black54,
+                        border: Border.all(
+                          color: view.rig == null
+                              ? Colors.white24
+                              : MiningTheme.accent,
                         ),
+                      ),
+                      alignment: Alignment.centerLeft,
+                      child: FractionallySizedBox(
+                        widthFactor: progress,
+                        heightFactor: 1,
+                        child: const ColoredBox(color: MiningTheme.warning),
                       ),
                     ),
                   ],
@@ -517,24 +585,41 @@ class _LockedNode extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: const Color(0xB8060A10),
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white24, width: 2),
+      CustomPaint(
+        foregroundPainter: MiningDashedRoundedBorderPainter(
+          color: const Color.fromRGBO(255, 255, 255, .24),
+          radius: size / 2,
+          strokeWidth: 2,
         ),
-        child: const Icon(Icons.lock_rounded, color: Colors.white38, size: 27),
+        child: Container(
+          width: size,
+          height: size,
+          decoration: const BoxDecoration(
+            color: Color.fromRGBO(6, 10, 16, .72),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.lock_rounded,
+            color: Colors.white38,
+            size: 27,
+          ),
+        ),
       ),
-      const SizedBox(height: 8),
-      const Text(
-        'LV 1',
-        style: TextStyle(
-          color: Colors.white54,
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-        ),
+      const SizedBox(height: 9),
+      const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.biotech_rounded, size: 15, color: MiningTheme.accent),
+          SizedBox(width: 6),
+          Text(
+            'LV 1',
+            style: TextStyle(
+              color: Colors.white54,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     ],
   );
@@ -578,10 +663,10 @@ class _SellControl extends StatelessWidget {
                 side: BorderSide.none,
                 shape: const RoundedRectangleBorder(),
               ),
-              child: const Icon(
-                Icons.local_shipping_rounded,
-                color: MiningTheme.warning,
-                size: 32,
+              child: Image.asset(
+                MiningVisuals.cargoIcon,
+                width: 38,
+                height: 38,
               ),
             ),
           ),
@@ -629,19 +714,17 @@ class _MineChromeButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: label,
-      child: IconButton(
-        tooltip: label,
-        onPressed: onPressed,
-        icon: Icon(icon),
-        color: MiningTheme.accent,
-        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SizedBox(
+    width: 44,
+    height: 48,
+    child: MiningHex(
+      fill: const Color.fromRGBO(6, 10, 16, .82),
+      border: const Color.fromRGBO(83, 212, 232, .32),
+      onTap: onPressed,
+      semanticLabel: label,
+      child: Icon(icon, color: MiningTheme.accent, size: 22),
+    ),
+  );
 }
 
 String _nodeLabel(MineSiteNodeView view) {

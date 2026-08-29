@@ -46,7 +46,7 @@ class FleetDock extends StatelessWidget {
   }
 
   List<Widget> _inlineChildren() => [
-    const SizedBox(width: 46, child: _FleetLabel()),
+    const SizedBox(width: 54, child: _FleetLabel()),
     SizedBox(
       width: 48,
       height: 54,
@@ -69,6 +69,7 @@ class FleetDock extends StatelessWidget {
 
   List<Widget> _horizontalChildren() => [
     Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         const _FleetLabel(),
         const SizedBox(width: 7),
@@ -89,27 +90,24 @@ class FleetDock extends StatelessWidget {
         ),
       ],
     ),
-    const SizedBox(height: 7),
+    const SizedBox(height: 9),
     Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         SizedBox(
           width: 60,
           height: 66,
-          child: _SpawnHex(view: view, onSpawnRig: onSpawnRig),
+          child: _SpawnHex(view: view, onSpawnRig: onSpawnRig, showRig: true),
         ),
-        const SizedBox(width: 6),
-        for (final bayId in DockBayId.values) ...[
-          Expanded(
-            child: SizedBox(
-              height: 66,
-              child: _BayButton(
-                view: view.bay(bayId),
-                onTap: () => onBayTap(bayId),
-              ),
+        for (final bayId in DockBayId.values)
+          SizedBox(
+            width: 60,
+            height: 66,
+            child: _BayButton(
+              view: view.bay(bayId),
+              onTap: () => onBayTap(bayId),
             ),
           ),
-          if (bayId != DockBayId.values.last) const SizedBox(width: 6),
-        ],
       ],
     ),
   ];
@@ -120,7 +118,7 @@ class FleetDock extends StatelessWidget {
     SizedBox(
       width: 56,
       height: 62,
-      child: _SpawnHex(view: view, onSpawnRig: onSpawnRig),
+      child: _SpawnHex(view: view, onSpawnRig: onSpawnRig, showRig: true),
     ),
     const SizedBox(height: 4),
     for (final bayId in DockBayId.values) ...[
@@ -138,27 +136,43 @@ class _FleetLabel extends StatelessWidget {
   const _FleetLabel();
 
   @override
-  Widget build(BuildContext context) => const Text(
-    'FLEET',
-    style: TextStyle(
-      color: Colors.white54,
-      fontSize: 9,
-      fontWeight: FontWeight.w800,
-      letterSpacing: 1.2,
+  Widget build(BuildContext context) => FittedBox(
+    fit: BoxFit.scaleDown,
+    alignment: Alignment.centerLeft,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Image.asset(MiningVisuals.mergeIcon, width: 14, height: 14),
+        const SizedBox(width: 6),
+        const Text(
+          'FLEET',
+          style: TextStyle(
+            color: Colors.white54,
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ],
     ),
   );
 }
 
 class _SpawnHex extends StatelessWidget {
-  const _SpawnHex({required this.view, required this.onSpawnRig});
+  const _SpawnHex({
+    required this.view,
+    required this.onSpawnRig,
+    this.showRig = false,
+  });
 
   final FleetDockView view;
   final VoidCallback onSpawnRig;
+  final bool showRig;
 
   @override
   Widget build(BuildContext context) => MiningHex(
-    fill: MiningTheme.accent.withAlpha(24),
-    border: MiningTheme.accent.withAlpha(180),
+    fill: const Color.fromRGBO(24, 255, 255, .1),
+    border: const Color.fromRGBO(24, 255, 255, .55),
     onTap: view.canSpawn ? onSpawnRig : null,
     semanticLabel: view.spawnHint,
     child: SizedBox.expand(
@@ -166,14 +180,30 @@ class _SpawnHex extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.add_rounded, color: MiningTheme.accent, size: 18),
-          Text(
-            '${view.spawnCost}',
-            style: const TextStyle(
-              color: MiningTheme.accent,
-              fontSize: 8,
-              fontWeight: FontWeight.w800,
+          if (showRig)
+            Image.asset(
+              MiningVisuals.rigAsset(RigTier.t1),
+              width: 30,
+              height: 30,
             ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.add_rounded,
+                color: MiningTheme.highlight,
+                size: showRig ? 12 : 18,
+              ),
+              if (showRig) const SizedBox(width: 2),
+              Text(
+                '${view.spawnCost}',
+                style: TextStyle(
+                  color: MiningTheme.highlight,
+                  fontSize: showRig ? 9 : 8,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -191,52 +221,64 @@ class _BayButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final bayName = view.id.name.toUpperCase();
     final rig = view.rig;
+    final tierColor = rig != null && rig.index >= RigTier.t3.index
+        ? const Color(0xFFC4AFFF)
+        : MiningTheme.accent;
     return Semantics(
       button: true,
       enabled: !view.isBusy,
       label: 'Dock bay $bayName: ${view.hint}',
       child: MiningHex(
         fill: view.isSelected
-            ? MiningTheme.accent.withAlpha(35)
-            : const Color(0xD90E1828),
-        border: view.isSelected ? MiningTheme.accent : Colors.white24,
+            ? const Color.fromRGBO(24, 255, 255, .16)
+            : rig == null
+            ? const Color.fromRGBO(255, 255, 255, .05)
+            : tierColor.withValues(alpha: .14),
+        border: view.isSelected
+            ? MiningTheme.highlight
+            : rig == null
+            ? const Color.fromRGBO(255, 255, 255, .16)
+            : tierColor.withValues(alpha: .6),
         onTap: view.isBusy ? null : onTap,
         child: Container(
           key: ValueKey<String>(view.id.name),
           constraints: const BoxConstraints(minHeight: 54, minWidth: 48),
           padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              SizedBox(
-                width: 33,
-                height: 33,
-                child: rig == null
-                    ? Icon(
-                        Icons.add_circle_outline,
-                        color: Colors.white38,
-                        size: 27,
-                        semanticLabel: 'Empty bay',
-                      )
-                    : Image.asset(
-                        MiningVisuals.rigAsset(rig),
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => Icon(
-                          Icons.precision_manufacturing_rounded,
-                          color: MiningTheme.accent,
-                          size: 27,
-                        ),
-                      ),
-              ),
-              const SizedBox(height: 2),
+              if (rig == null)
+                const Icon(
+                  Icons.add_circle_outline,
+                  color: Colors.white38,
+                  size: 27,
+                  semanticLabel: 'Empty bay',
+                )
+              else
+                SizedBox(
+                  width: rig.index >= RigTier.t3.index ? 38 : 36,
+                  height: rig.index >= RigTier.t3.index ? 38 : 36,
+                  child: Image.asset(
+                    MiningVisuals.rigAsset(rig),
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.precision_manufacturing_rounded,
+                      color: MiningTheme.accent,
+                      size: 27,
+                    ),
+                  ),
+                ),
               if (rig != null)
-                Text(
-                  rig.name.toUpperCase(),
-                  style: const TextStyle(
-                    color: Color(0xFF04121A),
-                    backgroundColor: MiningTheme.accent,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w800,
+                Positioned(
+                  bottom: 1,
+                  child: Text(
+                    rig.name.toUpperCase(),
+                    style: TextStyle(
+                      color: const Color(0xFF04121A),
+                      backgroundColor: tierColor,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
             ],

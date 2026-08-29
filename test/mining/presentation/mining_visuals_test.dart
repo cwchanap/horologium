@@ -45,10 +45,10 @@ void main() {
       'assets/images/mining/effects/merge_burst.png',
     );
     expect(MiningVisuals.offlineHero, 'assets/images/mining/offline/hero.png');
-    expect(MiningTheme.accent, Colors.cyanAccent);
+    expect(MiningTheme.accent, const Color(0xFF53D4E8));
     expect(MiningTheme.hudPanel, const Color(0xE6162133));
     expect(MiningTheme.panel, const Color(0xF20E1828));
-    expect(MiningTheme.warning, Colors.orangeAccent);
+    expect(MiningTheme.warning, const Color(0xFFFFD54A));
   });
 
   // The Chrome test runner stalls on the first rootBundle byte load; retain

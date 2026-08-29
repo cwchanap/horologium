@@ -99,6 +99,7 @@ Future<void> _pumpMineSite(
   });
   await tester.pumpWidget(
     MaterialApp(
+      theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
       home: MediaQuery(
         data: MediaQueryData(
           disableAnimations: disableAnimations,
@@ -147,6 +148,10 @@ void main() {
     expect(
       tester.getRect(find.byKey(const Key('mine-site-cargo'))),
       const Rect.fromLTWH(306, 50, 84, 84),
+    );
+    expect(
+      tester.getRect(find.byKey(const Key('mine-site-back'))),
+      const Rect.fromLTWH(14, 146, 44, 48),
     );
     expect(
       tester.getRect(find.byKey(const Key('mine-site-node-n1'))).topLeft,

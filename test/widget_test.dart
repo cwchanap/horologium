@@ -12,6 +12,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/main.dart' as app;
 
 void main() {
+  testWidgets('app uses the prototype Orbitron typeface', (tester) async {
+    await tester.pumpWidget(const app.HorologiumApp());
+
+    final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(materialApp.theme?.textTheme.bodyMedium?.fontFamily, 'Orbitron');
+  });
+
   testWidgets('Main menu displays correctly', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const app.HorologiumApp());

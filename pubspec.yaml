@@ -70,6 +70,20 @@ flutter:
     - assets/images/mining/offline/
     - assets/audio/
 
+  fonts:
+    - family: Orbitron
+      fonts:
+        - asset: assets/fonts/Orbitron-Variable.ttf
+          weight: 400
+        - asset: assets/fonts/Orbitron-Variable.ttf
+          weight: 500
+        - asset: assets/fonts/Orbitron-Variable.ttf
+          weight: 600
+        - asset: assets/fonts/Orbitron-Variable.ttf
+          weight: 700
+        - asset: assets/fonts/Orbitron-Variable.ttf
+          weight: 900
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

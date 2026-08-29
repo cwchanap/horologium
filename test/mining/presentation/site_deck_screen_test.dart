@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
+import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/site_deck_screen.dart';
 import 'package:horologium/mining/site_deck_view.dart';
@@ -57,6 +58,7 @@ Future<void> _pumpDeck(
   });
   await tester.pumpWidget(
     MaterialApp(
+      theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
       home: SiteDeckScreen(
         view: view,
         fleetDock: dock,
@@ -107,6 +109,47 @@ void main() {
     expect(cash.top, 54);
     expect(cash.left, 0);
     expect(gauge, const Rect.fromLTWH(310, 50, 80, 80));
+    expect(
+      tester
+          .widget<Opacity>(find.byKey(const Key('site-deck-header-art')))
+          .opacity,
+      .55,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('site-card-landingBasin-enter')),
+        matching: find.byType(MiningHex),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('site-card-landingBasin-node-dots')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('navigation hexes use prototype selection and panel alpha', (
+    tester,
+  ) async {
+    final state = _stateWith();
+    await _pumpDeck(tester, view: _deckView(state), dock: _dockView(state));
+
+    final selected = tester.widget<MiningHex>(
+      find.ancestor(
+        of: find.byKey(const Key('mining-nav-siteDeck')),
+        matching: find.byType(MiningHex),
+      ),
+    );
+    final idle = tester.widget<MiningHex>(
+      find.ancestor(
+        of: find.byKey(const Key('mining-nav-technology')),
+        matching: find.byType(MiningHex),
+      ),
+    );
+    expect(selected.fill, const Color.fromRGBO(24, 255, 255, .16));
+    expect(selected.border, const Color(0xFF18FFFF));
+    expect(idle.fill, const Color.fromRGBO(6, 10, 16, .86));
+    expect(idle.border, const Color.fromRGBO(83, 212, 232, .3));
   });
 
   testWidgets('renders each projected card state with canonical asset art', (
@@ -116,8 +159,16 @@ void main() {
       _stateWith(sites: {MiningSiteId.landingBasin: _progress(unlocked: true)}),
     );
     await _pumpDeck(tester, view: fresh, dock: _dockView(_stateWith()));
-    expect(find.text('AVAILABLE'), findsOneWidget);
-    expect(find.text('LOCKED'), findsWidgets);
+    expect(
+      find.byKey(const Key('site-card-landingBasin-node-dots')),
+      findsNothing,
+    );
+    expect(
+      find.bySemanticsLabel(
+        RegExp(r'Carbon Ridge.*locked', caseSensitive: false),
+      ),
+      findsOneWidget,
+    );
     expect(
       tester
           .widget<Image>(find.byKey(const Key('site-card-landingBasin-art')))
@@ -127,6 +178,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
         home: SiteDeckScreen(
           view: _deckView(
             _stateWith(
@@ -160,8 +212,14 @@ void main() {
       const Offset(0, -500),
     );
     await tester.pump();
-    expect(find.text('AVAILABLE'), findsOneWidget);
-    expect(find.text('OPERATIONAL'), findsOneWidget);
+    expect(
+      find.byKey(const Key('site-card-carbonRidge-node-dots')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('site-card-graniteCrater-node-dots')),
+      findsOneWidget,
+    );
     expect(MiningSiteCardState.values, <MiningSiteCardState>[
       MiningSiteCardState.locked,
       MiningSiteCardState.available,

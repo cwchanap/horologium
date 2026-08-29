@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
+import 'package:horologium/mining/presentation/mining_dashed_border.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
+import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:horologium/mining/site_deck_view.dart';
 
 /// Full-screen planet progression surface. All economy and action affordances
@@ -136,50 +138,60 @@ class _LockedPlanetTeaser extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xB20A0F16),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white24),
+        border: Border.all(color: Colors.transparent),
       ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -2,
-            top: -2,
-            child: Opacity(
-              opacity: .45,
-              child: _PlanetArt(definition: definition, size: 92),
-            ),
-          ),
-          Positioned(
-            left: 14,
-            top: 18,
-            child: Text(
-              definition.name,
-              style: const TextStyle(
-                color: Colors.white38,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
+      child: CustomPaint(
+        foregroundPainter: const MiningDashedRoundedBorderPainter(
+          color: Color.fromRGBO(255, 255, 255, .14),
+          radius: 16,
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -2,
+              top: -2,
+              child: Opacity(
+                opacity: .34,
+                child: _PlanetArt(definition: definition, size: 92),
               ),
             ),
-          ),
-          Positioned(
-            left: 14,
-            bottom: 17,
-            child: Row(
-              children: [
-                const Icon(Icons.lock_rounded, color: Colors.white38, size: 16),
-                const SizedBox(width: 7),
-                Text(
-                  'UNLOCK ${requiredPlanetName.split(' ').first.toUpperCase()} FIRST',
-                  style: const TextStyle(
-                    color: Colors.white38,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: .6,
-                  ),
+            Positioned(
+              left: 14,
+              top: 18,
+              child: Text(
+                definition.name,
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+            Positioned(
+              left: 14,
+              bottom: 17,
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.lock_rounded,
+                    color: Colors.white38,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    'UNLOCK ${requiredPlanetName.split(' ').first.toUpperCase()} FIRST',
+                    style: const TextStyle(
+                      color: Colors.white38,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: .6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -217,7 +229,7 @@ class _PlanetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final definition = content.planet(view.id);
     final stateLabel = _stateLabel(view);
-    final height = view.isActive ? 264.0 : 206.0;
+    final height = view.isActive ? 264.0 : 195.0;
     return Semantics(
       container: true,
       label: '${view.name}, ${stateLabel.toLowerCase()} planet',
@@ -236,6 +248,14 @@ class _PlanetCard extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: _borderColor(view)),
+          boxShadow: view.isActive
+              ? const [
+                  BoxShadow(
+                    color: Color.fromRGBO(83, 212, 232, .1),
+                    spreadRadius: 3,
+                  ),
+                ]
+              : null,
         ),
         child: Stack(
           children: [
@@ -250,20 +270,21 @@ class _PlanetCard extends StatelessWidget {
                 ),
               ),
             ),
+            if (view.isActive)
+              Positioned(
+                left: 14,
+                top: 14,
+                child: _StateChip(label: stateLabel, view: view),
+              ),
             Positioned(
               left: 14,
-              top: 14,
-              child: _StateChip(label: stateLabel, view: view),
-            ),
-            Positioned(
-              left: 14,
-              top: view.isActive ? 56 : 54,
+              top: view.isActive ? 56 : 16,
               child: Text(
                 view.name,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: view.isActive ? 24 : 20,
-                  fontWeight: FontWeight.w800,
+                  fontSize: view.isActive ? 24 : 22,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -293,8 +314,8 @@ class _PlanetCard extends StatelessWidget {
             else ...[
               Positioned(
                 left: 14,
-                right: 106,
-                top: 86,
+                right: 14,
+                top: 54,
                 child: Column(
                   children: [
                     for (final requirement in view.requirements)
@@ -309,25 +330,6 @@ class _PlanetCard extends StatelessWidget {
                             fontSize: 10,
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              ),
-              Positioned(
-                right: 14,
-                top: 106,
-                width: 78,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    for (final indicator in view.siteIndicators)
-                      _SiteIndicator(
-                        key: Key(
-                          'stellar-map-site-${view.id.name}-${indicator.id.name}',
-                        ),
-                        indicator: indicator,
-                        content: content,
-                        compact: true,
                       ),
                   ],
                 ),
@@ -372,7 +374,9 @@ class _PlanetCard extends StatelessWidget {
   }
 
   static Color _borderColor(StellarMapPlanetView view) {
-    if (view.isActive) return MiningTheme.accent.withAlpha(190);
+    if (view.isActive) {
+      return const Color.fromRGBO(83, 212, 232, .5);
+    }
     if (view.isUnlocked) return Colors.white38;
     return Colors.white24;
   }
@@ -413,26 +417,35 @@ class _StateChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = view.isActive
-        ? MiningTheme.accent
-        : view.isUnlocked
-        ? Colors.white70
-        : Colors.white54;
+    const color = MiningTheme.highlight;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: color.withAlpha(35),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withAlpha(150)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: .65)),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.5,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 7,
+            height: 7,
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: const TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -445,33 +458,39 @@ class _PlanetMetrics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Row(
       key: Key('stellar-map-planet-${view.id.name}-summary'),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-      decoration: BoxDecoration(
-        color: MiningTheme.hudPanel,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerLeft,
-        child: Text(
-          '${view.rate.toStringAsFixed(2)}/s · ${_amount(view.cargo)} cargo · +${view.projectedValue}',
-          maxLines: 1,
+      children: [
+        const Icon(
+          Icons.grid_view_rounded,
+          color: MiningTheme.accent,
+          size: 15,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          '${view.sitesCommissioned}/${view.siteTotal}',
           style: const TextStyle(
-            color: MiningTheme.primaryText,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
           ),
         ),
-      ),
+        const SizedBox(width: 10),
+        Container(width: 1, height: 18, color: Colors.white24),
+        const SizedBox(width: 10),
+        const Icon(Icons.speed_rounded, color: MiningTheme.accent, size: 16),
+        const SizedBox(width: 6),
+        Text(
+          '${view.rate.toStringAsFixed(1)}/s',
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
-
-  static String _amount(double value) => value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(1);
 }
 
 class _SiteIndicator extends StatelessWidget {
@@ -479,62 +498,102 @@ class _SiteIndicator extends StatelessWidget {
     super.key,
     required this.indicator,
     required this.content,
-    this.compact = false,
   });
 
   final StellarMapSiteIndicatorView indicator;
   final MiningContentRegistry content;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final site = content.site(indicator.id);
-    final color = _stateColor(indicator.state);
+    final color = indicator.isCommissioned
+        ? MiningTheme.warning
+        : _stateColor(indicator.state);
     return Semantics(
       container: true,
       label: '${indicator.name}, ${_stateLabel(indicator.state).toLowerCase()}',
-      child: Container(
-        width: compact ? 22 : null,
-        constraints: BoxConstraints(minHeight: compact ? 22 : 62),
-        padding: EdgeInsets.all(compact ? 1 : 7),
-        decoration: BoxDecoration(
-          color: Colors.black26,
-          borderRadius: BorderRadius.circular(compact ? 6 : 13),
-          border: Border.all(color: color.withAlpha(120)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              site.nodeAsset,
-              width: compact ? 17 : 30,
-              height: compact ? 17 : 30,
-              opacity: indicator.isUnlocked
-                  ? null
-                  : const AlwaysStoppedAnimation(.45),
+      child: CustomPaint(
+        foregroundPainter: !indicator.isUnlocked
+            ? const MiningDashedRoundedBorderPainter(
+                color: Color.fromRGBO(255, 255, 255, .24),
+                radius: 13,
+              )
+            : null,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 62),
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: Colors.black26,
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(
+              color: !indicator.isUnlocked
+                  ? Colors.transparent
+                  : color.withAlpha(120),
             ),
-            if (!compact) ...[
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var index = 0; index < 5; index++) ...[
-                    Container(
-                      width: 5,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: index < (indicator.isCommissioned ? 3 : 0)
-                            ? color
-                            : Colors.white24,
-                      ),
+          ),
+          child: !indicator.isUnlocked
+              ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.lock_rounded,
+                      color: Colors.white38,
+                      size: 27,
                     ),
-                    if (index != 4) const SizedBox(width: 3),
+                    const SizedBox(height: 5),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.biotech_rounded,
+                          color: MiningTheme.accent,
+                          size: 13,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${site.requiredSurveyingLevel}',
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                ],
-              ),
-            ],
-          ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      site.nodeAsset,
+                      width: 30,
+                      height: 30,
+                      opacity: indicator.isUnlocked
+                          ? null
+                          : const AlwaysStoppedAnimation(.45),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        for (var index = 0; index < 5; index++) ...[
+                          Container(
+                            width: 5,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: index < (indicator.isCommissioned ? 3 : 0)
+                                  ? color
+                                  : Colors.white24,
+                            ),
+                          ),
+                          if (index != 4) const SizedBox(width: 3),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
         ),
       ),
     );
@@ -574,31 +633,33 @@ class _RequirementRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final label = requirement.label;
+    final (asset, value) = label.contains(' sites ')
+        ? (MiningVisuals.cargoIcon, label.split(' ').last)
+        : label.startsWith('Surveying ')
+        ? (MiningVisuals.surveyingIcon, 'LV ${label.split(' ').last}')
+        : (MiningVisuals.cashIcon, label.split(' ').first);
+    final color = requirement.isSatisfied
+        ? MiningTheme.accent
+        : MiningTheme.gate;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Icon(
-            requirement.isSatisfied
-                ? Icons.check_circle_rounded
-                : Icons.radio_button_unchecked_rounded,
-            color: requirement.isSatisfied
-                ? MiningTheme.accent
-                : MiningTheme.warning,
-            size: 17,
-            semanticLabel: requirement.isSatisfied ? 'Satisfied' : 'Required',
-          ),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              requirement.label,
-              style: const TextStyle(
-                color: MiningTheme.secondaryText,
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Semantics(
+        label: '$label, ${requirement.isSatisfied ? 'satisfied' : 'required'}',
+        child: Row(
+          children: [
+            Image.asset(asset, width: 17, height: 17),
+            const SizedBox(width: 7),
+            Text(
+              '$value  ${requirement.isSatisfied ? '✓' : '×'}',
+              style: TextStyle(
+                color: color,
                 fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -623,8 +684,8 @@ class _PlanetAction extends StatelessWidget {
         width: 54,
         height: 60,
         child: MiningHex(
-          fill: MiningTheme.accent,
-          border: MiningTheme.accent,
+          fill: MiningTheme.highlight,
+          border: MiningTheme.highlight,
           onTap: !view.isActive && !view.isBusy
               ? () => onTravel(view.id)
               : null,
@@ -637,21 +698,38 @@ class _PlanetAction extends StatelessWidget {
         ),
       );
     }
+    final gatesLeft = view.requirements
+        .where((requirement) => !requirement.isSatisfied)
+        .length;
+    final canUnlock = view.canUnlock && !view.isBusy;
     return SizedBox(
       key: Key('mining-stellar-map-unlock-${view.id.name}'),
       width: double.infinity,
       height: 48,
       child: ElevatedButton(
-        onPressed: view.canUnlock && !view.isBusy
-            ? () => onUnlock(view.id)
-            : null,
+        onPressed: canUnlock ? () => onUnlock(view.id) : null,
         style: ElevatedButton.styleFrom(
           minimumSize: const Size(48, 48),
           foregroundColor: MiningTheme.warning,
-          disabledForegroundColor: MiningTheme.mutedText,
-          side: BorderSide(color: MiningTheme.warning.withAlpha(160)),
+          disabledForegroundColor: Colors.white38,
+          disabledBackgroundColor: const Color.fromRGBO(255, 255, 255, .05),
+          side: BorderSide(
+            color: canUnlock
+                ? MiningTheme.warning.withAlpha(160)
+                : const Color.fromRGBO(255, 255, 255, .14),
+          ),
+          shape: const StadiumBorder(),
         ),
-        child: Text('UNLOCK FOR ${view.unlockCashCost} CASH'),
+        child: canUnlock
+            ? Text('UNLOCK FOR ${view.unlockCashCost} CASH')
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.lock_rounded, size: 16),
+                  const SizedBox(width: 9),
+                  Text('$gatesLeft GATES LEFT'),
+                ],
+              ),
       ),
     );
   }

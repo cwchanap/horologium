@@ -75,9 +75,10 @@ class MiningHud extends StatelessWidget {
 }
 
 class MiningCashChip extends StatelessWidget {
-  const MiningCashChip({super.key, required this.cash});
+  const MiningCashChip({super.key, required this.cash, this.compact = false});
 
   final int cash;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -85,13 +86,19 @@ class MiningCashChip extends StatelessWidget {
       label: 'Cash $cash',
       child: Container(
         key: const Key('mining-cash-chip'),
-        constraints: const BoxConstraints(minWidth: 76, minHeight: 46),
-        padding: const EdgeInsets.fromLTRB(14, 11, 22, 11),
+        height: compact ? 39 : null,
+        constraints: BoxConstraints(minWidth: 76, minHeight: compact ? 39 : 46),
+        padding: compact
+            ? const EdgeInsets.fromLTRB(12, 9, 20, 9)
+            : const EdgeInsets.fromLTRB(14, 11, 22, 11),
         decoration: ShapeDecoration(
-          color: MiningTheme.warning.withAlpha(20),
-          shape: BeveledRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(color: MiningTheme.warning.withAlpha(160)),
+          color: const Color.fromRGBO(255, 213, 74, .16),
+          shape: _CashChipBorder(
+            cut: compact ? .9 : .88,
+            side: const BorderSide(
+              color: Color.fromRGBO(255, 213, 74, .5),
+              width: 1.5,
+            ),
           ),
         ),
         child: Row(
@@ -99,23 +106,24 @@ class MiningCashChip extends StatelessWidget {
           children: [
             Image.asset(
               MiningVisuals.cashIcon,
-              width: 24,
-              height: 24,
-              errorBuilder: (context, error, stackTrace) => const Icon(
+              width: compact ? 21 : 24,
+              height: compact ? 21 : 24,
+              errorBuilder: (context, error, stackTrace) => Icon(
                 Icons.monetization_on_rounded,
                 color: MiningTheme.warning,
-                size: 24,
+                size: compact ? 21 : 24,
               ),
             ),
-            const SizedBox(width: 4),
+            SizedBox(width: compact ? 8 : 9),
             Flexible(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
                   '$cash',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: MiningTheme.warning,
-                    fontSize: 22,
+                    fontSize: compact ? 19 : 22,
+                    height: compact ? 1 : null,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -139,6 +147,7 @@ class MiningCargoGauge extends StatelessWidget {
     this.buttonKey,
     this.containerKey,
     this.semanticLabel,
+    this.rate,
   });
 
   final double cargo;
@@ -149,6 +158,7 @@ class MiningCargoGauge extends StatelessWidget {
   final Key? buttonKey;
   final Key? containerKey;
   final String? semanticLabel;
+  final double? rate;
 
   @override
   Widget build(BuildContext context) {
@@ -167,14 +177,17 @@ class MiningCargoGauge extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            CircularProgressIndicator(
-              value: progress,
-              strokeWidth: 4,
-              color: MiningTheme.accent,
-              backgroundColor: Colors.white12,
+            Padding(
+              padding: const EdgeInsets.all(4.5),
+              child: CircularProgressIndicator(
+                value: progress,
+                strokeWidth: 5,
+                color: MiningTheme.accent,
+                backgroundColor: const Color.fromRGBO(255, 255, 255, .13),
+              ),
             ),
             Padding(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(7),
               child: OutlinedButton(
                 key: buttonKey,
                 onPressed: onPressed,
@@ -184,30 +197,39 @@ class MiningCargoGauge extends StatelessWidget {
                   side: BorderSide.none,
                   foregroundColor: MiningTheme.accent,
                   disabledForegroundColor: MiningTheme.mutedText,
-                  backgroundColor: MiningTheme.panel.withAlpha(220),
+                  backgroundColor: const Color.fromRGBO(6, 10, 16, .72),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Image.asset(
                       MiningVisuals.cargoIcon,
-                      width: size < 68 ? 16 : 19,
-                      height: size < 68 ? 16 : 19,
+                      width: size < 68 ? 16 : (size < 80 ? 18 : 20),
+                      height: size < 68 ? 16 : (size < 80 ? 18 : 20),
                       errorBuilder: (context, error, stackTrace) => Icon(
                         Icons.inventory_2_rounded,
                         color: MiningTheme.accent,
-                        size: size < 68 ? 16 : 19,
+                        size: size < 68 ? 16 : (size < 80 ? 18 : 20),
                       ),
                     ),
                     Text(
                       _amount(cargo),
                       maxLines: 1,
                       style: TextStyle(
-                        color: MiningTheme.primaryText,
-                        fontSize: size < 68 ? 9 : 11,
+                        color: MiningTheme.accent,
+                        fontSize: size < 68 ? 9 : (size < 80 ? 12 : 14),
                         fontWeight: FontWeight.w900,
                       ),
                     ),
+                    if (rate case final value?)
+                      Text(
+                        '${value.toStringAsFixed(1)}/s',
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -221,4 +243,46 @@ class MiningCargoGauge extends StatelessWidget {
   static String _amount(double value) => value == value.roundToDouble()
       ? value.toStringAsFixed(0)
       : value.toStringAsFixed(1);
+}
+
+class _CashChipBorder extends OutlinedBorder {
+  const _CashChipBorder({this.cut = .88, super.side = BorderSide.none});
+
+  final double cut;
+
+  @override
+  OutlinedBorder copyWith({BorderSide? side}) =>
+      _CashChipBorder(cut: cut, side: side ?? this.side);
+
+  @override
+  Path getOuterPath(Rect rect, {TextDirection? textDirection}) => Path()
+    ..moveTo(rect.left, rect.top)
+    ..lineTo(rect.right, rect.top)
+    ..lineTo(rect.left + rect.width * cut, rect.bottom)
+    ..lineTo(rect.left, rect.bottom)
+    ..close();
+
+  @override
+  Path getInnerPath(Rect rect, {TextDirection? textDirection}) =>
+      getOuterPath(rect.deflate(side.width), textDirection: textDirection);
+
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
+    if (side.style == BorderStyle.none) return;
+    final path = Path()
+      ..moveTo(rect.left, rect.top)
+      ..lineTo(rect.right, rect.top)
+      ..lineTo(rect.left + rect.width * cut, rect.bottom)
+      ..lineTo(rect.left, rect.bottom);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = side.color
+        ..strokeWidth = side.width
+        ..style = PaintingStyle.stroke,
+    );
+  }
+
+  @override
+  ShapeBorder scale(double t) => _CashChipBorder(cut: cut, side: side.scale(t));
 }
