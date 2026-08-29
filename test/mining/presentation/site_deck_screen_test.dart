@@ -133,6 +133,50 @@ void main() {
     ]);
   });
 
+  testWidgets('keeps site art dominant and exposes visual HUD gauges', (
+    tester,
+  ) async {
+    final state = _stateWith(
+      cash: 2_000,
+      sites: {
+        MiningSiteId.landingBasin: _progress(
+          unlocked: true,
+          commissioned: true,
+          rigs: {MiningNodeId.n1: RigTier.t2},
+        ),
+      },
+    );
+    await _pumpDeck(tester, view: _deckView(state), dock: _dockView(state));
+    tester.view.physicalSize = const Size(430, 932);
+    await tester.pump();
+
+    expect(find.byKey(const Key('mining-cash-chip')), findsOneWidget);
+    expect(find.byKey(const Key('mining-cargo-gauge')), findsOneWidget);
+
+    final card = tester.getRect(
+      find.byKey(const Key('site-card-landingBasin')),
+    );
+    final artFrame = tester.getRect(
+      find.byKey(const Key('site-card-landingBasin-art-frame')),
+    );
+    expect(artFrame.height, greaterThanOrEqualTo(120));
+    expect(artFrame.height, greaterThan(card.height * 0.45));
+    expect(
+      tester
+          .widget<Image>(find.byKey(const Key('site-card-landingBasin-art')))
+          .opacity
+          ?.value,
+      anyOf(isNull, equals(1)),
+    );
+
+    await tester.drag(
+      find.byKey(const Key('site-deck-scroll')),
+      const Offset(0, -220),
+    );
+    await tester.pump();
+    expect(tester.widget<Text>(find.text('UNLOCK · 250')).maxLines, 1);
+  });
+
   testWidgets('emits site, dock, spawn, and bottom navigation callbacks', (
     tester,
   ) async {
@@ -157,6 +201,11 @@ void main() {
     );
 
     await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.drag(
+      find.byKey(const Key('site-deck-scroll')),
+      const Offset(0, -240),
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const Key('site-card-carbonRidge-unlock')));
     await tester.tap(find.byKey(const ValueKey<String>('b1')));
     await tester.tap(find.byKey(const ValueKey<String>('b2')));

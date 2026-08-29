@@ -5,7 +5,6 @@ import 'package:horologium/mining/presentation/fleet_dock.dart';
 import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
-import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:horologium/mining/site_deck_view.dart';
 
 class SiteDeckScreen extends StatelessWidget {
@@ -35,7 +34,6 @@ class SiteDeckScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final compact = size.height < 500;
     final landscape = size.width > size.height;
     final deckContent = <Widget>[
       Padding(
@@ -45,7 +43,10 @@ class SiteDeckScreen extends StatelessWidget {
           cash: cash,
           commissionedSites: view.commissionedCount,
           totalSites: view.siteCount,
+          cargo: view.totalCargo,
+          capacity: view.totalCapacity,
           cargoValue: view.projectedValue,
+          rate: view.totalRate,
         ),
       ),
       Padding(
@@ -82,11 +83,6 @@ class SiteDeckScreen extends StatelessWidget {
           ],
         ),
       ),
-      if (!compact)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 5),
-          child: _DeckSummary(view: view),
-        ),
       Expanded(
         child: ListView.separated(
           key: const Key('site-deck-scroll'),
@@ -162,8 +158,17 @@ class _SiteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stateLabel = _stateLabel(card.state);
+    final artHeight = MediaQuery.sizeOf(context).height < 500 ? 104.0 : 150.0;
     final silhouette =
         MiningContentRegistry.resourceSilhouettes[card.definition.resource];
+    final status = !card.isUnlocked
+        ? card.unlockDisabledReason ??
+              (card.requiredSite == null
+                  ? 'Surveying ${card.requiredSurveyingLevel} required'
+                  : 'Previous site required')
+        : card.rate <= 0
+        ? 'IDLE'
+        : '${card.rate.toStringAsFixed(2)}/s  ·  ${_amount(card.cargo)} / ${_amount(card.capacity)}';
     return Semantics(
       container: true,
       label: '${card.name}, $stateLabel site',
@@ -185,145 +190,169 @@ class _SiteCard extends StatelessWidget {
             ),
           ],
         ),
-        child: Stack(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Positioned.fill(
-              child: Image.asset(
-                card.cardAsset,
-                key: Key('site-card-${card.id.name}-art'),
-                fit: BoxFit.cover,
-                opacity: const AlwaysStoppedAnimation(0.36),
-                errorBuilder: (context, error, stackTrace) => const SizedBox(),
-              ),
-            ),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xF20A1524),
-                      const Color(0xC90A1524),
-                      Colors.transparent,
-                    ],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
+            SizedBox(
+              key: Key('site-card-${card.id.name}-art-frame'),
+              height: artHeight,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    card.cardAsset,
+                    key: Key('site-card-${card.id.name}-art'),
+                    fit: BoxFit.cover,
+                    opacity: card.state == MiningSiteCardState.locked
+                        ? const AlwaysStoppedAnimation(0.48)
+                        : null,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox(),
                   ),
-                ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.transparent, Color(0xE607111E)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: _StateChip(label: stateLabel, state: card.state),
+                  ),
+                  Positioned(
+                    left: 12,
+                    right: card.isUnlocked ? 82 : 12,
+                    bottom: 12,
+                    child: Row(
+                      children: [
+                        if (silhouette != null)
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: silhouette.color.withAlpha(45),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: silhouette.color.withAlpha(150),
+                              ),
+                            ),
+                            child: Icon(
+                              silhouette.icon,
+                              color: silhouette.color,
+                              size: 22,
+                              semanticLabel: silhouette.name,
+                            ),
+                          ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                card.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: MiningTheme.primaryText,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              Text(
+                                silhouette?.name.toUpperCase() ?? 'RESOURCE',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color:
+                                      silhouette?.color ??
+                                      MiningTheme.secondaryText,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (card.isUnlocked)
+                    Positioned(
+                      right: 10,
+                      bottom: 9,
+                      child: MiningCargoGauge(
+                        key: Key('site-card-${card.id.name}-cargo-gauge'),
+                        cargo: card.cargo,
+                        capacity: card.capacity,
+                        projectedValue: card.projectedValue,
+                        size: 62,
+                      ),
+                    ),
+                ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(13),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(12, 8, 10, 10),
+              child: Row(
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (silhouette != null)
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: silhouette.color.withAlpha(45),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: silhouette.color.withAlpha(150),
-                            ),
-                          ),
-                          child: Icon(
-                            silhouette.icon,
-                            color: silhouette.color,
-                            size: 22,
-                            semanticLabel: silhouette.name,
-                          ),
-                        ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              card.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: MiningTheme.primaryText,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              silhouette?.name.toUpperCase() ?? 'RESOURCE',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color:
-                                    silhouette?.color ?? MiningTheme.mutedText,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ],
-                        ),
+                  Expanded(
+                    child: Text(
+                      status,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: MiningTheme.secondaryText,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                       ),
-                      _StateChip(label: stateLabel, state: card.state),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 11),
-                  _CardDetails(card: card),
-                  const SizedBox(height: 10),
-                  if (card.isUnlocked)
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        key: Key('site-card-${card.id.name}-enter'),
-                        onPressed: card.canEnter && !card.isBusy
-                            ? onEnter
-                            : null,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(48, 48),
-                          foregroundColor: MiningTheme.accent,
-                          disabledForegroundColor: MiningTheme.mutedText,
-                          side: BorderSide(
-                            color: MiningTheme.accent.withAlpha(160),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 132,
+                    height: 48,
+                    child: card.isUnlocked
+                        ? OutlinedButton(
+                            key: Key('site-card-${card.id.name}-enter'),
+                            onPressed: card.canEnter && !card.isBusy
+                                ? onEnter
+                                : null,
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(48, 48),
+                              foregroundColor: MiningTheme.accent,
+                              disabledForegroundColor: MiningTheme.mutedText,
+                              side: BorderSide(
+                                color: MiningTheme.accent.withAlpha(160),
+                              ),
+                            ),
+                            child: const Text('ENTER SITE'),
+                          )
+                        : OutlinedButton(
+                            key: Key('site-card-${card.id.name}-unlock'),
+                            onPressed: card.canUnlock ? onUnlock : null,
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(48, 48),
+                              foregroundColor: MiningTheme.warning,
+                              disabledForegroundColor: MiningTheme.mutedText,
+                              side: BorderSide(
+                                color: MiningTheme.warning.withAlpha(160),
+                              ),
+                            ),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'UNLOCK · ${card.unlockCost}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ),
-                        ),
-                        child: const Text('ENTER SITE'),
-                      ),
-                    )
-                  else
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        key: Key('site-card-${card.id.name}-unlock'),
-                        onPressed: card.canUnlock ? onUnlock : null,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(48, 48),
-                          foregroundColor: MiningTheme.warning,
-                          disabledForegroundColor: MiningTheme.mutedText,
-                          side: BorderSide(
-                            color: MiningTheme.warning.withAlpha(160),
-                          ),
-                        ),
-                        child: Text('UNLOCK · ${card.unlockCost}'),
-                      ),
-                    ),
-                  if (card.unlockDisabledReason != null && !card.canUnlock)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        card.unlockDisabledReason!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: MiningTheme.mutedText,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
+                  ),
                 ],
               ),
             ),
@@ -358,201 +387,10 @@ class _SiteCard extends StatelessWidget {
         return 'OPERATIONAL';
     }
   }
-}
-
-class _CardDetails extends StatelessWidget {
-  const _CardDetails({required this.card});
-
-  final MiningSiteCardView card;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!card.isUnlocked) {
-      return Row(
-        children: [
-          const Icon(Icons.lock_outline, color: Colors.white54, size: 17),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              card.requiredSite == null
-                  ? 'Surveying ${card.requiredSurveyingLevel} required'
-                  : 'Previous site required',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-          ),
-        ],
-      );
-    }
-    final cargo = card.capacity <= 0
-        ? 'NO CARGO'
-        : '${_amount(card.cargo)} / ${_amount(card.capacity)}'
-              ' CARGO';
-    final rate = card.rate <= 0 ? 'IDLE' : '${card.rate.toStringAsFixed(2)}/s';
-    return Row(
-      children: [
-        Expanded(
-          child: _Stat(label: 'CARGO', value: cargo),
-        ),
-        Expanded(
-          child: _Stat(label: 'RATE', value: rate),
-        ),
-        Expanded(
-          child: _Stat(label: 'VALUE', value: '${card.projectedValue}'),
-        ),
-      ],
-    );
-  }
 
   static String _amount(double value) => value == value.roundToDouble()
       ? value.toStringAsFixed(0)
       : value.toStringAsFixed(1);
-}
-
-class _DeckSummary extends StatelessWidget {
-  const _DeckSummary({required this.view});
-
-  final SiteDeckView view;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: MiningTheme.hudPanel,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _DeckMetric(
-              icon: MiningVisuals.cargoIcon,
-              label: 'CARGO',
-              value:
-                  '${_amount(view.totalCargo)} / ${_amount(view.totalCapacity)}',
-            ),
-          ),
-          Expanded(
-            child: _DeckMetric(
-              icon: MiningVisuals.cashIcon,
-              label: 'VALUE',
-              value: '${view.projectedValue}',
-            ),
-          ),
-          Expanded(
-            child: _DeckMetric(
-              label: 'RATE',
-              value: '${view.totalRate.toStringAsFixed(2)}/s',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _amount(double value) => value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(1);
-}
-
-class _DeckMetric extends StatelessWidget {
-  const _DeckMetric({required this.label, required this.value, this.icon});
-
-  final String label;
-  final String value;
-  final String? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (icon != null)
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: Image.asset(
-              icon!,
-              width: 15,
-              height: 15,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const SizedBox(),
-            ),
-          ),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MiningTheme.mutedText,
-                  fontSize: 8,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  value,
-                  maxLines: 1,
-                  style: const TextStyle(
-                    color: MiningTheme.primaryText,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: MiningTheme.mutedText,
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.9,
-          ),
-        ),
-        const SizedBox(height: 2),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            value,
-            maxLines: 1,
-            style: const TextStyle(
-              color: MiningTheme.primaryText,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 class _StateChip extends StatelessWidget {

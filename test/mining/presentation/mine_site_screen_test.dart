@@ -192,6 +192,33 @@ void main() {
     }
   });
 
+  testWidgets('anchors the cash chip and cargo gauge over portrait art', (
+    tester,
+  ) async {
+    final state = _stateWith(
+      landing: _progress(
+        commissioned: true,
+        storedAmount: 10,
+        rigs: {MiningNodeId.n1: RigTier.t2},
+      ),
+    );
+    await _pumpMineSite(
+      tester,
+      size: const Size(430, 932),
+      view: _siteView(state),
+      dock: _dockView(state),
+    );
+
+    final cash = tester.getRect(find.byKey(const Key('mining-cash-chip')));
+    final gauge = tester.getRect(find.byKey(const Key('mining-cargo-gauge')));
+    final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
+    expect(cash.width, greaterThanOrEqualTo(64));
+    expect(gauge.width, greaterThanOrEqualTo(72));
+    expect(gauge.height, greaterThanOrEqualTo(72));
+    expect(cavern.overlaps(gauge), isTrue);
+    expect(gauge.right, lessThanOrEqualTo(cavern.right));
+  });
+
   testWidgets('binds sale control to active-planet aggregate cargo and value', (
     tester,
   ) async {
@@ -361,10 +388,16 @@ void main() {
       final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
       expect(cavern.right, lessThanOrEqualTo(rail.left));
       expect(
-        rail.contains(
-          tester.getRect(find.byKey(const Key('mine-site-cargo'))).topLeft,
-        ),
-        isTrue,
+        tester.getRect(find.byKey(const Key('mine-site-cargo'))).right,
+        lessThanOrEqualTo(rail.left),
+      );
+      expect(
+        tester.getSize(find.byKey(const Key('mine-site-cargo'))).width,
+        greaterThanOrEqualTo(72),
+      );
+      expect(
+        tester.getSize(find.byKey(const Key('mine-site-cargo'))).height,
+        greaterThanOrEqualTo(72),
       );
       expect(
         rail.contains(
