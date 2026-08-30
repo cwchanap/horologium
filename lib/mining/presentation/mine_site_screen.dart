@@ -139,6 +139,7 @@ class _PortraitMineSite extends StatelessWidget {
               reducedMotion: reducedMotion,
               onNodeTap: onNodeTap,
               onSellCargo: onSellCargo,
+              portraitTopInset: pad.top,
             ),
           ),
           Positioned(
@@ -290,12 +291,14 @@ class _CavernScene extends StatelessWidget {
     required this.reducedMotion,
     required this.onNodeTap,
     required this.onSellCargo,
+    this.portraitTopInset = 0,
   });
 
   final MineSiteView view;
   final bool reducedMotion;
   final ValueChanged<MiningNodeId> onNodeTap;
   final VoidCallback onSellCargo;
+  final double portraitTopInset;
 
   @override
   Widget build(BuildContext context) {
@@ -313,7 +316,7 @@ class _CavernScene extends StatelessWidget {
               ),
             ),
             Positioned(
-              top: landscape ? 52 : 50,
+              top: landscape ? 52 : 50 + portraitTopInset,
               right: landscape ? 14 : 12,
               child: MiningCargoGauge(
                 containerKey: const Key('mine-site-cargo'),

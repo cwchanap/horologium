@@ -556,4 +556,59 @@ void main() {
     );
     expect(find.descendant(of: n4, matching: find.text('LV 1')), findsNothing);
   });
+
+  testWidgets(
+    'offsets cash chip, cargo gauge, and nav below safe-area insets',
+    (tester) async {
+      // _pumpMineSite wraps MineSiteScreen in a zero-padding MediaQuery, which
+      // would mask the system insets. Pump the screen directly so the portrait
+      // chrome reads MediaQuery.paddingOf(context) from the view padding.
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(430, 932);
+      tester.view.padding = const FakeViewPadding(
+        left: 0,
+        top: 59,
+        right: 0,
+        bottom: 34,
+      );
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPadding();
+      });
+      final state = _stateWith(
+        landing: _progress(
+          commissioned: true,
+          storedAmount: 10,
+          rigs: {MiningNodeId.n1: RigTier.t2},
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+          home: MineSiteScreen(
+            view: _siteView(state),
+            fleetDock: _dockView(state),
+            cash: 100,
+            onNodeTap: (_) {},
+            onBayTap: (_) {},
+            onSpawnRig: () {},
+            onSellCargo: () {},
+            onBack: () {},
+            onSettings: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final cash = tester.getRect(find.byKey(const Key('mining-cash-chip')));
+      final gauge = tester.getRect(find.byKey(const Key('mine-site-cargo')));
+      final nav = tester.getRect(
+        find.byKey(const Key('mining-bottom-navigation')),
+      );
+      expect(cash.top, 54 + 59);
+      expect(gauge.top, 50 + 59);
+      expect(nav.bottom, 932 - 34);
+    },
+  );
 }

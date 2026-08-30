@@ -234,7 +234,7 @@ class _PlanetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final definition = content.planet(view.id);
     final stateLabel = _stateLabel(view);
-    final height = view.isActive ? 264.0 : 255.0;
+    final height = view.isActive ? 264.0 : 290.0;
     return Semantics(
       container: true,
       label: '${view.name}, ${stateLabel.toLowerCase()} planet',
@@ -321,43 +321,47 @@ class _PlanetCard extends StatelessWidget {
                 left: 14,
                 right: 14,
                 top: 54,
+                bottom: 70,
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (final requirement in view.requirements)
-                      _RequirementRow(requirement: requirement),
-                    if (view.isBusy)
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Finishing previous action…',
-                          style: TextStyle(
-                            color: MiningTheme.warning,
-                            fontSize: 10,
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final requirement in view.requirements)
+                          _RequirementRow(requirement: requirement),
+                        if (view.isBusy)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Finishing previous action…',
+                              style: TextStyle(
+                                color: MiningTheme.warning,
+                                fontSize: 10,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Positioned(
-                left: 14,
-                right: 14,
-                bottom: 76,
-                child: Row(
-                  children: [
-                    for (final indicator in view.siteIndicators) ...[
-                      Expanded(
-                        child: _SiteIndicator(
-                          key: Key(
-                            'stellar-map-site-${view.id.name}-${indicator.id.name}',
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        for (final indicator in view.siteIndicators) ...[
+                          Expanded(
+                            child: _SiteIndicator(
+                              key: Key(
+                                'stellar-map-site-${view.id.name}-${indicator.id.name}',
+                              ),
+                              indicator: indicator,
+                              content: content,
+                            ),
                           ),
-                          indicator: indicator,
-                          content: content,
-                        ),
-                      ),
-                      if (indicator != view.siteIndicators.last)
-                        const SizedBox(width: 8),
-                    ],
+                          if (indicator != view.siteIndicators.last)
+                            const SizedBox(width: 8),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
               ),

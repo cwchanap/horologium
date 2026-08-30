@@ -567,55 +567,85 @@ class _LockedSite extends StatelessWidget {
 
   final MiningSiteCardView card;
 
+  /// The prerequisite-site gate copy when a previous site (not Surveying or
+  /// cash) is the active unlock blocker. The LV and cash rows already convey
+  /// the Surveying and cash requirements; this restores the prerequisite-site
+  /// feedback that the landscape `_SiteCard` surfaces via
+  /// `unlockDisabledReason`.
+  String? get _prerequisiteGate {
+    final reason = card.unlockDisabledReason;
+    if (reason != null && reason.startsWith('Unlock ')) {
+      return reason;
+    }
+    return null;
+  }
+
   @override
-  Widget build(BuildContext context) => Center(
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.lock_rounded, color: Colors.white38, size: 30),
-        const SizedBox(width: 18),
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+  Widget build(BuildContext context) {
+    final prerequisiteGate = _prerequisiteGate;
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.lock_rounded, color: Colors.white38, size: 30),
+          const SizedBox(width: 18),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 240),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
-                  Icons.biotech_rounded,
-                  size: 19,
-                  color: MiningTheme.accent,
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.biotech_rounded,
+                      size: 19,
+                      color: MiningTheme.accent,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'LV ${card.requiredSurveyingLevel}',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'LV ${card.requiredSurveyingLevel}',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
+                const SizedBox(height: 9),
+                Row(
+                  children: [
+                    Image.asset(MiningVisuals.cashIcon, width: 19, height: 19),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${card.unlockCost}',
+                      style: const TextStyle(
+                        color: MiningTheme.gate,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                if (prerequisiteGate != null) ...[
+                  const SizedBox(height: 9),
+                  Text(
+                    prerequisiteGate,
+                    style: const TextStyle(
+                      color: MiningTheme.warning,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
-            const SizedBox(height: 9),
-            Row(
-              children: [
-                Image.asset(MiningVisuals.cashIcon, width: 19, height: 19),
-                const SizedBox(width: 8),
-                Text(
-                  '${card.unlockCost}',
-                  style: const TextStyle(
-                    color: MiningTheme.gate,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _RigBadge extends StatelessWidget {
