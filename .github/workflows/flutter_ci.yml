@@ -40,6 +40,17 @@ jobs:
     - name: Run tests with coverage
       run: flutter test --coverage
 
+    - name: Regenerate goldens and upload (temporary)
+      if: always()
+      run: flutter test --update-goldens test/mining/presentation/visual_parity_golden_test.dart
+
+    - name: Upload regenerated goldens (temporary)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: regenerated-goldens
+        path: test/mining/presentation/goldens/*.png
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       with:
