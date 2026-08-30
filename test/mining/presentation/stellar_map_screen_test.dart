@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -124,7 +126,7 @@ void main() {
       tester.getRect(
         find.byKey(const Key('mining-stellar-map-teaser-marsFrontier')),
       ),
-      const Rect.fromLTWH(14, 687, 374, 104),
+      const Rect.fromLTWH(14, 722, 374, 104),
     );
     expect(
       find.byKey(const Key('stellar-map-site-homeworld-landingBasin')),
@@ -257,6 +259,71 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'non-active card keeps requirements and site indicators from overlapping',
+    (tester) async {
+      // The densest non-active case: three requirement rows plus the busy
+      // notice plus three site indicators, pumped at 1.3x text scale. The
+      // requirement section and the indicator row must not collide.
+      final view = StellarMapView.from(
+        state: _stateWith(
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+        ),
+        content: _content,
+        isBusy: true,
+      );
+      await _pumpMap(tester, view: view);
+
+      final mars = find.byKey(
+        const Key('mining-stellar-map-planet-marsFrontier'),
+      );
+      final requirementBottom = [
+        tester
+            .getRect(find.descendant(of: mars, matching: find.text('0/3  ×')))
+            .bottom,
+        tester
+            .getRect(find.descendant(of: mars, matching: find.text('LV 5  ×')))
+            .bottom,
+        tester
+            .getRect(find.descendant(of: mars, matching: find.text('20000  ×')))
+            .bottom,
+        tester
+            .getRect(
+              find.descendant(
+                of: mars,
+                matching: find.text('Finishing previous action…'),
+              ),
+            )
+            .bottom,
+      ].reduce(math.max);
+      final indicatorTop = [
+        tester
+            .getRect(
+              find.byKey(const Key('stellar-map-site-marsFrontier-ochreBasin')),
+            )
+            .top,
+        tester
+            .getRect(
+              find.byKey(
+                const Key('stellar-map-site-marsFrontier-silicaDunes'),
+              ),
+            )
+            .top,
+        tester
+            .getRect(
+              find.byKey(
+                const Key('stellar-map-site-marsFrontier-cobaltChasm'),
+              ),
+            )
+            .top,
+      ].reduce(math.min);
+      expect(requirementBottom, lessThanOrEqualTo(indicatorTop));
+    },
+  );
 
   testWidgets('map forwards direct travel and unlock actions', (tester) async {
     final initial = MiningSave.initial(nowUtc: _start);

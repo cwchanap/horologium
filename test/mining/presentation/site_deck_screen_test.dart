@@ -508,6 +508,37 @@ void main() {
     },
   );
 
+  testWidgets('portrait locked card shows the prerequisite-site gate', (
+    tester,
+  ) async {
+    // Granite Crater requires Carbon Ridge. With only Landing Basin unlocked,
+    // Granite Crater is blocked by the prerequisite site (not Surveying or
+    // cash), so the portrait _LockedSite must surface that gate alongside the
+    // authored LV 0 / 700 requirements rather than looking cash/Surveying-only.
+    final state = _stateWith(
+      sites: {MiningSiteId.landingBasin: _progress(unlocked: true)},
+    );
+    await _pumpDeck(tester, view: _deckView(state), dock: _dockView(state));
+
+    final granite = find.byKey(const Key('site-card-graniteCrater'));
+    expect(granite, findsOneWidget);
+    expect(
+      find.descendant(of: granite, matching: find.text('LV 0')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: granite, matching: find.text('700')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: granite,
+        matching: find.text('Unlock Carbon Ridge first.'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('offsets interactive chrome below non-zero safe-area insets', (
     tester,
   ) async {
