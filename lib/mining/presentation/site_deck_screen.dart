@@ -133,6 +133,7 @@ class _PortraitSiteDeck extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pad = MediaQuery.paddingOf(context);
     return ColoredBox(
       key: const Key('mining-shell-placeholder'),
       color: const Color(0xFF060A10),
@@ -168,9 +169,13 @@ class _PortraitSiteDeck extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(top: 54, left: 0, child: MiningCashChip(cash: cash)),
           Positioned(
-            top: 50,
+            top: 54 + pad.top,
+            left: 0,
+            child: MiningCashChip(cash: cash),
+          ),
+          Positioned(
+            top: 50 + pad.top,
             right: 12,
             child: MiningCargoGauge(
               cargo: view.totalCargo,
@@ -179,12 +184,16 @@ class _PortraitSiteDeck extends StatelessWidget {
               size: 80,
             ),
           ),
-          Positioned(left: 16, top: 110, child: _PlanetProgress(view: view)),
+          Positioned(
+            left: 16,
+            top: 110 + pad.top,
+            child: _PlanetProgress(view: view),
+          ),
           Positioned(
             left: 14,
             right: 14,
-            top: 164,
-            bottom: 198,
+            top: 164 + pad.top,
+            bottom: 198 + pad.bottom,
             child: SingleChildScrollView(
               key: const Key('site-deck-scroll'),
               child: Column(
@@ -210,7 +219,7 @@ class _PortraitSiteDeck extends StatelessWidget {
           Positioned(
             left: 14,
             right: 14,
-            bottom: 96,
+            bottom: 96 + pad.bottom,
             height: 64,
             child: FleetDock(
               view: fleetDock,
@@ -222,7 +231,7 @@ class _PortraitSiteDeck extends StatelessWidget {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 0,
+            bottom: pad.bottom,
             child: MiningNavigationBar(
               selected: selectedDestination,
               onDestinationSelected: onDestinationSelected,

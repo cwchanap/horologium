@@ -127,6 +127,7 @@ class _PortraitMineSite extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pad = MediaQuery.paddingOf(context);
     return ColoredBox(
       key: const Key('mine-site-screen'),
       color: const Color(0xFF0A1218),
@@ -140,9 +141,13 @@ class _PortraitMineSite extends StatelessWidget {
               onSellCargo: onSellCargo,
             ),
           ),
-          Positioned(top: 54, left: 0, child: MiningCashChip(cash: cash)),
           Positioned(
-            top: 146,
+            top: 54 + pad.top,
+            left: 0,
+            child: MiningCashChip(cash: cash),
+          ),
+          Positioned(
+            top: 146 + pad.top,
             left: 14,
             child: _MineChromeButton(
               key: const Key('mine-site-back'),
@@ -154,7 +159,7 @@ class _PortraitMineSite extends StatelessWidget {
           Positioned(
             left: 12,
             right: 12,
-            bottom: 100,
+            bottom: 100 + pad.bottom,
             child: FleetDock(
               view: fleetDock,
               axis: FleetDockAxis.horizontal,
@@ -165,7 +170,7 @@ class _PortraitMineSite extends StatelessWidget {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 0,
+            bottom: pad.bottom,
             child: MiningNavigationBar(
               selected: MiningNavigationDestination.siteDeck,
               onDestinationSelected: _navigate,
@@ -497,7 +502,10 @@ class _MineNodeButton extends StatelessWidget {
           onTap: enabled || canForwardDisabledTap ? onTap : null,
           borderRadius: BorderRadius.circular(14),
           child: view.isLocked
-              ? _LockedNode(size: nodeSize)
+              ? _LockedNode(
+                  size: nodeSize,
+                  requiredSurveyingLevel: view.requiredSurveyingLevel,
+                )
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -577,9 +585,10 @@ class _MineNodeButton extends StatelessWidget {
 }
 
 class _LockedNode extends StatelessWidget {
-  const _LockedNode({required this.size});
+  const _LockedNode({required this.size, required this.requiredSurveyingLevel});
 
   final double size;
+  final int requiredSurveyingLevel;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -606,14 +615,18 @@ class _LockedNode extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 9),
-      const Row(
+      Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.biotech_rounded, size: 15, color: MiningTheme.accent),
-          SizedBox(width: 6),
+          const Icon(
+            Icons.biotech_rounded,
+            size: 15,
+            color: MiningTheme.accent,
+          ),
+          const SizedBox(width: 6),
           Text(
-            'LV 1',
-            style: TextStyle(
+            'LV $requiredSurveyingLevel',
+            style: const TextStyle(
               color: Colors.white54,
               fontSize: 11,
               fontWeight: FontWeight.w800,

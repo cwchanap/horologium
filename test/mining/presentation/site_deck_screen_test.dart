@@ -507,4 +507,56 @@ void main() {
       expect(actionRect.height, greaterThanOrEqualTo(48));
     },
   );
+
+  testWidgets('offsets interactive chrome below non-zero safe-area insets', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.padding = const FakeViewPadding(
+      left: 0,
+      top: 59,
+      right: 0,
+      bottom: 34,
+    );
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPadding();
+    });
+    final state = _stateWith(
+      cash: 2_000,
+      sites: {
+        MiningSiteId.landingBasin: _progress(
+          unlocked: true,
+          commissioned: true,
+          rigs: {MiningNodeId.n1: RigTier.t1},
+        ),
+      },
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+        home: SiteDeckScreen(
+          view: _deckView(state),
+          fleetDock: _dockView(state),
+          onEnterSite: (_) {},
+          onUnlockSite: (_) {},
+          onBayTap: (_) {},
+          onSpawnRig: () {},
+          onDestinationSelected: (_) {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final cash = tester.getRect(find.byKey(const Key('mining-cash-chip')));
+    final gauge = tester.getRect(find.byKey(const Key('mining-cargo-gauge')));
+    final nav = tester.getRect(
+      find.byKey(const Key('mining-bottom-navigation')),
+    );
+    expect(cash.top, 54 + 59);
+    expect(gauge.top, 50 + 59);
+    expect(nav.bottom, 932 - 34);
+  });
 }

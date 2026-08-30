@@ -124,7 +124,7 @@ void main() {
       tester.getRect(
         find.byKey(const Key('mining-stellar-map-teaser-marsFrontier')),
       ),
-      const Rect.fromLTWH(14, 627, 374, 104),
+      const Rect.fromLTWH(14, 687, 374, 104),
     );
     expect(
       find.byKey(const Key('stellar-map-site-homeworld-landingBasin')),
@@ -246,7 +246,15 @@ void main() {
     );
     expect(
       find.byKey(const Key('stellar-map-site-marsFrontier-ochreBasin')),
-      findsNothing,
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('stellar-map-site-marsFrontier-silicaDunes')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('stellar-map-site-marsFrontier-cobaltChasm')),
+      findsOneWidget,
     );
   });
 
@@ -332,7 +340,7 @@ void main() {
                 'stellar-map-site-${planet.id.name}-',
               ),
         );
-        expect(indicators, findsNWidgets(planet.isActive ? 3 : 0));
+        expect(indicators, findsNWidgets(3));
       }
     }
   });
