@@ -273,8 +273,7 @@ class _CashChipBorder extends OutlinedBorder {
       ..moveTo(rect.left, rect.top)
       ..lineTo(rect.right, rect.top)
       ..lineTo(rect.left + rect.width * cut, rect.bottom)
-      ..lineTo(rect.left, rect.bottom)
-      ..close();
+      ..lineTo(rect.left, rect.bottom);
     canvas.drawPath(
       path,
       Paint()
