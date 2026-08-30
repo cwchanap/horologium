@@ -57,6 +57,7 @@ class StellarMapScreen extends StatelessWidget {
                 .name,
           ),
     ];
+    final pad = MediaQuery.paddingOf(context);
     return ColoredBox(
       key: const Key('stellar-map-screen'),
       color: const Color(0xFF060A10),
@@ -73,9 +74,13 @@ class StellarMapScreen extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(top: 54, left: 0, child: MiningCashChip(cash: cash)),
           Positioned(
-            top: 50,
+            top: 54 + pad.top,
+            left: 0,
+            child: MiningCashChip(cash: cash),
+          ),
+          Positioned(
+            top: 50 + pad.top,
             right: 12,
             child: MiningCargoGauge(
               cargo: cargo,
@@ -84,12 +89,12 @@ class StellarMapScreen extends StatelessWidget {
               size: 80,
             ),
           ),
-          const Positioned(left: 16, top: 112, child: _MapHeader()),
+          Positioned(left: 16, top: 112 + pad.top, child: const _MapHeader()),
           Positioned(
             left: 14,
             right: 14,
-            top: 146,
-            bottom: 99,
+            top: 146 + pad.top,
+            bottom: 99 + pad.bottom,
             child: SingleChildScrollView(
               key: const Key('stellar-map-scroll'),
               child: Column(
@@ -105,7 +110,7 @@ class StellarMapScreen extends StatelessWidget {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 0,
+            bottom: pad.bottom,
             child: MiningNavigationBar(
               selected: selectedDestination,
               onDestinationSelected: onDestinationSelected ?? (_) {},
@@ -229,7 +234,7 @@ class _PlanetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final definition = content.planet(view.id);
     final stateLabel = _stateLabel(view);
-    final height = view.isActive ? 264.0 : 195.0;
+    final height = view.isActive ? 264.0 : 255.0;
     return Semantics(
       container: true,
       label: '${view.name}, ${stateLabel.toLowerCase()} planet',
@@ -331,6 +336,28 @@ class _PlanetCard extends StatelessWidget {
                           ),
                         ),
                       ),
+                  ],
+                ),
+              ),
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 76,
+                child: Row(
+                  children: [
+                    for (final indicator in view.siteIndicators) ...[
+                      Expanded(
+                        child: _SiteIndicator(
+                          key: Key(
+                            'stellar-map-site-${view.id.name}-${indicator.id.name}',
+                          ),
+                          indicator: indicator,
+                          content: content,
+                        ),
+                      ),
+                      if (indicator != view.siteIndicators.last)
+                        const SizedBox(width: 8),
+                    ],
                   ],
                 ),
               ),

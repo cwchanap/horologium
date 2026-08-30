@@ -539,4 +539,21 @@ void main() {
     expect(find.byKey(const Key('mine-site-node-n1')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('locked node renders its authored Surveying requirement', (
+    tester,
+  ) async {
+    // Landing Basin N4 requires Surveying 2; with default Surveying 0 the
+    // node is locked and must show 'LV 2', not the previous hard-coded 'LV 1'.
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(tester, view: _siteView(state), dock: _dockView(state));
+
+    final n4 = find.byKey(const Key('mine-site-node-n4'));
+    expect(n4, findsOneWidget);
+    expect(
+      find.descendant(of: n4, matching: find.text('LV 2')),
+      findsOneWidget,
+    );
+    expect(find.descendant(of: n4, matching: find.text('LV 1')), findsNothing);
+  });
 }
