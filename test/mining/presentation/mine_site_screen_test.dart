@@ -679,6 +679,15 @@ void main() {
       expect(cavern.right, lessThanOrEqualTo(rail.left));
       // Cavern art stays full-bleed on the left edge.
       expect(cavern.left, 0);
+      // The interactive node layer is translated past the left cutout: N1's
+      // authored left is 22, which would sit under the 44 px cutout unless the
+      // node layer is inset by pad.left.
+      final nodeN1 = tester.getRect(find.byKey(const Key('mine-site-node-n1')));
+      expect(nodeN1.left, greaterThanOrEqualTo(padLeft));
+      // The vertical fleet dock stops above the home-indicator inset: the last
+      // bay (b4) must not extend into the bottom 21 px.
+      final lastBay = tester.getRect(find.byKey(const ValueKey<String>('b4')));
+      expect(lastBay.bottom, lessThanOrEqualTo(402 - padBottom));
     },
   );
 }
