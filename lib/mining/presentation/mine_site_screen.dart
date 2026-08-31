@@ -312,9 +312,6 @@ class _CavernScene extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final landscape = constraints.maxWidth > constraints.maxHeight;
-        final landscapeScale = landscape
-            ? constraints.maxWidth / _kLandscapeCavernWidth
-            : 1.0;
         return Stack(
           children: [
             Positioned.fill(
@@ -324,7 +321,7 @@ class _CavernScene extends StatelessWidget {
                 reducedMotion: reducedMotion,
                 onNodeTap: onNodeTap,
                 landscapeLeftInset: landscapeLeftInset,
-                landscapeScale: landscapeScale,
+                cavernWidth: constraints.maxWidth,
               ),
             ),
             Positioned(
@@ -368,7 +365,7 @@ class _MineCavern extends StatelessWidget {
     required this.reducedMotion,
     required this.onNodeTap,
     this.landscapeLeftInset = 0,
-    this.landscapeScale = 1.0,
+    this.cavernWidth = 0,
   });
 
   final MineSiteView view;
@@ -376,7 +373,7 @@ class _MineCavern extends StatelessWidget {
   final bool reducedMotion;
   final ValueChanged<MiningNodeId> onNodeTap;
   final double landscapeLeftInset;
-  final double landscapeScale;
+  final double cavernWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -465,24 +462,37 @@ class _MineCavern extends StatelessWidget {
               ),
             ),
           for (var index = 0; index < view.nodeList.length; index++)
-            Positioned(
-              left:
-                  _nodeLeft(index, landscape, landscapeScale) +
-                  (landscape ? landscapeLeftInset : 0),
-              top: _nodeTop(index, landscape),
-              child: _MineNodeButton(
-                view: view.nodeList[index],
-                nodeAsset: view.definition.nodeAsset,
-                nodeSize: _nodeSize(index, landscape),
-                rigSize: _rigSize(index, landscape),
-                progress: view.capacity <= 0
-                    ? 0
-                    : (view.cargo / view.capacity).clamp(0, 1),
-                reducedMotion: reducedMotion,
-                onTap: () => onNodeTap(view.nodeList[index].id),
-              ),
-            ),
+            _positionedNode(index),
         ],
+      ),
+    );
+  }
+
+  Widget _positionedNode(int index) {
+    // N4 is the only landscape node that can overflow a narrower cavern. When
+    // it would, anchor it to the cavern's right edge so its right side always
+    // clears the Clip regardless of its rendered (label/rig) width; otherwise
+    // keep its authored left so the 874x402 prototype layout is unchanged.
+    final n4RightAnchored =
+        landscape &&
+        index == 3 &&
+        _landscapeN4Overflows(cavernWidth, landscapeLeftInset);
+    return Positioned(
+      left: n4RightAnchored
+          ? null
+          : _nodeLeft(index, landscape) + (landscape ? landscapeLeftInset : 0),
+      right: n4RightAnchored ? 0 : null,
+      top: _nodeTop(index, landscape),
+      child: _MineNodeButton(
+        view: view.nodeList[index],
+        nodeAsset: view.definition.nodeAsset,
+        nodeSize: _nodeSize(index, landscape),
+        rigSize: _rigSize(index, landscape),
+        progress: view.capacity <= 0
+            ? 0
+            : (view.cargo / view.capacity).clamp(0, 1),
+        reducedMotion: reducedMotion,
+        onTap: () => onNodeTap(view.nodeList[index].id),
       ),
     );
   }
@@ -720,15 +730,27 @@ class _SellControl extends StatelessWidget {
 }
 
 // Landscape node left offsets are authored for the 874x402 prototype, whose
-// cavern is 770px wide (874 - 104 right rail). At narrower landscape widths the
-// cavern shrinks, so the offsets scale by cavernWidth / 770 to keep every node
-// inside the Clip.antiAlias bounds. At 874x402 the scale is exactly 1.0 and the
-// authored prototype positions are preserved.
-const double _kLandscapeCavernWidth = 770.0;
-
-double _nodeLeft(int index, bool landscape, double landscapeScale) => landscape
-    ? const [22.0, 210.0, 307.0, 510.0][index] * landscapeScale
+// cavern is 770px wide (874 - 104 right rail). N1-N3 keep their authored
+// positions at every landscape width: their right edges (max 401 for N3) fit
+// inside any phone-width landscape cavern and stay clear of the fixed Sell
+// control (left 236, width 56 -> right 292). N4 (authored left 510) is the only
+// node that can overflow a narrower cavern; when it would, it is anchored to
+// the cavern's right edge instead of its authored left so its right side always
+// clears the Clip regardless of label width. At 874x402 (cavern 770) the anchor
+// does not engage and the authored prototype positions are preserved.
+double _nodeLeft(int index, bool landscape) => landscape
+    ? const [22.0, 210.0, 307.0, 510.0][index]
     : const [18.0, 236.0, 86.0, 278.0][index];
+
+// Whether landscape N4 would overflow the cavern at its authored left. N4's
+// widget can be wider than its 70px circle (lock/rig labels add a label row or
+// a rig column), so reserve the max node width (image + gap + rig column)
+// against the available cavern width.
+bool _landscapeN4Overflows(double cavernWidth, double landscapeLeftInset) {
+  const authoredN4Left = 510.0;
+  final maxWidth = _nodeSize(3, true) + 2 + _rigSize(3, true);
+  return authoredN4Left + landscapeLeftInset + maxWidth > cavernWidth;
+}
 
 double _nodeTop(int index, bool landscape) => landscape
     ? const [132.0, 118.0, 194.0, 138.0][index]
