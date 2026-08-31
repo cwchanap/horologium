@@ -312,6 +312,9 @@ class _CavernScene extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final landscape = constraints.maxWidth > constraints.maxHeight;
+        final landscapeScale = landscape
+            ? constraints.maxWidth / _kLandscapeCavernWidth
+            : 1.0;
         return Stack(
           children: [
             Positioned.fill(
@@ -321,6 +324,7 @@ class _CavernScene extends StatelessWidget {
                 reducedMotion: reducedMotion,
                 onNodeTap: onNodeTap,
                 landscapeLeftInset: landscapeLeftInset,
+                landscapeScale: landscapeScale,
               ),
             ),
             Positioned(
@@ -364,6 +368,7 @@ class _MineCavern extends StatelessWidget {
     required this.reducedMotion,
     required this.onNodeTap,
     this.landscapeLeftInset = 0,
+    this.landscapeScale = 1.0,
   });
 
   final MineSiteView view;
@@ -371,6 +376,7 @@ class _MineCavern extends StatelessWidget {
   final bool reducedMotion;
   final ValueChanged<MiningNodeId> onNodeTap;
   final double landscapeLeftInset;
+  final double landscapeScale;
 
   @override
   Widget build(BuildContext context) {
@@ -461,7 +467,7 @@ class _MineCavern extends StatelessWidget {
           for (var index = 0; index < view.nodeList.length; index++)
             Positioned(
               left:
-                  _nodeLeft(index, landscape) +
+                  _nodeLeft(index, landscape, landscapeScale) +
                   (landscape ? landscapeLeftInset : 0),
               top: _nodeTop(index, landscape),
               child: _MineNodeButton(
@@ -713,8 +719,15 @@ class _SellControl extends StatelessWidget {
   );
 }
 
-double _nodeLeft(int index, bool landscape) => landscape
-    ? const [22.0, 210.0, 307.0, 510.0][index]
+// Landscape node left offsets are authored for the 874x402 prototype, whose
+// cavern is 770px wide (874 - 104 right rail). At narrower landscape widths the
+// cavern shrinks, so the offsets scale by cavernWidth / 770 to keep every node
+// inside the Clip.antiAlias bounds. At 874x402 the scale is exactly 1.0 and the
+// authored prototype positions are preserved.
+const double _kLandscapeCavernWidth = 770.0;
+
+double _nodeLeft(int index, bool landscape, double landscapeScale) => landscape
+    ? const [22.0, 210.0, 307.0, 510.0][index] * landscapeScale
     : const [18.0, 236.0, 86.0, 278.0][index];
 
 double _nodeTop(int index, bool landscape) => landscape

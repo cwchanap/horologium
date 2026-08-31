@@ -480,15 +480,13 @@ void main() {
     },
   );
 
-  // Characterizes the known narrow-landscape clip (CodeRabbit, PR #20).
-  // The landscape node positions are authored for the 874x402 prototype
-  // (cavern 770px). At 667x375 (cavern 563px) node N4's fixed left=510 plus
-  // its 70px image overflows the cavern's Clip.antiAlias bounds (worse with a
-  // rig column). This test locks in the current overflow so a future
-  // responsive fix is a deliberate, verified change rather than a silent
-  // regression. Flip the expectations (containment) when the layout derives
-  // offsets from constraints.
-  testWidgets('documents the narrow-landscape node N4 cavern clip at 667x375', (
+  // Landscape node left offsets scale with the cavern width (cavernWidth /
+  // 770, the 874x402 prototype cavern). At 667x375 the cavern is 563px and
+  // every node — including N4, which previously overflowed by 17px — must stay
+  // fully inside the cavern's Clip.antiAlias bounds. At 874x402 the scale is
+  // exactly 1.0, so the authored prototype positions are unchanged (covered by
+  // the 'fits landscape cavern and controls inside the fixed right rail' test).
+  testWidgets('keeps every landscape node inside the cavern at 667x375', (
     tester,
   ) async {
     final state = _stateWith(
@@ -505,24 +503,22 @@ void main() {
     final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
     expect(cavern, const Rect.fromLTWH(0, 0, 563, 375));
 
-    // Nodes N1, N2, N3 stay inside the cavern at this width.
-    for (final node in [MiningNodeId.n1, MiningNodeId.n2, MiningNodeId.n3]) {
+    // Every node, including N4, fits fully inside the narrower cavern.
+    for (final node in MiningNodeId.values) {
       final rect = tester.getRect(
         find.byKey(Key('mine-site-node-${node.name}')),
       );
       expect(
+        cavern.contains(rect.topLeft),
+        isTrue,
+        reason: '$node top-left should be inside the cavern at 667x375',
+      );
+      expect(
         cavern.contains(rect.bottomRight - const Offset(0.1, 0.1)),
         isTrue,
-        reason: '$node should fit inside the cavern at 667x375',
+        reason: '$node bottom-right should be inside the cavern at 667x375',
       );
     }
-
-    // Node N4 (index 3, left=510, image width=70) overflows by >=17px even
-    // when locked; a deployed rig column widens the overflow further.
-    final n4 = tester.getRect(find.byKey(const Key('mine-site-node-n4')));
-    expect(n4.left, 510);
-    expect(n4.right, greaterThan(cavern.right));
-    expect(n4.right - cavern.right, greaterThanOrEqualTo(17));
   });
 
   testWidgets('reduced motion settles node feedback without overflow', (
