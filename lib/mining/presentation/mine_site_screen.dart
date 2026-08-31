@@ -238,6 +238,7 @@ class _LandscapeMineSite extends StatelessWidget {
               reducedMotion: reducedMotion,
               onNodeTap: onNodeTap,
               onSellCargo: onSellCargo,
+              landscapeLeftInset: pad.left,
             ),
           ),
           Positioned(
@@ -272,11 +273,14 @@ class _LandscapeMineSite extends StatelessWidget {
                   left: BorderSide(color: Color.fromRGBO(83, 212, 232, .24)),
                 ),
               ),
-              child: FleetDock(
-                view: fleetDock,
-                axis: FleetDockAxis.vertical,
-                onBayTap: onBayTap,
-                onSpawnRig: onSpawnRig,
+              child: Padding(
+                padding: EdgeInsets.only(bottom: pad.bottom),
+                child: FleetDock(
+                  view: fleetDock,
+                  axis: FleetDockAxis.vertical,
+                  onBayTap: onBayTap,
+                  onSpawnRig: onSpawnRig,
+                ),
               ),
             ),
           ),
@@ -293,6 +297,7 @@ class _CavernScene extends StatelessWidget {
     required this.onNodeTap,
     required this.onSellCargo,
     this.portraitTopInset = 0,
+    this.landscapeLeftInset = 0,
   });
 
   final MineSiteView view;
@@ -300,6 +305,7 @@ class _CavernScene extends StatelessWidget {
   final ValueChanged<MiningNodeId> onNodeTap;
   final VoidCallback onSellCargo;
   final double portraitTopInset;
+  final double landscapeLeftInset;
 
   @override
   Widget build(BuildContext context) {
@@ -314,6 +320,7 @@ class _CavernScene extends StatelessWidget {
                 landscape: landscape,
                 reducedMotion: reducedMotion,
                 onNodeTap: onNodeTap,
+                landscapeLeftInset: landscapeLeftInset,
               ),
             ),
             Positioned(
@@ -356,12 +363,14 @@ class _MineCavern extends StatelessWidget {
     required this.landscape,
     required this.reducedMotion,
     required this.onNodeTap,
+    this.landscapeLeftInset = 0,
   });
 
   final MineSiteView view;
   final bool landscape;
   final bool reducedMotion;
   final ValueChanged<MiningNodeId> onNodeTap;
+  final double landscapeLeftInset;
 
   @override
   Widget build(BuildContext context) {
@@ -451,7 +460,9 @@ class _MineCavern extends StatelessWidget {
             ),
           for (var index = 0; index < view.nodeList.length; index++)
             Positioned(
-              left: _nodeLeft(index, landscape),
+              left:
+                  _nodeLeft(index, landscape) +
+                  (landscape ? landscapeLeftInset : 0),
               top: _nodeTop(index, landscape),
               child: _MineNodeButton(
                 view: view.nodeList[index],
