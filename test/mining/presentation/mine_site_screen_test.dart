@@ -611,4 +611,74 @@ void main() {
       expect(nav.bottom, 932 - 34);
     },
   );
+
+  testWidgets(
+    'offsets landscape cash chip, toolbar, and right rail by safe-area insets',
+    (tester) async {
+      // Landscape on a notched device: the cutout side and home-indicator
+      // inset must not sit under the cash chip, the compact nav toolbar, or
+      // the fleet rail. Pump directly so the landscape chrome reads
+      // MediaQuery.paddingOf(context) from the view padding.
+      const padLeft = 44.0;
+      const padRight = 44.0;
+      const padBottom = 21.0;
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(874, 402);
+      tester.view.padding = const FakeViewPadding(
+        left: padLeft,
+        top: 0,
+        right: padRight,
+        bottom: padBottom,
+      );
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPadding();
+      });
+      final state = _stateWith(
+        landing: _progress(
+          commissioned: true,
+          storedAmount: 10,
+          rigs: {MiningNodeId.n1: RigTier.t2},
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+          home: MineSiteScreen(
+            view: _siteView(state),
+            fleetDock: _dockView(state),
+            cash: 100,
+            onNodeTap: (_) {},
+            onBayTap: (_) {},
+            onSpawnRig: () {},
+            onSellCargo: () {},
+            onBack: () {},
+            onSettings: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final cash = tester.getRect(find.byKey(const Key('mining-cash-chip')));
+      final toolbar = tester.getRect(
+        find.byKey(const Key('mine-site-toolbar')),
+      );
+      final rail = tester.getRect(
+        find.byKey(const Key('mine-site-right-rail')),
+      );
+      final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
+      // Cash chip clears the left cutout.
+      expect(cash.left, padLeft);
+      // Compact nav toolbar clears the left cutout and the home indicator.
+      expect(toolbar.left, 12 + padLeft);
+      expect(toolbar.bottom, 402 - 16 - padBottom);
+      // Right fleet rail clears the right cutout and stays adjacent to the
+      // cavern (no overlap, no gap).
+      expect(rail.right, 874 - padRight);
+      expect(cavern.right, lessThanOrEqualTo(rail.left));
+      // Cavern art stays full-bleed on the left edge.
+      expect(cavern.left, 0);
+    },
+  );
 }

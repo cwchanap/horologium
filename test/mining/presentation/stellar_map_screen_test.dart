@@ -411,4 +411,101 @@ void main() {
       }
     }
   });
+
+  testWidgets('site indicators never overlap the bottom planet action', (
+    tester,
+  ) async {
+    // The active card and an unlocked non-active card both end their
+    // indicator row above the 60px travel hex at bottom: 14. Assert
+    // indicator.bottom <= action.top for every indicator on both cards.
+    final view = StellarMapView.from(
+      state: _stateWith(
+        unlockedPlanets: {
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+        },
+      ),
+      content: _content,
+    );
+    await _pumpMap(tester, view: view, viewport: const Size(430, 932));
+
+    for (final planet in view.planets.where((planet) => planet.isUnlocked)) {
+      final action = find.byKey(
+        Key('mining-stellar-map-travel-${planet.id.name}'),
+      );
+      expect(action, findsOneWidget);
+      final actionTop = tester.getRect(action).top;
+      for (final site in _content.planet(planet.id).sites) {
+        final indicator = find.byKey(
+          Key('stellar-map-site-${planet.id.name}-${site.id.name}'),
+        );
+        expect(indicator, findsOneWidget);
+        expect(
+          tester.getRect(indicator).bottom,
+          lessThanOrEqualTo(actionTop),
+          reason:
+              '${site.id.name} indicator overlaps the ${planet.id.name} '
+              'action',
+        );
+      }
+    }
+  });
+
+  testWidgets(
+    'offsets landscape foreground controls by horizontal safe-area insets',
+    (tester) async {
+      // No orientation lock: rotating to landscape on a device with a
+      // left/right display cutout must keep the cash chip, cargo gauge,
+      // scroll content, and navigation out of the unsafe horizontal region
+      // while the background stays full-bleed. Pump directly so the screen
+      // reads MediaQuery.paddingOf(context) from the view padding.
+      const padLeft = 44.0;
+      const padRight = 44.0;
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(874, 402);
+      tester.view.padding = const FakeViewPadding(
+        left: padLeft,
+        top: 0,
+        right: padRight,
+        bottom: 0,
+      );
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPadding();
+      });
+      final view = StellarMapView.from(
+        state: MiningSave.initial(nowUtc: _start),
+        content: _content,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+          home: StellarMapScreen(
+            view: view,
+            content: _content,
+            onUnlock: (_) {},
+            onTravel: (_) {},
+            onDestinationSelected: (_) {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final cash = tester.getRect(find.byKey(const Key('mining-cash-chip')));
+      final cargo = tester.getRect(find.byKey(const Key('mining-cargo-gauge')));
+      final scroll = tester.getRect(
+        find.byKey(const Key('stellar-map-scroll')),
+      );
+      final nav = tester.getRect(
+        find.byKey(const Key('mining-bottom-navigation')),
+      );
+      expect(cash.left, padLeft);
+      expect(cargo.right, 874 - 12 - padRight);
+      expect(scroll.left, 14 + padLeft);
+      expect(scroll.right, 874 - 14 - padRight);
+      expect(nav.left, padLeft);
+      expect(nav.right, 874 - padRight);
+    },
+  );
 }
