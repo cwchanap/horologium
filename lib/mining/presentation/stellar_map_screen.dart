@@ -76,12 +76,12 @@ class StellarMapScreen extends StatelessWidget {
           ),
           Positioned(
             top: 54 + pad.top,
-            left: 0,
+            left: pad.left,
             child: MiningCashChip(cash: cash),
           ),
           Positioned(
             top: 50 + pad.top,
-            right: 12,
+            right: 12 + pad.right,
             child: MiningCargoGauge(
               cargo: cargo,
               capacity: capacity,
@@ -89,10 +89,14 @@ class StellarMapScreen extends StatelessWidget {
               size: 80,
             ),
           ),
-          Positioned(left: 16, top: 112 + pad.top, child: const _MapHeader()),
           Positioned(
-            left: 14,
-            right: 14,
+            left: 16 + pad.left,
+            top: 112 + pad.top,
+            child: const _MapHeader(),
+          ),
+          Positioned(
+            left: 14 + pad.left,
+            right: 14 + pad.right,
             top: 146 + pad.top,
             bottom: 99 + pad.bottom,
             child: SingleChildScrollView(
@@ -108,8 +112,8 @@ class StellarMapScreen extends StatelessWidget {
             ),
           ),
           Positioned(
-            left: 0,
-            right: 0,
+            left: pad.left,
+            right: pad.right,
             bottom: pad.bottom,
             child: MiningNavigationBar(
               selected: selectedDestination,
@@ -369,7 +373,7 @@ class _PlanetCard extends StatelessWidget {
             Positioned(
               left: 14,
               right: 14,
-              bottom: 14,
+              bottom: 10,
               child: Row(
                 children: [
                   if (view.isActive)

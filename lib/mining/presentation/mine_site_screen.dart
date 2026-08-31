@@ -222,6 +222,7 @@ class _LandscapeMineSite extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pad = MediaQuery.paddingOf(context);
     return ColoredBox(
       key: const Key('mine-site-screen'),
       color: const Color(0xFF07111E),
@@ -230,7 +231,7 @@ class _LandscapeMineSite extends StatelessWidget {
           Positioned(
             left: 0,
             top: 0,
-            right: 104,
+            right: 104 + pad.right,
             bottom: 0,
             child: _CavernScene(
               view: view,
@@ -241,12 +242,12 @@ class _LandscapeMineSite extends StatelessWidget {
           ),
           Positioned(
             top: 52,
-            left: 0,
+            left: pad.left,
             child: MiningCashChip(cash: cash, compact: true),
           ),
           Positioned(
-            left: 12,
-            bottom: 16,
+            left: 12 + pad.left,
+            bottom: 16 + pad.bottom,
             width: 252,
             height: 54,
             child: SizedBox(
@@ -261,7 +262,7 @@ class _LandscapeMineSite extends StatelessWidget {
           Positioned(
             key: const Key('mine-site-right-rail'),
             top: 0,
-            right: 0,
+            right: pad.right,
             bottom: 0,
             width: 104,
             child: Container(
