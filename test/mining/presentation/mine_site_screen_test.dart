@@ -480,12 +480,16 @@ void main() {
     },
   );
 
-  // Landscape node left offsets scale with the cavern width (cavernWidth /
-  // 770, the 874x402 prototype cavern). At 667x375 the cavern is 563px and
-  // every node — including N4, which previously overflowed by 17px — must stay
-  // fully inside the cavern's Clip.antiAlias bounds. At 874x402 the scale is
-  // exactly 1.0, so the authored prototype positions are unchanged (covered by
-  // the 'fits landscape cavern and controls inside the fixed right rail' test).
+  // Landscape node left offsets are authored for the 874x402 prototype
+  // (cavern 770px). N1-N3 keep their authored positions at every width; only
+  // N4 (authored left 510) can overflow a narrower cavern, so when it would it
+  // is anchored to the cavern's right edge instead of its authored left. At
+  // 667x375 the cavern is 563px: N4's right edge sits at the cavern boundary
+  // while N1-N3 stay put. N3 (left 307, right 401) must also stay clear of the
+  // fixed Sell control (left 236, width 56 -> right 292), which is painted
+  // later in the cavern Stack and would otherwise mask N3's tap target. At
+  // 874x402 the right-anchor does not engage (covered by the 'fits landscape
+  // cavern and controls inside the fixed right rail' test).
   testWidgets('keeps every landscape node inside the cavern at 667x375', (
     tester,
   ) async {
@@ -519,6 +523,18 @@ void main() {
         reason: '$node bottom-right should be inside the cavern at 667x375',
       );
     }
+
+    // N3 keeps its authored left (307) and must not slide under the fixed Sell
+    // control, which is painted later in the cavern Stack and would mask N3's
+    // tap target. The earlier uniform scaling moved N3 to ~224 and overlapped
+    // the Sell control (left 236, right 292).
+    final n3 = tester.getRect(find.byKey(const Key('mine-site-node-n3')));
+    final sell = tester.getRect(find.byKey(const Key('mine-site-sell')));
+    expect(
+      n3.overlaps(sell),
+      isFalse,
+      reason: 'N3 must not overlap the Sell control at 667x375',
+    );
   });
 
   testWidgets('reduced motion settles node feedback without overflow', (
