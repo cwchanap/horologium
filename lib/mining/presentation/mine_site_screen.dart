@@ -470,18 +470,40 @@ class _MineCavern extends StatelessWidget {
 
   Widget _positionedNode(int index) {
     // N4 is the only landscape node that can overflow a narrower cavern. When
-    // it would, anchor it to the cavern's right edge so its right side always
-    // clears the Clip regardless of its rendered (label/rig) width; otherwise
-    // keep its authored left so the 874x402 prototype layout is unchanged.
+    // it would, anchor its right edge to the cavern's right edge (right: 0) so
+    // it clears the Clip regardless of its rendered label width. The one
+    // exception is when both N3 and N4 are occupied: N4's rig column makes it
+    // wide enough that right-anchoring would slide it under N3, and since N4 is
+    // later in the Stack it would steal the overlap from N3's tap target. In
+    // that case anchor N4 to N3's occupied right edge plus a gap instead,
+    // accepting that N4's own rig column may clip the cavern at very narrow
+    // widths rather than N3 losing any tap target. At 874x402 the anchor never
+    // engages and the authored prototype positions are preserved.
     final n4RightAnchored =
         landscape &&
         index == 3 &&
         _landscapeN4Overflows(cavernWidth, landscapeLeftInset);
+    final n4ShiftedPastN3 =
+        n4RightAnchored &&
+        _landscapeN4OverlapsOccupiedN3(view, cavernWidth, landscapeLeftInset);
+    final double? n4Left;
+    final double? n4Right;
+    if (n4RightAnchored) {
+      if (n4ShiftedPastN3) {
+        n4Left = _landscapeN4ShiftedLeft(view, landscapeLeftInset);
+        n4Right = null;
+      } else {
+        n4Left = null;
+        n4Right = 0;
+      }
+    } else {
+      n4Left =
+          _nodeLeft(index, landscape) + (landscape ? landscapeLeftInset : 0);
+      n4Right = null;
+    }
     return Positioned(
-      left: n4RightAnchored
-          ? null
-          : _nodeLeft(index, landscape) + (landscape ? landscapeLeftInset : 0),
-      right: n4RightAnchored ? 0 : null,
+      left: n4Left,
+      right: n4Right,
       top: _nodeTop(index, landscape),
       child: _MineNodeButton(
         view: view.nodeList[index],
@@ -736,8 +758,10 @@ class _SellControl extends StatelessWidget {
 // control (left 236, width 56 -> right 292). N4 (authored left 510) is the only
 // node that can overflow a narrower cavern; when it would, it is anchored to
 // the cavern's right edge instead of its authored left so its right side always
-// clears the Clip regardless of label width. At 874x402 (cavern 770) the anchor
-// does not engage and the authored prototype positions are preserved.
+// clears the Clip regardless of label width. When both N3 and N4 are occupied
+// the anchor shifts N4 past N3's right edge so N4 never paints over N3's tap
+// target (see _landscapeN4OverlapsOccupiedN3). At 874x402 (cavern 770) the
+// anchor does not engage and the authored prototype positions are preserved.
 double _nodeLeft(int index, bool landscape) => landscape
     ? const [22.0, 210.0, 307.0, 510.0][index]
     : const [18.0, 236.0, 86.0, 278.0][index];
@@ -750,6 +774,37 @@ bool _landscapeN4Overflows(double cavernWidth, double landscapeLeftInset) {
   const authoredN4Left = 510.0;
   final maxWidth = _nodeSize(3, true) + 2 + _rigSize(3, true);
   return authoredN4Left + landscapeLeftInset + maxWidth > cavernWidth;
+}
+
+// Whether an occupied N4 right-anchored to the cavern's right edge would
+// overlap an occupied N3 (and so steal part of N3's tap target, since N4 is
+// painted later in the cavern Stack). Only the occupied case is deterministic
+// (image + 2px gap + rig column); a non-occupied N4 renders at the image width
+// plus a short label row that stays clear of N3 at phone landscape widths, so
+// it keeps the right anchor.
+bool _landscapeN4OverlapsOccupiedN3(
+  MineSiteView view,
+  double cavernWidth,
+  double landscapeLeftInset,
+) {
+  final n4 = view.nodeList[3];
+  final n3 = view.nodeList[2];
+  if (n4.rig == null || n3.rig == null) return false;
+  final n4OccupiedWidth = _nodeSize(3, true) + 2 + _rigSize(3, true);
+  final n3OccupiedWidth = _nodeSize(2, true) + 2 + _rigSize(2, true);
+  final rightAnchorLeft = cavernWidth - n4OccupiedWidth;
+  final n3Right = _nodeLeft(2, true) + landscapeLeftInset + n3OccupiedWidth;
+  return rightAnchorLeft < n3Right;
+}
+
+// N4's left when it must shift past an occupied N3: N3's occupied right edge
+// plus a gap, so the two tap targets stay disjoint. N4's own right edge may
+// then clip the cavern at very narrow widths.
+double _landscapeN4ShiftedLeft(MineSiteView view, double landscapeLeftInset) {
+  final n3OccupiedWidth = _nodeSize(2, true) + 2 + _rigSize(2, true);
+  final n3Right = _nodeLeft(2, true) + landscapeLeftInset + n3OccupiedWidth;
+  const gap = 4.0;
+  return n3Right + gap;
 }
 
 double _nodeTop(int index, bool landscape) => landscape
