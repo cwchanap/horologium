@@ -537,12 +537,12 @@ void main() {
     );
   });
 
-  // At 667x375 an occupied N3 (width 150, right 457) and an occupied N4 (width
-  // 116) cannot both fit inside the 563px cavern without overlapping. N4 is
-  // anchored using N3's occupied right edge as a left bound so its tap target
-  // stays disjoint from N3; N4's own right edge may clip the cavern, but N3's
-  // full tap target is preserved (N4 is painted later in the Stack and would
-  // otherwise steal the ~10x27px overlapping slice of N3).
+  // At 667x375 an occupied N3 (width 150) and an occupied N4 (width 116)
+  // cannot both fit inside the 563px cavern at their authored positions without
+  // overlapping. N4 right-anchors to the cavern's right edge and N3 shifts left
+  // so its occupied right edge plus a 4px gap reaches N4's left edge: both
+  // occupied tap targets stay disjoint AND fully contained (N4 no longer clips
+  // the cavern), and N3 stays clear of the fixed Sell control (right 292).
   testWidgets('keeps occupied N3 and N4 tap targets disjoint at 667x375', (
     tester,
   ) async {
@@ -561,18 +561,38 @@ void main() {
     );
 
     expect(tester.takeException(), isNull);
+    final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
     final n3 = tester.getRect(find.byKey(const Key('mine-site-node-n3')));
     final n4 = tester.getRect(find.byKey(const Key('mine-site-node-n4')));
+    final sell = tester.getRect(find.byKey(const Key('mine-site-sell')));
     expect(
       n3.overlaps(n4),
       isFalse,
       reason: 'Occupied N3 and N4 tap targets must not overlap at 667x375',
     );
-    // N3 keeps its authored left (307) and full occupied width (150 -> 457).
-    expect(n3.left, 307);
-    expect(n3.right, 457);
-    // N4 sits to the right of N3 with a gap, never under it.
-    expect(n4.left, greaterThan(n3.right));
+    // N3 shifts left from its authored left (307) to 293 so N4 can right-anchor;
+    // N3's occupied right edge (443) leaves a 4px gap to N4 and a 1px gap to the
+    // fixed Sell control (right 292).
+    expect(n3.left, 293);
+    expect(n3.right, 443);
+    expect(
+      n3.overlaps(sell),
+      isFalse,
+      reason: 'Shifted N3 must not overlap the Sell control at 667x375',
+    );
+    // N4 right-anchors to the cavern's right edge and stays fully contained.
+    expect(n4.left, 447);
+    expect(n4.right, cavern.right);
+    expect(
+      cavern.contains(n4.bottomRight - const Offset(0.1, 0.1)),
+      isTrue,
+      reason: 'Occupied N4 must stay fully inside the cavern at 667x375',
+    );
+    expect(
+      cavern.contains(n3.bottomRight - const Offset(0.1, 0.1)),
+      isTrue,
+      reason: 'Occupied N3 must stay fully inside the cavern at 667x375',
+    );
   });
 
   testWidgets('reduced motion settles node feedback without overflow', (
