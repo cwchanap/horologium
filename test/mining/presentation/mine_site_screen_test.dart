@@ -537,6 +537,44 @@ void main() {
     );
   });
 
+  // At 667x375 an occupied N3 (width 150, right 457) and an occupied N4 (width
+  // 116) cannot both fit inside the 563px cavern without overlapping. N4 is
+  // anchored using N3's occupied right edge as a left bound so its tap target
+  // stays disjoint from N3; N4's own right edge may clip the cavern, but N3's
+  // full tap target is preserved (N4 is painted later in the Stack and would
+  // otherwise steal the ~10x27px overlapping slice of N3).
+  testWidgets('keeps occupied N3 and N4 tap targets disjoint at 667x375', (
+    tester,
+  ) async {
+    final state = _stateWith(
+      landing: _progress(
+        commissioned: true,
+        storedAmount: 10,
+        rigs: {MiningNodeId.n3: RigTier.t2, MiningNodeId.n4: RigTier.t1},
+      ),
+    );
+    await _pumpMineSite(
+      tester,
+      size: const Size(667, 375),
+      view: _siteView(state),
+      dock: _dockView(state),
+    );
+
+    expect(tester.takeException(), isNull);
+    final n3 = tester.getRect(find.byKey(const Key('mine-site-node-n3')));
+    final n4 = tester.getRect(find.byKey(const Key('mine-site-node-n4')));
+    expect(
+      n3.overlaps(n4),
+      isFalse,
+      reason: 'Occupied N3 and N4 tap targets must not overlap at 667x375',
+    );
+    // N3 keeps its authored left (307) and full occupied width (150 -> 457).
+    expect(n3.left, 307);
+    expect(n3.right, 457);
+    // N4 sits to the right of N3 with a gap, never under it.
+    expect(n4.left, greaterThan(n3.right));
+  });
+
   testWidgets('reduced motion settles node feedback without overflow', (
     tester,
   ) async {
