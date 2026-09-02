@@ -790,7 +790,17 @@ _refreshPresentation(
 );
 ```
 
-Pass `syncLandingBasinCargoOnSuccess: true` only for `recallRig`. Spawn/deploy/technology/etc. retain the default `false`.
+Change only the recall call site to:
+
+```dart
+_runSheetAction(
+  () => _controller.recallRig(siteId, nodeId),
+  successMessage: 'Rig recalled.',
+  syncLandingBasinCargoOnSuccess: true,
+);
+```
+
+Spawn/deploy/technology/unlock/etc. retain the default `false`.
 
 Sale needs no special economy branch: after authoritative cargo becomes 0, the pure helper publishes the decrease immediately. Calling `_refreshPresentation()` remains sufficient.
 
