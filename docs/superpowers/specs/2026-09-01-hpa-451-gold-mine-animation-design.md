@@ -4,28 +4,30 @@
 
 Approved implementation design for Linear HPA-451, **Ship hit-synchronized gold mine animation and visual variety**.
 
-Planning, implementation, review, and verification stay on **one branch and one pull request**. This design is intentionally limited to one authored resource site: `MiningSiteId.landingBasin`.
+Planning, implementation, review, and verification stay on **one branch and one pull request**. The feature remains intentionally limited to one authored resource site: `MiningSiteId.landingBasin`.
 
-This revision is grounded on `main` commit `b00e0bcaa3bc4c77e5ae0ebdb0d6c83e51aeaee3` and incorporates the first planning review of draft PR #22.
+This revision is grounded on `main` commit `b00e0bcaa3bc4c77e5ae0ebdb0d6c83e51aeaee3` and incorporates the first two planning reviews of draft PR #22.
 
 ## Goal
 
-Make Landing Basin read as a physical mining scene rather than a continuously ticking number:
+Make passive foreground production at Landing Basin read as a physical mining event:
 
 ```text
-robot reaches contact
-    -> gold deposit reacts
-    -> visible Landing Basin cargo/progress increases
-    -> robot recoils, winds up, and approaches the next hit
+one-second foreground refresh
+  -> authoritative cargo increases
+  -> robot reaches contact
+  -> gold deposit reacts
+  -> cargo/progress update is visible on that same rebuild
+  -> robot recoils, winds up, and approaches the next hit
 ```
 
-At the same time, increase the visual variety of the gold site with five robot-tier images, four deterministic gold-deposit variants, and one authored hit accent.
+At the same time, increase the visual variety of the gold site with five robot-tier images and four deterministic gold-deposit variants.
 
-The underlying economy remains deterministic elapsed-time production. Animation presents authoritative results; it never owns or calculates them.
+The underlying economy remains deterministic elapsed-time production. Animation presents authoritative results; it never owns, delays, or calculates them.
 
 ## Current reusable baseline
 
-The active runtime already has the correct ownership seams:
+Keep the established ownership path:
 
 ```text
 MainMenu
@@ -38,238 +40,119 @@ MainMenu
 
 Reuse rather than recreate:
 
-- `MiningShell` as the single owner of the one-second foreground timer, `_displayState`, lifecycle, navigation, and reduced-motion propagation;
+- `MiningShell` as the sole owner of the one-second foreground timer, `_displayState`, lifecycle, navigation, and reduced-motion propagation;
 - `MiningController.refresh()` as the in-memory foreground accrual seam;
-- `MiningController` mutation methods, which accrue to the injected clock before changing state and persisting;
-- `MiningSimulation` as the pure elapsed-time production source of truth;
-- `MineSiteView.from(...)` as the one projection boundary for Mine Site display and interaction state;
+- existing controller mutations, which accrue to their injected-clock timestamp before mutating/persisting;
+- `MiningSimulation` as the pure elapsed-time economy source of truth;
+- `MineSiteView.from(...)` unchanged as the current authoritative view-model projection;
 - `MineSiteScreen` and its existing responsive cavern/node composition;
-- `MiningVisuals` for authored presentation paths;
+- `MiningVisuals.rigAsset(...)` as the narrow asset-mapping pattern;
 - `MiningNodeId`, `RigTier`, and `MiningSiteId` as closed identities;
-- the existing injected `TestClock`, `CountingMiningSaveRepository`, `deployedLandingBasin`, `deployedLandingState`, and `pumpShell` test fixtures.
+- the existing injected `TestClock`, `CountingMiningSaveRepository`, `deployedLandingBasin`, `deployedLandingState`, and `pumpShell` fixtures.
 
-The current Mine Site renders one site-wide `nodeAsset` and one shared rig image per `RigTier`. Landing Basin currently points at `assets/images/mining/nodes/gold.png`; deployed rigs use `assets/images/mining/rigs/t1.png` through `t5.png`.
+The current Mine Site renders one site-wide `nodeAsset` and one shared rig image per `RigTier`. Landing Basin currently uses `assets/images/mining/nodes/gold.png`, while deployed rigs use `assets/images/mining/rigs/t1.png` through `t5.png`.
 
-Do not add a second controller, simulation, repository, timer, or persisted animation state.
+`MiningVisuals.mergeBurst` already maps `assets/images/mining/effects/merge_burst.png`. Code search shows that asset is bundle-tested but not rendered anywhere in `lib/`. It is therefore the first reuse candidate for the mining-contact accent.
 
 ## Selected architecture
 
-### 1. Keep `_displayState` authoritative; hold only one visible cargo number
+### 1. Add only one new shell state value
 
-The production model does not change.
+Do not add a visible-cargo overlay, projected `MiningSave`, alternate Mine Site cargo field, or mutation-flush classification.
 
-`MiningController.refresh()` and every existing mutation continue to accrue authoritative state to the supplied UTC clock. Offline, resume, cold-load, action ordering, persistence, rates, capacity, recall legality, sale values, and selling semantics remain unchanged.
-
-The new rule is narrower than a projected/fake `MiningSave`:
-
-> While Landing Basin is open, only the **visible Landing Basin cargo/progress amount** may lag authoritative cargo until an eligible foreground impact pulse.
-
-`MiningShell` keeps:
+`MiningShell` adds exactly:
 
 ```dart
-MiningSave _displayState;                // authoritative presentation snapshot
-int _landingBasinImpactSequence = 0;     // transient animation trigger
-double _landingBasinVisibleCargo = 0;    // visual-only cargo/progress overlay
+int _landingBasinImpactSequence = 0;
 ```
 
-`_displayState` continues to copy `_controller.state` on every presentation refresh. Do **not** clone a `MiningSave` with a fake `storedAmount`.
+`_displayState` remains exactly what it is today: the latest authoritative `_controller.state` published by `_refreshPresentation()`.
 
-This keeps all interaction/value calculations honest while allowing the gold gauge and node progress bars to wait for contact.
+This removes the possibility of a frozen cargo number disagreeing with projected sale value, Sell semantics, recall legality, or controller actions.
 
-### 2. Use one pure function for the hold/decrease/flush rule
+### 2. Reuse the existing one-second timer as the passive impact clock
 
-Extract one top-level presentation helper in `mining_shell.dart`:
+Replace only the timer callback body with a focused foreground-production method:
 
 ```dart
-double projectLandingBasinVisibleCargo({
-  required double authoritativeCargo,
-  required double visibleCargo,
-  required MiningSiteId? openSiteId,
-  required bool publishUpwardLandingCargo,
-}) {
-  if (openSiteId != MiningSiteId.landingBasin ||
-      publishUpwardLandingCargo) {
-    return authoritativeCargo;
+void _refreshForegroundProduction() {
+  if (_controller.isBusy) return;
+
+  final before = _controller
+      .state
+      .sites[MiningSiteId.landingBasin]!
+      .storedAmount;
+
+  _controller.refresh();
+
+  final landing = _controller.state.sites[MiningSiteId.landingBasin]!;
+  final hasRig = landing.rigByNode.values.any((tier) => tier != null);
+
+  if (_openSiteId == MiningSiteId.landingBasin &&
+      hasRig &&
+      landing.storedAmount > before) {
+    _landingBasinImpactSequence++;
   }
-  return authoritativeCargo < visibleCargo
-      ? authoritativeCargo
-      : visibleCargo;
+
+  _refreshPresentation();
 }
 ```
 
-The table is deliberately small:
-
-| Situation | Visible cargo result |
-| --- | --- |
-| Landing Basin open, authoritative cargo rose, ordinary refresh | hold previous visible cargo |
-| Landing Basin open, authoritative cargo decreased | publish decrease immediately |
-| Landing Basin open, eligible impact | publish authoritative cargo |
-| Landing Basin closed / another site open | publish authoritative cargo |
-| cold-load / resume explicit flush | publish authoritative cargo |
-
-This helper has no dependency on widget state, timers, repositories, or controller methods. Unit tests prove the table directly; shell widget tests only prove wiring/timing.
-
-### 3. `MineSiteView` separates visual cargo from authoritative interaction state
-
-Extend `MineSiteView.from(...)` with one optional override:
+The existing timer remains the only clock:
 
 ```dart
-static MineSiteView from({
-  required MiningSave state,
-  required MiningContentRegistry content,
-  required MiningSiteId siteId,
-  required DockBayId? selectedBayId,
-  required bool isBusy,
-  double? visibleCargo,
-})
+Timer.periodic(const Duration(seconds: 1), ...)
 ```
 
-`state` is always authoritative.
+The timer still calls `MiningController.refresh()` exactly once. The authoritative cargo update and the `impactSequence` increment are published in the same shell rebuild, so the animation begins at the already-updated cargo frame.
 
-Inside the factory:
+A delayed callback may accrue several elapsed seconds but still produces one impact sequence increment. Missed foreground strikes are not replayed.
+
+The final callback that reaches capacity may increment once; later callbacks do not because cargo no longer rises.
+
+### 3. Deliberately scope synchronization to passive foreground production
+
+User-initiated controller actions remain unchanged. Spawn, merge, deploy, recall, technology, sale, and other mutations may accrue authoritative production to their action timestamp and publish it with the action response.
+
+Do **not** fabricate an additional mining strike for those mutations and do not delay their state behind animation.
+
+This is the explicit KISS boundary for HPA-451:
+
+> Passive one-second foreground production is synchronized with the robot/deposit hit. User-initiated mutation results remain authoritative and immediate.
+
+Cold-load and lifecycle resume also publish deterministic elapsed-time accrual immediately and do not increment `impactSequence` or replay historical strikes.
+
+### 4. Thread one transient sequence; keep one Landing Basin gate
+
+Add `impactSequence` to `MineSiteScreen`, defaulting to `0` so direct fixtures and goldens are deterministic.
+
+`MiningShell` passes the counter unconditionally:
 
 ```dart
-final progress = state.sites[siteId]!;
-final displayedCargo = visibleCargo ?? progress.storedAmount;
+impactSequence: _landingBasinImpactSequence,
 ```
 
-Only this field uses `displayedCargo`:
-
-```dart
-cargo: displayedCargo,
-```
-
-Everything that affects player decisions or monetary value remains derived from authoritative `progress.storedAmount` / authoritative active-planet site progress:
-
-- `projectedSale`;
-- `activePlanetCargo`;
-- `activePlanetProjectedSale`;
-- `canSell`;
-- `hasUnsellableCargo` inputs;
-- recall capacity comparison;
-- `canRecall`;
-- node `disabledReason`;
-- deploy legality;
-- rig assignments;
-- capacity/rate/technology state.
-
-Therefore a held visual delta can never make the Sell label disagree with the cash actually paid, and it can never make a recall button appear legal when the controller will reject it.
-
-`MiningShell.build` supplies the override only for Landing Basin:
-
-```dart
-MineSiteView.from(
-  state: _displayState,
-  content: _content,
-  siteId: siteId,
-  selectedBayId: _selectedBayId,
-  isBusy: _controller.isBusy,
-  visibleCargo: siteId == MiningSiteId.landingBasin
-      ? _landingBasinVisibleCargo
-      : null,
-)
-```
-
-The Site Deck and Stellar Map continue to use authoritative `_displayState` with no overlay.
-
-### 4. Use the existing one-second timer as the impact publication clock
-
-On each existing timer callback:
-
-1. skip when the controller is busy, preserving current behavior;
-2. capture `_landingBasinVisibleCargo`;
-3. call `MiningController.refresh()` exactly once;
-4. read authoritative Landing Basin `storedAmount` and current rig assignment;
-5. if Landing Basin is open, at least one rig is deployed, and authoritative cargo is greater than visible cargo, increment `_landingBasinImpactSequence`;
-6. refresh presentation with `publishUpwardLandingCargo: true` only for that impact;
-7. publish authoritative `_displayState`, the visible cargo flush, and the new sequence in the same `setState`.
-
-A delayed timer callback may publish several elapsed seconds of production in one strike. Missed foreground strikes are not replayed.
-
-The final production update that reaches capacity may emit one impact because cargo increased. Subsequent callbacks have no upward delta and emit no impact.
-
-### 5. Mutation behavior stays explicit
-
-Controller mutations remain authoritative and persist exactly as they do now.
-
-While Landing Basin is open:
-
-- spawn/deploy/technology/unlock and other non-sell/non-recall mutations may accrue production, but an upward cargo delta remains visually held until the next impact;
-- a sale publishes the authoritative decrease immediately and does not increment `_landingBasinImpactSequence`;
-- a successful recall explicitly flushes `_landingBasinVisibleCargo` to authoritative cargo without incrementing the sequence, so removing the final rig cannot strand hidden cargo indefinitely;
-- recall legality, disabled reason, and Sell value are authoritative even while the visible gauge is held.
-
-A narrow optional flag on the existing shell action helper is sufficient for the recall flush. Do not add an event bus or mutation classification framework.
-
-### 6. Initialization, resume, and exit paths flush without strike replay
-
-Initialization and lifecycle resume keep their existing deterministic accrual behavior.
-
-They publish authoritative Landing Basin cargo immediately **without** incrementing `_landingBasinImpactSequence`.
-
-Exiting the Mine Site also flushes the visual overlay without an impact:
-
-- Back to Site Deck;
-- bottom navigation to Stellar Map / another primary surface.
-
-Because `_displayState` remains authoritative, Site Deck/Stellar Map totals are always real. The explicit overlay flush keeps the next Landing Basin entry aligned with those totals.
-
-Therefore:
-
-- cold launch never replays historical strikes;
-- returning from background never replays historical strikes;
-- entering Landing Basin shows current cargo but never fabricates a hit;
-- leaving Landing Basin cannot leave stale cargo on another primary surface;
-- re-entering starts from the current authoritative amount with the same unchanged impact sequence.
-
-### 7. Add one authored Landing Basin asset family
-
-Keep the scope local to one concrete site. Add exactly ten new PNGs under one manifest directory:
+Thread it through the existing private composition the same way `reducedMotion` is already threaded:
 
 ```text
-assets/images/mining/landing_basin/
-  robot_t1.png
-  robot_t2.png
-  robot_t3.png
-  robot_t4.png
-  robot_t5.png
-  deposit_n1.png
-  deposit_n2.png
-  deposit_n3.png
-  deposit_n4.png
-  impact.png
+MineSiteScreen
+  -> _PortraitMineSite / _LandscapeMineSite
+  -> _CavernScene
+  -> _MineCavern
+  -> _MineNodeButton
 ```
 
-Asset rules:
+Only `_MineNodeButton` decides whether it matters:
 
-- transparent RGBA PNGs;
-- consistent orientation: deposits on the left, robot facing/working toward the left-side deposit;
-- robot silhouettes form one progression family but differ enough that T1–T5 are recognizable without reading the tier badge;
-- higher tiers gain visible machinery mass/tooling rather than only color changes;
-- four deposits clearly read as gold-bearing rock from the same Landing Basin environment but differ in silhouette, exposed gold vein/ore shape, and surrounding rock detail;
-- all four deposit variants keep a similar bounding footprint so current node geometry remains valid;
-- `impact.png` is a small spark/chip/fragment accent readable at current node sizes.
+- Landing Basin unlocked node -> `LandingBasinMiningNodeVisual`;
+- every other unlocked site -> existing `nodeAsset + MiningVisuals.rigAsset(...)` Row;
+- locked node -> existing `_LockedNode`.
 
-Do not reorganize existing global rig/node assets. Fleet Dock and every non-Landing-Basin site keep their current files.
+Do not duplicate the `siteId == MiningSiteId.landingBasin` gate in `MiningShell`.
 
-Extend `MiningVisuals` only with narrow helpers:
+### 5. One node-local animation owner synchronizes robot and resource
 
-```dart
-static String landingBasinRobotAsset(RigTier tier) =>
-    'assets/images/mining/landing_basin/robot_${tier.name}.png';
-
-static String landingBasinDepositAsset(MiningNodeId nodeId) =>
-    'assets/images/mining/landing_basin/deposit_${nodeId.name}.png';
-
-static const landingBasinImpact =
-    'assets/images/mining/landing_basin/impact.png';
-```
-
-Do not add string resource IDs, random variants, persisted variant state, or a generic resource visual registry.
-
-### 8. One node-local animation owner synchronizes robot and resource
-
-Use one focused stateful widget:
+Add one focused stateful widget:
 
 ```dart
 LandingBasinMiningNodeVisual(
@@ -282,122 +165,166 @@ LandingBasinMiningNodeVisual(
 )
 ```
 
-The widget owns one `AnimationController` with a one-second duration. It does not own a timer and never calls `MiningController`.
+It owns exactly one `AnimationController` with a one-second duration. It has no timer, controller, repository, or economy dependency.
 
 For unlocked Landing Basin nodes:
 
-- `rig == null`: render the deterministic `deposit_nX.png` with the current subdued no-rig treatment;
-- `rig != null`: render the deposit and tier-specific robot together;
-- a new `impactSequence` starts exactly one animation;
-- rebuilding with the same sequence does not restart;
-- a sequence jump greater than one still plays one strike rather than replaying missed impacts.
+- `rig == null`: render the deterministic deposit variant with the existing subdued no-rig treatment;
+- `rig != null`: render deposit + tier-specific robot in the existing Row footprint;
+- a new sequence starts exactly one animation;
+- the same sequence does not restart;
+- a jump greater than one still plays one strike, with no replay of missed impacts.
 
 Suggested choreography:
 
 ```text
-0 ms        contact; deposit compresses/flashes; impact accent visible
+0 ms        contact; deposit compresses/flashes; contact accent visible
 0–140 ms    robot recoils; deposit settles
 140–700 ms  robot recovers / winds up
 700–1000 ms robot approaches the deposit
 ```
 
-The widget reproduces the current deposit + 2 px gap + robot/tier-badge composition. Transforms occur inside fixed child bounds; width, height, padding, Row/Column size, and the outer tap target never animate.
+The controller rests at its end value. Transforms occur inside fixed child bounds; width, height, padding, Row/Column size, and outer tap geometry never animate.
 
-Locked nodes continue using `_LockedNode`.
+### 6. Prototype the art footprint before producing the full family
 
-### 9. Reduced motion keeps contact semantics without spatial motion
+Do not author the whole asset family before any asset is rendered.
 
-`MediaQuery.disableAnimations` remains the sole source of truth and is still propagated from `MiningShell`.
+First prove one vertical visual pair:
 
-When reduced motion is enabled:
+```text
+robot_t1.png
+deposit_n1.png
+```
 
-- do not translate, rotate, shake, or continuously animate robot/deposit;
-- render stable robot/deposit poses;
-- on a new impact sequence, permit only a brief non-spatial opacity/brightness confirmation and/or the static `impact.png` accent;
-- publish cargo/progress on the exact same impact update as normal motion.
+Wire that pair through the real Landing Basin node composition and verify the existing 402×874 and 667×375 geometry/tap-target gates.
 
-Reduced motion changes presentation only, never economy cadence.
+Before authoring a dedicated `impact.png`, render the existing unused `MiningVisuals.mergeBurst` over the N1 prototype at the intended small contact size. Reuse it if all are true:
 
-### 10. Keep Mine Site geometry and chrome unchanged
+- reads as a compact mining contact rather than a merge-specific symbol;
+- remains legible at the node's actual rendered size;
+- does not obscure the deposit/robot silhouette;
+- works in both normal and reduced-motion presentation.
 
-Add `impactSequence` to `MineSiteScreen`, defaulting to `0`, and thread it through the existing private composition the same way `reducedMotion` is already threaded.
+Only create `assets/images/mining/landing_basin/impact.png` if that reuse check fails. Do not create two equivalent contact-effect assets.
 
-`_MineNodeButton` chooses one narrow visual branch:
+After the prototype footprint is proven, author the remaining robot/deposit family:
 
-- Landing Basin unlocked node: `LandingBasinMiningNodeVisual`;
-- every other unlocked site: existing `nodeAsset + MiningVisuals.rigAsset(...)` presentation;
-- locked node: existing `_LockedNode`.
+```text
+robot_t2.png ... robot_t5.png
+deposit_n2.png ... deposit_n4.png
+```
+
+Final robot rules:
+
+- same orientation and ground line;
+- one progression family;
+- higher tiers gain visible machinery/tooling, not only recolor;
+- readable at current `rigSize` values.
+
+Final deposit rules:
+
+- clearly gold-bearing rock from one Landing Basin environment;
+- distinct silhouettes/veins;
+- similar occupied footprint at current `nodeSize` values.
+
+### 7. Narrow asset mappings only
+
+Use naming helpers, following `rigAsset(...)`:
+
+```dart
+static String landingBasinRobotAsset(RigTier tier) =>
+    'assets/images/mining/landing_basin/robot_${tier.name}.png';
+
+static String landingBasinDepositAsset(MiningNodeId nodeId) =>
+    'assets/images/mining/landing_basin/deposit_${nodeId.name}.png';
+```
+
+For the contact accent:
+
+- reuse `MiningVisuals.mergeBurst` when the prototype check passes; or
+- add one `landingBasinImpact` constant only when a dedicated asset is required.
+
+Add one manifest directory for the Landing Basin robot/deposit images:
+
+```yaml
+- assets/images/mining/landing_basin/
+```
+
+No generic resource visual registry, string resource identity, randomized variant, or persisted variant state.
+
+### 8. Reduced motion stays presentation-only
+
+`MediaQuery.disableAnimations` remains the sole source of truth.
+
+With reduced motion:
+
+- no robot/deposit translation, rotation, shake, or continuous spatial motion;
+- stable robot/deposit poses;
+- a brief non-spatial opacity/brightness/contact-accent confirmation may appear on a new sequence;
+- economy and one-second foreground refresh behavior are unchanged.
+
+### 9. Keep Mine Site geometry and chrome unchanged
+
+Preserve the existing outer structure:
+
+```text
+Semantics
+  -> Material
+    -> InkWell(key: mine-site-node-*)
+      -> locked OR Column(
+           node visual,
+           6 px gap,
+           progress bar,
+         )
+```
+
+The Landing Basin widget reproduces the current deposit + 2 px gap + robot/tier-badge layout. Do not restyle the badge or chrome.
 
 Preserve unchanged:
 
-- outer `Semantics`;
-- `InkWell` and `mine-site-node-${id.name}` key;
-- disabled-reason forwarding;
-- tier badge styling/spacing;
-- site progress bar geometry;
+- semantics and disabled-reason forwarding;
+- `mine-site-node-${id.name}` keys;
 - deploy/recall callbacks;
-- portrait anchors;
-- landscape anchors;
-- special 667×375 occupied N3/N4 containment/overlap behavior;
-- Sell control geometry.
-
-No generic widget factory is needed for one special site.
+- progress bar geometry;
+- portrait positions;
+- landscape positions;
+- Sell control geometry;
+- special 667×375 occupied N3/N4 containment/overlap behavior.
 
 ## Data flow
 
-### Normal visible impact
+Passive foreground production:
 
 ```text
 Timer.periodic(1s)
-  -> MiningShell captures visible Landing Basin cargo
+  -> capture authoritative Landing Basin cargo before refresh
   -> MiningController.refresh()
-  -> MiningSimulation accrues authoritative elapsed-time production
-  -> authoritative _displayState is refreshed
-  -> authoritative cargo > visible cargo + rig deployed + Landing Basin open
-  -> impactSequence++
-  -> visible cargo flushes to authoritative in the same setState
-  -> MineSiteView.from(authoritative state, visibleCargo: flushed value)
-  -> gauge/progress jump + robot/deposit contact begin together
+  -> MiningSimulation accrues deterministic elapsed-time production
+  -> if Landing Basin open + rig deployed + cargo rose:
+       impactSequence++
+  -> _refreshPresentation() publishes authoritative state
+  -> MineSiteScreen rebuilds with same sequence update
+  -> LandingBasinMiningNodeVisual starts at contact
 ```
 
-### Controller action between impacts
+User action between timer ticks:
 
 ```text
 user action
-  -> controller mutation accrues/persists authoritative state
-  -> MiningShell copies authoritative state immediately
-  -> MineSiteView interaction/value fields use authoritative state
-  -> visible cargo overlay holds only an upward Landing Basin delta
-  -> next timer impact publishes that visible cargo delta
+  -> existing controller mutation accrues/mutates/persists
+  -> existing shell presentation refresh publishes authoritative result
+  -> no synthetic mining impact is added
 ```
 
-### Sell while cargo is held
+Resume:
 
 ```text
-authoritative cargo > visible cargo
-  -> Sell label/canSell use authoritative activePlanetProjectedSale
-  -> controller sells authoritative cargo
-  -> visible cargo immediately decreases to 0
-  -> snackbar revenue matches the pre-tap Sell value
-  -> no impactSequence increment
-```
-
-### Recall while cargo is held
-
-```text
-authoritative cargo > visible cargo
-  -> canRecall/disabledReason use authoritative cargo
-  -> UI legality matches controller legality
-  -> successful recall flushes visible cargo without a mining impact
-```
-
-### Exit / resume
-
-```text
-Back / Stellar Map / resume
-  -> authoritative state remains unchanged
-  -> visible Landing Basin cargo flushes to authoritative
-  -> impactSequence stays unchanged
+MiningController.resume()
+  -> deterministic elapsed accrual
+  -> authoritative presentation publishes immediately
+  -> impactSequence unchanged
+  -> no historical strike replay
 ```
 
 ## Files expected to change
@@ -406,40 +333,35 @@ Create:
 
 ```text
 lib/mining/presentation/landing_basin_mining_node_visual.dart
-assets/images/mining/landing_basin/robot_t1.png
-assets/images/mining/landing_basin/robot_t2.png
-assets/images/mining/landing_basin/robot_t3.png
-assets/images/mining/landing_basin/robot_t4.png
-assets/images/mining/landing_basin/robot_t5.png
-assets/images/mining/landing_basin/deposit_n1.png
-assets/images/mining/landing_basin/deposit_n2.png
-assets/images/mining/landing_basin/deposit_n3.png
-assets/images/mining/landing_basin/deposit_n4.png
-assets/images/mining/landing_basin/impact.png
+assets/images/mining/landing_basin/robot_t1.png ... robot_t5.png
+assets/images/mining/landing_basin/deposit_n1.png ... deposit_n4.png
 test/mining/presentation/landing_basin_mining_node_visual_test.dart
+```
+
+Conditionally create only if `mergeBurst` fails the prototype reuse check:
+
+```text
+assets/images/mining/landing_basin/impact.png
 ```
 
 Modify:
 
 ```text
-lib/mining/mine_site_view.dart
+lib/mining/presentation/mining_visuals.dart
 lib/mining/presentation/mining_shell.dart
 lib/mining/presentation/mine_site_screen.dart
-lib/mining/presentation/mining_visuals.dart
 pubspec.yaml
-test/mining/mine_site_view_test.dart
+test/mining/presentation/mining_visuals_test.dart
 test/mining/presentation/mining_shell_test.dart
 test/mining/presentation/mine_site_screen_test.dart
-test/mining/presentation/mining_visuals_test.dart
 test/mining/presentation/visual_parity_golden_test.dart
 CLAUDE.md
 ```
 
-`AGENTS.md` is a repository-relative symlink to `CLAUDE.md`; do not edit it separately.
-
-Do not modify unless implementation uncovers a contradiction with this design:
+Do not modify:
 
 ```text
+lib/mining/mine_site_view.dart
 lib/mining/mining_content.dart
 lib/mining/mining_state.dart
 lib/mining/mining_controller.dart
@@ -449,93 +371,66 @@ lib/mining/mining_save_repository.dart
 
 ## Testing strategy
 
-### Pure visible-cargo projection
+### Shell sequence wiring
 
-Unit-test `projectLandingBasinVisibleCargo(...)` without pumping the shell:
+Use sequence **deltas**, not absolute values coupled to `pumpShell`'s timer phase.
 
-- hold an upward delta while Landing Basin is open;
-- publish a decrease immediately;
-- publish authoritative cargo on an impact flush;
-- publish authoritative cargo when Landing Basin is closed / another site is open.
+Add a small test helper that advances the injected clock and pumps one timer interval. Cover only the behavior that belongs in the shell:
 
-### View-model separation
+- an open Landing Basin with a deployed rig and a real passive cargo increase increments sequence exactly once and publishes the cargo increase;
+- delayed multi-second accrual still increments once for one timer callback;
+- closed Landing Basin / no rig / already-full cargo does not increment;
+- foreground refresh still does not persist per second;
+- lifecycle resume publishes cargo without incrementing sequence.
 
-Extend `mine_site_view_test.dart` to prove that `visibleCargo` affects only `view.cargo` while:
+Do not add sell-while-held, recall-while-held, overlay-flush, or `MineSiteView.visibleCargo` tests because that state layer does not exist.
 
-- `activePlanetProjectedSale` remains authoritative;
-- `canSell` remains authoritative;
-- `projectedSale` remains authoritative;
-- `canRecall` and recall `disabledReason` remain authoritative.
+### Animation component
 
-### Shell integration
+Test:
 
-Use the existing injected fixtures to prove:
-
-- an eligible timer callback publishes visible cargo and a new impact sequence together;
-- a controller action advances authoritative cargo without moving visible cargo before the impact;
-- **sell while held:** displayed Sell value equals the eventual `Sold N cash.` result;
-- **recall while held near post-recall capacity:** the visible enabled/disabled state matches the tap/controller result;
-- successful recall flushes held cargo without a mining impact;
-- delayed multi-second accrual produces one impact with the complete accumulated delta;
-- no-rig, unchanged-clock, busy, and already-full cases emit no impact;
-- Back to Site Deck flushes held cargo without an impact;
-- bottom navigation to Stellar Map flushes held cargo without an impact;
-- resume publishes accumulated cargo immediately without replaying an impact;
-- foreground refresh still does not save every second.
-
-### Animation behavior
-
-Widget tests use a fixed initial `impactSequence = 0`, then rebuild with `1` and pump key durations:
-
-- contact frame at sequence change;
-- recoil during the first 140 ms;
-- stable end state at one second;
+- deterministic rest at initial sequence;
+- new sequence enters contact/recoil;
 - same sequence does not restart;
-- sequence jump produces one animation only;
-- `rig == null` remains static;
+- sequence jump produces one animation;
+- empty node remains static;
 - reduced motion has no spatial transform;
-- tier/node changes resolve the correct assets;
-- disposal leaves no active ticker/test exception.
+- disposing leaves no active ticker/test exception;
+- fixed external bounds across animation phases.
 
-Test behavior and phase boundaries, not pixel-perfect easing.
+### Asset/geometry proof
 
-### Layout/regression
+Before bulk asset generation:
 
-Existing Mine Site tests remain authoritative. Add Landing Basin coverage without relaxing current assertions, especially:
+- render T1/N1 in the real node composition;
+- evaluate `mergeBurst` reuse at target size;
+- run 402×874 Mine Site layout assertions;
+- run 667×375 occupied N3/N4 disjoint/contained assertions.
 
-- portrait node containment;
-- landscape node placement;
-- 667×375 occupied N3/N4 tap targets remain disjoint and contained;
-- Sell control does not overlap N3;
-- semantics, disabled reasons, deploy/recall callbacks, and tier badge spacing remain intact.
+After bulk assets:
 
-Visual-parity goldens render `impactSequence = 0` / reduced motion so they capture a deterministic resting pose.
+- exhaustive path checks for all `RigTier` and `MiningNodeId` values;
+- root-bundle loads for all final new files;
+- normal Mine Site screen tests;
+- Linux Mine Site goldens at deterministic `impactSequence: 0` + reduced motion.
 
 ## Risks and mitigations
 
-### Display / interaction desynchronization
+### Asset footprint drift
 
-**Risk:** visible cargo intentionally lags authoritative cargo, so using the visible number for Sell value or recall legality would create contradictory UI/controller behavior.
+New art can change perceived or actual node footprint. Mitigation: prove T1/N1 in the real component before generating the remaining family; reject assets that require geometry changes.
 
-**Mitigation:** `_displayState` stays authoritative; `MineSiteView.visibleCargo` overrides only `cargo`. Explicit unit and shell tests cover sell-while-held and recall-while-held.
+### Golden platform dependence
 
-### Golden platform behavior
+Mine Site goldens are skipped on macOS. Mitigation: keep structural geometry tests authoritative on all hosts and regenerate intended Mine Site goldens only on Linux.
 
-**Risk:** Mine Site goldens run on Linux but are skipped on macOS; authored image changes may require intentional Linux golden updates.
+### Timer-phase brittleness in tests
 
-**Mitigation:** keep direct golden fixtures at `impactSequence = 0` and reduced motion; regenerate only the two Mine Site goldens on Linux and reject geometry drift.
+`pumpShell` consumes fake time during initialization. Mitigation: use a tick helper plus before/after sequence deltas instead of absolute sequence values tied to fractional pumps.
 
-### New PNG footprint/style consistency
+### Existing contact-effect suitability
 
-**Risk:** ten new images can change effective node width/visual balance even when widget dimensions are unchanged.
-
-**Mitigation:** use consistent 512×512 transparent canvases, camera/lighting/facing direction, central subject bounds, and similar deposit footprint; run existing 402×874 and 667×375 geometry tests before accepting goldens.
-
-### Timer-alignment test fragility
-
-**Risk:** `pumpShell` advances fake time during initialization, making exact timer wiring tests sensitive to pump duration.
-
-**Mitigation:** prove the hold/flush/decrease truth table with the pure function and use shell tests only for impact sequencing and concrete action/navigation wiring.
+`mergeBurst` is unused but may visually encode merging rather than impact. Mitigation: render it at the actual contact size before reuse; create one dedicated asset only if it fails the stated criteria.
 
 ## Verification
 
@@ -552,40 +447,50 @@ flutter build web
 flutter build ios --simulator --debug
 ```
 
+Keep the executable domain/save scope guard:
+
+```sh
+git diff main...HEAD -- \
+  lib/mining/mine_site_view.dart \
+  lib/mining/mining_content.dart \
+  lib/mining/mining_state.dart \
+  lib/mining/mining_controller.dart \
+  lib/mining/mining_simulation.dart \
+  lib/mining/mining_save_repository.dart
+```
+
+Expected: no output.
+
 ## Non-goals
 
 Do not add in HPA-451:
 
 - literal discrete-hit authoritative economy;
+- a second presentation cargo state;
+- mutation-specific cargo flush/classification plumbing;
 - production rate/capacity/sale/technology/offline-cap changes;
-- per-rig production allocation;
-- staggered/randomized robot phases;
-- finite resources/depletion;
-- animations or new assets for coal, stone, Lunar Frontier, Mars Frontier, or any non-gold site;
+- per-rig production allocation or staggered robot phases;
+- finite resources or depletion;
+- animated rollout to non-gold sites;
 - generic resource/planet visual registries;
-- animation/event frameworks;
-- new state-management packages;
 - save fields, versioning, migration, or compatibility machinery;
-- Flame, Rive, Lottie, physics, audio, or haptics;
+- Flame, Rive, Lottie, physics, audio, or new haptics;
 - unrelated Mine Site redesign.
 
 ## Acceptance criteria
 
-- Landing Basin uses five authored robot-tier images and four deterministic N1–N4 gold-deposit variants plus one hit accent.
-- Deployed Landing Basin robots visibly strike their gold deposits.
-- The gold deposit itself visibly reacts at contact.
-- While Landing Basin is visible, passive upward gold cargo/progress changes are published only on the same presentation update as robot/deposit contact.
-- `_displayState`, Sell value, Sell legality, recall legality, and disabled reasons remain authoritative while visible cargo is held.
-- Sell-while-held pays exactly the amount displayed before the tap.
-- Recall-while-held exposes the same legality/reason as the controller action.
-- Successful recall, Back, Stellar Map navigation, cold-load, and resume can flush visible cargo without fabricating a mining impact.
-- The final filling hit may animate; a full site emits no further impacts.
-- Reduced-motion mode preserves contact confirmation without spatial motion.
+- Landing Basin uses five authored robot-tier images and four deterministic gold-deposit variants.
+- The existing `mergeBurst` is reused for contact if it passes the real-size prototype check; otherwise exactly one dedicated hit asset is added.
+- Passive foreground Landing Basin cargo/progress increases and robot/deposit contact are published by the same one-second shell callback.
+- Deployed Landing Basin robots visibly strike their gold deposits; the deposit visibly reacts at contact.
+- One delayed foreground callback produces one strike, not replayed ticks.
+- Final fill may strike once; a full site produces no further impacts.
+- Cold-load/resume production remains deterministic and is never replayed as strikes.
+- User-initiated mutation results remain authoritative/immediate and do not create synthetic mining impacts.
+- Reduced-motion mode preserves contact confirmation without spatial movement.
 - Non-gold sites remain on the existing static presentation.
-- Existing Mine Site interaction, accessibility, responsive geometry, persistence behavior, and repository verification remain green.
+- Existing Mine Site interaction, accessibility, responsive geometry, persistence, and repository verification remain green.
 
 ## Delivery boundary
 
-Exactly **one HPA-451 implementation PR**.
-
-The implementation may use several small commits for TDD/reviewability, but do not split assets, pulse plumbing, animation, integration, tests, or documentation into separate Linear tickets or pull requests.
+Exactly **one HPA-451 implementation PR**. Use small commits for TDD/reviewability, but do not split assets, pulse wiring, animation, integration, tests, or documentation into separate Linear tickets or pull requests.
