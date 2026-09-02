@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship one Landing Basin vertical slice where tier-specific mining robots visibly strike varied gold deposits and passive visible gold cargo/progress increases only on the synchronized contact update.
+**Goal:** Ship one Landing Basin vertical slice where tier-specific mining robots visibly strike varied gold deposits and passive visible gold cargo/progress increases only on the synchronized contact update, while Sell/recall legality and monetary values always use authoritative cargo.
 
-**Architecture:** Keep `MiningController`/`MiningSimulation` authoritative and unchanged. `MiningShell` adds one transient Landing Basin impact sequence and a presentation-only gate that holds upward Landing Basin cargo while the site is open until the next eligible one-second refresh. One node-local Flutter widget owns both robot and deposit motion so the contact frame cannot drift.
+**Architecture:** Keep `MiningController`/`MiningSimulation` authoritative and unchanged. `MiningShell._displayState` remains authoritative; the shell adds only a transient `double _landingBasinVisibleCargo` plus `int _landingBasinImpactSequence`. `MineSiteView.from(...)` accepts an optional visible-cargo override that affects only `view.cargo`; Sell value, `canSell`, recall legality, disabled reasons, and every other interaction field remain authoritative. One node-local Flutter widget owns both robot and deposit motion so contact cannot drift.
 
-**Tech Stack:** Flutter/Dart, existing `Timer.periodic` shell refresh, `AnimationController`, PNG assets, SharedPreferences-backed existing mining repository, Flutter widget tests, injected clocks/repositories.
+**Tech Stack:** Flutter/Dart, existing `Timer.periodic` shell refresh, `AnimationController`, PNG assets, existing SharedPreferences mining repository, Flutter/pure-Dart tests, injected clocks/repositories.
 
 **Spec:** `docs/superpowers/specs/2026-09-01-hpa-451-gold-mine-animation-design.md`
 
@@ -15,13 +15,14 @@
 - Deliver HPA-451 through exactly one implementation PR.
 - Animate only `MiningSiteId.landingBasin`; every non-gold site keeps its current presentation.
 - Keep `MiningController`, `MiningSimulation`, `MiningSaveRepository`, save schema, rates, capacities, sale values, technology, planet progression, and offline caps unchanged.
-- `MiningShell` remains the only foreground timer and presentation-state owner.
+- `MiningShell` remains the only foreground timer/presentation owner.
+- `_displayState` always contains authoritative controller values; never clone a fake `MiningSave` to lag `storedAmount`.
+- While Landing Basin is open, only `MineSiteView.cargo` / node progress may use `_landingBasinVisibleCargo`; interaction/value fields stay authoritative.
 - UI/animation never grants resources and never calls a controller mutation from an animation callback.
-- While Landing Basin is open, non-impact presentation refreshes must not expose an upward Landing Basin `storedAmount`; decreases and all non-production state changes remain immediate.
-- Cold-load/resume may publish authoritative production immediately without replaying impacts.
-- Add no save field for animation/variants; `impactSequence` is transient only.
+- Cold-load/resume/exit may flush visible cargo without replaying impacts.
+- Add no save field for animation/variants; `impactSequence` and visible cargo are transient only.
 - Add five robot PNGs, four deterministic N1–N4 gold-deposit PNGs, and one hit-accent PNG under one Landing Basin asset directory.
-- Do not add a generic resource visual registry, string resource IDs, randomized/persisted variants, sprite sheets, Rive, Lottie, Flame, physics, audio, haptics, or new state-management packages.
+- Do not add a generic resource visual registry, string resource IDs, randomized/persisted variants, sprite sheets, Rive, Lottie, Flame, physics, audio, haptics, event buses, or new state-management packages.
 - Preserve existing Mine Site semantics, keys, disabled-reason behavior, tier badge, progress bar, tap targets, portrait/landscape placement, Sell geometry, and 667×375 occupied N3/N4 containment.
 - `MediaQuery.disableAnimations` remains the reduced-motion source of truth.
 - `AGENTS.md` follows `CLAUDE.md`; update only `CLAUDE.md`.
@@ -50,10 +51,12 @@ test/mining/presentation/landing_basin_mining_node_visual_test.dart
 Modify:
 
 ```text
+lib/mining/mine_site_view.dart
 lib/mining/presentation/mining_visuals.dart
 lib/mining/presentation/mining_shell.dart
 lib/mining/presentation/mine_site_screen.dart
 pubspec.yaml
+test/mining/mine_site_view_test.dart
 test/mining/presentation/mining_visuals_test.dart
 test/mining/presentation/mining_shell_test.dart
 test/mining/presentation/mine_site_screen_test.dart
@@ -92,7 +95,7 @@ lib/mining/mining_save_repository.dart
 
 **Interfaces:**
 - Produces: `MiningVisuals.landingBasinRobotAsset(RigTier)`, `MiningVisuals.landingBasinDepositAsset(MiningNodeId)`, `MiningVisuals.landingBasinImpact`.
-- Consumed later by: `LandingBasinMiningNodeVisual` in Task 3.
+- Consumed by: `LandingBasinMiningNodeVisual` in Task 4.
 - Preserves: `MiningVisuals.rigAsset(...)` and every existing site `nodeAsset` path for Fleet Dock/non-gold presentation.
 
 - [ ] **Step 1: Write failing path-contract tests**
@@ -107,14 +110,12 @@ test('maps every Landing Basin robot and deposit asset deterministically', () {
       'assets/images/mining/landing_basin/robot_${tier.name}.png',
     );
   }
-
   for (final nodeId in MiningNodeId.values) {
     expect(
       MiningVisuals.landingBasinDepositAsset(nodeId),
       'assets/images/mining/landing_basin/deposit_${nodeId.name}.png',
     );
   }
-
   expect(
     MiningVisuals.landingBasinImpact,
     'assets/images/mining/landing_basin/impact.png',
@@ -122,7 +123,7 @@ test('maps every Landing Basin robot and deposit asset deterministically', () {
 });
 ```
 
-Extend the existing host-only root-bundle test with:
+Extend the existing host-only root-bundle test:
 
 ```dart
 for (final tier in RigTier.values) {
@@ -134,7 +135,7 @@ for (final nodeId in MiningNodeId.values) {
 await rootBundle.load(MiningVisuals.landingBasinImpact);
 ```
 
-- [ ] **Step 2: Run the visual contract tests and verify RED**
+- [ ] **Step 2: Run the visual contract test and verify RED**
 
 ```sh
 flutter test test/mining/presentation/mining_visuals_test.dart
@@ -144,7 +145,7 @@ Expected: FAIL because the Landing Basin helpers/constants do not exist.
 
 - [ ] **Step 3: Add the narrow `MiningVisuals` mappings**
 
-Append to `MiningVisuals` without changing `rigAsset(...)`:
+Append without changing `rigAsset(...)`:
 
 ```dart
 static String landingBasinRobotAsset(RigTier tier) =>
@@ -165,16 +166,16 @@ Add under `flutter.assets` in `pubspec.yaml`:
 - assets/images/mining/landing_basin/
 ```
 
-Do not remove or relocate the existing `nodes/` or `rigs/` declarations.
+Keep existing `nodes/` and `rigs/` declarations.
 
 - [ ] **Step 5: Author/generate the ten transparent PNGs**
 
-Use 512×512 RGBA source canvases with transparent backgrounds and keep each subject inside the central ~80%.
+Use 512×512 RGBA transparent canvases; keep each subject inside the central ~80% so existing fixed Flutter sizes remain safe.
 
-Shared robot prompt:
+Shared robot brief:
 
 ```text
-Stylized mobile-game sci-fi mining robot, readable at small size, three-quarter side view, facing left toward a resource deposit, transparent background, hard-surface industrial design, dark steel body with warm work lights, clean silhouette, no text, no scenery, no floor shadow outside the transparent canvas, consistent camera and lighting across the full tier family.
+Stylized mobile-game sci-fi mining robot, readable at small size, three-quarter side view, facing left toward a resource deposit, transparent background, hard-surface industrial design, dark steel body with warm work lights, clean silhouette, no text, no scenery, consistent camera and lighting across all tiers.
 ```
 
 Tier additions:
@@ -184,13 +185,13 @@ T1: compact two-track starter rig, one simple hydraulic pick/drill arm, exposed 
 T2: reinforced chassis, larger arm linkage, added work light and protective plating.
 T3: medium heavy rig, dual hydraulic joints, larger mining head, visible cooling/energy module.
 T4: heavy multi-actuator rig, broad armored chassis, stronger mining head and auxiliary stabilizer.
-T5: premium massive automated rig, dense reinforced tooling, largest mining head, advanced energy/tooling modules; clearly the strongest tier without relying on recolor alone.
+T5: premium massive automated rig, dense reinforced tooling, largest mining head, advanced energy/tooling modules; strongest tier without relying on recolor alone.
 ```
 
-Shared deposit prompt:
+Shared deposit brief:
 
 ```text
-Stylized mobile-game gold-bearing rock deposit, three-quarter side view matching the mining robot camera, transparent background, dark volcanic/stone matrix with clearly exposed metallic gold veins and chunks, readable at small size, no text, no scenery, consistent lighting and material style across all four variants.
+Stylized mobile-game gold-bearing rock deposit, three-quarter side view matching the mining robot camera, transparent background, dark volcanic/stone matrix with clearly exposed metallic gold veins/chunks, readable at small size, no text, no scenery, consistent lighting/material style across variants.
 ```
 
 Variant additions:
@@ -202,21 +203,21 @@ N3: low wide layered rock shelf with several smaller gold seams.
 N4: angular high-grade deposit with the largest visible gold chunks while keeping the same approximate footprint.
 ```
 
-Impact prompt:
+Impact brief:
 
 ```text
-Small stylized mining impact burst for a mobile game: bright gold-white sparks, two or three tiny rock/gold chips, compact radial shape, transparent background, no smoke cloud, no text, designed to overlay a gold deposit at small size.
+Small stylized mining impact burst for a mobile game: bright gold-white sparks, two or three tiny rock/gold chips, compact radial shape, transparent background, no smoke cloud, no text.
 ```
 
-Review all ten files together. Reject a set if the camera angle, lighting, ground line, robot facing direction, or deposit footprint changes enough to alter the existing node composition.
+Review all ten files together. Reject a set if camera angle, lighting, ground line, robot facing direction, or deposit footprint changes enough to alter the existing node composition.
 
-- [ ] **Step 6: Run the asset tests and verify GREEN**
+- [ ] **Step 6: Run the asset test and verify GREEN**
 
 ```sh
 flutter test test/mining/presentation/mining_visuals_test.dart
 ```
 
-Expected: PASS, including host root-bundle loads.
+Expected: PASS including host root-bundle loads.
 
 - [ ] **Step 7: Commit the asset contract**
 
@@ -231,7 +232,204 @@ git commit -m "feat(mining): add Landing Basin robot and gold assets"
 
 ---
 
-### Task 2: Gate Visible Landing Basin Production and Publish One Impact Sequence
+### Task 2: Separate Visible Cargo From Authoritative Mine Site Interaction State
+
+**Files:**
+- Modify: `lib/mining/mine_site_view.dart`
+- Modify: `lib/mining/presentation/mining_shell.dart`
+- Modify: `test/mining/mine_site_view_test.dart`
+- Modify: `test/mining/presentation/mining_shell_test.dart`
+
+**Interfaces:**
+- Produces: optional `MineSiteView.from(..., double? visibleCargo)`, and top-level `projectLandingBasinVisibleCargo(...)`.
+- Guarantees: `view.cargo` may be visual-only; Sell/revenue/recall/deploy fields remain authoritative.
+
+- [ ] **Step 1: Add a failing view-model separation test**
+
+Add to `test/mining/mine_site_view_test.dart`:
+
+```dart
+test('visible cargo override never changes sale or recall legality', () {
+  final view = MineSiteView.from(
+    state: stateWith(
+      landing: progress(
+        commissioned: true,
+        storedAmount: 90.5,
+        rigs: {
+          MiningNodeId.n1: RigTier.t1,
+          MiningNodeId.n2: RigTier.t1,
+        },
+      ),
+    ),
+    content: content,
+    siteId: MiningSiteId.landingBasin,
+    selectedBayId: null,
+    isBusy: false,
+    visibleCargo: 90,
+  );
+
+  expect(view.cargo, 90);
+  expect(view.projectedSale, 362);
+  expect(view.activePlanetCargo, 90.5);
+  expect(view.activePlanetProjectedSale, 362);
+  expect(view.canSell, isTrue);
+  expect(view.node(MiningNodeId.n1).canRecall, isFalse);
+  expect(
+    view.node(MiningNodeId.n1).disabledReason,
+    'Sell cargo before recalling this rig.',
+  );
+});
+```
+
+- [ ] **Step 2: Add pure failing tests for the visible-cargo truth table**
+
+Add non-widget tests near the top of `mining_shell_test.dart`:
+
+```dart
+test('Landing Basin visible cargo holds only upward open-site deltas', () {
+  expect(
+    projectLandingBasinVisibleCargo(
+      authoritativeCargo: .25,
+      visibleCargo: 0,
+      openSiteId: MiningSiteId.landingBasin,
+      publishUpwardLandingCargo: false,
+    ),
+    0,
+  );
+  expect(
+    projectLandingBasinVisibleCargo(
+      authoritativeCargo: 0,
+      visibleCargo: 10,
+      openSiteId: MiningSiteId.landingBasin,
+      publishUpwardLandingCargo: false,
+    ),
+    0,
+  );
+  expect(
+    projectLandingBasinVisibleCargo(
+      authoritativeCargo: .25,
+      visibleCargo: 0,
+      openSiteId: MiningSiteId.landingBasin,
+      publishUpwardLandingCargo: true,
+    ),
+    .25,
+  );
+  expect(
+    projectLandingBasinVisibleCargo(
+      authoritativeCargo: .25,
+      visibleCargo: 0,
+      openSiteId: MiningSiteId.carbonRidge,
+      publishUpwardLandingCargo: false,
+    ),
+    .25,
+  );
+  expect(
+    projectLandingBasinVisibleCargo(
+      authoritativeCargo: .25,
+      visibleCargo: 0,
+      openSiteId: null,
+      publishUpwardLandingCargo: false,
+    ),
+    .25,
+  );
+});
+```
+
+- [ ] **Step 3: Run focused tests and verify RED**
+
+```sh
+flutter test test/mining/mine_site_view_test.dart
+flutter test test/mining/presentation/mining_shell_test.dart
+```
+
+Expected: FAIL because `visibleCargo` and `projectLandingBasinVisibleCargo` do not exist.
+
+- [ ] **Step 4: Add the optional `MineSiteView` visual override**
+
+Extend the factory signature:
+
+```dart
+static MineSiteView from({
+  required MiningSave state,
+  required MiningContentRegistry content,
+  required MiningSiteId siteId,
+  required DockBayId? selectedBayId,
+  required bool isBusy,
+  double? visibleCargo,
+}) {
+```
+
+Immediately after resolving `progress`:
+
+```dart
+final displayedCargo = visibleCargo ?? progress.storedAmount;
+```
+
+Change only the return field:
+
+```dart
+cargo: displayedCargo,
+```
+
+Keep these calculations on authoritative `progress.storedAmount` / authoritative active-site progress exactly as they are now:
+
+```text
+projectedSale
+activePlanetCargo
+activePlanetProjectedSale
+canSell
+recallCapacity comparison
+canRecall
+disabledReason
+```
+
+- [ ] **Step 5: Add the pure top-level projection helper**
+
+In `mining_shell.dart`, outside `_MiningShellState`, add:
+
+```dart
+@visibleForTesting
+double projectLandingBasinVisibleCargo({
+  required double authoritativeCargo,
+  required double visibleCargo,
+  required MiningSiteId? openSiteId,
+  required bool publishUpwardLandingCargo,
+}) {
+  if (openSiteId != MiningSiteId.landingBasin ||
+      publishUpwardLandingCargo) {
+    return authoritativeCargo;
+  }
+  return authoritativeCargo < visibleCargo
+      ? authoritativeCargo
+      : visibleCargo;
+}
+```
+
+Do not pass `MiningSave` into this helper.
+
+- [ ] **Step 6: Run focused tests and verify GREEN**
+
+```sh
+flutter test test/mining/mine_site_view_test.dart
+flutter test test/mining/presentation/mining_shell_test.dart
+```
+
+Expected: the new unit tests PASS; existing shell behavior remains unchanged because wiring comes in Task 3.
+
+- [ ] **Step 7: Commit the view/projection contract**
+
+```sh
+git add \
+  lib/mining/mine_site_view.dart \
+  lib/mining/presentation/mining_shell.dart \
+  test/mining/mine_site_view_test.dart \
+  test/mining/presentation/mining_shell_test.dart
+git commit -m "refactor(mining): separate visible gold cargo from interactions"
+```
+
+---
+
+### Task 3: Publish Landing Basin Impact Pulses and Wire All Flush Paths
 
 **Files:**
 - Modify: `lib/mining/presentation/mining_shell.dart`
@@ -239,16 +437,49 @@ git commit -m "feat(mining): add Landing Basin robot and gold assets"
 - Modify: `test/mining/presentation/mining_shell_test.dart`
 
 **Interfaces:**
-- Produces: shell-local `_landingBasinImpactSequence`, `MineSiteScreen.impactSequence`, and `_projectPresentationState(...)`.
-- Consumes: existing `MiningController.refresh()`, `_displayState`, `_openSiteId`, `MiningSave.copyWith`, and `SiteProgress.copyWith`.
-- Preserves: controller/simulation state and all persistence behavior.
+- Produces: `_landingBasinVisibleCargo`, `_landingBasinImpactSequence`, `MineSiteScreen.impactSequence`.
+- Consumes: Task 2 `MineSiteView.visibleCargo` and `projectLandingBasinVisibleCargo(...)`.
+- Preserves: authoritative `_displayState`, controller/simulation/persistence behavior.
 
-- [ ] **Step 1: Write the failing timer impact test**
+- [ ] **Step 1: Add a two-rig test seed for recall-boundary cases**
+
+Add beside `deployedLandingState`:
+
+```dart
+MiningSave deployedLandingTwoRigState(DateTime now, {double cargo = 0}) {
+  final base = MiningSave.initial(nowUtc: now);
+  final landing = base.sites[MiningSiteId.landingBasin]!;
+  return base.copyWith(
+    sites: {
+      ...base.sites,
+      MiningSiteId.landingBasin: landing.copyWith(
+        commissioned: true,
+        storedAmount: cargo,
+        rigByNode: {
+          ...landing.rigByNode,
+          MiningNodeId.n1: RigTier.t1,
+          MiningNodeId.n2: RigTier.t1,
+        },
+      ),
+    },
+    docks: {
+      ...base.docks,
+      MiningPlanetId.homeworld: {
+        ...base.docks[MiningPlanetId.homeworld]!,
+        DockBayId.b1: null,
+        DockBayId.b2: null,
+      },
+    },
+  );
+}
+```
+
+- [ ] **Step 2: Write the failing timer impact test**
 
 Import `mine_site_screen.dart` in `mining_shell_test.dart`, then add:
 
 ```dart
-testWidgets('Landing Basin timer publishes cargo and impact together', (
+testWidgets('Landing Basin timer publishes visible cargo and impact together', (
   tester,
 ) async {
   final clock = TestClock(_start);
@@ -259,36 +490,28 @@ testWidgets('Landing Basin timer publishes cargo and impact together', (
 
   await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
   await tester.pump();
-
-  expect(
-    tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).impactSequence,
-    0,
-  );
+  expect(tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).impactSequence, 0);
 
   clock.now = _start.add(const Duration(seconds: 2));
   await tester.pump(const Duration(seconds: 2));
 
   final screen = tester.widget<MineSiteScreen>(find.byType(MineSiteScreen));
-  final gauge = tester.widget<MiningCargoGauge>(
-    find.byKey(const Key('mining-cargo-gauge')),
-  );
   expect(screen.impactSequence, 1);
-  expect(gauge.cargo, 1);
+  expect(screen.view.cargo, 1);
   expect(repository.saveCount, savesBeforeTicks);
 });
 ```
 
-- [ ] **Step 2: Write the failing action-accrual presentation-gate test**
+- [ ] **Step 3: Write the failing action-hold test**
 
 ```dart
-testWidgets('action accrual stays hidden until the next Landing Basin impact', (
+testWidgets('action accrual stays visual-only held until the next impact', (
   tester,
 ) async {
   final clock = TestClock(_start);
   final repository = CountingMiningSaveRepository();
   await repository.save(deployedLandingBasin(_start));
   await pumpShell(tester, repository: repository, clock: clock);
-
   await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
   await tester.pump();
 
@@ -296,81 +519,33 @@ testWidgets('action accrual stays hidden until the next Landing Basin impact', (
   await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
   await tester.pump(const Duration(milliseconds: 300));
 
+  final held = tester.widget<MineSiteScreen>(find.byType(MineSiteScreen));
   expect(
-    shellHandles(tester)
-        .controller
-        .state
-        .sites[MiningSiteId.landingBasin]!
-        .storedAmount,
+    shellHandles(tester).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
     closeTo(.25, .0001),
   );
-  expect(
-    tester
-        .widget<MiningCargoGauge>(find.byKey(const Key('mining-cargo-gauge')))
-        .cargo,
-    0,
-  );
-  expect(
-    tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).impactSequence,
-    0,
-  );
+  expect(held.view.cargo, 0);
+  expect(held.impactSequence, 0);
 
   clock.now = _start.add(const Duration(seconds: 1));
   await tester.pump(const Duration(milliseconds: 700));
 
-  expect(
-    tester
-        .widget<MiningCargoGauge>(find.byKey(const Key('mining-cargo-gauge')))
-        .cargo,
-    closeTo(.5, .0001),
-  );
-  expect(
-    tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).impactSequence,
-    1,
-  );
+  final impacted = tester.widget<MineSiteScreen>(find.byType(MineSiteScreen));
+  expect(impacted.view.cargo, closeTo(.5, .0001));
+  expect(impacted.impactSequence, 1);
 });
 ```
 
-- [ ] **Step 3: Write failing immediate-decrease and leave-site synchronization tests**
-
-Add both tests verbatim, adjusting only expected sale revenue if existing sale rounding makes the snackbar text differ:
+- [ ] **Step 4: Write the failing sell-while-held consistency test**
 
 ```dart
-testWidgets('sale decrease is immediate and does not fabricate an impact', (
+testWidgets('sell while cargo is held shows and pays authoritative value', (
   tester,
 ) async {
   final clock = TestClock(_start);
   final repository = CountingMiningSaveRepository();
   await repository.save(deployedLandingState(_start, cargo: 10));
   await pumpShell(tester, repository: repository, clock: clock);
-
-  await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
-  await tester.pump();
-
-  clock.now = _start.add(const Duration(milliseconds: 500));
-  await tester.tap(find.byKey(const Key('mine-site-sell')));
-  await tester.pump(const Duration(milliseconds: 300));
-
-  expect(
-    tester
-        .widget<MiningCargoGauge>(find.byKey(const Key('mining-cargo-gauge')))
-        .cargo,
-    0,
-  );
-  expect(
-    tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).impactSequence,
-    0,
-  );
-});
-
-testWidgets('leaving Landing Basin publishes held cargo without an impact', (
-  tester,
-) async {
-  final clock = TestClock(_start);
-  final repository = CountingMiningSaveRepository();
-  await repository.save(deployedLandingBasin(_start));
-  await pumpShell(tester, repository: repository, clock: clock);
-
   await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
   await tester.pump();
 
@@ -378,25 +553,19 @@ testWidgets('leaving Landing Basin publishes held cargo without an impact', (
   await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
   await tester.pump(const Duration(milliseconds: 300));
 
+  final held = tester.widget<MineSiteScreen>(find.byType(MineSiteScreen));
+  expect(held.view.cargo, 10);
+  expect(held.view.activePlanetProjectedSale, 41);
+  expect(find.text('+41'), findsOneWidget);
+
+  await tester.tap(find.byKey(const Key('mine-site-sell')));
+  await tester.pump(const Duration(milliseconds: 300));
+
+  expect(find.text('Sold 41 cash.'), findsOneWidget);
   expect(
-    tester
-        .widget<MiningCargoGauge>(find.byKey(const Key('mining-cargo-gauge')))
-        .cargo,
+    tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).view.cargo,
     0,
   );
-
-  await tester.tap(find.byKey(const Key('mine-site-back')));
-  await tester.pump();
-
-  expect(
-    tester
-        .widget<MiningCargoGauge>(find.byKey(const Key('mining-cargo-gauge')))
-        .cargo,
-    closeTo(.25, .0001),
-  );
-
-  await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
-  await tester.pump();
   expect(
     tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).impactSequence,
     0,
@@ -404,69 +573,165 @@ testWidgets('leaving Landing Basin publishes held cargo without an impact', (
 });
 ```
 
-- [ ] **Step 4: Run focused shell tests and verify RED**
+- [ ] **Step 5: Write the failing recall-while-held legality test**
+
+```dart
+testWidgets('recall while cargo is held uses authoritative capacity legality', (
+  tester,
+) async {
+  final clock = TestClock(_start);
+  final repository = CountingMiningSaveRepository();
+  await repository.save(deployedLandingTwoRigState(_start, cargo: 90));
+  await pumpShell(tester, repository: repository, clock: clock);
+  await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+  await tester.pump();
+
+  clock.now = _start.add(const Duration(milliseconds: 500));
+  await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
+  await tester.pump(const Duration(milliseconds: 300));
+
+  final held = tester.widget<MineSiteScreen>(find.byType(MineSiteScreen));
+  expect(held.view.cargo, 90);
+  expect(
+    shellHandles(tester).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+    closeTo(90.5, .0001),
+  );
+  expect(held.view.node(MiningNodeId.n1).canRecall, isFalse);
+  expect(
+    held.view.node(MiningNodeId.n1).disabledReason,
+    'Sell cargo before recalling this rig.',
+  );
+
+  await tester.tap(find.byKey(const Key('mine-site-node-n1')));
+  await tester.pump(const Duration(milliseconds: 300));
+  expect(find.text('Sell cargo before recalling this rig.'), findsOneWidget);
+});
+```
+
+- [ ] **Step 6: Write the failing successful-recall flush test**
+
+```dart
+testWidgets('successful recall flushes held cargo without an impact', (
+  tester,
+) async {
+  final clock = TestClock(_start);
+  final repository = CountingMiningSaveRepository();
+  await repository.save(deployedLandingTwoRigState(_start, cargo: 89));
+  await pumpShell(tester, repository: repository, clock: clock);
+  await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+  await tester.pump();
+
+  clock.now = _start.add(const Duration(milliseconds: 500));
+  await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
+  await tester.pump(const Duration(milliseconds: 300));
+  expect(tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).view.cargo, 89);
+
+  await tester.tap(find.byKey(const Key('mine-site-node-n1')));
+  await tester.pump(const Duration(milliseconds: 300));
+
+  final screen = tester.widget<MineSiteScreen>(find.byType(MineSiteScreen));
+  expect(screen.view.cargo, closeTo(89.5, .0001));
+  expect(screen.impactSequence, 0);
+});
+```
+
+- [ ] **Step 7: Write failing Back and Stellar Map flush tests**
+
+Back path:
+
+```dart
+testWidgets('Back flushes held Landing Basin cargo without an impact', (
+  tester,
+) async {
+  final clock = TestClock(_start);
+  final repository = CountingMiningSaveRepository();
+  await repository.save(deployedLandingBasin(_start));
+  await pumpShell(tester, repository: repository, clock: clock);
+  await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+  await tester.pump();
+
+  clock.now = _start.add(const Duration(milliseconds: 500));
+  await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
+  await tester.pump(const Duration(milliseconds: 300));
+  expect(tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).view.cargo, 0);
+
+  await tester.tap(find.byKey(const Key('mine-site-back')));
+  await tester.pump();
+  final gauge = tester.widget<MiningCargoGauge>(
+    find.byKey(const Key('mining-cargo-gauge')),
+  );
+  expect(gauge.cargo, closeTo(.25, .0001));
+});
+```
+
+Stellar Map path:
+
+```dart
+testWidgets('Stellar Map navigation flushes held cargo without a strike', (
+  tester,
+) async {
+  final clock = TestClock(_start);
+  final repository = CountingMiningSaveRepository();
+  await repository.save(deployedLandingBasin(_start));
+  await pumpShell(tester, repository: repository, clock: clock);
+  await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+  await tester.pump();
+
+  clock.now = _start.add(const Duration(milliseconds: 500));
+  await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
+  await tester.pump(const Duration(milliseconds: 300));
+  expect(tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).view.cargo, 0);
+
+  await tester.tap(find.byKey(const Key('mining-nav-stellarMap')));
+  await tester.pump();
+  expect(find.byKey(const Key('stellar-map-screen')), findsOneWidget);
+  expect(
+    tester.widget<MiningCargoGauge>(find.byKey(const Key('mining-cargo-gauge'))).cargo,
+    closeTo(.25, .0001),
+  );
+
+  await tester.tap(find.byKey(const Key('mining-nav-siteDeck')));
+  await tester.pump();
+  await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+  await tester.pump();
+  final reentered = tester.widget<MineSiteScreen>(find.byType(MineSiteScreen));
+  expect(reentered.view.cargo, closeTo(.25, .0001));
+  expect(reentered.impactSequence, 0);
+});
+```
+
+- [ ] **Step 8: Run shell tests and verify RED**
 
 ```sh
 flutter test test/mining/presentation/mining_shell_test.dart
 ```
 
-Expected: FAIL because `MineSiteScreen` has no `impactSequence` and `_refreshPresentation()` currently copies controller state directly.
+Expected: FAIL because the shell has no visible overlay/impact sequence wiring and `MineSiteScreen` has no `impactSequence`.
 
-- [ ] **Step 5: Add the transient shell sequence and pure projection helper**
+- [ ] **Step 9: Add the shell-local overlay/sequence and authoritative refresh**
 
 In `_MiningShellState` add:
 
 ```dart
+double _landingBasinVisibleCargo = 0;
 int _landingBasinImpactSequence = 0;
 ```
 
-Add:
-
-```dart
-MiningSave _projectPresentationState(
-  MiningSave authoritative, {
-  required bool allowLandingBasinProductionIncrease,
-}) {
-  if (_openSiteId != MiningSiteId.landingBasin ||
-      allowLandingBasinProductionIncrease) {
-    return authoritative;
-  }
-
-  final displayedLanding =
-      _displayState.sites[MiningSiteId.landingBasin]!;
-  final authoritativeLanding =
-      authoritative.sites[MiningSiteId.landingBasin]!;
-
-  if (authoritativeLanding.storedAmount <= displayedLanding.storedAmount) {
-    return authoritative;
-  }
-
-  return authoritative.copyWith(
-    sites: {
-      ...authoritative.sites,
-      MiningSiteId.landingBasin: authoritativeLanding.copyWith(
-        storedAmount: displayedLanding.storedAmount,
-      ),
-    },
-  );
-}
-```
-
-This keeps rig/cash/technology/busy-related presentation changes authoritative while holding only the upward Landing Basin cargo field.
-
-- [ ] **Step 6: Make `_refreshPresentation` explicit about upward cargo publication**
-
-Change it to:
+Replace the current presentation copy with:
 
 ```dart
 void _refreshPresentation({
-  bool allowLandingBasinProductionIncrease = false,
+  bool publishUpwardLandingCargo = false,
 }) {
   if (!_initialized) return;
-  _displayState = _projectPresentationState(
-    _controller.state,
-    allowLandingBasinProductionIncrease:
-        allowLandingBasinProductionIncrease,
+  final authoritative = _controller.state;
+  _displayState = authoritative;
+  _landingBasinVisibleCargo = projectLandingBasinVisibleCargo(
+    authoritativeCargo:
+        authoritative.sites[MiningSiteId.landingBasin]!.storedAmount,
+    visibleCargo: _landingBasinVisibleCargo,
+    openSiteId: _openSiteId,
+    publishUpwardLandingCargo: publishUpwardLandingCargo,
   );
   _reducedMotion =
       MediaQuery.maybeOf(context)?.disableAnimations ?? _reducedMotion;
@@ -474,39 +739,29 @@ void _refreshPresentation({
 }
 ```
 
-Existing mutation paths keep calling `_refreshPresentation()` with the default `false`.
-
-- [ ] **Step 7: Replace the timer body with one impact-publication method**
-
-Add:
+- [ ] **Step 10: Replace the timer body with one impact publication method**
 
 ```dart
 void _refreshForegroundProduction() {
   if (_controller.isBusy) return;
 
-  final displayedCargo =
-      _displayState.sites[MiningSiteId.landingBasin]!.storedAmount;
+  final visibleCargo = _landingBasinVisibleCargo;
   _controller.refresh();
-
   final landing = _controller.state.sites[MiningSiteId.landingBasin]!;
   final hasRig = landing.rigByNode.values.any((tier) => tier != null);
   final publishImpact =
       _openSiteId == MiningSiteId.landingBasin &&
       hasRig &&
-      landing.storedAmount > displayedCargo;
+      landing.storedAmount > visibleCargo;
 
   if (publishImpact) {
     _landingBasinImpactSequence++;
   }
   _refreshPresentation(
-    allowLandingBasinProductionIncrease: publishImpact,
+    publishUpwardLandingCargo: publishImpact,
   );
 }
-```
 
-Keep one timer:
-
-```dart
 void _startRefreshTimer() {
   _refreshTimer?.cancel();
   _refreshTimer = Timer.periodic(
@@ -516,50 +771,96 @@ void _startRefreshTimer() {
 }
 ```
 
-- [ ] **Step 8: Make initialization/resume/leave synchronization explicit**
+No second timer is added.
 
-After initialization and after `_controller.resume()`, call:
+- [ ] **Step 11: Flush explicitly on recall/resume/exit; hold other mutations**
+
+Extend `_runSheetAction` with:
 
 ```dart
-_refreshPresentation(allowLandingBasinProductionIncrease: true);
+bool syncLandingBasinCargoOnSuccess = false,
 ```
 
-Do not increment `_landingBasinImpactSequence` on those paths.
-
-For `_leaveSite()` and `_showPrimarySurface(...)`, clear `_openSiteId` first and then synchronize authoritative presentation immediately:
+After a successful operation, call:
 
 ```dart
-setState(() => _openSiteId = null);
-_refreshPresentation(allowLandingBasinProductionIncrease: true);
+_refreshPresentation(
+  publishUpwardLandingCargo:
+      result.isSuccess && syncLandingBasinCargoOnSuccess,
+);
 ```
 
-If implementation combines this into one `setState`, preserve the same ordering: the projection must see `_openSiteId != MiningSiteId.landingBasin` before it decides whether to hold cargo.
+Pass `syncLandingBasinCargoOnSuccess: true` only for `recallRig`. Spawn/deploy/technology/etc. retain the default `false`.
 
-- [ ] **Step 9: Add `impactSequence` to `MineSiteScreen` and pass the shell value**
+Sale needs no special economy branch: after authoritative cargo becomes 0, the pure helper publishes the decrease immediately. Calling `_refreshPresentation()` remains sufficient.
 
-Add a deterministic default for direct screen fixtures:
+For resume:
 
 ```dart
-const MineSiteScreen({
-  super.key,
-  required this.view,
-  required this.fleetDock,
-  required this.onNodeTap,
-  required this.onBayTap,
-  required this.onSpawnRig,
-  required this.onSellCargo,
-  required this.onBack,
-  required this.onSettings,
-  this.onDestinationSelected,
-  this.cash = 0,
-  this.reducedMotion = false,
-  this.impactSequence = 0,
-});
+_refreshPresentation(publishUpwardLandingCargo: true);
+```
 
+Do not increment the sequence.
+
+For `_leaveSite()` use one refresh-driven setState:
+
+```dart
+void _leaveSite() {
+  if (!mounted) return;
+  _openSiteId = null;
+  _refreshPresentation(publishUpwardLandingCargo: true);
+}
+```
+
+For `_showPrimarySurface(...)`:
+
+```dart
+void _showPrimarySurface(MiningNavigationDestination destination) {
+  if (!_initialized) return;
+  _selectedDestination = destination;
+  _openSiteId = null;
+  _refreshPresentation(publishUpwardLandingCargo: true);
+}
+```
+
+On `_enterSite`, synchronize Landing Basin before opening without an impact:
+
+```dart
+if (id == MiningSiteId.landingBasin) {
+  _landingBasinVisibleCargo =
+      _controller.state.sites[id]!.storedAmount;
+}
+setState(() => _openSiteId = id);
+```
+
+Initialization already has `_openSiteId == null`, so the first `_refreshPresentation()` synchronizes the overlay automatically.
+
+- [ ] **Step 12: Add `impactSequence` to `MineSiteScreen` and supply authoritative view + visual override**
+
+Add:
+
+```dart
+this.impactSequence = 0,
+...
 final int impactSequence;
 ```
 
-In `MiningShell.build`, pass:
+In `MiningShell.build`, construct the Mine Site view with:
+
+```dart
+final mineSite = MineSiteView.from(
+  state: _displayState,
+  content: _content,
+  siteId: siteId,
+  selectedBayId: _selectedBayId,
+  isBusy: _controller.isBusy,
+  visibleCargo: siteId == MiningSiteId.landingBasin
+      ? _landingBasinVisibleCargo
+      : null,
+);
+```
+
+Pass:
 
 ```dart
 impactSequence: siteId == MiningSiteId.landingBasin
@@ -567,17 +868,18 @@ impactSequence: siteId == MiningSiteId.landingBasin
     : 0,
 ```
 
-Do not add the sequence to `MiningSave`, `MiningController`, or `MineSiteView`.
+Do not put visible cargo or sequence into `MiningSave` or `MiningController`.
 
-- [ ] **Step 10: Run shell tests and verify GREEN**
+- [ ] **Step 13: Run shell/view tests and verify GREEN**
 
 ```sh
+flutter test test/mining/mine_site_view_test.dart
 flutter test test/mining/presentation/mining_shell_test.dart
 ```
 
-Expected: PASS, including `timer refresh accrues cargo without persisting`.
+Expected: PASS including existing `timer refresh accrues cargo without persisting`.
 
-- [ ] **Step 11: Commit the presentation contract**
+- [ ] **Step 14: Commit the shell publication contract**
 
 ```sh
 git add \
@@ -589,14 +891,14 @@ git commit -m "feat(mining): publish Landing Basin cargo on impact pulses"
 
 ---
 
-### Task 3: Build One Node-Local Robot + Gold Hit Animation Component
+### Task 4: Build One Node-Local Robot + Gold Hit Animation Component
 
 **Files:**
 - Create: `lib/mining/presentation/landing_basin_mining_node_visual.dart`
 - Create: `test/mining/presentation/landing_basin_mining_node_visual_test.dart`
 
 **Interfaces:**
-- Consumes: Task 1 `MiningVisuals` mappings, `MiningNodeId`, `RigTier`.
+- Consumes: Task 1 `MiningVisuals` helpers, `MiningNodeId`, `RigTier`.
 - Produces:
 
 ```dart
@@ -614,7 +916,7 @@ LandingBasinMiningNodeVisual({
 
 - [ ] **Step 1: Write resting/asset-selection tests first**
 
-Create a helper that pumps `LandingBasinMiningNodeVisual` inside `MaterialApp`. For `nodeId: n2`, `rig: t3`, assert:
+Pump `nodeId: n2`, `rig: t3` and assert:
 
 ```dart
 expect(find.byKey(const Key('landing-basin-deposit-n2')), findsOneWidget);
@@ -632,36 +934,36 @@ final robot = tester.widget<Image>(
     matching: find.byType(Image),
   ),
 );
-expect((deposit.image as AssetImage).assetName,
-    MiningVisuals.landingBasinDepositAsset(MiningNodeId.n2));
-expect((robot.image as AssetImage).assetName,
-    MiningVisuals.landingBasinRobotAsset(RigTier.t3));
+expect(
+  (deposit.image as AssetImage).assetName,
+  MiningVisuals.landingBasinDepositAsset(MiningNodeId.n2),
+);
+expect(
+  (robot.image as AssetImage).assetName,
+  MiningVisuals.landingBasinRobotAsset(RigTier.t3),
+);
 ```
 
-Pump with `rig: null` and assert the deposit exists while the robot and impact keys do not.
+Pump `rig: null`; deposit exists, robot/impact keys do not.
 
-- [ ] **Step 2: Write failing sequence behavior tests**
+- [ ] **Step 2: Write failing sequence/reduced-motion tests**
 
-Pump `impactSequence: 0`, record the `Transform` matrix from the keyed robot transform, rebuild with `impactSequence: 1`, then assert:
+Start `impactSequence: 0`, record keyed robot/deposit transform matrices, rebuild with `impactSequence: 1`, then:
 
 ```dart
 expect(find.byKey(const Key('landing-basin-impact-n2')), findsOneWidget);
 await tester.pump(const Duration(milliseconds: 100));
 expect(
   tester.widget<Transform>(find.byKey(const Key('landing-basin-robot-n2'))).transform,
-  isNot(equals(restMatrix)),
+  isNot(equals(restRobotMatrix)),
 );
 await tester.pump(const Duration(milliseconds: 900));
 expect(find.byKey(const Key('landing-basin-impact-n2')), findsNothing);
 ```
 
-Rebuild again with sequence `1`, pump 100 ms, and assert the robot remains at the rest matrix. Rebuild from `1` directly to `4`, pump 100 ms, and assert one recoil is active; after a total of one second it is back at rest with no second replay.
+Rebuild again with sequence `1`: no restart. Rebuild `1 -> 4`: one strike only. With `reducedMotion: true`, robot/deposit transform matrices remain unchanged while the brief impact accent may appear.
 
-- [ ] **Step 3: Write failing reduced-motion coverage**
-
-With `reducedMotion: true`, rebuild from sequence `0` to `1` and compare the keyed robot/deposit `Transform` matrices before and after 100 ms. Both matrices must remain equal to rest. The impact accent may be visible during that interval.
-
-- [ ] **Step 4: Run the new widget test and verify RED**
+- [ ] **Step 3: Run the new widget test and verify RED**
 
 ```sh
 flutter test test/mining/presentation/landing_basin_mining_node_visual_test.dart
@@ -669,9 +971,7 @@ flutter test test/mining/presentation/landing_basin_mining_node_visual_test.dart
 
 Expected: FAIL because the widget does not exist.
 
-- [ ] **Step 5: Implement the public widget and stable keys**
-
-Create:
+- [ ] **Step 4: Implement one public stateful widget and stable keys**
 
 ```dart
 class LandingBasinMiningNodeVisual extends StatefulWidget {
@@ -698,7 +998,7 @@ class LandingBasinMiningNodeVisual extends StatefulWidget {
 }
 ```
 
-Use keys on the `Transform`/effect roots:
+Stable keyed transform/effect roots:
 
 ```dart
 Key('landing-basin-deposit-${widget.nodeId.name}')
@@ -706,9 +1006,9 @@ Key('landing-basin-robot-${widget.nodeId.name}')
 Key('landing-basin-impact-${widget.nodeId.name}')
 ```
 
-Initialize the one-second controller with `value: 1` so first mount is a deterministic rest/contact-ready pose.
+Initialize the one-second controller at `value: 1` for a deterministic resting pose.
 
-- [ ] **Step 6: Restart only on a new sequence with an occupied rig**
+- [ ] **Step 5: Restart only on a new sequence with a rig**
 
 ```dart
 @override
@@ -725,49 +1025,37 @@ void didUpdateWidget(LandingBasinMiningNodeVisual oldWidget) {
 }
 ```
 
-A sequence jump invokes `forward(from: 0)` once.
+- [ ] **Step 6: Implement one shared phase function**
 
-- [ ] **Step 7: Implement one shared phase function**
-
-Use `dart:ui` `lerpDouble` (or an equivalent local linear helper) with:
-
-```dart
-const recoilEnd = .14;
-const windupEnd = .70;
-```
-
-Normal-motion values:
+Use these phase points:
 
 ```text
 robot dx:
-  t=0.00 -> 0
-  t=0.14 -> +12% of rigSize
-  t=0.70 -> +8% of rigSize
-  t=1.00 -> 0
+  0.00 -> 0
+  0.14 -> +12% rigSize
+  0.70 -> +8% rigSize
+  1.00 -> 0
 
 deposit scale:
-  t=0.00 -> 0.94
-  t=0.14 -> 1.00
-  t>=0.14 -> 1.00
-
+  0.00 -> 0.94
+  0.14 -> 1.00
+  >=0.14 -> 1.00
 impact opacity:
-  t=0.00 -> 1.00
-  t=0.18 -> 0.00
-  t>=0.18 -> 0.00
+  0.00 -> 1.00
+  0.18 -> 0.00
+  >=0.18 -> 0.00
 ```
 
-Reduced-motion values:
+Reduced motion:
 
 ```dart
 robotDx = 0;
 depositScale = 1;
 ```
 
-The impact opacity may still follow the first 18% of the controller timeline.
+- [ ] **Step 7: Copy current deposit/robot/tier-badge geometry exactly**
 
-- [ ] **Step 8: Reproduce the current node/rig geometry inside fixed bounds**
-
-Render exactly this structure:
+The component replaces only the existing visual `Row`:
 
 ```text
 Row(crossAxisAlignment: end)
@@ -780,9 +1068,9 @@ Row(crossAxisAlignment: end)
       existing TIER badge styling
 ```
 
-Use child `Transform.translate`/`Transform.scale`; never animate width, height, padding, margin, Row size, or Column size. With `rig == null`, render only the deposit using the current `.62` opacity treatment.
+Use child transforms only; never animate width/height/padding/margin/Row size/Column size. With `rig == null`, use the current `.62` deposit opacity.
 
-- [ ] **Step 9: Dispose the ticker**
+- [ ] **Step 8: Dispose and verify GREEN**
 
 ```dart
 @override
@@ -792,15 +1080,15 @@ void dispose() {
 }
 ```
 
-- [ ] **Step 10: Run widget tests and verify GREEN**
+Run:
 
 ```sh
 flutter test test/mining/presentation/landing_basin_mining_node_visual_test.dart
 ```
 
-Expected: PASS with no ticker exception during teardown.
+Expected: PASS with no ticker exception.
 
-- [ ] **Step 11: Commit the animation component**
+- [ ] **Step 9: Commit the component**
 
 ```sh
 git add \
@@ -811,7 +1099,7 @@ git commit -m "feat(mining): animate Landing Basin robot impacts"
 
 ---
 
-### Task 4: Integrate the Animated Gold Path Without Moving Mine Site Geometry
+### Task 5: Integrate the Animated Gold Row Without Moving Mine Site Geometry
 
 **Files:**
 - Modify: `lib/mining/presentation/mine_site_screen.dart`
@@ -820,24 +1108,20 @@ git commit -m "feat(mining): animate Landing Basin robot impacts"
 - Potential intentional golden updates: `test/mining/presentation/goldens/mine_site_430x932.png`, `test/mining/presentation/goldens/mine_site_874x402.png`
 
 **Interfaces:**
-- Consumes: Task 2 `MineSiteScreen.impactSequence`, Task 3 `LandingBasinMiningNodeVisual`.
-- Produces: Landing Basin-only branch in `_MineNodeButton`; all non-gold paths remain unchanged.
+- Consumes: `MineSiteScreen.impactSequence`, Task 4 `LandingBasinMiningNodeVisual`.
+- Produces: Landing Basin-only visual branch; all other sites retain current rendering.
 
-- [ ] **Step 1: Extend the Mine Site test helper and add failing selection assertions**
+- [ ] **Step 1: Extend `_pumpMineSite` and add failing Landing/non-gold assertions**
 
-Add to `_pumpMineSite`:
+Add:
 
 ```dart
 int impactSequence = 0,
 ```
 
-and pass:
+and pass it to `MineSiteScreen`.
 
-```dart
-impactSequence: impactSequence,
-```
-
-For a Landing Basin view with T1 on N1:
+For Landing Basin T1 on N1:
 
 ```dart
 expect(find.byKey(const Key('landing-basin-deposit-n1')), findsOneWidget);
@@ -845,25 +1129,13 @@ expect(find.byKey(const Key('landing-basin-robot-n1')), findsOneWidget);
 expect(find.byKey(const Key('mine-site-node-n1')), findsOneWidget);
 ```
 
-For empty N2:
+For empty N2, deposit exists and robot does not.
 
-```dart
-expect(find.byKey(const Key('landing-basin-deposit-n2')), findsOneWidget);
-expect(find.byKey(const Key('landing-basin-robot-n2')), findsNothing);
-```
-
-Add a non-gold view helper by constructing `MineSiteView.from(... siteId: MiningSiteId.carbonRidge ...)`, then assert:
-
-```dart
-expect(find.byKey(const Key('landing-basin-deposit-n1')), findsNothing);
-expect(find.byKey(const Key('landing-basin-robot-n1')), findsNothing);
-```
-
-and inspect the existing `Image` assets to confirm `view.definition.nodeAsset` and `MiningVisuals.rigAsset(...)` remain in use.
+Construct a Carbon Ridge `MineSiteView`; assert no `landing-basin-*` keys and verify the existing node/rig asset paths remain.
 
 - [ ] **Step 2: Add failing synchronized-contact screen coverage**
 
-Pump a Landing Basin view with cargo `0`, `impactSequence: 0`, then repump the same occupied-node state with cargo `.5`, `impactSequence: 1`:
+Pump Landing Basin cargo `0`, sequence `0`; repump cargo `.5`, sequence `1`:
 
 ```dart
 expect(find.byKey(const Key('landing-basin-impact-n1')), findsOneWidget);
@@ -873,22 +1145,23 @@ final progress = tester.widget<FractionallySizedBox>(
     matching: find.byType(FractionallySizedBox),
   ).last,
 );
-expect(progress.widthFactor, closeTo(.5 / _siteView(nextState).capacity, .0001));
+expect(
+  progress.widthFactor,
+  closeTo(.5 / _siteView(nextState).capacity, .0001),
+);
 ```
 
-The presentation test does not call a controller; it proves the screen consumes the new view state and impact sequence in one rebuild.
-
-- [ ] **Step 3: Run focused Mine Site tests and verify RED**
+- [ ] **Step 3: Run Mine Site tests and verify RED**
 
 ```sh
 flutter test test/mining/presentation/mine_site_screen_test.dart
 ```
 
-Expected: FAIL because `_MineNodeButton` still renders shared node/rig images directly.
+Expected: FAIL because `_MineNodeButton` still renders shared images.
 
-- [ ] **Step 4: Thread `impactSequence` and `siteId` through the private composition**
+- [ ] **Step 4: Thread `impactSequence` exactly like `reducedMotion`**
 
-Add `required int impactSequence` through:
+Pass required `int impactSequence` through:
 
 ```text
 _PortraitMineSite
@@ -898,9 +1171,9 @@ _MineCavern
 _MineNodeButton
 ```
 
-Pass the public value unchanged. Also pass `view.siteId` into `_MineNodeButton`. Add no child-local counter.
+Also pass `view.siteId` to `_MineNodeButton`.
 
-- [ ] **Step 5: Branch only the unlocked Landing Basin visual subtree**
+- [ ] **Step 5: Replace only the Landing Basin unlocked visual Row**
 
 Inside `_MineNodeButton`:
 
@@ -908,7 +1181,7 @@ Inside `_MineNodeButton`:
 final isLandingBasin = siteId == MiningSiteId.landingBasin;
 ```
 
-For unlocked Landing Basin nodes render:
+For unlocked Landing Basin nodes:
 
 ```dart
 LandingBasinMiningNodeVisual(
@@ -921,66 +1194,61 @@ LandingBasinMiningNodeVisual(
 )
 ```
 
-For unlocked non-gold nodes keep the existing `Image.asset(nodeAsset)` plus `MiningVisuals.rigAsset(view.rig!)` structure. Keep `_LockedNode` unchanged.
+For unlocked non-gold nodes keep the existing `Image.asset(nodeAsset)` + `MiningVisuals.rigAsset(view.rig!)` Row. Locked nodes keep `_LockedNode`.
+
+Do not restyle tier badges or chrome; the new component copies the current 2 px robot gap and 3 px badge gap exactly.
 
 - [ ] **Step 6: Preserve the outer interaction/progress structure**
 
-Do not move or replace:
+Do not move/replace:
 
 ```text
 Semantics
   -> Material
     -> InkWell(key: mine-site-node-*)
       -> locked OR Column(
-           node visual,
+           node visual Row/component,
            6 px gap,
            progress bar,
          )
 ```
 
-The semantics label, enabled/disabled logic, disabled-reason forwarding, progress bar width/height, callback, and outer `InkWell` bounds stay unchanged.
-
-- [ ] **Step 7: Run geometry regression coverage before goldens**
+- [ ] **Step 7: Run geometry regressions before goldens**
 
 ```sh
 flutter test test/mining/presentation/mine_site_screen_test.dart
 ```
 
-Expected: PASS without relaxing existing coordinate/tolerance assertions, including the 667×375 occupied N3/N4 tests and Sell/N3 non-overlap coverage.
+Expected: PASS without relaxing current coordinate/tolerance assertions, including 667×375 occupied N3/N4 and Sell/N3 non-overlap.
 
-- [ ] **Step 8: Verify or update only the two Mine Site goldens**
-
-First run normally:
+- [ ] **Step 8: Verify/update only Mine Site goldens on Linux**
 
 ```sh
 flutter test test/mining/presentation/visual_parity_golden_test.dart
 ```
 
-On Linux, the Landing Basin art change is expected to alter the two Mine Site images. If and only if the failures show the intended robot/deposit art with unchanged geometry, regenerate:
+If Linux failures show only intended Landing Basin art with unchanged geometry:
 
 ```sh
 flutter test test/mining/presentation/visual_parity_golden_test.dart --update-goldens
 ```
 
-On macOS the Mine Site golden cases are skipped; do not manufacture replacement goldens there. In all direct `MineSiteScreen` golden fixtures leave `impactSequence` at default `0` and `reducedMotion: true` so the captured pose is deterministic.
+Mine Site goldens are skipped on macOS; do not manufacture replacements there. Keep direct fixtures at `impactSequence: 0` and `reducedMotion: true`.
 
-- [ ] **Step 9: Commit the Mine Site integration**
+- [ ] **Step 9: Commit Mine Site integration**
 
 ```sh
 git add \
   lib/mining/presentation/mine_site_screen.dart \
   test/mining/presentation/mine_site_screen_test.dart \
-  test/mining/presentation/visual_parity_golden_test.dart \
-  test/mining/presentation/goldens/mine_site_430x932.png \
-  test/mining/presentation/goldens/mine_site_874x402.png
+  test/mining/presentation/visual_parity_golden_test.dart
+git add -u test/mining/presentation/goldens
 git commit -m "feat(mining): integrate hit-synchronized Landing Basin visuals"
 ```
 
-If normal golden verification passes without image updates, omit the two PNGs from `git add` rather than touching them.
-
 ---
 
-### Task 5: Pin Full/Resume/Reduced-Motion Regressions and Repository Guidance
+### Task 6: Pin Full/Resume/Reduced-Motion Regressions and Repository Guidance
 
 **Files:**
 - Modify: `test/mining/presentation/mining_shell_test.dart`
@@ -989,11 +1257,9 @@ If normal golden verification passes without image updates, omit the two PNGs fr
 
 **Interfaces:**
 - Verifies: full HPA-451 contract.
-- Changes no domain/public economy interface.
+- Changes no economy/save interface.
 
-- [ ] **Step 1: Add final-fill and already-full timer tests**
-
-Create a helper seed with configurable cargo if needed by reusing `deployedLandingState`. Add:
+- [ ] **Step 1: Add final-fill and already-full tests**
 
 ```dart
 testWidgets('final Landing Basin fill impacts once and then stops', (
@@ -1008,35 +1274,23 @@ testWidgets('final Landing Basin fill impacts once and then stops', (
 
   clock.now = _start.add(const Duration(seconds: 1));
   await tester.pump(const Duration(seconds: 1));
+  expect(tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).impactSequence, 1);
   expect(
-    tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).impactSequence,
-    1,
-  );
-  expect(
-    shellHandles(tester)
-        .controller
-        .state
-        .sites[MiningSiteId.landingBasin]!
-        .storedAmount,
+    shellHandles(tester).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
     90,
   );
 
   clock.now = _start.add(const Duration(seconds: 2));
   await tester.pump(const Duration(seconds: 1));
-  expect(
-    tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).impactSequence,
-    1,
-  );
+  expect(tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).impactSequence, 1);
 });
 ```
 
-Also seed `cargo: 90`, enter the site, advance one second, and assert `impactSequence` remains `0`.
+Also seed `cargo: 90`, enter, advance one second, and assert sequence remains `0`.
 
-- [ ] **Step 2: Add no-rig and lifecycle-resume no-replay tests**
+- [ ] **Step 2: Add lifecycle-resume no-replay test**
 
-For no-rig behavior, copy `deployedLandingState`, replace Landing Basin `rigByNode` with all nulls while keeping a small authoritative/display mismatch setup through an action or direct controller state fixture, then advance the timer and assert the sequence remains unchanged.
-
-For resume, use the existing lifecycle test pattern:
+Use injected time only:
 
 ```dart
 final before = tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).impactSequence;
@@ -1048,30 +1302,19 @@ await tester.pump();
 final after = tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).impactSequence;
 expect(after, before);
 expect(
-  tester
-      .widget<MiningCargoGauge>(find.byKey(const Key('mining-cargo-gauge')))
-      .cargo,
+  tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).view.cargo,
   greaterThan(0),
 );
 ```
 
-Use only injected clock advancement; do not add real sleeps.
+- [ ] **Step 3: Finish reduced-motion/disposal assertions**
 
-- [ ] **Step 3: Add final reduced-motion transform assertions**
+In the component test, capture keyed robot/deposit matrices at sequence `0`, rebuild to `1`, pump 100 ms, assert both matrices unchanged, impact accent present, then remove the widget tree and assert `tester.takeException()` is null.
 
-In `landing_basin_mining_node_visual_test.dart`, capture both keyed transform matrices at sequence `0`, rebuild with sequence `1`, pump 100 ms, then assert:
-
-```dart
-expect(robotTransformAfter, equals(robotTransformBefore));
-expect(depositTransformAfter, equals(depositTransformBefore));
-expect(find.byKey(const Key('landing-basin-impact-n1')), findsOneWidget);
-```
-
-After removing the widget tree, `expect(tester.takeException(), isNull)`.
-
-- [ ] **Step 4: Run the complete mining presentation slice**
+- [ ] **Step 4: Run the complete focused slice**
 
 ```sh
+flutter test test/mining/mine_site_view_test.dart
 flutter test test/mining/presentation/mining_visuals_test.dart
 flutter test test/mining/presentation/landing_basin_mining_node_visual_test.dart
 flutter test test/mining/presentation/mine_site_screen_test.dart
@@ -1079,17 +1322,17 @@ flutter test test/mining/presentation/mining_shell_test.dart
 flutter test test/mining/presentation/visual_parity_golden_test.dart
 ```
 
-Expected: PASS on the current platform; macOS keeps the existing Mine Site golden skip.
+Expected: PASS on the current platform; macOS retains the existing Mine Site golden skip.
 
-- [ ] **Step 5: Update `CLAUDE.md` with the active impact contract**
+- [ ] **Step 5: Update `CLAUDE.md` with the final ownership contract**
 
-Add under the current economy/presentation guidance:
+Add under economy/presentation guidance:
 
 ```markdown
-- Landing Basin is the first authored animated resource-site slice. Its robot/deposit impacts present deterministic elapsed-time production; they are not an economy clock.
-- `MiningShell` owns the transient Landing Basin impact sequence. While Landing Basin is open, upward passive cargo publication may be held until the next eligible foreground impact; authoritative controller state is never rewritten to match animation timing.
-- Animation widgets never call `MiningController`, write the repository, or persist animation/variant state.
-- Cold-load/resume/offline production publishes directly and is never replayed as historical strikes.
+- Landing Basin is the first authored animated resource-site slice. Robot/deposit impacts present deterministic elapsed-time production; they are not an economy clock.
+- `MiningShell._displayState` remains authoritative. The shell may hold only a transient Landing Basin visible-cargo overlay for Mine Site gauge/progress until the next eligible impact; Sell value/legality and recall legality always use authoritative cargo through `MineSiteView`.
+- `MiningShell` owns the transient Landing Basin impact sequence. Animation widgets never call `MiningController`, write the repository, or persist animation/variant state.
+- Cold-load/resume/exit paths may flush visible cargo directly and never replay historical strikes.
 - Add another resource/site visual variant only when a concrete second site needs one; do not pre-build a generic resource visual registry.
 ```
 
@@ -1104,7 +1347,7 @@ flutter analyze --fatal-infos
 
 Expected: PASS.
 
-- [ ] **Step 7: Run the full repository verification gates**
+- [ ] **Step 7: Run full repository gates**
 
 ```sh
 flutter test
@@ -1115,12 +1358,11 @@ flutter build web
 flutter build ios --simulator --debug
 ```
 
-Expected: all PASS. The existing Chrome host-only asset-test skip remains unchanged.
+Expected: PASS; existing host-only Chrome asset-test behavior remains unchanged.
 
 - [ ] **Step 8: Prove no prohibited domain/save scope entered the PR**
 
 ```sh
-git diff --stat main...HEAD
 git diff main...HEAD -- \
   lib/mining/mining_content.dart \
   lib/mining/mining_state.dart \
@@ -1129,9 +1371,9 @@ git diff main...HEAD -- \
   lib/mining/mining_save_repository.dart
 ```
 
-Expected: the second command prints no diff.
+Expected: no diff.
 
-- [ ] **Step 9: Commit final regression coverage and guidance**
+- [ ] **Step 9: Commit final verification/guidance**
 
 ```sh
 git add \
@@ -1143,31 +1385,58 @@ git commit -m "test(mining): verify Landing Basin impact presentation"
 
 - [ ] **Step 10: Final PR readiness check**
 
-Run:
-
 ```sh
 git status --short
 git log --oneline main..HEAD
 ```
 
-Expected: clean working tree and a small sequence of HPA-451 commits covering assets, pulse publication, animation, integration, and final verification. Keep all of them in the same pull request.
+Expected: clean tree and one HPA-451 PR containing assets, view/pulse separation, animation, integration, tests, and guidance.
+
+---
+
+## Risks and Mitigations
+
+### Display / interaction desynchronization
+
+**Risk:** visible cargo intentionally lags authoritative cargo.
+
+**Mitigation:** `_displayState` stays authoritative; `MineSiteView.visibleCargo` changes only `view.cargo`. Explicit view/shell tests cover Sell and recall while held.
+
+### Linux-only Mine Site goldens
+
+**Risk:** art changes require Linux golden updates while macOS skips those cases.
+
+**Mitigation:** deterministic resting fixtures; update only the two Mine Site goldens on Linux after geometry tests pass.
+
+### Ten new PNGs may disturb visual footprint
+
+**Risk:** inconsistent subject bounds/camera/lighting can visually overflow fixed node composition.
+
+**Mitigation:** 512×512 transparent canvases, central ~80% subject bounds, consistent camera/facing/lighting, similar deposit footprints, and existing 402×874 / 667×375 geometry gates.
+
+### Shell timer alignment in widget tests
+
+**Risk:** `pumpShell` advances fake time during initialization, so exact timer timing can be brittle.
+
+**Mitigation:** pure projection tests own the hold/decrease/flush truth table; shell tests cover only concrete timer/action/navigation wiring.
 
 ---
 
 ## Spec Coverage Self-Review
 
-- One Landing Basin-only authored slice: Tasks 1 and 4.
-- Five robot tiers / four deposit variants / hit accent: Task 1.
-- Deterministic elapsed-time economy unchanged: Task 2 and Task 5 diff guard.
-- Upward visible cargo only on impact while the site is open: Task 2.
-- Controller-action accrual does not leak between hits: Task 2 regression.
-- One shared robot/deposit contact owner: Task 3.
-- Final fill animates once; full site stops: Task 5.
-- Resume/cold-load no replay: Tasks 2 and 5.
-- Reduced motion non-spatial: Tasks 3 and 5.
-- Non-gold sites unchanged: Tasks 1 and 4.
-- Mine Site interaction/layout/N3-N4 geometry preserved: Task 4.
-- No generic framework/save/domain change: Global Constraints plus Task 5 diff guard.
-- Full repository verification: Task 5.
+- Landing Basin-only slice: Tasks 1/5.
+- Five robot tiers, four deposits, hit accent: Task 1.
+- Authoritative economy/save untouched: Global Constraints + Task 6 diff guard.
+- Visible cargo separated from interaction state: Task 2.
+- Pure hold/decrease/flush function: Task 2.
+- Sell-while-held consistency: Task 3.
+- Recall-while-held legality + successful recall flush: Task 3.
+- Back + Stellar Map flush without impact: Task 3.
+- One shell timer/impact sequence: Task 3.
+- One robot/deposit animation owner: Task 4.
+- Existing geometry/chrome preserved: Task 5.
+- Full/full-stop, resume, reduced motion: Task 6.
+- Risks explicitly covered: Risks and Mitigations.
+- Full repository verification: Task 6.
 
 No additional subsystem, Linear ticket, or pull request is required for HPA-451.
