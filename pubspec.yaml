@@ -63,6 +63,7 @@ flutter:
     - assets/images/mining/caverns/
     - assets/images/mining/nodes/
     - assets/images/mining/rigs/
+    - assets/images/mining/landing_basin/
     - assets/images/mining/planets/
     - assets/images/mining/sites/
     - assets/images/mining/icons/
