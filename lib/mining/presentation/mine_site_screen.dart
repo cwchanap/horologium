@@ -24,6 +24,7 @@ class MineSiteScreen extends StatelessWidget {
     this.onDestinationSelected,
     this.cash = 0,
     this.reducedMotion = false,
+    this.impactSequence = 0,
   });
 
   final MineSiteView view;
@@ -37,6 +38,7 @@ class MineSiteScreen extends StatelessWidget {
   final ValueChanged<MiningNavigationDestination>? onDestinationSelected;
   final int cash;
   final bool reducedMotion;
+  final int impactSequence;
 
   @override
   Widget build(BuildContext context) {

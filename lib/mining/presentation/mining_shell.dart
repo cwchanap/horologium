@@ -62,6 +62,7 @@ class _MiningShellState extends State<MiningShell>
   bool _recoverySnackBarScheduled = false;
   DockBayId? _selectedBayId;
   MiningSiteId? _openSiteId;
+  int _landingBasinImpactSequence = 0;
   MiningNavigationDestination _selectedDestination =
       MiningNavigationDestination.siteDeck;
 
@@ -100,12 +101,30 @@ class _MiningShellState extends State<MiningShell>
 
   void _startRefreshTimer() {
     _refreshTimer?.cancel();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!_controller.isBusy) {
-        _controller.refresh();
-        _refreshPresentation();
-      }
-    });
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _refreshForegroundProduction(),
+    );
+  }
+
+  void _refreshForegroundProduction() {
+    if (_controller.isBusy) return;
+
+    final before =
+        _controller.state.sites[MiningSiteId.landingBasin]!.storedAmount;
+
+    _controller.refresh();
+
+    final landing = _controller.state.sites[MiningSiteId.landingBasin]!;
+    final hasRig = landing.rigByNode.values.any((tier) => tier != null);
+
+    if (_openSiteId == MiningSiteId.landingBasin &&
+        hasRig &&
+        landing.storedAmount > before) {
+      _landingBasinImpactSequence++;
+    }
+
+    _refreshPresentation();
   }
 
   @override
@@ -512,6 +531,7 @@ class _MiningShellState extends State<MiningShell>
           fleetDock: fleetDock,
           cash: _displayState.cash,
           reducedMotion: _reducedMotion,
+          impactSequence: _landingBasinImpactSequence,
           onNodeTap: _handleSiteNodeTap,
           onBayTap: _handleDockBayTap,
           onSpawnRig: _spawnRig,
