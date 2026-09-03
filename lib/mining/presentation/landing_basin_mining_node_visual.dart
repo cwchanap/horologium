@@ -34,6 +34,7 @@ class _LandingBasinMiningNodeVisualState
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 1),
+    animationBehavior: AnimationBehavior.preserve,
     value: 1,
   );
 

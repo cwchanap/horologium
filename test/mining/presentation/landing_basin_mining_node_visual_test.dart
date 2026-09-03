@@ -250,6 +250,30 @@ void main() {
     expect(tester.getSize(find.byType(LandingBasinMiningNodeVisual)), restSize);
   });
 
+  testWidgets(
+    'keeps reduced-motion effects visible for the authored sequence window',
+    (tester) async {
+      tester.binding.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.binding.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+
+      await _pumpVisual(tester, impactSequence: 0, reducedMotion: true);
+      await _pumpVisual(tester, impactSequence: 1, reducedMotion: true);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        find.byKey(const Key('landing-basin-gold-glow-n1')),
+        findsOneWidget,
+      );
+      expect(
+        _effectOpacity(tester, 'landing-basin-gold-glow-n1'),
+        greaterThan(0),
+      );
+    },
+  );
+
   testWidgets('disposes the animation controller when the visual is removed', (
     tester,
   ) async {
