@@ -164,11 +164,12 @@ void main() {
   testWidgets('disposes the animation controller when the visual is removed', (
     tester,
   ) async {
-    await _pumpVisual(tester, impactSequence: 0);
-    await _pumpVisual(tester, impactSequence: 1);
+    await _pumpVisual(tester, impactSequence: 0, reducedMotion: true);
+    await _pumpVisual(tester, impactSequence: 1, reducedMotion: true);
     await tester.pump(const Duration(milliseconds: 100));
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 1));
+    expect(tester.takeException(), isNull);
   });
 }

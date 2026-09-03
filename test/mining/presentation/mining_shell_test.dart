@@ -645,6 +645,41 @@ void main() {
     );
   });
 
+  testWidgets('final-fill production emits one impact and stops at capacity', (
+    tester,
+  ) async {
+    final clock = TestClock(_start);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingState(clock.now, cargo: 89.5));
+    await pumpShell(tester, repository: repository, clock: clock);
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+
+    final before = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+
+    await pumpMiningTick(tester, clock);
+
+    final after = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+    expect(after - before, 1);
+    expect(
+      shellHandles(
+        tester,
+      ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+      90,
+    );
+
+    await pumpMiningTick(tester, clock);
+
+    final afterFull = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+    expect(afterFull - after, 0);
+  });
+
   testWidgets('closed Landing Basin production emits no impact', (
     tester,
   ) async {
@@ -705,10 +740,12 @@ void main() {
     expect(after - before, 0);
   });
 
-  testWidgets('full Landing Basin production emits no impact', (tester) async {
+  testWidgets('already-full Landing Basin production emits no impact', (
+    tester,
+  ) async {
     final clock = TestClock(_start);
     final repository = CountingMiningSaveRepository();
-    await repository.save(deployedLandingState(clock.now, cargo: 150));
+    await repository.save(deployedLandingState(clock.now, cargo: 90));
     await pumpShell(tester, repository: repository, clock: clock);
     await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
     await tester.pump();
@@ -905,4 +942,36 @@ void main() {
       expect(find.textContaining('Gold'), findsWidgets);
     },
   );
+
+  testWidgets('lifecycle resume does not replay passive impacts', (
+    tester,
+  ) async {
+    final clock = TestClock(_start);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingBasin(clock.now));
+    await pumpShell(tester, repository: repository, clock: clock);
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+
+    final before = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    clock.now = clock.now.add(const Duration(seconds: 10));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+
+    final after = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+    expect(after - before, 0);
+    expect(
+      shellHandles(
+        tester,
+      ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+      greaterThan(0),
+    );
+  });
 }
