@@ -158,6 +158,60 @@ void main() {
     expect(find.byKey(const Key('landing-basin-impact-n1')), findsOneWidget);
   });
 
+  testWidgets(
+    'selects Landing Basin deposit variants and robot tiers per occupied node',
+    (tester) async {
+      final state = _stateWith(
+        landing: _progress(
+          commissioned: true,
+          rigs: {MiningNodeId.n1: RigTier.t4, MiningNodeId.n2: RigTier.t3},
+        ),
+      );
+      await _pumpMineSite(
+        tester,
+        size: const Size(402, 874),
+        view: _siteView(state),
+        dock: _dockView(state),
+      );
+
+      for (final entry in {
+        MiningNodeId.n1: RigTier.t4,
+        MiningNodeId.n2: RigTier.t3,
+      }.entries) {
+        final node = entry.key.name;
+        final robot = entry.value.name;
+        expect(find.byKey(Key('landing-basin-deposit-$node')), findsOneWidget);
+        expect(find.byKey(Key('landing-basin-robot-$node')), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byKey(Key('landing-basin-deposit-$node')),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Image &&
+                  widget.image is AssetImage &&
+                  (widget.image as AssetImage).assetName ==
+                      'assets/images/mining/landing_basin/deposit_$node.png',
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(Key('landing-basin-robot-$node')),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Image &&
+                  widget.image is AssetImage &&
+                  (widget.image as AssetImage).assetName ==
+                      'assets/images/mining/landing_basin/robot_$robot.png',
+            ),
+          ),
+          findsOneWidget,
+        );
+      }
+    },
+  );
+
   testWidgets('keeps non-gold sites on the existing static node and rig art', (
     tester,
   ) async {

@@ -560,10 +560,7 @@ class _MineNodeButton extends StatelessWidget {
     final enabled = view.canDeploy || view.canRecall;
     final canForwardDisabledTap = view.disabledReason != null;
     final label = _nodeLabel(view);
-    final useLandingBasinPrototype =
-        siteId == MiningSiteId.landingBasin &&
-        view.id == MiningNodeId.n1 &&
-        (view.rig == null || view.rig == RigTier.t1);
+    final useLandingBasinVisual = siteId == MiningSiteId.landingBasin;
     return Semantics(
       button: true,
       enabled: enabled,
@@ -582,7 +579,7 @@ class _MineNodeButton extends StatelessWidget {
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (useLandingBasinPrototype)
+                    if (useLandingBasinVisual)
                       LandingBasinMiningNodeVisual(
                         nodeId: view.id,
                         rig: view.rig,
