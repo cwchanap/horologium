@@ -51,6 +51,21 @@ void main() {
     expect(MiningTheme.warning, const Color(0xFFFFD54A));
   });
 
+  test('maps the Landing Basin prototype assets by closed identity', () {
+    expect(
+      MiningVisuals.landingBasinRobotAsset(RigTier.t1),
+      'assets/images/mining/landing_basin/robot_t1.png',
+    );
+    expect(
+      MiningVisuals.landingBasinDepositAsset(MiningNodeId.n1),
+      'assets/images/mining/landing_basin/deposit_n1.png',
+    );
+    expect(
+      MiningVisuals.mergeBurst,
+      'assets/images/mining/effects/merge_burst.png',
+    );
+  });
+
   // The Chrome test runner stalls on the first rootBundle byte load; retain
   // the complete bundle proof for the host, coverage, and full test suites.
   testWidgets('every site cavern node and card resolves', (tester) async {
@@ -64,6 +79,10 @@ void main() {
     for (final tier in RigTier.values) {
       await rootBundle.load(MiningVisuals.rigAsset(tier));
     }
+    await rootBundle.load(MiningVisuals.landingBasinRobotAsset(RigTier.t1));
+    await rootBundle.load(
+      MiningVisuals.landingBasinDepositAsset(MiningNodeId.n1),
+    );
     for (final planet in content.planets.values) {
       await rootBundle.load(planet.planetAsset);
     }

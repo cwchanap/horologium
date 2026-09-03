@@ -19,6 +19,12 @@ abstract final class MiningVisuals {
   static String rigAsset(RigTier tier) =>
       'assets/images/mining/rigs/${tier.name}.png';
 
+  static String landingBasinRobotAsset(RigTier tier) =>
+      'assets/images/mining/landing_basin/robot_${tier.name}.png';
+
+  static String landingBasinDepositAsset(MiningNodeId nodeId) =>
+      'assets/images/mining/landing_basin/deposit_${nodeId.name}.png';
+
   static const cashIcon = 'assets/images/mining/icons/cash.png';
   static const cargoIcon = 'assets/images/mining/icons/cargo.png';
   static const mergeIcon = 'assets/images/mining/icons/merge.png';
