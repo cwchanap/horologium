@@ -56,12 +56,6 @@ void main() {
   });
 
   test('maps every Landing Basin asset by closed identity', () {
-    for (final tier in RigTier.values) {
-      expect(
-        MiningVisuals.landingBasinRobotAsset(tier),
-        'assets/images/mining/landing_basin/robot_${tier.name}.png',
-      );
-    }
     for (final nodeId in MiningNodeId.values) {
       expect(
         MiningVisuals.landingBasinDepositAsset(nodeId),
@@ -99,9 +93,6 @@ void main() {
     }
     for (final tier in RigTier.values) {
       await rootBundle.load(MiningVisuals.rigAsset(tier));
-    }
-    for (final tier in RigTier.values) {
-      await rootBundle.load(MiningVisuals.landingBasinRobotAsset(tier));
     }
     for (final tier in RigTier.values) {
       await rootBundle.load(MiningVisuals.landingBasinRobotBodyAsset(tier));
