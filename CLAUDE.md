@@ -30,6 +30,11 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
   Dock, Stellar Map, Technology, Settings, and offline-return surfaces. There
   is no Flame runtime in this ownership path.
 
+- Landing Basin is the first authored animated mining site. Its transient shell-owned `impactSequence` presents passive one-second deterministic production; animation is not an economy clock.
+- `MiningController`, `MiningSimulation`, `MineSiteView`, and `_displayState` remain authoritative. User-initiated mutations may publish their accrued state immediately and do not fabricate mining impacts.
+- Landing Basin robot/deposit animation never calls the controller or persists animation/variant state. Cold-load/resume production is never replayed as historical strikes.
+- Add another site-specific visual path only when a concrete second animated site needs it; do not pre-build a generic resource visual registry.
+
 Do not add a second state owner, direct widget/repository writes, a parallel
 mutation path, or a speculative processing/sink/currency layer.
 
