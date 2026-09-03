@@ -44,6 +44,10 @@ void main() {
       MiningVisuals.mergeBurst,
       'assets/images/mining/effects/merge_burst.png',
     );
+    expect(
+      MiningVisuals.landingBasinImpact,
+      'assets/images/mining/landing_basin/impact.png',
+    );
     expect(MiningVisuals.offlineHero, 'assets/images/mining/offline/hero.png');
     expect(MiningTheme.accent, const Color(0xFF53D4E8));
     expect(MiningTheme.hudPanel, const Color(0xE6162133));
@@ -94,6 +98,7 @@ void main() {
       MiningVisuals.logisticsIcon,
       MiningVisuals.surveyingIcon,
       MiningVisuals.mergeBurst,
+      MiningVisuals.landingBasinImpact,
       MiningVisuals.offlineHero,
     ]) {
       await rootBundle.load(path);

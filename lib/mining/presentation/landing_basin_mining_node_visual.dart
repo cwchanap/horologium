@@ -134,7 +134,7 @@ class _LandingBasinMiningNodeVisualState
               child: Opacity(
                 key: Key('landing-basin-impact-${widget.nodeId.name}'),
                 opacity: _contactOpacity(t),
-                child: Image.asset(MiningVisuals.mergeBurst),
+                child: Image.asset(MiningVisuals.landingBasinImpact),
               ),
             ),
         ],

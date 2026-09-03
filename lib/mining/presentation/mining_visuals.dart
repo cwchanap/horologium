@@ -32,5 +32,7 @@ abstract final class MiningVisuals {
   static const logisticsIcon = 'assets/images/mining/icons/logistics.png';
   static const surveyingIcon = 'assets/images/mining/icons/surveying.png';
   static const mergeBurst = 'assets/images/mining/effects/merge_burst.png';
+  static const landingBasinImpact =
+      'assets/images/mining/landing_basin/impact.png';
   static const offlineHero = 'assets/images/mining/offline/hero.png';
 }

@@ -61,10 +61,11 @@ MineSiteView _siteView(
   MiningSave state, {
   DockBayId? selectedBayId,
   bool isBusy = false,
+  MiningSiteId siteId = MiningSiteId.landingBasin,
 }) => MineSiteView.from(
   state: state,
   content: _content,
-  siteId: MiningSiteId.landingBasin,
+  siteId: siteId,
   selectedBayId: selectedBayId,
   isBusy: isBusy,
 );
@@ -83,6 +84,7 @@ Future<void> _pumpMineSite(
   required FleetDockView dock,
   Size size = const Size(360, 640),
   bool disableAnimations = false,
+  int impactSequence = 0,
   ValueChanged<MiningNodeId>? onNodeTap,
   ValueChanged<DockBayId>? onBayTap,
   VoidCallback? onSpawnRig,
@@ -110,6 +112,7 @@ Future<void> _pumpMineSite(
           fleetDock: dock,
           cash: 100,
           reducedMotion: disableAnimations,
+          impactSequence: impactSequence,
           onNodeTap: onNodeTap ?? (_) {},
           onBayTap: onBayTap ?? (_) {},
           onSpawnRig: onSpawnRig ?? () {},
@@ -125,6 +128,89 @@ Future<void> _pumpMineSite(
 }
 
 void main() {
+  testWidgets('uses the Landing Basin prototype for an occupied T1 node', (
+    tester,
+  ) async {
+    final state = _stateWith(
+      landing: _progress(
+        commissioned: true,
+        rigs: {MiningNodeId.n1: RigTier.t1},
+      ),
+    );
+    await _pumpMineSite(
+      tester,
+      size: const Size(402, 874),
+      view: _siteView(state),
+      dock: _dockView(state),
+    );
+
+    expect(find.byKey(const Key('landing-basin-deposit-n1')), findsOneWidget);
+    expect(find.byKey(const Key('landing-basin-robot-n1')), findsOneWidget);
+    expect(find.byKey(const Key('mine-site-node-n1')), findsOneWidget);
+
+    await _pumpMineSite(
+      tester,
+      size: const Size(402, 874),
+      impactSequence: 1,
+      view: _siteView(state),
+      dock: _dockView(state),
+    );
+    expect(find.byKey(const Key('landing-basin-impact-n1')), findsOneWidget);
+  });
+
+  testWidgets('keeps non-gold sites on the existing static node and rig art', (
+    tester,
+  ) async {
+    final initial = MiningSave.initial(nowUtc: _start);
+    final state = initial.copyWith(
+      sites: {
+        ...initial.sites,
+        MiningSiteId.carbonRidge: _progress(
+          commissioned: true,
+          rigs: {MiningNodeId.n1: RigTier.t1},
+        ),
+      },
+    );
+    final view = _siteView(state, siteId: MiningSiteId.carbonRidge);
+    await _pumpMineSite(
+      tester,
+      impactSequence: 1,
+      view: view,
+      dock: _dockView(state),
+    );
+
+    expect(find.byKey(const Key('landing-basin-deposit-n1')), findsNothing);
+    expect(find.byKey(const Key('landing-basin-robot-n1')), findsNothing);
+    expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
+    final n1 = find.byKey(const Key('mine-site-node-n1'));
+    expect(
+      find.descendant(
+        of: n1,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Image &&
+              widget.image is AssetImage &&
+              (widget.image as AssetImage).assetName ==
+                  view.definition.nodeAsset,
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: n1,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Image &&
+              widget.image is AssetImage &&
+              (widget.image as AssetImage).assetName ==
+                  'assets/images/mining/rigs/t1.png',
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('matches the authored 402x874 Mine Site chrome', (tester) async {
     final state = _stateWith(
       cash: 412,
