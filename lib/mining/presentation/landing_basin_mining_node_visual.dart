@@ -57,17 +57,10 @@ class _LandingBasinMiningNodeVisualState
     builder: (context, child) {
       final t = _controller.value.clamp(0.0, 1.0).toDouble();
       final rig = widget.rig;
-      final articulatedT1 = rig == RigTier.t1;
       final impactActive = rig != null && t >= .24 && t < 1;
-      final robotOffset = rig == null || widget.reducedMotion || articulatedT1
-          ? Offset.zero
-          : _robotOffset(t, widget.rigSize);
-      final robotAngle = rig == null || widget.reducedMotion || articulatedT1
-          ? 0.0
-          : _robotAngle(t);
-      final robotScale = rig == null || widget.reducedMotion || articulatedT1
-          ? 1.0
-          : _robotScale(t);
+      const robotOffset = Offset.zero;
+      const robotAngle = 0.0;
+      const robotScale = 1.0;
       final depositScale = widget.reducedMotion ? 1.0 : _depositScale(t);
       final depositOffset = rig == null || widget.reducedMotion
           ? Offset.zero
@@ -162,13 +155,11 @@ class _LandingBasinMiningNodeVisualState
                               'landing-basin-robot-scale-${widget.nodeId.name}',
                             ),
                             scale: robotScale,
-                            child: articulatedT1
-                                ? _articulatedT1Robot(t, widget.reducedMotion)
-                                : Image.asset(
-                                    MiningVisuals.landingBasinRobotAsset(rig),
-                                    width: widget.rigSize,
-                                    height: widget.rigSize,
-                                  ),
+                            child: _articulatedRobot(
+                              rig,
+                              t,
+                              widget.reducedMotion,
+                            ),
                           ),
                         ),
                       ),
@@ -289,8 +280,7 @@ class _LandingBasinMiningNodeVisualState
     ];
   }
 
-  Widget _articulatedT1Robot(double t, bool reducedMotion) {
-    final tier = RigTier.t1;
+  Widget _articulatedRobot(RigTier tier, double t, bool reducedMotion) {
     return Stack(
       fit: StackFit.expand,
       clipBehavior: Clip.none,
@@ -337,48 +327,6 @@ class _LandingBasinMiningNodeVisualState
       ),
     );
     return Opacity(key: Key(key), opacity: opacity, child: child);
-  }
-
-  Offset _robotOffset(double t, double rigSize) {
-    final dx = _robotDx(t, rigSize);
-    final dy = _robotDy(t, rigSize);
-    return Offset(dx, dy);
-  }
-
-  double _robotDx(double t, double rigSize) {
-    if (t <= .24) return _lerp(0, .30 * rigSize, _easeOut(t / .24));
-    if (t <= .46) {
-      return _lerp(.30 * rigSize, -.18 * rigSize, _easeOut((t - .24) / .22));
-    }
-    if (t <= .62) {
-      return _lerp(-.18 * rigSize, .10 * rigSize, _easeOut((t - .46) / .16));
-    }
-    if (t <= .78) return _lerp(.10 * rigSize, 0, _easeOut((t - .62) / .16));
-    return 0;
-  }
-
-  double _robotDy(double t, double rigSize) {
-    if (t <= .24) return _lerp(0, -.06 * rigSize, t / .24);
-    if (t <= .46) return _lerp(-.06 * rigSize, .08 * rigSize, (t - .24) / .22);
-    if (t <= .62) return _lerp(.08 * rigSize, -.03 * rigSize, (t - .46) / .16);
-    if (t <= .78) return _lerp(-.03 * rigSize, 0, (t - .62) / .16);
-    return 0;
-  }
-
-  double _robotAngle(double t) {
-    if (t <= .24) return _lerp(0, -.06, t / .24);
-    if (t <= .46) return _lerp(-.06, .10, (t - .24) / .22);
-    if (t <= .62) return _lerp(.10, -.04, (t - .46) / .16);
-    if (t <= .78) return _lerp(-.04, 0, (t - .62) / .16);
-    return 0;
-  }
-
-  double _robotScale(double t) {
-    if (t <= .24) return _lerp(1, .96, t / .24);
-    if (t <= .46) return _lerp(.96, 1.04, (t - .24) / .22);
-    if (t <= .62) return _lerp(1.04, .98, (t - .46) / .16);
-    if (t <= .78) return _lerp(.98, 1, (t - .62) / .16);
-    return 1;
   }
 
   double _armAngle(double t) {

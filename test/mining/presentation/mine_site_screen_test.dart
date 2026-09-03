@@ -6,6 +6,7 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
+import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 final _start = DateTime.utc(2026, 8, 26, 12);
 final _content = MiningContentRegistry.stellarMining();
@@ -161,7 +162,7 @@ void main() {
   });
 
   testWidgets(
-    'selects Landing Basin deposit variants and robot tiers per occupied node',
+    'selects Landing Basin deposit variants and articulated robot tiers per occupied node',
     (tester) async {
       final state = _stateWith(
         landing: _progress(
@@ -181,7 +182,7 @@ void main() {
         MiningNodeId.n2: RigTier.t3,
       }.entries) {
         final node = entry.key.name;
-        final robot = entry.value.name;
+        final tier = entry.value;
         expect(find.byKey(Key('landing-basin-deposit-$node')), findsOneWidget);
         expect(find.byKey(Key('landing-basin-robot-$node')), findsOneWidget);
         expect(
@@ -197,19 +198,23 @@ void main() {
           ),
           findsOneWidget,
         );
-        expect(
-          find.descendant(
-            of: find.byKey(Key('landing-basin-robot-$node')),
-            matching: find.byWidgetPredicate(
-              (widget) =>
-                  widget is Image &&
-                  widget.image is AssetImage &&
-                  (widget.image as AssetImage).assetName ==
-                      'assets/images/mining/landing_basin/robot_$robot.png',
+        for (final assetPath in [
+          MiningVisuals.landingBasinRobotBodyAsset(tier),
+          MiningVisuals.landingBasinRobotArmAsset(tier),
+        ]) {
+          expect(
+            find.descendant(
+              of: find.byKey(Key('landing-basin-robot-$node')),
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Image &&
+                    widget.image is AssetImage &&
+                    (widget.image as AssetImage).assetName == assetPath,
+              ),
             ),
-          ),
-          findsOneWidget,
-        );
+            findsOneWidget,
+          );
+        }
       }
     },
   );

@@ -74,15 +74,17 @@ void main() {
     );
   });
 
-  test('maps the T1 articulated Landing Basin layers by closed identity', () {
-    expect(
-      MiningVisuals.landingBasinRobotBodyAsset(RigTier.t1),
-      'assets/images/mining/landing_basin/robot_t1_body.png',
-    );
-    expect(
-      MiningVisuals.landingBasinRobotArmAsset(RigTier.t1),
-      'assets/images/mining/landing_basin/robot_t1_arm.png',
-    );
+  test('maps every articulated Landing Basin layer by closed identity', () {
+    for (final tier in RigTier.values) {
+      expect(
+        MiningVisuals.landingBasinRobotBodyAsset(tier),
+        'assets/images/mining/landing_basin/robot_${tier.name}_body.png',
+      );
+      expect(
+        MiningVisuals.landingBasinRobotArmAsset(tier),
+        'assets/images/mining/landing_basin/robot_${tier.name}_arm.png',
+      );
+    }
   });
 
   // The Chrome test runner stalls on the first rootBundle byte load; retain
@@ -101,8 +103,10 @@ void main() {
     for (final tier in RigTier.values) {
       await rootBundle.load(MiningVisuals.landingBasinRobotAsset(tier));
     }
-    await rootBundle.load(MiningVisuals.landingBasinRobotBodyAsset(RigTier.t1));
-    await rootBundle.load(MiningVisuals.landingBasinRobotArmAsset(RigTier.t1));
+    for (final tier in RigTier.values) {
+      await rootBundle.load(MiningVisuals.landingBasinRobotBodyAsset(tier));
+      await rootBundle.load(MiningVisuals.landingBasinRobotArmAsset(tier));
+    }
     for (final nodeId in MiningNodeId.values) {
       await rootBundle.load(MiningVisuals.landingBasinDepositAsset(nodeId));
     }

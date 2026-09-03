@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/presentation/landing_basin_mining_node_visual.dart';
+import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 Future<void> _pumpVisual(
   WidgetTester tester, {
@@ -341,6 +342,55 @@ void main() {
     expect(_robotBodyTransform(tester).transform, equals(restBody));
     expect(_robotArmTransform(tester).transform, equals(restArm));
   });
+
+  testWidgets('selects articulated body and arm layers for every rig tier', (
+    tester,
+  ) async {
+    for (final tier in RigTier.values) {
+      await _pumpVisual(tester, rig: tier);
+
+      final bodyImage = tester.widget<Image>(
+        find.descendant(
+          of: find.byKey(const Key('landing-basin-robot-body-transform-n1')),
+          matching: find.byType(Image),
+        ),
+      );
+      final armImage = tester.widget<Image>(
+        find.descendant(
+          of: find.byKey(const Key('landing-basin-robot-arm-transform-n1')),
+          matching: find.byType(Image),
+        ),
+      );
+
+      expect(
+        (bodyImage.image as AssetImage).assetName,
+        MiningVisuals.landingBasinRobotBodyAsset(tier),
+      );
+      expect(
+        (armImage.image as AssetImage).assetName,
+        MiningVisuals.landingBasinRobotArmAsset(tier),
+      );
+    }
+  });
+
+  testWidgets(
+    'keeps every articulated chassis stationary while the arm moves',
+    (tester) async {
+      for (final tier in RigTier.values) {
+        await _pumpVisual(tester, rig: tier, impactSequence: 0);
+        final restRobot = _robotTransform(tester).transform;
+        final restBody = _robotBodyTransform(tester).transform;
+        final restArm = _robotArmTransform(tester).transform;
+
+        await _pumpVisual(tester, rig: tier, impactSequence: 1);
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(_robotTransform(tester).transform, equals(restRobot));
+        expect(_robotBodyTransform(tester).transform, equals(restBody));
+        expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
+      }
+    },
+  );
 
   testWidgets('pins the T1 arm rotation to the authored shoulder pivot', (
     tester,
