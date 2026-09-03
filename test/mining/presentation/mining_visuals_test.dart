@@ -74,6 +74,17 @@ void main() {
     );
   });
 
+  test('maps the T1 articulated Landing Basin layers by closed identity', () {
+    expect(
+      MiningVisuals.landingBasinRobotBodyAsset(RigTier.t1),
+      'assets/images/mining/landing_basin/robot_t1_body.png',
+    );
+    expect(
+      MiningVisuals.landingBasinRobotArmAsset(RigTier.t1),
+      'assets/images/mining/landing_basin/robot_t1_arm.png',
+    );
+  });
+
   // The Chrome test runner stalls on the first rootBundle byte load; retain
   // the complete bundle proof for the host, coverage, and full test suites.
   testWidgets('every site cavern node and card resolves', (tester) async {
@@ -90,6 +101,8 @@ void main() {
     for (final tier in RigTier.values) {
       await rootBundle.load(MiningVisuals.landingBasinRobotAsset(tier));
     }
+    await rootBundle.load(MiningVisuals.landingBasinRobotBodyAsset(RigTier.t1));
+    await rootBundle.load(MiningVisuals.landingBasinRobotArmAsset(RigTier.t1));
     for (final nodeId in MiningNodeId.values) {
       await rootBundle.load(MiningVisuals.landingBasinDepositAsset(nodeId));
     }

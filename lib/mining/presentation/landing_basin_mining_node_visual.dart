@@ -57,14 +57,15 @@ class _LandingBasinMiningNodeVisualState
     builder: (context, child) {
       final t = _controller.value.clamp(0.0, 1.0).toDouble();
       final rig = widget.rig;
+      final articulatedT1 = rig == RigTier.t1;
       final impactActive = rig != null && t >= .24 && t < 1;
-      final robotOffset = rig == null || widget.reducedMotion
+      final robotOffset = rig == null || widget.reducedMotion || articulatedT1
           ? Offset.zero
           : _robotOffset(t, widget.rigSize);
-      final robotAngle = rig == null || widget.reducedMotion
+      final robotAngle = rig == null || widget.reducedMotion || articulatedT1
           ? 0.0
           : _robotAngle(t);
-      final robotScale = rig == null || widget.reducedMotion
+      final robotScale = rig == null || widget.reducedMotion || articulatedT1
           ? 1.0
           : _robotScale(t);
       final depositScale = widget.reducedMotion ? 1.0 : _depositScale(t);
@@ -99,13 +100,42 @@ class _LandingBasinMiningNodeVisualState
                     child: Transform.scale(
                       key: Key('landing-basin-deposit-${widget.nodeId.name}'),
                       scale: depositScale,
-                      child: Image.asset(
-                        MiningVisuals.landingBasinDepositAsset(widget.nodeId),
-                        width: widget.nodeSize,
-                        height: widget.nodeSize,
-                        opacity: rig == null
-                            ? const AlwaysStoppedAnimation(.62)
-                            : null,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.asset(
+                            MiningVisuals.landingBasinDepositAsset(
+                              widget.nodeId,
+                            ),
+                            width: widget.nodeSize,
+                            height: widget.nodeSize,
+                            opacity: rig == null
+                                ? const AlwaysStoppedAnimation(.62)
+                                : null,
+                          ),
+                          if (rig != null && _resourceFlashActive(t))
+                            Positioned.fill(
+                              child: Opacity(
+                                key: Key(
+                                  'landing-basin-resource-flash-${widget.nodeId.name}',
+                                ),
+                                opacity: _resourceFlashOpacity(t),
+                                child: ColorFiltered(
+                                  colorFilter: const ColorFilter.mode(
+                                    Color(0xFFFFD05A),
+                                    BlendMode.srcATop,
+                                  ),
+                                  child: Image.asset(
+                                    MiningVisuals.landingBasinDepositAsset(
+                                      widget.nodeId,
+                                    ),
+                                    width: widget.nodeSize,
+                                    height: widget.nodeSize,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
@@ -132,11 +162,13 @@ class _LandingBasinMiningNodeVisualState
                               'landing-basin-robot-scale-${widget.nodeId.name}',
                             ),
                             scale: robotScale,
-                            child: Image.asset(
-                              MiningVisuals.landingBasinRobotAsset(rig),
-                              width: widget.rigSize,
-                              height: widget.rigSize,
-                            ),
+                            child: articulatedT1
+                                ? _articulatedT1Robot(t, widget.reducedMotion)
+                                : Image.asset(
+                                    MiningVisuals.landingBasinRobotAsset(rig),
+                                    width: widget.rigSize,
+                                    height: widget.rigSize,
+                                  ),
                           ),
                         ),
                       ),
@@ -257,6 +289,35 @@ class _LandingBasinMiningNodeVisualState
     ];
   }
 
+  Widget _articulatedT1Robot(double t, bool reducedMotion) {
+    final tier = RigTier.t1;
+    return Stack(
+      fit: StackFit.expand,
+      clipBehavior: Clip.none,
+      children: [
+        Transform(
+          key: Key('landing-basin-robot-body-transform-${widget.nodeId.name}'),
+          transform: Matrix4.identity(),
+          child: Image.asset(
+            MiningVisuals.landingBasinRobotBodyAsset(tier),
+            width: widget.rigSize,
+            height: widget.rigSize,
+          ),
+        ),
+        Transform.rotate(
+          key: Key('landing-basin-robot-arm-transform-${widget.nodeId.name}'),
+          alignment: const Alignment(.33, -.24),
+          angle: reducedMotion ? 0 : _armAngle(t),
+          child: Image.asset(
+            MiningVisuals.landingBasinRobotArmAsset(tier),
+            width: widget.rigSize,
+            height: widget.rigSize,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _paintedEffect({
     required String key,
     required double opacity,
@@ -320,6 +381,16 @@ class _LandingBasinMiningNodeVisualState
     return 1;
   }
 
+  double _armAngle(double t) {
+    if (t <= .24) return _lerp(0, -.36, _easeOut(t / .24));
+    if (t <= .46) {
+      return _lerp(-.36, .45, _easeOut((t - .24) / .22));
+    }
+    if (t <= .62) return _lerp(.45, -.16, _easeOut((t - .46) / .16));
+    if (t <= .78) return _lerp(-.16, 0, _easeOut((t - .62) / .16));
+    return 0;
+  }
+
   double _depositScale(double t) {
     if (t <= .24) return _lerp(1, .92, _easeIn(t / .24));
     if (t <= .46) return _lerp(.92, 1.08, _easeOut((t - .24) / .22));
@@ -360,26 +431,26 @@ class _LandingBasinMiningNodeVisualState
   }
 
   double _impactOpacity(double t) {
-    if (t <= .30) return _lerp(0, 1, (t - .24) / .06);
-    if (t <= .52) return 1;
-    return _lerp(1, 0, (t - .52) / .48);
+    if (t <= .30) return _lerp(0, .22, (t - .24) / .06);
+    if (t <= .52) return .22;
+    return _lerp(.22, 0, (t - .52) / .48);
   }
 
   double _impactScale(double t) {
-    if (t <= .32) return _lerp(.45, 1.20, (t - .24) / .08);
-    if (t <= .52) return _lerp(1.20, 1.02, (t - .32) / .20);
-    return _lerp(1.02, 1, (t - .52) / .48);
+    if (t <= .32) return _lerp(.35, .88, (t - .24) / .08);
+    if (t <= .52) return _lerp(.88, .78, (t - .32) / .20);
+    return _lerp(.78, .72, (t - .52) / .48);
   }
 
   double _sparkOpacity(double t) {
-    if (t <= .30) return _lerp(0, 1, (t - .24) / .06);
-    if (t <= .62) return 1;
-    return _lerp(1, 0, (t - .62) / .30);
+    if (t <= .30) return _lerp(0, .58, (t - .24) / .06);
+    if (t <= .62) return .58;
+    return _lerp(.58, 0, (t - .62) / .30);
   }
 
   double _sparkScale(double t) {
-    if (t <= .40) return _lerp(.30, 1.20, (t - .24) / .16);
-    return _lerp(1.20, 1.65, (t - .40) / .60);
+    if (t <= .40) return _lerp(.25, .90, (t - .24) / .16);
+    return _lerp(.90, 1.10, (t - .40) / .60);
   }
 
   double _sparkRotation(double t) =>
@@ -387,34 +458,42 @@ class _LandingBasinMiningNodeVisualState
 
   double _rockChipOpacity(double t) {
     if (t <= .32) return 0;
-    if (t <= .42) return _lerp(0, 1, (t - .32) / .10);
-    return _lerp(1, 0, (t - .42) / .46);
+    if (t <= .42) return _lerp(0, .72, (t - .32) / .10);
+    return _lerp(.72, 0, (t - .42) / .46);
   }
 
   double _rockChipScale(double t) {
     if (t <= .42) return _lerp(.35, 1, (t - .32) / .10);
-    return _lerp(1, 1.35, (t - .42) / .46);
+    return _lerp(1, 1.10, (t - .42) / .46);
   }
 
   double _dustOpacity(double t) {
     if (t <= .36) return 0;
-    if (t <= .54) return _lerp(0, .78, (t - .36) / .18);
-    return _lerp(.78, 0, (t - .54) / .46);
+    if (t <= .54) return _lerp(0, .34, (t - .36) / .18);
+    return _lerp(.34, 0, (t - .54) / .46);
   }
 
   double _dustScale(double t) {
     if (t <= .36) return .50;
-    return _lerp(.50, 1.55, (t - .36) / .64);
+    return _lerp(.50, 1.10, (t - .36) / .64);
   }
 
   double _goldGlowOpacity(double t) {
-    if (t <= .32) return _lerp(0, .70, (t - .24) / .08);
-    return _lerp(.70, 0, (t - .32) / .68);
+    if (t <= .32) return _lerp(0, .18, (t - .24) / .08);
+    return _lerp(.18, 0, (t - .32) / .68);
+  }
+
+  bool _resourceFlashActive(double t) => t >= .24 && t < 1;
+
+  double _resourceFlashOpacity(double t) {
+    if (t <= .28) return _lerp(0, .32, (t - .24) / .04);
+    if (t <= .42) return .32;
+    return _lerp(.32, 0, (t - .42) / .58);
   }
 
   double _goldGlowScale(double t) {
-    if (t <= .42) return _lerp(.45, 1.15, (t - .24) / .18);
-    return _lerp(1.15, 1.65, (t - .42) / .58);
+    if (t <= .42) return _lerp(.35, .92, (t - .24) / .18);
+    return _lerp(.92, 1.30, (t - .42) / .58);
   }
 
   double _easeIn(double amount) => amount * amount;

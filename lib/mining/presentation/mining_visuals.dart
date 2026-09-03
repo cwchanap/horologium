@@ -22,6 +22,12 @@ abstract final class MiningVisuals {
   static String landingBasinRobotAsset(RigTier tier) =>
       'assets/images/mining/landing_basin/robot_${tier.name}.png';
 
+  static String landingBasinRobotBodyAsset(RigTier tier) =>
+      'assets/images/mining/landing_basin/robot_${tier.name}_body.png';
+
+  static String landingBasinRobotArmAsset(RigTier tier) =>
+      'assets/images/mining/landing_basin/robot_${tier.name}_arm.png';
+
   static String landingBasinDepositAsset(MiningNodeId nodeId) =>
       'assets/images/mining/landing_basin/deposit_${nodeId.name}.png';
 
