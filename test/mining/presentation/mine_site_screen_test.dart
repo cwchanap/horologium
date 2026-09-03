@@ -155,6 +155,8 @@ void main() {
       view: _siteView(state),
       dock: _dockView(state),
     );
+    expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('landing-basin-impact-n1')), findsOneWidget);
   });
 
