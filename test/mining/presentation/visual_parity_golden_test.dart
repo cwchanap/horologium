@@ -139,6 +139,7 @@ void main() {
             ),
             cash: state.cash,
             reducedMotion: true,
+            impactSequence: 0,
             onNodeTap: (_) {},
             onBayTap: (_) {},
             onSpawnRig: () {},

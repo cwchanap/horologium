@@ -55,15 +55,19 @@ void main() {
     expect(MiningTheme.warning, const Color(0xFFFFD54A));
   });
 
-  test('maps the Landing Basin prototype assets by closed identity', () {
-    expect(
-      MiningVisuals.landingBasinRobotAsset(RigTier.t1),
-      'assets/images/mining/landing_basin/robot_t1.png',
-    );
-    expect(
-      MiningVisuals.landingBasinDepositAsset(MiningNodeId.n1),
-      'assets/images/mining/landing_basin/deposit_n1.png',
-    );
+  test('maps every Landing Basin asset by closed identity', () {
+    for (final tier in RigTier.values) {
+      expect(
+        MiningVisuals.landingBasinRobotAsset(tier),
+        'assets/images/mining/landing_basin/robot_${tier.name}.png',
+      );
+    }
+    for (final nodeId in MiningNodeId.values) {
+      expect(
+        MiningVisuals.landingBasinDepositAsset(nodeId),
+        'assets/images/mining/landing_basin/deposit_${nodeId.name}.png',
+      );
+    }
     expect(
       MiningVisuals.mergeBurst,
       'assets/images/mining/effects/merge_burst.png',
@@ -83,10 +87,12 @@ void main() {
     for (final tier in RigTier.values) {
       await rootBundle.load(MiningVisuals.rigAsset(tier));
     }
-    await rootBundle.load(MiningVisuals.landingBasinRobotAsset(RigTier.t1));
-    await rootBundle.load(
-      MiningVisuals.landingBasinDepositAsset(MiningNodeId.n1),
-    );
+    for (final tier in RigTier.values) {
+      await rootBundle.load(MiningVisuals.landingBasinRobotAsset(tier));
+    }
+    for (final nodeId in MiningNodeId.values) {
+      await rootBundle.load(MiningVisuals.landingBasinDepositAsset(nodeId));
+    }
     for (final planet in content.planets.values) {
       await rootBundle.load(planet.planetAsset);
     }
