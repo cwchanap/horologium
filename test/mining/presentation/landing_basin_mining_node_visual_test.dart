@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -31,6 +33,14 @@ Future<void> _pumpVisual(
 Transform _robotTransform(WidgetTester tester) =>
     tester.widget<Transform>(find.byKey(const Key('landing-basin-robot-n1')));
 
+Transform _robotBodyTransform(WidgetTester tester) => tester.widget<Transform>(
+  find.byKey(const Key('landing-basin-robot-body-transform-n1')),
+);
+
+Transform _robotArmTransform(WidgetTester tester) => tester.widget<Transform>(
+  find.byKey(const Key('landing-basin-robot-arm-transform-n1')),
+);
+
 Transform _depositTransform(WidgetTester tester) =>
     tester.widget<Transform>(find.byKey(const Key('landing-basin-deposit-n1')));
 
@@ -49,6 +59,13 @@ Transform _transformByKey(WidgetTester tester, String key) =>
 
 double _effectOpacity(WidgetTester tester, String key) =>
     tester.widget<Opacity>(find.byKey(Key(key))).opacity;
+
+double _resourceFlashOpacity(WidgetTester tester) => tester
+    .widget<Opacity>(find.byKey(const Key('landing-basin-resource-flash-n1')))
+    .opacity;
+
+double _rotation(Matrix4 transform) =>
+    math.atan2(transform.storage[1], transform.storage[0]);
 
 void main() {
   testWidgets(
@@ -71,7 +88,8 @@ void main() {
     'plays one one-second contact sequence and does not restart same sequence',
     (tester) async {
       await _pumpVisual(tester, impactSequence: 0);
-      final restRobot = _robotTransform(tester).transform;
+      final restBody = _robotBodyTransform(tester).transform;
+      final restArm = _robotArmTransform(tester).transform;
       final restSize = tester.getSize(
         find.byType(LandingBasinMiningNodeVisual),
       );
@@ -81,8 +99,8 @@ void main() {
       expect(_depositTransform(tester).transform.storage[0], closeTo(1, .001));
 
       await tester.pump(const Duration(milliseconds: 100));
-      expect(_robotTransform(tester).transform, isNot(equals(restRobot)));
-      expect(_robotTransform(tester).transform.storage[12], greaterThan(0));
+      expect(_robotBodyTransform(tester).transform, equals(restBody));
+      expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
       expect(
         _depositTransform(tester).transform.storage[0],
         closeTo(.986, .002),
@@ -92,12 +110,12 @@ void main() {
         restSize,
       );
 
-      final continuingRobotDx = _robotTransform(tester).transform.storage[12];
+      final continuingArm = _robotArmTransform(tester).transform;
       await _pumpVisual(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 100));
       expect(
-        _robotTransform(tester).transform.storage[12],
-        greaterThan(continuingRobotDx),
+        _robotArmTransform(tester).transform,
+        isNot(equals(continuingArm)),
       );
 
       await _pumpVisual(tester, impactSequence: 4);
@@ -107,7 +125,8 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
 
       expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
-      expect(_robotTransform(tester).transform, equals(restRobot));
+      expect(_robotBodyTransform(tester).transform, equals(restBody));
+      expect(_robotArmTransform(tester).transform, equals(restArm));
       expect(_depositTransform(tester).transform.storage[0], closeTo(1, .001));
       expect(
         tester.getSize(find.byType(LandingBasinMiningNodeVisual)),
@@ -120,19 +139,22 @@ void main() {
     tester,
   ) async {
     await _pumpVisual(tester, impactSequence: 0);
-    final restRobot = _robotTransform(tester).transform;
+    final restBody = _robotBodyTransform(tester).transform;
+    final restArm = _robotArmTransform(tester).transform;
 
     await _pumpVisual(tester, impactSequence: 1);
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(_robotTransform(tester).transform.storage[12], greaterThan(0));
+    expect(_robotBodyTransform(tester).transform, equals(restBody));
+    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
     expect(_depositTransform(tester).transform.storage[0], lessThan(1));
     expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
     expect(find.byKey(const Key('landing-basin-sparks-n1')), findsNothing);
 
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(_robotTransform(tester).transform.storage[12], lessThan(0));
+    expect(_robotBodyTransform(tester).transform, equals(restBody));
+    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
     expect(
       _depositResponseTransform(tester).transform.storage[12].abs() +
           _depositResponseTransform(tester).transform.storage[13].abs(),
@@ -156,7 +178,8 @@ void main() {
       expect(find.byKey(Key(key)), findsOneWidget);
       expect(_effectOpacity(tester, key), greaterThan(0));
     }
-    expect(_robotTransform(tester).transform.storage[12], greaterThan(0));
+    expect(_robotBodyTransform(tester).transform, equals(restBody));
+    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
 
     await tester.pump(const Duration(milliseconds: 420));
 
@@ -165,32 +188,34 @@ void main() {
     expect(find.byKey(const Key('landing-basin-rock-chips-n1')), findsNothing);
     expect(find.byKey(const Key('landing-basin-dust-n1')), findsNothing);
     expect(find.byKey(const Key('landing-basin-gold-glow-n1')), findsNothing);
-    expect(_robotTransform(tester).transform, equals(restRobot));
+    expect(_robotBodyTransform(tester).transform, equals(restBody));
+    expect(_robotArmTransform(tester).transform, equals(restArm));
   });
 
-  testWidgets('reaches the authored robot and deposit phase endpoints', (
+  testWidgets('reaches the articulated arm and deposit phase endpoints', (
     tester,
   ) async {
     await _pumpVisual(tester, impactSequence: 0);
+    final restArm = _robotArmTransform(tester).transform;
     await _pumpVisual(tester, impactSequence: 1);
 
     await tester.pump(const Duration(milliseconds: 140));
-    expect(_robotTransform(tester).transform.storage[12], closeTo(9.92, .02));
+    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
     expect(_depositTransform(tester).transform.storage[0], closeTo(.973, .001));
 
     await tester.pump(const Duration(milliseconds: 100));
-    expect(_robotTransform(tester).transform.storage[12], closeTo(12, .02));
+    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
     expect(_depositTransform(tester).transform.storage[0], closeTo(.92, .001));
 
     await tester.pump(const Duration(milliseconds: 220));
-    expect(_robotTransform(tester).transform.storage[12], closeTo(-7.2, .02));
+    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
     expect(_depositTransform(tester).transform.storage[0], closeTo(1.08, .001));
 
     await tester.pump(const Duration(milliseconds: 160));
-    expect(_robotTransform(tester).transform.storage[12], closeTo(4, .02));
+    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
 
     await tester.pump(const Duration(milliseconds: 380));
-    expect(_robotTransform(tester).transform.storage[12], closeTo(0, .02));
+    expect(_robotArmTransform(tester).transform, equals(restArm));
     expect(_depositTransform(tester).transform.storage[0], closeTo(1, .001));
     expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
   });
@@ -284,5 +309,96 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 1));
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('keeps the T1 body fixed while only the arm moves', (
+    tester,
+  ) async {
+    await _pumpVisual(tester, impactSequence: 0);
+    final restBody = _robotBodyTransform(tester).transform;
+    final restArm = _robotArmTransform(tester).transform;
+
+    await _pumpVisual(tester, impactSequence: 1);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(_robotBodyTransform(tester).transform, equals(restBody));
+    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
+    expect(
+      (_rotation(_robotArmTransform(tester).transform) - _rotation(restArm))
+          .abs(),
+      greaterThan(.15),
+    );
+
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(_robotBodyTransform(tester).transform, equals(restBody));
+    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
+    expect(
+      (_rotation(_robotArmTransform(tester).transform) - _rotation(restArm))
+          .abs(),
+      greaterThan(.30),
+    );
+
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(_robotBodyTransform(tester).transform, equals(restBody));
+    expect(_robotArmTransform(tester).transform, equals(restArm));
+  });
+
+  testWidgets('pins the T1 arm rotation to the authored shoulder pivot', (
+    tester,
+  ) async {
+    await _pumpVisual(tester);
+
+    expect(_robotArmTransform(tester).alignment, const Alignment(.33, -.24));
+  });
+
+  testWidgets(
+    'flashes the resource image at contact and settles at one second',
+    (tester) async {
+      await _pumpVisual(tester, impactSequence: 0);
+      await _pumpVisual(tester, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        find.byKey(const Key('landing-basin-resource-flash-n1')),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(
+          of: find.byKey(const Key('landing-basin-resource-flash-n1')),
+          matching: find.byKey(const Key('landing-basin-deposit-n1')),
+        ),
+        findsOneWidget,
+      );
+      expect(_resourceFlashOpacity(tester), greaterThan(0));
+      expect(_resourceFlashOpacity(tester), lessThan(.5));
+
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(
+        find.byKey(const Key('landing-basin-resource-flash-n1')),
+        findsNothing,
+      );
+      expect(_robotArmTransform(tester).transform, equals(Matrix4.identity()));
+    },
+  );
+
+  testWidgets('reduced motion fixes the articulated layers and fades flash', (
+    tester,
+  ) async {
+    await _pumpVisual(tester, impactSequence: 0, reducedMotion: true);
+    final restBody = _robotBodyTransform(tester).transform;
+    final restArm = _robotArmTransform(tester).transform;
+
+    await _pumpVisual(tester, impactSequence: 1, reducedMotion: true);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(_robotBodyTransform(tester).transform, equals(restBody));
+    expect(_robotArmTransform(tester).transform, equals(restArm));
+    expect(_resourceFlashOpacity(tester), greaterThan(0));
+
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(_robotBodyTransform(tester).transform, equals(restBody));
+    expect(_robotArmTransform(tester).transform, equals(restArm));
+    expect(
+      find.byKey(const Key('landing-basin-resource-flash-n1')),
+      findsNothing,
+    );
   });
 }
