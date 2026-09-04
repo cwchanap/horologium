@@ -782,9 +782,10 @@ Widget _volumeSlider(AudioManager audioManager) {
                     : null,
               ),
             ),
-            IgnorePointer(
-              child: Transform.translate(
-                offset: Offset(usable * value, 0),
+            Positioned(
+              left: usable * value,
+              top: 7,
+              child: IgnorePointer(
                 child: SizedBox(
                   width: thumbWidth,
                   height: 34,
@@ -1563,7 +1564,7 @@ Offline portrait: hero ~400px; result around authored 250px; production card aro
 Offline landscape: left hero/result + right ~470px summary panel + reachable Continue.
 ```
 
-Fix only presentation/layout/test fixtures, regenerate the affected golden, rerun its focused tests, and amend with a normal follow-up commit rather than rewriting history.
+Fix only presentation/layout/test fixtures, regenerate the affected golden, rerun its focused tests, and commit the correction as a normal follow-up commit rather than rewriting history.
 
 - [ ] **Step 6: Update PR #24 from planning-only to implementation-complete review context**
 
