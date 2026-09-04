@@ -28,6 +28,11 @@ abstract final class MiningVisuals {
   static String landingBasinDepositAsset(MiningNodeId nodeId) =>
       'assets/images/mining/landing_basin/deposit_${nodeId.name}.png';
 
+  static String goldNodeStageAsset(int stage) => switch (stage) {
+    1 || 2 || 3 || 4 => 'assets/images/mining/nodes/node-gold-s$stage.png',
+    _ => throw RangeError.range(stage, 1, 4, 'stage'),
+  };
+
   static const cashIcon = 'assets/images/mining/icons/cash.png';
   static const cargoIcon = 'assets/images/mining/icons/cargo.png';
   static const mergeIcon = 'assets/images/mining/icons/merge.png';

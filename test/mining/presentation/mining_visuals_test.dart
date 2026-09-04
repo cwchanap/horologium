@@ -55,6 +55,17 @@ void main() {
     expect(MiningTheme.warning, const Color(0xFFFFD54A));
   });
 
+  test('maps every staged gold node asset by closed identity', () {
+    for (final entry in const {
+      1: 'assets/images/mining/nodes/node-gold-s1.png',
+      2: 'assets/images/mining/nodes/node-gold-s2.png',
+      3: 'assets/images/mining/nodes/node-gold-s3.png',
+      4: 'assets/images/mining/nodes/node-gold-s4.png',
+    }.entries) {
+      expect(MiningVisuals.goldNodeStageAsset(entry.key), entry.value);
+    }
+  });
+
   test('maps every Landing Basin asset by closed identity', () {
     for (final nodeId in MiningNodeId.values) {
       expect(
@@ -100,6 +111,9 @@ void main() {
     }
     for (final nodeId in MiningNodeId.values) {
       await rootBundle.load(MiningVisuals.landingBasinDepositAsset(nodeId));
+    }
+    for (var stage = 1; stage <= 4; stage++) {
+      await rootBundle.load(MiningVisuals.goldNodeStageAsset(stage));
     }
     for (final planet in content.planets.values) {
       await rootBundle.load(planet.planetAsset);
