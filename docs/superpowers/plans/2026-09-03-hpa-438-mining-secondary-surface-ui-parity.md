@@ -1390,6 +1390,8 @@ Use `skip: kIsWeb || Platform.isMacOS` for the five pixel goldens, matching the 
 
 - [ ] **Step 5: Generate the five implementation goldens on Linux**
 
+Generate/update HPA-438 pixel goldens in the repository's Linux CI/container environment, not on macOS, so the committed output uses the same FreeType rendering as the existing mining golden policy.
+
 Run:
 
 ```bash
@@ -1397,7 +1399,7 @@ flutter test --update-goldens test/mining/presentation/visual_parity_golden_test
 flutter test test/mining/presentation/visual_parity_golden_test.dart
 ```
 
-Expected: all non-skipped goldens PASS on the generation platform.
+Expected: all non-skipped goldens PASS on Linux.
 
 Verify dimensions:
 
