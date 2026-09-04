@@ -230,7 +230,6 @@ Create `lib/mining/presentation/mining_modal_chrome.dart` with a deliberately na
 
 ```dart
 import 'package:flutter/material.dart';
-import 'package:horologium/mining/presentation/mining_theme.dart';
 
 class MiningModalChrome extends StatelessWidget {
   const MiningModalChrome({
@@ -268,12 +267,9 @@ class MiningModalChrome extends StatelessWidget {
               ),
             ],
           ),
-          child: Padding(
-            padding: padding,
-            child: child,
-          ),
+          child: Padding(padding: padding, child: child),
         ),
-        Positioned(
+        const Positioned(
           left: 0,
           right: 0,
           top: 11,
@@ -364,7 +360,7 @@ final panelTop = math.min(190.0, constraints.maxHeight * .24);
 
 Render:
 
-- `Align(alignment: Alignment.bottomCenter)` / `Positioned(top: panelTop, left: 0, right: 0, bottom: 0)`;
+- `Positioned(top: panelTop, left: 0, right: 0, bottom: 0)`;
 - `MiningModalChrome`;
 - protruding technology `MiningHex` at the left and close `MiningHex` at the right;
 - `Technology` + `MAX LV 5` header;
@@ -404,7 +400,7 @@ At `874×402`, use a right-side panel width of `528` exactly; on narrower landsc
 final panelWidth = math.min(528.0, constraints.maxWidth * .64);
 ```
 
-Render `MiningModalChrome` with left/right top radii set to zero where the panel touches top/bottom, and position it at `right: 0, top: 0, bottom: 0`.
+Render `MiningModalChrome` with top radii set to zero where the panel touches top/bottom, and position it at `right: 0, top: 0, bottom: 0`.
 
 Each track row is:
 
@@ -664,65 +660,151 @@ Do not add a reduced-motion toggle.
 Use an `InkWell`/`Semantics` pill with the existing stable key:
 
 ```dart
-Semantics(
-  toggled: audioManager.musicEnabled,
-  button: true,
-  label: 'Music',
-  child: InkWell(
-    key: const Key('mining-music-switch'),
-    borderRadius: BorderRadius.circular(24),
-    onTap: () {
-      unawaited(
-        audioManager.setMusicEnabled(!audioManager.musicEnabled),
-      );
-      setState(() {});
-    },
-    child: SizedBox(
-      width: 78,
-      height: 48,
-      child: Stack(
-        children: [
-          // Render ON/OFF text on the inactive side.
-          // Render a 32x36 MiningHex thumb aligned left/right.
-        ],
+Widget _musicToggle(AudioManager audioManager) {
+  final enabled = audioManager.musicEnabled;
+  final reducedMotion = MediaQuery.of(context).disableAnimations;
+  final thumb = SizedBox(
+    width: 32,
+    height: 36,
+    child: MiningHex(
+      fill: MiningTheme.highlight,
+      border: MiningTheme.highlight,
+      child: Icon(
+        enabled ? Icons.music_note_rounded : Icons.music_off_rounded,
+        size: 17,
+        color: const Color(0xFF061018),
       ),
     ),
-  ),
-)
+  );
+
+  final alignedThumb = reducedMotion
+      ? Align(
+          alignment: enabled ? Alignment.centerRight : Alignment.centerLeft,
+          child: thumb,
+        )
+      : AnimatedAlign(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          alignment: enabled ? Alignment.centerRight : Alignment.centerLeft,
+          child: thumb,
+        );
+
+  return Semantics(
+    toggled: enabled,
+    button: true,
+    label: 'Music',
+    child: InkWell(
+      key: const Key('mining-music-switch'),
+      borderRadius: BorderRadius.circular(24),
+      onTap: () {
+        unawaited(audioManager.setMusicEnabled(!enabled));
+        setState(() {});
+      },
+      child: Container(
+        width: 84,
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          color: enabled
+              ? const Color.fromRGBO(24, 255, 255, .15)
+              : const Color.fromRGBO(255, 255, 255, .06),
+          border: Border.all(
+            color: enabled
+                ? MiningTheme.highlight
+                : const Color.fromRGBO(255, 255, 255, .24),
+          ),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: enabled ? Alignment.centerLeft : Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 7),
+                child: Text(
+                  enabled ? 'ON' : 'OFF',
+                  style: const TextStyle(
+                    fontFamily: 'IBMPlexMono',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            alignedThumb,
+          ],
+        ),
+      ),
+    ),
+  );
+}
 ```
 
-Use `MiningHex` for the thumb and `AnimatedAlign` only when animations are enabled; otherwise use plain `Align`. The whole tap target remains at least 48px high.
+The whole tap target remains at least 48px high. Do not introduce a generic toggle component.
 
 - [ ] **Step 5: Keep a real 20-division `Slider` and apply parity styling**
 
-Use `SliderTheme`:
+Keep the Material slider as the only interactive/semantic control. Hide its stock thumb and overlay a non-interactive `MiningHex` at the normalized value:
 
 ```dart
-SliderTheme(
-  data: SliderTheme.of(context).copyWith(
-    trackHeight: 10,
-    activeTrackColor: MiningTheme.highlight,
-    inactiveTrackColor: const Color.fromRGBO(255, 255, 255, .10),
-    overlayColor: const Color.fromRGBO(24, 255, 255, .12),
-    thumbColor: MiningTheme.highlight,
-  ),
-  child: Slider(
-    key: const Key('mining-volume-slider'),
-    value: audioManager.musicVolume,
-    min: 0,
-    max: 1,
-    divisions: 20,
-    onChanged: audioManager.musicEnabled
-        ? (value) {
-            audioManager.setMusicVolume(value);
-            setState(() {});
-          }
-        : null,
-  ),
-)
+Widget _volumeSlider(AudioManager audioManager) {
+  final value = audioManager.musicVolume;
+  return SizedBox(
+    height: 48,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        const thumbWidth = 30.0;
+        final usable = math.max(0.0, constraints.maxWidth - thumbWidth);
+        return Stack(
+          alignment: Alignment.centerLeft,
+          children: [
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 10,
+                activeTrackColor: MiningTheme.highlight,
+                inactiveTrackColor: const Color.fromRGBO(255, 255, 255, .10),
+                overlayColor: const Color.fromRGBO(24, 255, 255, .12),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 0),
+                disabledThumbColor: Colors.transparent,
+              ),
+              child: Slider(
+                key: const Key('mining-volume-slider'),
+                value: value,
+                min: 0,
+                max: 1,
+                divisions: 20,
+                onChanged: audioManager.musicEnabled
+                    ? (next) {
+                        audioManager.setMusicVolume(next);
+                        setState(() {});
+                      }
+                    : null,
+              ),
+            ),
+            IgnorePointer(
+              child: Transform.translate(
+                offset: Offset(usable * value, 0),
+                child: SizedBox(
+                  width: thumbWidth,
+                  height: 34,
+                  child: MiningHex(
+                    fill: MiningTheme.highlight,
+                    border: MiningTheme.highlight,
+                    child: const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
 ```
 
-Do not introduce a custom gesture/slider implementation. Keep Material slider keyboard/semantics behavior. For visual parity, overlay a non-interactive 30×34 `MiningHex` at the current normalized slider value inside the same 48px-high stack and set the Material thumb radius to zero; the real `Slider` remains the only interactive/semantic control.
+Keep Material slider keyboard/semantics behavior and `divisions: 20`; do not implement custom drag math.
 
 - [ ] **Step 6: Change `MiningShell.openSettings()` to the same transparent built-in route style**
 
