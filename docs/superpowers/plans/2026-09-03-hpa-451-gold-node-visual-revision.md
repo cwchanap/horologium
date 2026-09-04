@@ -229,7 +229,7 @@ git commit -m "feat(mining): animate gold resource depletion"
 
 - [ ] **Step 1: Run the Linux golden test before updating**
 
-Run the established Flutter 3.44.0 Linux container command for `test/mining/presentation/visual_parity_golden_test.dart` without `--update-goldens` and confirm the Landing Basin goldens fail only because the approved node art changed.
+Run the established Flutter 3.32.5 Linux container command for `test/mining/presentation/visual_parity_golden_test.dart` without `--update-goldens` and confirm the Landing Basin goldens fail only because the approved node art changed.
 
 - [ ] **Step 2: Update and re-run the Linux goldens**
 
