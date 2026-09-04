@@ -96,107 +96,11 @@ lib/mining/presentation/site_deck_screen.dart
 
 Delete assertions that depend on the current list layout: `Extraction · Level 0`, repeated gate rows, three simultaneous buy controls, and direct `ElevatedButton` casts for Logistics/Surveying.
 
-Keep a starter fixture:
-
-```dart
-TechnologySheetView _starterView() => const TechnologySheetView(
-  tracks: [
-    TechnologyTrackView(
-      track: TechnologyTrack.extraction,
-      name: 'Extraction',
-      level: 0,
-      currentEffect: 'Mining rate ×1.00',
-      nextEffect: 'Mining rate ×1.10',
-      cost: 300,
-      gateSiteName: 'Landing Basin',
-      isGateSatisfied: true,
-      isAffordable: true,
-      isMaxLevel: false,
-      disabledReason: null,
-    ),
-    TechnologyTrackView(
-      track: TechnologyTrack.logistics,
-      name: 'Logistics',
-      level: 0,
-      currentEffect: 'Mine capacity ×1.00, offline cap 8h',
-      nextEffect: 'Mine capacity ×1.15, offline cap 10h',
-      cost: 300,
-      gateSiteName: 'Landing Basin',
-      isGateSatisfied: false,
-      isAffordable: true,
-      isMaxLevel: false,
-      disabledReason: 'Commission the Landing Basin site first.',
-    ),
-    TechnologyTrackView(
-      track: TechnologyTrack.surveying,
-      name: 'Surveying',
-      level: 0,
-      currentEffect: '1 of 9 sites revealable',
-      nextEffect: '2 of 9 sites revealable',
-      cost: 300,
-      gateSiteName: 'Landing Basin',
-      isGateSatisfied: false,
-      isAffordable: true,
-      isMaxLevel: false,
-      disabledReason: 'Commission the Landing Basin site first.',
-    ),
-  ],
-);
-```
-
-Keep a parity fixture:
-
-```dart
-TechnologySheetView _parityView() => const TechnologySheetView(
-  tracks: [
-    TechnologyTrackView(
-      track: TechnologyTrack.extraction,
-      name: 'Extraction',
-      level: 2,
-      currentEffect: 'Mining rate ×1.25',
-      nextEffect: 'Mining rate ×1.45',
-      cost: 1500,
-      gateSiteName: 'Granite Crater',
-      isGateSatisfied: true,
-      isAffordable: true,
-      isMaxLevel: false,
-      disabledReason: null,
-    ),
-    TechnologyTrackView(
-      track: TechnologyTrack.logistics,
-      name: 'Logistics',
-      level: 3,
-      currentEffect: 'Mine capacity ×1.50, offline cap 16h',
-      nextEffect: 'Mine capacity ×1.75, offline cap 20h',
-      cost: 4000,
-      gateSiteName: 'Frozen Basin',
-      isGateSatisfied: false,
-      isAffordable: false,
-      isMaxLevel: false,
-      disabledReason: 'Commission the Frozen Basin site first.',
-    ),
-    TechnologyTrackView(
-      track: TechnologyTrack.surveying,
-      name: 'Surveying',
-      level: 5,
-      currentEffect: '9 of 9 sites revealable',
-      nextEffect: null,
-      cost: null,
-      gateSiteName: null,
-      isGateSatisfied: true,
-      isAffordable: true,
-      isMaxLevel: true,
-      disabledReason: 'Technology is at max level.',
-    ),
-  ],
-);
-```
+Keep a starter fixture with Extraction level 0 actionable and Logistics/Surveying blocked by Landing Basin. Keep a parity fixture with Extraction level 2 actionable to level 3, Logistics level 3 blocked at level 4, and Surveying maxed at level 5. Use the exact existing `TechnologyTrackView` fields; do not add a test-only view type.
 
 - [ ] **Step 2: Add failing Technology behavior/layout tests**
 
-Add a pump helper accepting `Size` and `TextScaler`.
-
-For `_parityView()` at `402×874` assert:
+For the parity fixture at `402×874` assert:
 
 ```dart
 expect(find.byKey(const Key('mining-technology-panel-portrait')), findsOneWidget);
@@ -222,7 +126,7 @@ await tester.pump();
 expect(purchases, isEmpty);
 ```
 
-Starter small-phone coverage:
+Starter small-phone coverage at `360×640` and again with `TextScaler.linear(1.3)`:
 
 ```dart
 final action = find.byKey(const Key('mining-technology-buy-extraction'));
@@ -230,8 +134,6 @@ await tester.ensureVisible(action);
 expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
 expect(tester.takeException(), isNull);
 ```
-
-Repeat at `360×640` with `TextScaler.linear(1.3)`.
 
 Landscape coverage at `874×402`:
 
@@ -255,7 +157,7 @@ expect(tester.takeException(), isNull);
 flutter test test/mining/presentation/technology_sheet_test.dart
 ```
 
-Expected: FAIL on new tree/panel/node behavior.
+Expected: FAIL on the new tree/panel/node behavior.
 
 - [ ] **Step 4: Vendor/register IBM Plex Mono**
 
@@ -270,28 +172,11 @@ Copy official Regular, SemiBold, and OFL files to the paths listed above. Add:
           weight: 600
 ```
 
-Run:
-
-```bash
-flutter pub get
-```
+Run `flutter pub get` and keep Orbitron unchanged.
 
 - [ ] **Step 5: Create `MiningModalChrome` using `MiningTheme` tokens**
 
-Create a stateless helper with constructor:
-
-```dart
-const MiningModalChrome({
-  super.key,
-  required this.child,
-  this.leading,
-  this.trailing,
-  this.padding = const EdgeInsets.fromLTRB(14, 26, 14, 20),
-  this.borderRadius = const BorderRadius.vertical(top: Radius.circular(24)),
-});
-```
-
-Its panel decoration uses:
+Create a stateless helper with `child`, optional `leading`/`trailing`, padding, border radius, shadow, and a 42×4 handle. Use:
 
 ```dart
 color: MiningTheme.panel,
@@ -300,7 +185,7 @@ border: Border(
 ),
 ```
 
-Its 42×4 handle uses `MiningTheme.accent.withAlpha(180)`. Keep only `child`, `leading`, `trailing`, padding, border radius, shadow, and handle. No routing/state/actions.
+Use `MiningTheme.accent.withAlpha(180)` for the handle. Do not add routing/state/actions to the helper.
 
 - [ ] **Step 6: Convert `TechnologySheet` to local selection only**
 
@@ -324,15 +209,9 @@ _TechnologyNodeState _nodeState(TechnologyTrackView track, int level) {
 }
 ```
 
-Initial selection priority: first purchasable track, else first non-max track, else first track.
+Initial selection priority: first purchasable track, else first non-max track, else first track. All loops/labels use `MiningContentRegistry.maxTechnologyLevel`.
 
-All loops use:
-
-```dart
-MiningContentRegistry.maxTechnologyLevel
-```
-
-- [ ] **Step 7: Render all Technology nodes with `MiningHex`**
+- [ ] **Step 7: Render Technology nodes with `MiningHex`**
 
 Use a `48×48` wrapper for every node. `MiningHex.onTap` is non-null only for actionable/blocked next nodes. Stable key:
 
@@ -340,25 +219,23 @@ Use a `48×48` wrapper for every node. `MiningHex.onTap` is non-null only for ac
 Key('mining-technology-node-${track.track.name}-$level')
 ```
 
-Stable semantic label:
+Semantic label:
 
 ```dart
 '${track.name} level $level ${state.name}'
 ```
 
-Use `MiningTheme.accent`, `warning`, `gate`, and subdued white for owned/actionable/blocked/future states. Do not create another hex painter.
+Use `MiningTheme.accent`, `warning`, `gate`, and subdued white for states. Do not create another hex painter.
 
 - [ ] **Step 8: Implement portrait Technology composition**
 
-Use transparent full-screen `Material` + `LayoutBuilder`. Portrait panel:
+Use transparent full-screen `Material` + `LayoutBuilder`. Panel top:
 
 ```dart
 final panelTop = math.min(190.0, constraints.maxHeight * .24);
 ```
 
-Place `MiningModalChrome` from `panelTop` to bottom. Use `SingleChildScrollView` inside the panel so `360×640`/1.3 stays reachable.
-
-Render three vertical columns, max level down to 1, simple visual connectors, common root, and one selected detail/action card.
+Place `MiningModalChrome` from panel top to bottom and make panel content scrollable. Render three vertical columns, max level down to 1, simple connectors, common root, and one selected detail/action card.
 
 Header:
 
@@ -367,51 +244,20 @@ Text('Technology')
 Text('MAX LV ${MiningContentRegistry.maxTechnologyLevel}')
 ```
 
-Only selected detail card contains:
-
-```dart
-Key('mining-technology-buy-${selected.track.name}')
-```
-
-Disabled selected cards keep a 48px action surface but do not fire `onPurchase`; show `disabledReason`.
+Only selected detail card contains `mining-technology-buy-${selected.track.name}`. Disabled selected cards keep a 48px action surface but do not fire `onPurchase`; show `disabledReason`.
 
 - [ ] **Step 9: Implement measured Technology landscape composition**
-
-At landscape:
 
 ```dart
 const canonicalPanelWidth = 528.0;
 final panelWidth = math.min(canonicalPanelWidth, constraints.maxWidth);
 ```
 
-Right-align a full-height panel keyed `mining-technology-panel-landscape`. Render three horizontal tracks with 48×48 `MiningHex` nodes and one selected detail/action area.
-
-Do not change Site Deck for the left side.
+Right-align a full-height panel keyed `mining-technology-panel-landscape`. Render three horizontal tracks with 48×48 `MiningHex` nodes and one selected detail/action area. Do not change Site Deck on the left.
 
 - [ ] **Step 10: Present Technology with `showGeneralDialog`**
 
-Replace only the Technology `showModalBottomSheet` call in `MiningShell`:
-
-```dart
-unawaited(
-  showGeneralDialog<void>(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'Close technology',
-    barrierColor: const Color.fromRGBO(0, 0, 0, .18),
-    transitionDuration: _reducedMotion
-        ? Duration.zero
-        : const Duration(milliseconds: 180),
-    pageBuilder: (_, __, ___) => TechnologySheet(
-      view: TechnologySheetView.from(
-        state: _displayState,
-        content: _content,
-      ),
-      onPurchase: _purchaseTechnology,
-    ),
-  ),
-);
-```
+Replace only the Technology bottom-sheet call with a barrier-dismissible transparent `showGeneralDialog<void>` using the existing view projection and `_purchaseTechnology`. Use zero transition duration when `_reducedMotion` is true; otherwise 180ms.
 
 - [ ] **Step 11: Run focused Technology/shell tests and commit**
 
@@ -439,18 +285,7 @@ git commit -m "feat: revamp mining technology overlay"
 
 - [ ] **Step 1: Replace class-specific Settings tests with behavior tests**
 
-Stop casting `mining-music-switch` to `SwitchListTile`. With preferences `musicEnabled=true`, `musicVolume=.70`, assert:
-
-```dart
-expect(find.text('AUDIO'), findsOneWidget);
-expect(find.text('Music'), findsOneWidget);
-expect(find.text('Cavern ambience'), findsOneWidget);
-expect(find.text('70%'), findsOneWidget);
-expect(find.text('20 steps'), findsOneWidget);
-expect(find.text('ACCESSIBILITY'), findsOneWidget);
-expect(find.text('Reduced motion'), findsOneWidget);
-expect(find.text('SYSTEM'), findsOneWidget);
-```
+Stop casting `mining-music-switch` to `SwitchListTile`. With preferences `musicEnabled=true`, `musicVolume=.70`, assert Audio/Music/Cavern ambience/70%/20 steps/Accessibility/Reduced motion/SYSTEM copy.
 
 Toggle behavior:
 
@@ -472,22 +307,9 @@ expect(slider.divisions, 20);
 expect(slider.value, .70);
 ```
 
-- [ ] **Step 2: Add failing Settings dense-layout tests**
+- [ ] **Step 2: Add failing dense-layout Settings tests**
 
-At `360×640` / 1.3:
-
-```dart
-for (final finder in [
-  find.byKey(const Key('mining-music-switch')),
-  find.byKey(const Key('mining-volume-slider')),
-  find.text('SYSTEM'),
-]) {
-  await tester.ensureVisible(finder);
-}
-expect(tester.takeException(), isNull);
-```
-
-At `874×402` / 1.3, assert `mining-settings-panel-landscape`, ensure Volume and SYSTEM are visible/reachable, and `tester.takeException()` is null.
+At `360×640` / 1.3, `ensureVisible` Music, Volume, and SYSTEM and assert no exception. At `874×402` / 1.3, assert `mining-settings-panel-landscape`, ensure Volume and SYSTEM are reachable, and assert no exception.
 
 - [ ] **Step 3: Run Settings tests to verify failure**
 
@@ -497,82 +319,33 @@ flutter test test/mining/presentation/mining_settings_sheet_test.dart
 
 - [ ] **Step 4: Rebuild Settings with `MiningModalChrome`**
 
-Use transparent full-screen `Material` + `LayoutBuilder`.
-
-Portrait panel:
+Use transparent full-screen `Material` + `LayoutBuilder`. Portrait panel top:
 
 ```dart
 final panelTop = math.min(392.0, constraints.maxHeight * .45);
 ```
 
-Use `SingleChildScrollView` inside the panel. Build Audio card and Accessibility card directly in `mining_settings_sheet.dart`; no generic card/toggle framework.
-
-Use `IBMPlexMono` for secondary/status text and percentage metadata.
+Use scrollable Audio and Accessibility cards. Use IBM Plex Mono for secondary/status text and percentage metadata.
 
 - [ ] **Step 5: Implement inline Music pill with `MiningHex`**
 
-Keep key `mining-music-switch`, 48px height, `Semantics(toggled: ...)`, and `InkWell`. Use `AnimatedAlign` with duration zero when `MediaQuery.disableAnimations` is true. Thumb is a small `MiningHex` widget.
+Keep key `mining-music-switch`, 48px height, `Semantics(toggled: ...)`, and `InkWell`. Use `AnimatedAlign` with zero duration under reduced motion. The thumb is a small `MiningHex`. Do not add a generic toggle widget.
 
 - [ ] **Step 6: Keep real Slider and add local `SliderComponentShape`**
 
-Create `_HexSliderThumbShape extends SliderComponentShape` in `mining_settings_sheet.dart`. Its `paint` method draws a six-point thumb path centered at the supplied Slider center using `sliderTheme.thumbColor` / `MiningTheme.highlight` and `MiningTheme.accent` border.
-
-Use:
-
-```dart
-SliderTheme(
-  data: SliderTheme.of(context).copyWith(
-    trackHeight: 10,
-    activeTrackColor: MiningTheme.highlight,
-    inactiveTrackColor: Colors.white.withAlpha(26),
-    overlayColor: MiningTheme.highlight.withAlpha(31),
-    thumbColor: MiningTheme.highlight,
-    thumbShape: const _HexSliderThumbShape(),
-  ),
-  child: Slider(
-    key: const Key('mining-volume-slider'),
-    value: audioManager.musicVolume,
-    min: 0,
-    max: 1,
-    divisions: 20,
-    onChanged: audioManager.musicEnabled
-        ? (value) {
-            unawaited(audioManager.setMusicVolume(value));
-            setState(() {});
-          }
-        : null,
-  ),
-)
-```
-
-Do not hide the stock thumb and overlay a second `Positioned` hex.
+Create `_HexSliderThumbShape extends SliderComponentShape` in `mining_settings_sheet.dart`. Paint a six-point path centered at the Slider-supplied center. Use it through `SliderTheme.thumbShape`; keep Material `Slider` with `divisions: 20`. Do not hide the stock thumb and overlay a second manually positioned hex.
 
 - [ ] **Step 7: Keep Settings landscape functional only**
 
-Use the same cards in a bounded right-side `SingleChildScrollView`, keyed `mining-settings-panel-landscape`. There is no Settings landscape pixel target.
+Use the same cards in a bounded right-side scroll view keyed `mining-settings-panel-landscape`. No pixel-parity landscape design is invented.
 
 - [ ] **Step 8: Present Settings with `showGeneralDialog`**
 
-```dart
-unawaited(
-  showGeneralDialog<void>(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'Close settings',
-    barrierColor: const Color.fromRGBO(0, 0, 0, .18),
-    transitionDuration: _reducedMotion
-        ? Duration.zero
-        : const Duration(milliseconds: 180),
-    pageBuilder: (_, __, ___) => MiningSettingsSheet(
-      audioManager: _audioManager,
-    ),
-  ),
-);
-```
+Replace only the Settings bottom-sheet call with barrier-dismissible transparent `showGeneralDialog<void>` using the injected `_audioManager`; reduced-motion transition is zero, otherwise 180ms.
 
 - [ ] **Step 9: Update shell Settings regression**
 
-Assert root key, visible `75%`, manager values, toggle mutation, and absence of a `BottomSheet`. Do not assert `SwitchListTile` class.
+Assert root key, visible `75%`, AudioManager values and mutation, plus absence of `BottomSheet`. Do not assert `SwitchListTile` class.
 
 - [ ] **Step 10: Run focused tests and commit**
 
@@ -600,32 +373,7 @@ git commit -m "feat: revamp mining settings overlay"
 
 - [ ] **Step 1: Update Offline tests for new scalars and keys**
 
-Pass `cash` and `logisticsLevel` to every test constructor. Keep existing multi-planet/resource/silhouette/full-site coverage.
-
-Add:
-
-```dart
-expect(find.byKey(const Key('offline-return-portrait')), findsOneWidget);
-expect(find.byKey(const Key('mining-cash-chip')), findsOneWidget);
-expect(find.text('FLEET RETURNED'), findsOneWidget);
-```
-
-Capped fixture:
-
-```dart
-expect(find.text('Capped at 12h — Logistics LV 2'), findsOneWidget);
-```
-
-Uncapped fixture has no `Capped at` text.
-
-Landscape at `874×402`:
-
-```dart
-final panel = find.byKey(const Key('offline-return-summary-landscape'));
-expect(tester.getSize(panel).width, 470);
-```
-
-Keep/add Continue reachability at `360×640` and `430×932` with text scale `1.3`.
+Pass `cash` and `logisticsLevel` to every test constructor. Keep existing multi-planet/resource/silhouette/full-site coverage. Add portrait root/status/cash assertions, capped copy `Capped at 12h — Logistics LV 2`, uncapped absence, 470px landscape panel assertion, and Continue reachability at `360×640` and `430×932` with text scale `1.3`.
 
 - [ ] **Step 2: Run Offline tests to verify failure**
 
@@ -635,91 +383,31 @@ flutter test test/mining/presentation/offline_return_sheet_test.dart
 
 - [ ] **Step 3: Convert `OfflineReturnSheet` to stateful pulse ownership**
 
-Constructor:
-
-```dart
-OfflineReturnSheet({
-  required OfflineProductionSummary summary,
-  required MiningContentRegistry content,
-  required int cash,
-  required int logisticsLevel,
-})
-```
-
-Use `SingleTickerProviderStateMixin`. Follow `MainMenu.didChangeDependencies()` locally: own one pulse `AnimationController`, stop/value=1 when `MediaQuery.disableAnimations` is true, repeat(reverse: true) when false, dispose it. Animate only the FLEET RETURNED status dot.
+Constructor accepts summary, content, cash, logisticsLevel. Use `SingleTickerProviderStateMixin`. Follow `MainMenu.didChangeDependencies()` locally: own one pulse controller, stop/value=1 under `MediaQuery.disableAnimations`, repeat(reverse:true) otherwise, dispose it. Animate only the FLEET RETURNED status dot.
 
 - [ ] **Step 4: Extend the existing duration formatter**
 
-Use one formatter with `compact` option:
-
-```dart
-String _formatDuration(Duration duration, {bool compact = false}) {
-  final hours = duration.inHours;
-  final minutes = duration.inMinutes.remainder(60);
-  if (compact) {
-    return minutes == 0 ? '${hours}h' : '${hours}h ${minutes}m';
-  }
-  if (hours == 0) return '${minutes}m';
-  return '${hours}h ${minutes.toString().padLeft(2, '0')}m';
-}
-```
-
-Cap text:
-
-```dart
-'Capped at ${_formatDuration(summary.elapsedUsed, compact: true)} '
-'— Logistics LV $logisticsLevel'
-```
-
-Do not call `content.offlineCapFor()` in the widget.
+Use one formatter with a `compact` option. Cap text is derived from `summary.elapsedUsed` and `logisticsLevel`; do not call `content.offlineCapFor()` in the widget.
 
 - [ ] **Step 5: Implement portrait full-screen result**
 
-Root uses `PopScope(canPop: false)` + full-screen Material. Portrait key `offline-return-portrait`.
-
-Composition: hero + gradient, `MiningCashChip`, FLEET RETURNED chip, elapsed/cap text, data-driven production sections, catalog silhouettes, full-site warnings, one `CONTINUE MINING` button keyed `offline-return-dismiss`.
-
-Use scrolling so real multi-planet production and 1.3 text scale remain reachable.
+Root uses `PopScope(canPop: false)` + full-screen Material. Composition: hero + gradient, `MiningCashChip`, FLEET RETURNED, elapsed/cap text, data-driven production sections, existing catalog silhouettes/full-site warnings, one `CONTINUE MINING` button keyed `offline-return-dismiss`. Keep content scrollable.
 
 - [ ] **Step 6: Implement 470px Offline landscape panel**
 
-Landscape key `offline-return-landscape`. Right-side summary panel key `offline-return-summary-landscape` with canonical width 470px. Keep return/hero info left; production + Continue stay in right scroll flow.
+Use `offline-return-landscape` root and `offline-return-summary-landscape` right panel at `470` px. Keep return/hero info left and production + Continue in right scroll flow.
 
 - [ ] **Step 7: Make Continue the only dismissal path**
 
-`PopScope(canPop: false)`, shell route `barrierDismissible: false`, and button:
-
-```dart
-onPressed: () => Navigator.of(context).pop()
-```
+Use `PopScope(canPop:false)`, shell route `barrierDismissible:false`, and Continue `Navigator.of(context).pop()`.
 
 - [ ] **Step 8: Promote shell Offline Return to `showGeneralDialog`**
 
-```dart
-Future<void> _showOfflineReturn(OfflineProductionSummary summary) {
-  return showGeneralDialog<void>(
-    context: context,
-    barrierDismissible: false,
-    barrierLabel: 'Offline mining return',
-    barrierColor: Colors.black,
-    transitionDuration: _reducedMotion
-        ? Duration.zero
-        : const Duration(milliseconds: 180),
-    pageBuilder: (_, __, ___) => OfflineReturnSheet(
-      summary: summary,
-      content: _content,
-      cash: _displayState.cash,
-      logisticsLevel: _displayState.technology.logistics,
-    ),
-  );
-}
-```
-
-Do not alter resume/accrual timing.
+Pass unchanged summary/content plus `_displayState.cash` and `_displayState.technology.logistics`; keep resume/accrual timing untouched.
 
 - [ ] **Step 9: Extend shell resume regression**
 
-Assert Offline root/portrait keys, no `BottomSheet`, production text, controller state preserved, then tap `offline-return-dismiss` and confirm route closes.
+Assert Offline root/portrait keys, no `BottomSheet`, production text/controller state preserved, then tap Continue and confirm dismissal.
 
 - [ ] **Step 10: Run focused tests and commit**
 
@@ -747,52 +435,15 @@ git commit -m "feat: revamp offline mining return"
 
 - [ ] **Step 1: Load both IBM Plex Mono weights**
 
-Use one loader per family and add both files:
-
-```dart
-final mono = FontLoader('IBMPlexMono');
-mono.addFont(
-  File('assets/fonts/IBMPlexMono-Regular.ttf')
-      .readAsBytes()
-      .then(ByteData.sublistView),
-);
-mono.addFont(
-  File('assets/fonts/IBMPlexMono-SemiBold.ttf')
-      .readAsBytes()
-      .then(ByteData.sublistView),
-);
-await mono.load();
-```
-
-Keep existing Orbitron loading. Do not load Regular only.
+Use one `FontLoader('IBMPlexMono')`, add both Regular and SemiBold TTF byte futures, then `await loader.load()`. Keep existing Orbitron loader. Do not load Regular only.
 
 - [ ] **Step 2: Add deterministic parity fixtures**
 
-Use the same Technology parity state as Task 1 and this test-only Offline summary:
-
-```dart
-const _hpa438OfflineSummary = OfflineProductionSummary(
-  elapsedUsed: Duration(hours: 16),
-  produced: {
-    ResourceType.gold: 742.5,
-    ResourceType.coal: 318.0,
-    ResourceType.stone: 96.4,
-  },
-  productionByPlanet: {
-    MiningPlanetId.homeworld: {
-      ResourceType.gold: 742.5,
-      ResourceType.coal: 318.0,
-      ResourceType.stone: 96.4,
-    },
-  },
-  fullSites: {MiningSiteId.landingBasin},
-  wasOfflineCapped: true,
-);
-```
+Use the same Technology parity state as Task 1 and a test-only 16h Offline summary with mock-like Gold/Coal/Stone values. Keep all sample values in tests only.
 
 - [ ] **Step 3: Reuse actual Site Deck as Technology/Settings backdrop**
 
-Extend the existing golden harness using a deterministic `SiteDeckScreen` with `cash: 1840`, non-empty cargo, and existing view factories. Stack the overlay above it. Do not create or modify a separate landscape Site Deck reference implementation.
+Extend existing `_pumpSurface` composition with a deterministic real `SiteDeckScreen`, cash `1840`, and non-empty cargo. Stack Technology/Settings overlays above it. Do not modify Site Deck.
 
 - [ ] **Step 4: Add exactly five full-screen canonical goldens**
 
@@ -804,9 +455,7 @@ hpa438_offline_return_402x874.png
 hpa438_offline_return_874x402.png
 ```
 
-Use current `skip: kIsWeb || Platform.isMacOS` policy.
-
-Technology landscape full-screen golden is a composition smoke test; the left-side Site Deck is not parity-scored.
+Use current `skip: kIsWeb || Platform.isMacOS`. Technology landscape full-screen golden is composition smoke context; left-side Site Deck is not parity-scored.
 
 - [ ] **Step 5: Generate/verify goldens on Linux**
 
@@ -818,23 +467,11 @@ file test/mining/presentation/goldens/hpa438_*.png
 
 - [ ] **Step 6: Export five source mock frames**
 
-Capture exact `data-screen-label` frames: Technology sheet, Technology landscape, Settings sheet, Offline return, Offline return landscape. Save them to the evidence paths listed under File Structure. Do not commit the HTML bundle.
+Capture exact `data-screen-label` frames: Technology sheet, Technology landscape, Settings sheet, Offline return, Offline return landscape. Save to the evidence paths. Do not commit the HTML bundle.
 
 - [ ] **Step 7: Write evidence with explicit landscape scoring**
 
-`docs/superpowers/evidence/hpa-438/parity.md` must state:
-
-```markdown
-| Surface | Scored scope |
-| --- | --- |
-| Technology 402×874 | Full Technology sheet + visible HUD context |
-| Technology 874×402 | Rightmost **528 px Technology panel only**; left-side current Site Deck is smoke-test context/out of scope |
-| Settings 402×874 | Full Settings sheet + visible HUD context |
-| Offline Return 402×874 | Full screen |
-| Offline Return 874×402 | Full screen |
-```
-
-Include the mock/Flutter images and checklist for 528px Technology panel, 470px Offline panel, node hierarchy, Settings hierarchy, Offline hierarchy, IBM Plex Regular/SemiBold, 1.3 reachability, and no Site Deck changes.
+`parity.md` states that Technology landscape scores only the **rightmost 528 px Technology panel**; left-side current Site Deck is out-of-scope smoke context. Other four canonical rows score their full defined surfaces. Include mock and Flutter images plus checklist for 528/470 widths, node hierarchy, Settings hierarchy, Offline hierarchy, both IBM Plex weights, 1.3 reachability, and no Site Deck changes.
 
 - [ ] **Step 8: Run focused visual suite and commit**
 
@@ -906,19 +543,17 @@ Expected: no output.
 
 - [ ] **Step 5: Complete parity evidence review**
 
-Check every row in `docs/superpowers/evidence/hpa-438/parity.md`. For Technology landscape, score only the rightmost 528px panel. Do not expand scope to fix the current left-side Site Deck.
+Check every row in `docs/superpowers/evidence/hpa-438/parity.md`. Technology landscape scoring is limited to its rightmost 528px panel. Do not expand scope to Site Deck.
 
 - [ ] **Step 6: Update PR #24 and Linear after green gates**
 
-PR body records: five canonical states, 528/470 measured widths, 360×640 + 1.3 Technology/Settings coverage, exact verification results, no-domain-drift output, and evidence path.
-
-Move HPA-438 to `In Review` and mark PR #24 ready only after those results are recorded.
+PR body records five canonical states, 528/470 measured widths, 360×640 + 1.3 Technology/Settings coverage, exact verification results, no-domain-drift output, and evidence path. Move HPA-438 to `In Review` and mark PR #24 ready only after those results are recorded.
 
 ---
 
 ## Review-Resolved Decisions
 
-- Technology landscape width is **528 px**, verified from the mock. The old design's 470px value was wrong; 470px applies to Offline Return landscape.
+- Technology landscape width is **528 px**, verified from the mock; `470 px` applies to Offline Return landscape.
 - Every selectable Technology node is at least `48×48`.
 - Technology loops/labels use `MiningContentRegistry.maxTechnologyLevel`.
 - Technology nodes reuse `MiningHex`.
