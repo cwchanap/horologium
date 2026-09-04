@@ -4,7 +4,7 @@
 
 **Goal:** Revamp Technology, Settings, and Offline Return to the supplied mock's visual parity while preserving mining domain, save, economy, lifecycle, and ownership contracts.
 
-**Architecture:** Keep `MiningShell` as runtime owner. Move Technology node-state projection into `TechnologyTrackView` so widgets render projected state instead of re-deriving rule-shaped logic. Technology/Settings use transparent built-in dialogs plus one tiny shared chrome helper; Offline Return uses a non-dismissible full-screen dialog fed by the existing summary/content plus cash, Logistics level, and shell-owned reduced motion. Structural/behavior tests are the primary automated gate; only two Technology panel goldens are added, while five committed source-vs-app captures are the actual parity gate.
+**Architecture:** Keep `MiningShell` as runtime owner. Move Technology node-state projection into `TechnologyTrackView` so widgets render projected state instead of re-deriving rule-shaped logic. Technology/Settings use transparent built-in dialogs plus one tiny shared chrome helper; Offline Return uses a non-dismissible full-screen dialog fed by the existing summary/content plus cash, Logistics level, and shell-owned reduced motion. Structural/behavior tests are the primary automated gate; two cropped Technology panel goldens run as Linux CI regression guards, while five committed source-vs-app captures are the actual parity gate.
 
 **Tech Stack:** Flutter/Dart, Material widgets, `showGeneralDialog`, existing mining projections/theme/hex/HUD primitives, `flutter_test`, SharedPreferences test doubles, existing golden harness.
 
@@ -649,7 +649,7 @@ git commit -m "feat: revamp offline mining return"
 
 **Interfaces:**
 - Consumes: existing `_pumpSurface`, finished Technology widget, existing Linux CI golden behavior.
-- Produces: maintainable golden harness with no new background-coupled HPA-438 baselines, two Technology panel regression guards at most, five source-vs-app parity rows.
+- Produces: maintainable golden harness with no new background-coupled HPA-438 baselines, two Technology panel regression guards, five source-vs-app parity rows.
 
 - [ ] **Step 1: Confirm existing Linux golden behavior before adding HPA-438 baselines**
 
@@ -663,7 +663,7 @@ Expected before edits: active Mine Site goldens run; Site Deck/Stellar Map remai
 
 - [ ] **Step 2: Rehabilitate or remove the two stale unconditional skips**
 
-First remove `skip:true` from Site Deck and Stellar Map and regenerate **only** their current baselines on Linux:
+First remove `skip:true` from Site Deck and Stellar Map and regenerate their current baselines on Linux:
 
 ```bash
 flutter test --update-goldens test/mining/presentation/visual_parity_golden_test.dart
@@ -687,7 +687,7 @@ hpa438_technology_panel_402x874.png
 hpa438_technology_panel_874x402.png
 ```
 
-Pump the relevant Technology overlay state, but golden the finder rather than the full screen:
+Pump the Technology overlay state, but golden the in-scope finder rather than the full screen:
 
 ```dart
 await expectLater(
@@ -705,7 +705,7 @@ await expectLater(
 );
 ```
 
-Keep the repository's existing platform predicate so CI/Linux executes them. Do not add full-screen Technology/Settings/Offline goldens.
+Use `skip: kIsWeb || Platform.isMacOS`, matching the repository's current platform policy. These tests are skipped on macOS/web but **run in the existing Ubuntu CI** through `flutter test --coverage`; a mismatch therefore blocks CI. Do not add full-screen Technology/Settings/Offline goldens.
 
 - [ ] **Step 5: Generate and verify the two panel goldens on Linux**
 
@@ -843,7 +843,7 @@ flutter test test/mining/presentation/offline_return_sheet_test.dart
 flutter test test/mining/presentation/mining_shell_test.dart
 ```
 
-Confirm the test names/coverage include:
+Confirm coverage includes:
 
 - `874×402` at text scale `1.3`;
 - system back leaves dialog visible;
@@ -885,7 +885,7 @@ Move HPA-438 to `In Review` and mark PR #24 ready only after the recorded gates 
 - Offline cap copy uses `content.offlineCapFor(logisticsLevel)`.
 - Offline Return receives `reducedMotion` from `MiningShell`.
 - The non-dismissible resume dialog gets explicit 874×402/1.3, system-back, hero-failure, and Continue tests.
-- No five full-screen HPA-438 golden set is added. At most two Technology panel goldens are committed.
+- No five full-screen HPA-438 golden set is added. Two cropped Technology panel goldens run on Linux CI as regression guards.
 - Existing unconditional stale goldens are rehabilitated on Linux or removed; HPA-438 does not add to a stale-baseline graveyard.
 - Five committed source-vs-app captures are the actual visual parity acceptance gate.
 - No `OfflineReturnView`, modal manager, generic toggle, second palette, Site Deck redesign, or domain change is added.
