@@ -430,16 +430,17 @@ The selected detail card keeps the established action key:
 Key('mining-technology-buy-${track.track.name}')
 ```
 
-When `track.canPurchase` is true:
+When `track.canPurchase` is true, preserve the current standalone-test-safe behavior:
 
 ```dart
 onPressed: () {
-  Navigator.of(context).pop();
+  final navigator = Navigator.of(context);
+  if (navigator.canPop()) navigator.pop();
   widget.onPurchase(track.track);
 },
 ```
 
-When blocked/maxed, the action remains disabled and the existing `disabledReason` is visible. The protruding close hex always calls `Navigator.of(context).pop()` and has semantic label `Close technology`.
+When blocked/maxed, the action remains disabled and the existing `disabledReason` is visible. The protruding close hex calls `Navigator.of(context).pop()` and has semantic label `Close technology`.
 
 - [ ] **Step 9: Change `MiningShell.openTechnology()` to a transparent dialog route**
 
@@ -1443,11 +1444,11 @@ Create `docs/superpowers/evidence/hpa-438/parity.md`:
 
 | Surface | Mock reference | Flutter implementation |
 | --- | --- | --- |
-| Technology 402×874 | ![](reference/technology-402x874.png) | ![](../../../../../test/mining/presentation/goldens/hpa438_technology_402x874.png) |
-| Technology 874×402 | ![](reference/technology-874x402.png) | ![](../../../../../test/mining/presentation/goldens/hpa438_technology_874x402.png) |
-| Settings 402×874 | ![](reference/settings-402x874.png) | ![](../../../../../test/mining/presentation/goldens/hpa438_settings_402x874.png) |
-| Offline Return 402×874 | ![](reference/offline-return-402x874.png) | ![](../../../../../test/mining/presentation/goldens/hpa438_offline_return_402x874.png) |
-| Offline Return 874×402 | ![](reference/offline-return-874x402.png) | ![](../../../../../test/mining/presentation/goldens/hpa438_offline_return_874x402.png) |
+| Technology 402×874 | ![](reference/technology-402x874.png) | ![](../../../../test/mining/presentation/goldens/hpa438_technology_402x874.png) |
+| Technology 874×402 | ![](reference/technology-874x402.png) | ![](../../../../test/mining/presentation/goldens/hpa438_technology_874x402.png) |
+| Settings 402×874 | ![](reference/settings-402x874.png) | ![](../../../../test/mining/presentation/goldens/hpa438_settings_402x874.png) |
+| Offline Return 402×874 | ![](reference/offline-return-402x874.png) | ![](../../../../test/mining/presentation/goldens/hpa438_offline_return_402x874.png) |
+| Offline Return 874×402 | ![](reference/offline-return-874x402.png) | ![](../../../../test/mining/presentation/goldens/hpa438_offline_return_874x402.png) |
 
 ## Review checklist
 
@@ -1460,7 +1461,7 @@ Create `docs/superpowers/evidence/hpa-438/parity.md`:
 - [ ] No critical action is clipped at text scale 1.3.
 ```
 
-`parity.md` lives in `docs/superpowers/evidence/hpa-438/`; reaching the repository root requires four parent traversals, then `test/...`. Markdown resolves the `../../../../../test/...` target above from the document's directory through `hpa-438 -> evidence -> superpowers -> docs -> repository root`.
+`parity.md` lives in `docs/superpowers/evidence/hpa-438/`; `../../../../` reaches the repository root, then `test/...` resolves to the golden directory.
 
 If visual review finds geometry/style drift, tune only the presentation files already in HPA-438 and regenerate the affected golden. Do not change domain/projection values to make screenshots match.
 
