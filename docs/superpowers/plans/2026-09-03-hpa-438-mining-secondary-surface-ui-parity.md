@@ -682,8 +682,8 @@ Semantics(
       height: 48,
       child: Stack(
         children: [
-          // ON/OFF text on the inactive side.
-          // 32x36 MiningHex thumb aligned left/right.
+          // Render ON/OFF text on the inactive side.
+          // Render a 32x36 MiningHex thumb aligned left/right.
         ],
       ),
     ),
@@ -722,7 +722,7 @@ SliderTheme(
 )
 ```
 
-Do not introduce a custom gesture/slider implementation. Keep Material slider keyboard/semantics behavior; the mock's hex language comes from the surrounding panel/toggle and later parity tuning, not from replacing Slider mechanics.
+Do not introduce a custom gesture/slider implementation. Keep Material slider keyboard/semantics behavior. For visual parity, overlay a non-interactive 30×34 `MiningHex` at the current normalized slider value inside the same 48px-high stack and set the Material thumb radius to zero; the real `Slider` remains the only interactive/semantic control.
 
 - [ ] **Step 6: Change `MiningShell.openSettings()` to the same transparent built-in route style**
 
