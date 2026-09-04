@@ -585,6 +585,7 @@ class _MineNodeButton extends StatelessWidget {
                         rig: view.rig,
                         nodeSize: nodeSize,
                         rigSize: rigSize,
+                        progress: progress,
                         impactSequence: impactSequence,
                         reducedMotion: reducedMotion,
                       )
