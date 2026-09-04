@@ -68,6 +68,21 @@ void main() {
     expect(_nodeAsset(tester), MiningVisuals.goldNodeStageAsset(1));
   });
 
+  testWidgets('keeps gapless playback on the changing deposit image', (
+    tester,
+  ) async {
+    await _pumpVisual(tester);
+
+    final image = tester.widget<Image>(
+      find.descendant(
+        of: find.byKey(const Key('landing-basin-deposit-n1')),
+        matching: find.byType(Image),
+      ),
+    );
+
+    expect(image.gaplessPlayback, isTrue);
+  });
+
   testWidgets('selects the staged gold plate at progress boundaries', (
     tester,
   ) async {

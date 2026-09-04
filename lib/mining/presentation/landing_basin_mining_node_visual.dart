@@ -106,6 +106,7 @@ class _LandingBasinMiningNodeVisualState
                         _nodeAsset(t),
                         width: widget.nodeSize,
                         height: widget.nodeSize,
+                        gaplessPlayback: true,
                         opacity: rig == null
                             ? const AlwaysStoppedAnimation(.62)
                             : null,
