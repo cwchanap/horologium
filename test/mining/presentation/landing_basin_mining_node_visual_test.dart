@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -9,6 +7,7 @@ import 'package:horologium/mining/presentation/mining_visuals.dart';
 Future<void> _pumpVisual(
   WidgetTester tester, {
   RigTier? rig = RigTier.t1,
+  double progress = 0,
   int impactSequence = 0,
   bool reducedMotion = false,
   double nodeSize = 80,
@@ -22,6 +21,7 @@ Future<void> _pumpVisual(
           rig: rig,
           nodeSize: nodeSize,
           rigSize: rigSize,
+          progress: progress,
           impactSequence: impactSequence,
           reducedMotion: reducedMotion,
         ),
@@ -29,6 +29,21 @@ Future<void> _pumpVisual(
     ),
   );
   await tester.pump();
+}
+
+String _nodeAsset(WidgetTester tester) {
+  final images = tester
+      .widgetList<Image>(
+        find.descendant(
+          of: find.byKey(const Key('landing-basin-deposit-n1')),
+          matching: find.byType(Image),
+        ),
+      )
+      .toList();
+  expect(images, hasLength(1));
+  final image = images.single.image;
+  expect(image, isA<AssetImage>());
+  return (image as AssetImage).assetName;
 }
 
 Transform _robotTransform(WidgetTester tester) =>
@@ -42,101 +57,66 @@ Transform _robotArmTransform(WidgetTester tester) => tester.widget<Transform>(
   find.byKey(const Key('landing-basin-robot-arm-transform-n1')),
 );
 
-Transform _depositTransform(WidgetTester tester) =>
-    tester.widget<Transform>(find.byKey(const Key('landing-basin-deposit-n1')));
-
-Transform _depositResponseTransform(WidgetTester tester) =>
-    tester.widget<Transform>(
-      find.byKey(const Key('landing-basin-deposit-response-n1')),
-    );
-
-Transform _depositRotationTransform(WidgetTester tester) =>
-    tester.widget<Transform>(
-      find.byKey(const Key('landing-basin-deposit-rotation-n1')),
-    );
-
-Transform _transformByKey(WidgetTester tester, String key) =>
-    tester.widget<Transform>(find.byKey(Key(key)));
-
-double _effectOpacity(WidgetTester tester, String key) =>
-    tester.widget<Opacity>(find.byKey(Key(key))).opacity;
-
-double _resourceFlashOpacity(WidgetTester tester) => tester
-    .widget<Opacity>(find.byKey(const Key('landing-basin-resource-flash-n1')))
-    .opacity;
-
-double _rotation(Matrix4 transform) =>
-    math.atan2(transform.storage[1], transform.storage[0]);
-
 void main() {
-  testWidgets(
-    'renders stable N1/T1 roots and omits rig feedback without a rig',
-    (tester) async {
-      await _pumpVisual(tester);
+  testWidgets('renders the staged plate and omits the rig without a rig', (
+    tester,
+  ) async {
+    await _pumpVisual(tester, rig: null, reducedMotion: true);
 
-      expect(find.byKey(const Key('landing-basin-deposit-n1')), findsOneWidget);
-      expect(find.byKey(const Key('landing-basin-robot-n1')), findsOneWidget);
+    expect(find.byKey(const Key('landing-basin-deposit-n1')), findsOneWidget);
+    expect(find.byKey(const Key('landing-basin-robot-n1')), findsNothing);
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeStageAsset(1));
+  });
 
-      await _pumpVisual(tester, rig: null);
+  testWidgets('selects the staged gold plate at progress boundaries', (
+    tester,
+  ) async {
+    final cases = {
+      0.0: 'assets/images/mining/nodes/node-gold-s1.png',
+      .249: 'assets/images/mining/nodes/node-gold-s1.png',
+      .25: 'assets/images/mining/nodes/node-gold-s2.png',
+      .599: 'assets/images/mining/nodes/node-gold-s2.png',
+      .60: 'assets/images/mining/nodes/node-gold-s3.png',
+      .899: 'assets/images/mining/nodes/node-gold-s3.png',
+      .90: 'assets/images/mining/nodes/node-gold-s4.png',
+      1.0: 'assets/images/mining/nodes/node-gold-s4.png',
+    };
 
-      expect(find.byKey(const Key('landing-basin-deposit-n1')), findsOneWidget);
-      expect(find.byKey(const Key('landing-basin-robot-n1')), findsNothing);
-      expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
-    },
-  );
+    for (final entry in cases.entries) {
+      await _pumpVisual(tester, progress: entry.key, reducedMotion: true);
+      expect(_nodeAsset(tester), entry.value);
+    }
+  });
 
-  testWidgets(
-    'plays one one-second contact sequence and does not restart same sequence',
-    (tester) async {
-      await _pumpVisual(tester, impactSequence: 0);
-      final restBody = _robotBodyTransform(tester).transform;
-      final restArm = _robotArmTransform(tester).transform;
-      final restSize = tester.getSize(
-        find.byType(LandingBasinMiningNodeVisual),
-      );
+  testWidgets('loops the four S1 idle frames every 125ms', (tester) async {
+    await _pumpVisual(tester, reducedMotion: false);
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeIdleAsset(1));
 
-      await _pumpVisual(tester, impactSequence: 1);
-      expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
-      expect(_depositTransform(tester).transform.storage[0], closeTo(1, .001));
+    await tester.pump(const Duration(milliseconds: 125));
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeIdleAsset(2));
+    await tester.pump(const Duration(milliseconds: 125));
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeIdleAsset(3));
+    await tester.pump(const Duration(milliseconds: 125));
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeIdleAsset(4));
+    await tester.pump(const Duration(milliseconds: 125));
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeIdleAsset(1));
+  });
 
-      await tester.pump(const Duration(milliseconds: 100));
-      expect(_robotBodyTransform(tester).transform, equals(restBody));
-      expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
-      expect(
-        _depositTransform(tester).transform.storage[0],
-        closeTo(.986, .002),
-      );
-      expect(
-        tester.getSize(find.byType(LandingBasinMiningNodeVisual)),
-        restSize,
-      );
+  testWidgets('stops the idle loop outside S1', (tester) async {
+    await _pumpVisual(tester, progress: 0);
+    await tester.pump(const Duration(milliseconds: 125));
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeIdleAsset(2));
 
-      final continuingArm = _robotArmTransform(tester).transform;
-      await _pumpVisual(tester, impactSequence: 1);
-      await tester.pump(const Duration(milliseconds: 100));
-      expect(
-        _robotArmTransform(tester).transform,
-        isNot(equals(continuingArm)),
-      );
+    await _pumpVisual(tester, progress: .25);
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeStageAsset(2));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeStageAsset(2));
 
-      await _pumpVisual(tester, impactSequence: 4);
-      expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.byKey(const Key('landing-basin-impact-n1')), findsOneWidget);
-      await tester.pump(const Duration(seconds: 1));
+    await _pumpVisual(tester, progress: 0);
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeIdleAsset(1));
+  });
 
-      expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
-      expect(_robotBodyTransform(tester).transform, equals(restBody));
-      expect(_robotArmTransform(tester).transform, equals(restArm));
-      expect(_depositTransform(tester).transform.storage[0], closeTo(1, .001));
-      expect(
-        tester.getSize(find.byType(LandingBasinMiningNodeVisual)),
-        restSize,
-      );
-    },
-  );
-
-  testWidgets('separates wind-up, strike, and layered aftermath beats', (
+  testWidgets('selects every S1 hit frame while the chassis stays fixed', (
     tester,
   ) async {
     await _pumpVisual(tester, impactSequence: 0);
@@ -144,167 +124,85 @@ void main() {
     final restArm = _robotArmTransform(tester).transform;
 
     await _pumpVisual(tester, impactSequence: 1);
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(_robotBodyTransform(tester).transform, equals(restBody));
-    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
-    expect(_depositTransform(tester).transform.storage[0], lessThan(1));
-    expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
-    expect(find.byKey(const Key('landing-basin-sparks-n1')), findsNothing);
-
-    await tester.pump(const Duration(milliseconds: 300));
-
-    expect(_robotBodyTransform(tester).transform, equals(restBody));
-    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
-    expect(
-      _depositResponseTransform(tester).transform.storage[12].abs() +
-          _depositResponseTransform(tester).transform.storage[13].abs(),
-      greaterThan(0),
-    );
-    expect(
-      _depositRotationTransform(tester).transform.storage[1].abs(),
-      greaterThan(.01),
-    );
-    expect(find.byKey(const Key('landing-basin-impact-n1')), findsOneWidget);
-    expect(find.byKey(const Key('landing-basin-sparks-n1')), findsOneWidget);
-
-    await tester.pump(const Duration(milliseconds: 180));
-
-    for (final key in [
-      'landing-basin-sparks-n1',
-      'landing-basin-rock-chips-n1',
-      'landing-basin-dust-n1',
-      'landing-basin-gold-glow-n1',
-    ]) {
-      expect(find.byKey(Key(key)), findsOneWidget);
-      expect(_effectOpacity(tester, key), greaterThan(0));
-    }
+    await tester.pump(const Duration(milliseconds: 240));
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeHitAsset(1));
     expect(_robotBodyTransform(tester).transform, equals(restBody));
     expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
 
-    await tester.pump(const Duration(milliseconds: 420));
-
-    expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
-    expect(find.byKey(const Key('landing-basin-sparks-n1')), findsNothing);
-    expect(find.byKey(const Key('landing-basin-rock-chips-n1')), findsNothing);
-    expect(find.byKey(const Key('landing-basin-dust-n1')), findsNothing);
-    expect(find.byKey(const Key('landing-basin-gold-glow-n1')), findsNothing);
+    await tester.pump(const Duration(milliseconds: 84));
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeHitAsset(2));
     expect(_robotBodyTransform(tester).transform, equals(restBody));
-    expect(_robotArmTransform(tester).transform, equals(restArm));
+    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
+
+    await tester.pump(const Duration(milliseconds: 84));
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeHitAsset(3));
+    expect(_robotBodyTransform(tester).transform, equals(restBody));
+    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
   });
 
-  testWidgets('reaches the articulated arm and deposit phase endpoints', (
+  testWidgets('plays exhaust frames only when progress crosses into S4', (
     tester,
   ) async {
-    await _pumpVisual(tester, impactSequence: 0);
-    final restArm = _robotArmTransform(tester).transform;
-    await _pumpVisual(tester, impactSequence: 1);
+    await _pumpVisual(tester, progress: .899, impactSequence: 0);
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeStageAsset(3));
 
-    await tester.pump(const Duration(milliseconds: 140));
-    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
-    expect(_depositTransform(tester).transform.storage[0], closeTo(.973, .001));
+    await _pumpVisual(tester, progress: .90, impactSequence: 1);
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeStageAsset(3));
 
+    await tester.pump(const Duration(milliseconds: 240));
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeExhaustAsset(1));
     await tester.pump(const Duration(milliseconds: 100));
-    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
-    expect(_depositTransform(tester).transform.storage[0], closeTo(.92, .001));
-
-    await tester.pump(const Duration(milliseconds: 220));
-    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
-    expect(_depositTransform(tester).transform.storage[0], closeTo(1.08, .001));
-
-    await tester.pump(const Duration(milliseconds: 160));
-    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
-
-    await tester.pump(const Duration(milliseconds: 380));
-    expect(_robotArmTransform(tester).transform, equals(restArm));
-    expect(_depositTransform(tester).transform.storage[0], closeTo(1, .001));
-    expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
-  });
-
-  testWidgets('reduced motion keeps spatial transforms and bounds fixed', (
-    tester,
-  ) async {
-    await _pumpVisual(tester, impactSequence: 0, reducedMotion: true);
-    final restRobot = _robotTransform(tester).transform;
-    final restDeposit = _depositTransform(tester).transform;
-    final restSize = tester.getSize(find.byType(LandingBasinMiningNodeVisual));
-
-    await _pumpVisual(tester, impactSequence: 1, reducedMotion: true);
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeExhaustAsset(2));
     await tester.pump(const Duration(milliseconds: 100));
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeExhaustAsset(3));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeExhaustAsset(4));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeStageAsset(4));
 
-    expect(_robotTransform(tester).transform, equals(restRobot));
-    expect(_depositTransform(tester).transform, equals(restDeposit));
-    expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
-    expect(tester.getSize(find.byType(LandingBasinMiningNodeVisual)), restSize);
-
-    await tester.pump(const Duration(milliseconds: 300));
-    for (final key in [
-      'landing-basin-sparks-n1',
-      'landing-basin-rock-chips-n1',
-      'landing-basin-dust-n1',
-      'landing-basin-gold-glow-n1',
-    ]) {
-      expect(find.byKey(Key(key)), findsOneWidget);
-      expect(
-        _transformByKey(tester, '$key-transform').transform,
-        equals(Matrix4.identity()),
-      );
-      expect(
-        _transformByKey(tester, '$key-scale').transform,
-        equals(Matrix4.identity()),
-      );
-    }
-    for (final key in [
-      'landing-basin-robot-response-n1',
-      'landing-basin-robot-scale-n1',
-      'landing-basin-deposit-response-n1',
-      'landing-basin-deposit-rotation-n1',
-      'landing-basin-deposit-n1',
-    ]) {
-      expect(
-        _transformByKey(tester, key).transform,
-        equals(Matrix4.identity()),
-      );
-    }
-    expect(_robotTransform(tester).transform, equals(restRobot));
-    expect(_depositTransform(tester).transform, equals(restDeposit));
-
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
-    expect(_robotTransform(tester).transform, equals(restRobot));
-    expect(_depositTransform(tester).transform, equals(restDeposit));
-    expect(tester.getSize(find.byType(LandingBasinMiningNodeVisual)), restSize);
+    await _pumpVisual(tester, progress: 0, impactSequence: 1);
+    expect(_nodeAsset(tester), MiningVisuals.goldNodeIdleAsset(1));
   });
 
   testWidgets(
-    'keeps reduced-motion effects visible for the authored sequence window',
+    'reduced motion keeps the static stage and rig transforms fixed',
     (tester) async {
-      tester.binding.platformDispatcher.accessibilityFeaturesTestValue =
-          const FakeAccessibilityFeatures(disableAnimations: true);
-      addTearDown(
-        tester.binding.platformDispatcher.clearAccessibilityFeaturesTestValue,
-      );
+      await _pumpVisual(tester, reducedMotion: true, impactSequence: 0);
+      final restRobot = _robotTransform(tester).transform;
+      final restBody = _robotBodyTransform(tester).transform;
+      final restArm = _robotArmTransform(tester).transform;
 
-      await _pumpVisual(tester, impactSequence: 0, reducedMotion: true);
-      await _pumpVisual(tester, impactSequence: 1, reducedMotion: true);
-      await tester.pump(const Duration(milliseconds: 300));
+      await _pumpVisual(tester, reducedMotion: true, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 500));
 
-      expect(
-        find.byKey(const Key('landing-basin-gold-glow-n1')),
-        findsOneWidget,
-      );
-      expect(
-        _effectOpacity(tester, 'landing-basin-gold-glow-n1'),
-        greaterThan(0),
-      );
+      expect(_nodeAsset(tester), MiningVisuals.goldNodeStageAsset(1));
+      expect(_robotTransform(tester).transform, equals(restRobot));
+      expect(_robotBodyTransform(tester).transform, equals(restBody));
+      expect(_robotArmTransform(tester).transform, equals(restArm));
     },
   );
 
-  testWidgets('disposes the animation controller when the visual is removed', (
+  testWidgets('does not expose obsolete procedural effect keys', (
     tester,
   ) async {
-    await _pumpVisual(tester, impactSequence: 0, reducedMotion: true);
-    await _pumpVisual(tester, impactSequence: 1, reducedMotion: true);
+    await _pumpVisual(tester, impactSequence: 1);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    for (final key in [
+      'landing-basin-impact-n1',
+      'landing-basin-sparks-n1',
+      'landing-basin-rock-chips-n1',
+      'landing-basin-dust-n1',
+      'landing-basin-gold-glow-n1',
+    ]) {
+      expect(find.byKey(Key(key)), findsNothing);
+    }
+  });
+
+  testWidgets('disposes both animation controllers when removed', (
+    tester,
+  ) async {
+    await _pumpVisual(tester, reducedMotion: false, impactSequence: 1);
     await tester.pump(const Duration(milliseconds: 100));
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -312,42 +210,11 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('keeps the T1 body fixed while only the arm moves', (
-    tester,
-  ) async {
-    await _pumpVisual(tester, impactSequence: 0);
-    final restBody = _robotBodyTransform(tester).transform;
-    final restArm = _robotArmTransform(tester).transform;
-
-    await _pumpVisual(tester, impactSequence: 1);
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(_robotBodyTransform(tester).transform, equals(restBody));
-    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
-    expect(
-      (_rotation(_robotArmTransform(tester).transform) - _rotation(restArm))
-          .abs(),
-      greaterThan(.15),
-    );
-
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(_robotBodyTransform(tester).transform, equals(restBody));
-    expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
-    expect(
-      (_rotation(_robotArmTransform(tester).transform) - _rotation(restArm))
-          .abs(),
-      greaterThan(.30),
-    );
-
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(_robotBodyTransform(tester).transform, equals(restBody));
-    expect(_robotArmTransform(tester).transform, equals(restArm));
-  });
-
   testWidgets('selects articulated body and arm layers for every rig tier', (
     tester,
   ) async {
     for (final tier in RigTier.values) {
-      await _pumpVisual(tester, rig: tier);
+      await _pumpVisual(tester, rig: tier, reducedMotion: true);
 
       final bodyImage = tester.widget<Image>(
         find.descendant(
@@ -373,82 +240,11 @@ void main() {
     }
   });
 
-  testWidgets(
-    'keeps every articulated chassis stationary while the arm moves',
-    (tester) async {
-      for (final tier in RigTier.values) {
-        await _pumpVisual(tester, rig: tier, impactSequence: 0);
-        final restRobot = _robotTransform(tester).transform;
-        final restBody = _robotBodyTransform(tester).transform;
-        final restArm = _robotArmTransform(tester).transform;
-
-        await _pumpVisual(tester, rig: tier, impactSequence: 1);
-        await tester.pump(const Duration(milliseconds: 100));
-
-        expect(_robotTransform(tester).transform, equals(restRobot));
-        expect(_robotBodyTransform(tester).transform, equals(restBody));
-        expect(_robotArmTransform(tester).transform, isNot(equals(restArm)));
-      }
-    },
-  );
-
-  testWidgets('pins the T1 arm rotation to the authored shoulder pivot', (
+  testWidgets('pins the arm rotation to the authored shoulder pivot', (
     tester,
   ) async {
     await _pumpVisual(tester);
 
     expect(_robotArmTransform(tester).alignment, const Alignment(.33, -.24));
-  });
-
-  testWidgets(
-    'flashes the resource image at contact and settles at one second',
-    (tester) async {
-      await _pumpVisual(tester, impactSequence: 0);
-      await _pumpVisual(tester, impactSequence: 1);
-      await tester.pump(const Duration(milliseconds: 300));
-
-      expect(
-        find.byKey(const Key('landing-basin-resource-flash-n1')),
-        findsOneWidget,
-      );
-      expect(
-        find.ancestor(
-          of: find.byKey(const Key('landing-basin-resource-flash-n1')),
-          matching: find.byKey(const Key('landing-basin-deposit-n1')),
-        ),
-        findsOneWidget,
-      );
-      expect(_resourceFlashOpacity(tester), greaterThan(0));
-      expect(_resourceFlashOpacity(tester), lessThan(.5));
-
-      await tester.pump(const Duration(milliseconds: 700));
-      expect(
-        find.byKey(const Key('landing-basin-resource-flash-n1')),
-        findsNothing,
-      );
-      expect(_robotArmTransform(tester).transform, equals(Matrix4.identity()));
-    },
-  );
-
-  testWidgets('reduced motion fixes the articulated layers and fades flash', (
-    tester,
-  ) async {
-    await _pumpVisual(tester, impactSequence: 0, reducedMotion: true);
-    final restBody = _robotBodyTransform(tester).transform;
-    final restArm = _robotArmTransform(tester).transform;
-
-    await _pumpVisual(tester, impactSequence: 1, reducedMotion: true);
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(_robotBodyTransform(tester).transform, equals(restBody));
-    expect(_robotArmTransform(tester).transform, equals(restArm));
-    expect(_resourceFlashOpacity(tester), greaterThan(0));
-
-    await tester.pump(const Duration(milliseconds: 700));
-    expect(_robotBodyTransform(tester).transform, equals(restBody));
-    expect(_robotArmTransform(tester).transform, equals(restArm));
-    expect(
-      find.byKey(const Key('landing-basin-resource-flash-n1')),
-      findsNothing,
-    );
   });
 }

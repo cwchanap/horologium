@@ -156,9 +156,20 @@ void main() {
       view: _siteView(state),
       dock: _dockView(state),
     );
-    expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byKey(const Key('landing-basin-impact-n1')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('landing-basin-deposit-n1')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Image &&
+              widget.image is AssetImage &&
+              (widget.image as AssetImage).assetName ==
+                  MiningVisuals.goldNodeHitAsset(1),
+        ),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -193,7 +204,7 @@ void main() {
                   widget is Image &&
                   widget.image is AssetImage &&
                   (widget.image as AssetImage).assetName ==
-                      'assets/images/mining/landing_basin/deposit_$node.png',
+                      MiningVisuals.goldNodeIdleAsset(1),
             ),
           ),
           findsOneWidget,
@@ -242,7 +253,6 @@ void main() {
 
     expect(find.byKey(const Key('landing-basin-deposit-n1')), findsNothing);
     expect(find.byKey(const Key('landing-basin-robot-n1')), findsNothing);
-    expect(find.byKey(const Key('landing-basin-impact-n1')), findsNothing);
     final n1 = find.byKey(const Key('mine-site-node-n1'));
     expect(
       find.descendant(
