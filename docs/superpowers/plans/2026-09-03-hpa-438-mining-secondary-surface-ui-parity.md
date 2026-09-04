@@ -379,9 +379,9 @@ Use these node styles:
 
 ```text
 owned      fill #53D4E8, dark level text
- actionable border/fill #FFD54A + glow, level text #FFD54A
- blocked    border #FFAB40, lock icon, dark panel interior
- future     rgba(255,255,255,.13) border/fill, muted level text
+actionable border/fill #FFD54A + glow, level text #FFD54A
+blocked    border #FFAB40, lock icon, dark panel interior
+future     rgba(255,255,255,.13) border/fill, muted level text
 ```
 
 Every node gets:
@@ -1358,11 +1358,11 @@ Create `docs/superpowers/evidence/hpa-438/parity.md`:
 
 | Surface | Mock reference | Flutter implementation |
 | --- | --- | --- |
-| Technology 402×874 | ![](reference/technology-402x874.png) | ![](../../../test/mining/presentation/goldens/hpa438_technology_402x874.png) |
-| Technology 874×402 | ![](reference/technology-874x402.png) | ![](../../../test/mining/presentation/goldens/hpa438_technology_874x402.png) |
-| Settings 402×874 | ![](reference/settings-402x874.png) | ![](../../../test/mining/presentation/goldens/hpa438_settings_402x874.png) |
-| Offline Return 402×874 | ![](reference/offline-return-402x874.png) | ![](../../../test/mining/presentation/goldens/hpa438_offline_return_402x874.png) |
-| Offline Return 874×402 | ![](reference/offline-return-874x402.png) | ![](../../../test/mining/presentation/goldens/hpa438_offline_return_874x402.png) |
+| Technology 402×874 | ![](reference/technology-402x874.png) | ![](../../../../test/mining/presentation/goldens/hpa438_technology_402x874.png) |
+| Technology 874×402 | ![](reference/technology-874x402.png) | ![](../../../../test/mining/presentation/goldens/hpa438_technology_874x402.png) |
+| Settings 402×874 | ![](reference/settings-402x874.png) | ![](../../../../test/mining/presentation/goldens/hpa438_settings_402x874.png) |
+| Offline Return 402×874 | ![](reference/offline-return-402x874.png) | ![](../../../../test/mining/presentation/goldens/hpa438_offline_return_402x874.png) |
+| Offline Return 874×402 | ![](reference/offline-return-874x402.png) | ![](../../../../test/mining/presentation/goldens/hpa438_offline_return_874x402.png) |
 
 ## Review checklist
 
