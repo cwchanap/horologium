@@ -4,11 +4,11 @@
 
 Approved design for HPA-438, **Revamp Technology, Settings, and Offline Return for mining UI parity**.
 
-This is a presentation-only follow-up to completed HPA-285. It keeps the current merge-mining runtime, progression, persistence, audio, lifecycle, and projection seams intact while bringing the retained Technology, Settings, and Offline Return surfaces to the supplied standalone mock's visual language.
+This is a presentation-only follow-up to completed HPA-285. It keeps the current merge-mining runtime, progression, persistence, audio, lifecycle, and projection seams intact while bringing Technology, Settings, and Offline Return to the supplied standalone mock's visual language.
 
 Planning, implementation, responsive variants, visual evidence, tests, and cleanup stay on **one branch and one pull request**.
 
-The user-supplied `Horologium Merge Mining (standalone).html` is the visual source of truth for hierarchy, geometry, typography intent, color, and responsive composition. Repository state and rules remain authoritative where the mock uses sample values.
+The user-supplied `Horologium Merge Mining (standalone).html` is authoritative for hierarchy, geometry, typography intent, color, and responsive composition. Repository state and rules remain authoritative where the mock uses sample values.
 
 ## Goal
 
@@ -26,7 +26,7 @@ Canonical references:
 - Offline Return portrait: `402×874`
 - Offline Return landscape: `874×402`
 
-The mock keeps live mining context visible behind Technology and Settings. Offline Return is different: it is an immersive full-screen result.
+The mock keeps live mining context visible behind Technology and Settings. Offline Return is an immersive full-screen result.
 
 ## Non-goals
 
@@ -40,14 +40,7 @@ Do not change:
 - Site Deck, Mine Site, or Stellar Map layouts;
 - lifecycle, foreground refresh, haptics, or reduced-motion ownership.
 
-Do not add:
-
-- Provider, Riverpod, Bloc, service locator, or command bus;
-- routing package or generic modal manager;
-- design-system package;
-- persisted UI selection;
-- reward claims, multipliers, ads, streaks, notifications, or retention mechanics;
-- asset-generation or screenshot infrastructure.
+Do not add Provider/Riverpod/Bloc, a routing package, generic modal manager, design-system package, persisted UI selection, reward/retention mechanics, or a new visual-test stack.
 
 ## Existing seams to preserve
 
@@ -66,55 +59,42 @@ MiningShell
        <- cash + logisticsLevel presentation scalars
 ```
 
-Reuse in place:
+Reuse:
 
 - `MiningTheme` for panel/accent/highlight/warning/gate colors;
-- `MiningHex` for technology nodes, icon affordances, and hex visual language;
+- `MiningHex` for technology nodes and hex affordances;
 - `MiningVisuals` for technology/offline/resource art;
 - `MiningCashChip` and `MiningCargoGauge` where the mock shows HUD context;
-- the existing mining widget tests;
+- existing mining widget tests;
 - `visual_parity_golden_test.dart` as the only golden harness.
 
-`TechnologySheetView` remains the rule projection. Widgets do not recalculate affordability, gates, or effects. `MiningContentRegistry.maxTechnologyLevel` is the source for the maximum visible level; do not introduce a second literal progression contract.
+`TechnologySheetView` remains the rule projection. Widgets do not recalculate affordability, gates, or effects. `MiningContentRegistry.maxTechnologyLevel` is the visible max-level source.
 
-`OfflineProductionSummary` remains the offline result projection. Offline Return may receive only live presentation scalars already available in `MiningShell`, specifically `cash` and `logisticsLevel`.
+`OfflineProductionSummary` remains the offline result projection. Offline Return may receive only live rendering scalars already available in `MiningShell`: `cash` and `logisticsLevel`.
 
 ## Visual language
 
 Use existing `MiningTheme` tokens directly. Do not fork the palette with raw equivalents for panel or cyan accent.
 
-The mock's visual values correspond to the existing mining palette:
-
-```text
-panel       #0E1828
-accent      #53D4E8
-highlight   #18FFFF
-warning     #FFD54A
-gate        #FFAB40
-```
-
 ### Typography
 
-Keep Orbitron as the app/display family. Bundle IBM Plex Mono Regular (`400`) and SemiBold (`600`) with the OFL and scope it to small status, metadata, and explanatory copy on these three surfaces.
+Keep Orbitron as the display family. Bundle IBM Plex Mono Regular (`400`) and SemiBold (`600`) plus OFL and scope it to small status/metadata/explanatory copy on these surfaces.
 
-Golden setup must load **both** IBM Plex Mono files into the same `FontLoader('IBMPlexMono')`; otherwise `w600` copy is rendered as faux-bold Regular and parity evidence is misleading.
+Golden setup loads **both** IBM Plex Mono files into the same family loader so SemiBold metrics are real rather than faux-bold Regular.
 
 ### Shared modal chrome
 
 Technology and Settings may share one narrow `MiningModalChrome` widget. It owns only:
 
 - `MiningTheme.panel` fill;
-- `MiningTheme.accent.withAlpha(...)` top edge / handle;
+- `MiningTheme.accent.withAlpha(...)` top edge and 42×4 handle;
 - rounded upper corners;
-- 42×4 drag handle;
 - safe-area-aware padding;
-- optional protruding `MiningHex` leading/trailing affordances.
+- optional protruding `MiningHex` affordances.
 
-It does **not** own routing, navigation, state, scroll policy, titles, actions, technology nodes, or settings cards. Offline Return does not use this chrome and does not get a drag handle.
+It does not own routing, state, titles, actions, business rules, or scroll policy. Offline Return does not use this chrome and does not get a drag handle.
 
 ## Technology
-
-### Ownership and selection
 
 Keep the public boundary:
 
@@ -125,65 +105,45 @@ TechnologySheet({
 })
 ```
 
-The widget becomes stateful only for transient selected-track state. Default selection is:
-
-1. first `track.canPurchase`;
-2. otherwise first non-max track;
-3. otherwise first track.
-
-Selection is never persisted.
-
-### Node-state projection
+The widget becomes stateful only for transient selected-track state. Default selection is first purchasable track, else first non-max track, else first track. Selection is not persisted.
 
 For each level `1..MiningContentRegistry.maxTechnologyLevel`:
 
-- `level <= track.level`: **owned**;
-- `level == track.level + 1 && track.canPurchase`: **actionable**;
-- `level == track.level + 1 && !track.isMaxLevel && !track.canPurchase`: **blocked**;
-- later levels: **future**.
+- `level <= track.level`: owned;
+- `level == track.level + 1 && track.canPurchase`: actionable;
+- `level == track.level + 1 && !track.isMaxLevel && !track.canPurchase`: blocked;
+- later levels: future.
 
-Render technology nodes with `MiningHex`. Actionable/blocked next nodes can select a track. Owned/future nodes are informational only.
-
-Every tappable node is at least `48×48`. Informational owned/future hexes may be visually smaller only when they have no tap/semantic button action.
+Render nodes with `MiningHex`. Actionable/blocked next nodes can select a track. Owned/future nodes are informational. Every tappable node is at least `48×48`.
 
 ### Portrait — `402×874`
 
-Match the mock:
+Match:
 
-- live mining backdrop and HUD remain visible above the panel;
-- panel begins at about `top: 190` on the canonical frame and shrinks safely on short phones;
+- live mining backdrop/HUD visible above panel;
+- panel begins around `top: 190` on canonical frame and shrinks safely on shorter phones;
 - Technology hex left, close hex right, drag handle centered;
-- `Technology` heading plus `MAX LV ${MiningContentRegistry.maxTechnologyLevel}`;
+- `Technology` + `MAX LV ${MiningContentRegistry.maxTechnologyLevel}`;
 - three vertical columns: Extraction, Logistics, Surveying;
 - levels descend `max → 1`;
-- connectors converge to a common root;
-- one selected-track detail/action card at the bottom.
+- connectors converge to common root;
+- one selected detail/action card at bottom.
 
-Only the selected track has a purchase control. The existing key `mining-technology-buy-${track.name}` stays on that visible action. Successful purchase keeps the current close-then-`onPurchase(track)` behavior.
+Only the selected track has a purchase control. Keep key `mining-technology-buy-${track.name}` on that action. Successful purchase keeps current close-then-callback behavior.
 
 ### Landscape — `874×402`
 
-Do not rotate or stretch the portrait tree.
+Do not rotate/stretch portrait.
 
-The mock was measured directly: the Technology panel is **528 px wide** at `874×402`. This is the canonical width. Offline Return's landscape panel is a separate **470 px** composition.
+The mock was measured directly: the Technology right-side panel is **528 px wide**. This is the canonical Technology landscape width. The previously documented 470px value was incorrect for Technology.
 
-Technology landscape contains:
-
-- a right-side full-height `528` px panel;
-- protruding Technology hex on its left edge;
-- heading/helper copy and close hex;
-- three horizontal level tracks;
-- levels `1 → max` across each row;
-- the same node-state mapping;
-- one compact selected-track effect/cost/action area.
-
-All selectable next nodes remain at least `48×48`.
+Landscape contains three horizontal level tracks, the same node-state mapping, and one selected detail/action area. All selectable next nodes remain at least `48×48`.
 
 ## Settings
 
 Keep `MiningSettingsSheet(audioManager:)` and `AudioManager` as the only preference owner.
 
-Preserve these stable keys:
+Preserve keys:
 
 - `mining-settings-sheet`
 - `mining-music-switch`
@@ -191,36 +151,26 @@ Preserve these stable keys:
 
 ### Portrait — `402×874`
 
-Match the mock's panel starting around `top: 392`:
+Match panel around `top: 392` with:
 
-1. Settings header with protruding tune hex.
-2. Audio card:
-   - `AUDIO` eyebrow;
-   - Music + `Cavern ambience` copy;
-   - inline ON/OFF pill with hex thumb;
-   - divider;
-   - Volume + percentage;
-   - real Material `Slider` with `divisions: 20`;
-   - `0 / 20 steps / 100` metadata.
-3. Accessibility card:
-   - `ACCESSIBILITY` eyebrow;
-   - Reduced motion;
-   - `SYSTEM` badge;
-   - copy that makes system ownership explicit.
+- Audio card;
+- inline Music ON/OFF pill with `MiningHex` thumb;
+- real Material `Slider(divisions: 20)` with percentage and `0 / 20 steps / 100` labels;
+- Accessibility card with Reduced motion + SYSTEM.
 
-Do not create a generic toggle widget. Keep the Music pill local to this file.
+Do not create a generic toggle widget.
 
-Use the real Material `Slider` for drag, keyboard, and semantics. Implement the mock's hex thumb as a small local `SliderComponentShape`; do not zero the stock thumb and place a second `Positioned` hex using manual track math.
+Use a small local `SliderComponentShape` for the hex thumb so Material Slider retains drag/keyboard/semantics. Do not zero the thumb and position a second hex manually.
 
 ### Landscape
 
-There is no canonical Settings landscape mock. Keep the same cards in a bounded, scrollable, safe-area-aware panel at `874×402`. Requirements are reachability, no overflow, correct semantics, and minimum target sizes; do not invent a new visual composition.
+No canonical Settings landscape mock exists. Keep the same cards in a bounded scrollable panel at `874×402`; requirements are no overflow, reachability, semantics, and 48px targets.
 
 ## Offline Return
 
-Keep `_showOfflineReturn(OfflineProductionSummary)` owned by `MiningShell`, but present it with Flutter's built-in non-dismissible `showGeneralDialog<void>` instead of a bottom sheet.
+Keep `_showOfflineReturn(OfflineProductionSummary)` owned by `MiningShell`, but present it through non-dismissible `showGeneralDialog<void>` instead of a bottom sheet.
 
-`OfflineReturnSheet` keeps the existing class/file name but becomes full-screen. It receives:
+`OfflineReturnSheet` remains the class/file name and receives:
 
 ```dart
 OfflineReturnSheet(
@@ -235,55 +185,29 @@ Do not extend `OfflineProductionSummary` for rendering-only values and do not ca
 
 ### Portrait — `402×874`
 
-Match:
-
-- `MiningVisuals.offlineHero` upper hero with dark gradient;
-- `MiningCashChip` top-left;
-- `FLEET RETURNED` status chip;
-- large elapsed duration;
-- orange cap/Logistics copy only when capped;
-- production grouped by real planet/resource data;
-- existing catalog silhouettes and full-site warnings;
-- one clear `CONTINUE MINING` action.
-
-Multiple producing planets remain scrollable and data-driven.
+Match hero + gradient, `MiningCashChip`, FLEET RETURNED status, elapsed/cap text, real planet/resource production, existing silhouettes/full-site warnings, and one Continue action. Multiple producing planets stay scrollable.
 
 ### Landscape — `874×402`
 
-The mock's right-side summary panel is **470 px wide**. Keep hero/result information on the left and production/Continue in the right flow.
+The mock's right-side Offline Return summary panel is **470 px wide**. Keep hero/result info left and production/Continue in the right flow.
 
 ### Motion
 
-The returned-status dot may pulse when animations are enabled. Follow the existing `MainMenu.didChangeDependencies()` pattern locally:
-
-- own one `AnimationController` in Offline Return;
-- inspect `MediaQuery.disableAnimations` in `didChangeDependencies`;
-- stop and render statically when reduced motion is true;
-- repeat only when animations are allowed;
-- dispose the controller with the widget.
-
-Do not add a shared animation service.
-
-## Error/degraded-asset behavior
-
-- optional image failures fall back to existing Material/icon/color treatment;
-- disabled technology actions show the existing `disabledReason` and never fire purchase;
-- Settings mutates only through `AudioManager`;
-- Offline Return always exposes Continue, including empty production or failed optional art.
+The returned-status dot may pulse when animations are enabled. Follow the existing `MainMenu.didChangeDependencies()` pattern locally: one controller, `MediaQuery.disableAnimations`, static state under reduced motion, repeat only when allowed, dispose with widget.
 
 ## Accessibility and responsive contract
 
-Across all three surfaces:
+Across all surfaces:
 
-- every tappable control is at least `48×48`;
-- icon-only controls have semantic labels;
-- technology state is not communicated by color alone;
+- every tappable control >= `48×48`;
+- icon-only controls have semantics;
+- Technology state is not color-only;
 - Material Slider semantics remain intact;
 - text scale `1.3` keeps critical controls reachable;
-- safe areas and rounded-device insets are respected;
+- safe areas are respected;
 - reduced motion removes nonessential animation.
 
-Explicit structural sizes:
+Explicit structural coverage:
 
 - `360×640` portrait;
 - `430×932` portrait;
@@ -292,25 +216,18 @@ Explicit structural sizes:
 
 ## Testing and parity evidence
 
-Extend existing focused tests and golden harness; do not build a new visual stack.
+Technology tests include:
 
-Technology tests must include:
+- starter fixture with Extraction level 0 actionable;
+- parity fixture covering owned/actionable/blocked/future/max states;
+- local selection and blocked reason;
+- callback only from visible selected purchase action;
+- `360×640` no-overflow + 1.3 reachability;
+- 528px landscape panel and 48px selectable nodes.
 
-- a **starter fixture** with Extraction level 0 actionable;
-- a **parity fixture** covering owned/actionable/blocked/future/max states;
-- local selection and disabled reason;
-- callback only from the visible selected purchase action;
-- `360×640` no-overflow and text-scale `1.3` `ensureVisible` coverage;
-- landscape `528` px panel and `48×48` tappable next nodes.
+Settings tests include AudioManager mutation, real 20-division Slider, SYSTEM presentation, `360×640`, `874×402`, and 1.3 reachability.
 
-Settings tests must include:
-
-- AudioManager mutation for Music and Volume;
-- real 20-division Slider;
-- SYSTEM reduced-motion presentation;
-- `360×640`, `874×402`, and text-scale `1.3` reachability/no-overflow.
-
-Offline Return tests keep existing duration/resource/full-site/cap/Continue coverage and add portrait/landscape full-screen route assertions.
+Offline tests keep duration/resource/full-site/cap/Continue coverage and add full-screen portrait/landscape route assertions.
 
 Five canonical Linux goldens remain:
 
@@ -322,9 +239,9 @@ Offline Return  402×874
 Offline Return  874×402
 ```
 
-For **Technology landscape**, the full-screen golden is a composition smoke test because the left-side Site Deck landscape UI is explicitly out of HPA-438 scope. Parity review scores the **rightmost 528 px Technology panel only**: panel edge, node geometry/state, typography, and detail/action area. Reviewers must not reject this ticket for current Site Deck landscape differences or expand the ticket to fix them.
+For **Technology landscape**, the full-screen golden is a composition smoke test because the left-side Site Deck landscape UI is explicitly out of HPA-438 scope. Parity review scores the **rightmost 528 px Technology panel only**: panel edge, nodes, typography, and detail/action area. Site Deck landscape differences must not expand this ticket.
 
-Golden setup loads Orbitron plus both IBM Plex Mono font files. Final PR evidence pairs the five mock captures with implementation goldens and states the landscape scoring boundary above.
+Golden setup loads Orbitron plus both IBM Plex Mono weights. Final evidence pairs the five mock captures with the implementation goldens and states the landscape scoring boundary.
 
 ## Expected file changes
 
@@ -354,4 +271,4 @@ test/mining/presentation/goldens/hpa438_*.png
 docs/superpowers/evidence/hpa-438/...
 ```
 
-No mining domain/state/repository/simulation file should change.
+No mining domain/state/repository/simulation or Site Deck presentation file should change.
