@@ -433,14 +433,14 @@ Offline Return:
 
 Do **not** add five full-screen HPA-438 goldens.
 
-The existing Linux CI runs non-skipped goldens, but two pre-existing baselines are permanently `skip:true` because they became stale. HPA-438 must not add another set of background-coupled full-screen baselines.
+The existing Linux CI executes non-skipped golden tests through `flutter test --coverage`, so a new non-skipped Linux golden mismatch is a real CI failure. The problem is not that the harness is wholly dead; it is that two pre-existing baselines are permanently `skip:true` and full-screen Technology baselines would couple HPA-438 to out-of-scope Site Deck pixels.
 
-Keep at most two new automated goldens, both scoped to Technology panel finders:
+Keep exactly two new automated goldens, both scoped to Technology panel finders:
 
 - Technology portrait panel;
 - Technology landscape 528 px panel.
 
-They are regression guards, not the parity acceptance gate.
+They use the repository's existing macOS/web skip predicate and therefore run in Ubuntu CI. They are regression guards, not the parity acceptance gate.
 
 As part of the same Linux visual-test pass, either:
 
@@ -530,7 +530,7 @@ test/mining/presentation/mining_settings_sheet_test.dart
 test/mining/presentation/offline_return_sheet_test.dart
 test/mining/presentation/mining_shell_test.dart
 test/mining/presentation/visual_parity_golden_test.dart
-test/mining/presentation/goldens/... # only panel goldens + existing baseline maintenance
+test/mining/presentation/goldens/... # two Technology panel goldens + existing baseline maintenance
 docs/superpowers/evidence/hpa-438/...
 ```
 
@@ -565,5 +565,5 @@ lib/mining/presentation/stellar_map_screen.dart
 - No domain/save/economy/progression mutation behavior changes.
 - No Site Deck/Mine Site/Stellar Map production changes.
 - Structural tests cover the dense/resume failure modes.
-- At most two scoped Technology panel goldens are added; pre-existing stale baselines are rehabilitated or removed, not multiplied.
+- Exactly two scoped Technology panel goldens are added; pre-existing stale baselines are rehabilitated or removed, not multiplied.
 - Five committed source-vs-app evidence rows form the visual parity acceptance gate.
