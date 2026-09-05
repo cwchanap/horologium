@@ -132,6 +132,10 @@ void main() {
   testWidgets('uses the Landing Basin prototype for an occupied T1 node', (
     tester,
   ) async {
+    // Force a cold image cache so the visual's first-impact deferral takes
+    // its deterministic budget flush path (see landing_basin_mining_node_visual
+    // for the rationale).
+    imageCache.clear();
     final state = _stateWith(
       landing: _progress(
         commissioned: true,
@@ -156,6 +160,11 @@ void main() {
       view: _siteView(state),
       dock: _dockView(state),
     );
+    // The visual defers its first one-shot impact until the finite gold
+    // frames finish precaching (capped by its deferral budget). Pump the
+    // budget so the deferred impact fires, then advance into the S1 hit
+    // window.
+    await tester.pump(const Duration(milliseconds: 200));
     await tester.pump(const Duration(milliseconds: 300));
     expect(
       find.descendant(

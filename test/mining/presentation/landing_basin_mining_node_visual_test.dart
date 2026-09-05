@@ -58,6 +58,13 @@ Transform _robotArmTransform(WidgetTester tester) => tester.widget<Transform>(
 );
 
 void main() {
+  // The visual defers its first one-shot impact until the finite gold frames
+  // finish precaching. In the fake-async test environment a cold image cache
+  // never decodes those frames, so the deferral budget is the deterministic
+  // flush path. Clearing the cache before each test prevents ordering-dependent
+  // warming from making the impact fire immediately instead of via the budget.
+  setUp(() => imageCache.clear());
+
   testWidgets('renders the staged plate and omits the rig without a rig', (
     tester,
   ) async {
@@ -139,6 +146,11 @@ void main() {
     final restArm = _robotArmTransform(tester).transform;
 
     await _pumpVisual(tester, impactSequence: 1);
+    // The first one-shot impact is deferred until the finite gold frames
+    // finish precaching (capped by the visual's deferral budget). Pump the
+    // budget so the deferred impact fires, then advance into the S1 hit
+    // window.
+    await tester.pump(const Duration(milliseconds: 200));
     await tester.pump(const Duration(milliseconds: 240));
     expect(_nodeAsset(tester), MiningVisuals.goldNodeHitAsset(1));
     expect(_robotBodyTransform(tester).transform, equals(restBody));
@@ -164,6 +176,9 @@ void main() {
     await _pumpVisual(tester, progress: .90, impactSequence: 1);
     expect(_nodeAsset(tester), MiningVisuals.goldNodeStageAsset(3));
 
+    // Pump the deferral budget so the deferred exhaust impact fires, then
+    // advance into the exhaust window.
+    await tester.pump(const Duration(milliseconds: 200));
     await tester.pump(const Duration(milliseconds: 240));
     expect(_nodeAsset(tester), MiningVisuals.goldNodeExhaustAsset(1));
     await tester.pump(const Duration(milliseconds: 100));
