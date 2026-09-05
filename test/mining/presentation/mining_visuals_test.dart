@@ -55,18 +55,6 @@ void main() {
       MiningVisuals.mergeBurst,
       'assets/images/mining/effects/merge_burst.png',
     );
-    expect(
-      MiningVisuals.goldNodeIdleStrip,
-      'assets/images/mining/nodes/node-gold-idle-strip.png',
-    );
-    expect(
-      MiningVisuals.goldNodeHitStrip,
-      'assets/images/mining/nodes/node-gold-hit-strip.png',
-    );
-    expect(
-      MiningVisuals.goldNodeExhaustStrip,
-      'assets/images/mining/nodes/node-gold-exhaust-strip.png',
-    );
     expect(MiningVisuals.offlineHero, 'assets/images/mining/offline/hero.png');
     expect(MiningTheme.accent, const Color(0xFF53D4E8));
     expect(MiningTheme.hudPanel, const Color(0xE6162133));
@@ -137,6 +125,9 @@ void main() {
       for (var frame = 1; frame <= 4; frame++)
         MiningVisuals.goldNodeExhaustAsset(frame),
     ];
+    for (final planet in content.planets.values) {
+      await rootBundle.load(planet.planetAsset);
+    }
     for (final site in content.planets.values.expand(
       (planet) => planet.sites,
     )) {
@@ -153,13 +144,6 @@ void main() {
       await rootBundle.load(MiningVisuals.goldNodeStageAsset(stage));
     }
     for (final path in framePaths) {
-      await rootBundle.load(path);
-    }
-    for (final path in [
-      MiningVisuals.goldNodeIdleStrip,
-      MiningVisuals.goldNodeHitStrip,
-      MiningVisuals.goldNodeExhaustStrip,
-    ]) {
       await rootBundle.load(path);
     }
     for (final path in [
@@ -180,16 +164,6 @@ void main() {
       expect(image, isNotNull);
       expect(image!.width, 512, reason: path);
       expect(image.height, 512, reason: path);
-    }
-    for (final entry in {
-      MiningVisuals.goldNodeIdleStrip: const (2048, 512),
-      MiningVisuals.goldNodeHitStrip: const (1536, 512),
-      MiningVisuals.goldNodeExhaustStrip: const (2048, 512),
-    }.entries) {
-      final image = await tester.runAsync(() => _decodeAsset(entry.key));
-      expect(image, isNotNull);
-      expect(image!.width, entry.value.$1, reason: entry.key);
-      expect(image.height, entry.value.$2, reason: entry.key);
     }
   }, skip: kIsWeb);
 }

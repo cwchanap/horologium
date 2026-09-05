@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
@@ -45,11 +47,37 @@ class _LandingBasinMiningNodeVisualState
   );
 
   int? _exhaustImpactSequence;
+  bool _framesPrecached = false;
 
   @override
   void initState() {
     super.initState();
     _syncIdleController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_framesPrecached) {
+      _framesPrecached = true;
+      _precacheFrames();
+    }
+  }
+
+  void _precacheFrames() {
+    final paths = <String>[
+      for (var stage = 1; stage <= 4; stage++)
+        MiningVisuals.goldNodeStageAsset(stage),
+      for (var frame = 1; frame <= 4; frame++)
+        MiningVisuals.goldNodeIdleAsset(frame),
+      for (var frame = 1; frame <= 3; frame++)
+        MiningVisuals.goldNodeHitAsset(frame),
+      for (var frame = 1; frame <= 4; frame++)
+        MiningVisuals.goldNodeExhaustAsset(frame),
+    ];
+    for (final path in paths) {
+      unawaited(precacheImage(AssetImage(path), context));
+    }
   }
 
   @override
