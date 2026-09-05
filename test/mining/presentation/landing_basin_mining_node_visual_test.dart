@@ -93,7 +93,10 @@ void main() {
   // [warmGoldFrames] before mounting the visual; its _precacheFrames then
   // completes from cache hits and _framesReady becomes true. Clearing the
   // cache before each test keeps non-impact tests cold and deterministic.
-  setUp(() => imageCache.clear());
+  setUp(() {
+    imageCache.clear();
+    imageCache.clearLiveImages();
+  });
 
   testWidgets('renders the staged plate and omits the rig without a rig', (
     tester,
