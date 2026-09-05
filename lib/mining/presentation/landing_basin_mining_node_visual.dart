@@ -46,12 +46,15 @@ class _LandingBasinMiningNodeVisualState
     animationBehavior: AnimationBehavior.preserve,
   );
 
-  /// Maximum wait for the finite gold frames to decode before playing the
-  /// first one-shot impact anyway. Production decode for these small PNGs
-  /// normally completes well under this budget, so the authored hit/exhaust
-  /// frames are ready before the first impact. The cap only triggers when
-  /// decode stalls (cold web, or headless tests where the platform asset
-  /// channel does not pump), so the visual never hangs waiting on images.
+  /// Maximum wait for the finite gold frames to decode before dropping the
+  /// first one-shot impact. Production decode for these small PNGs normally
+  /// completes well under this budget, so the authored hit/exhaust frames are
+  /// ready before the first impact. The cap only triggers when decode stalls
+  /// (cold web, or headless tests where the platform asset channel does not
+  /// pump); in that case the pending impact is dropped (kept static) rather
+  /// than fired against unresolved frames. Readiness stays tied to actual
+  /// [Future.wait] completion, so later impacts animate once the frames really
+  /// decode. The visual never hangs waiting on images.
   static const Duration _firstImpactDeferBudget = Duration(milliseconds: 200);
 
   int? _exhaustImpactSequence;
@@ -121,8 +124,16 @@ class _LandingBasinMiningNodeVisualState
     _deferTimer?.cancel();
     _deferTimer = Timer(_firstImpactDeferBudget, () {
       if (!mounted || _framesReady) return;
-      _framesReady = true;
-      _flushPendingImpact();
+      // Decode stalled past the safety budget. Drop this one impact and keep
+      // the node static instead of firing the one-shot against unresolved
+      // frames. Readiness stays owned by the precache [Future.wait] completion
+      // above, so later impacts animate correctly once the frames really
+      // decode. No historical replay: the pending sequence is discarded.
+      _deferTimer = null;
+      _pendingImpactSequence = null;
+      _pendingExhaust = false;
+      _exhaustImpactSequence = null;
+      _impactController.value = 1;
     });
   }
 
