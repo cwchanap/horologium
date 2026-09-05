@@ -19,6 +19,35 @@ abstract final class MiningVisuals {
   static String rigAsset(RigTier tier) =>
       'assets/images/mining/rigs/${tier.name}.png';
 
+  static String landingBasinRobotBodyAsset(RigTier tier) =>
+      'assets/images/mining/landing_basin/robot_${tier.name}_body.png';
+
+  static String landingBasinRobotArmAsset(RigTier tier) =>
+      'assets/images/mining/landing_basin/robot_${tier.name}_arm.png';
+
+  static String goldNodeStageAsset(int stage) => switch (stage) {
+    1 || 2 || 3 || 4 => 'assets/images/mining/nodes/node-gold-s$stage.png',
+    _ => throw RangeError.range(stage, 1, 4, 'stage'),
+  };
+
+  static String goldNodeIdleAsset(int frame) => switch (frame) {
+    1 || 2 || 3 || 4 =>
+      'assets/images/mining/nodes/node-gold-idle-${frame.toString().padLeft(2, '0')}.png',
+    _ => throw RangeError.range(frame, 1, 4, 'frame'),
+  };
+
+  static String goldNodeHitAsset(int frame) => switch (frame) {
+    1 || 2 || 3 =>
+      'assets/images/mining/nodes/node-gold-hit-${frame.toString().padLeft(2, '0')}.png',
+    _ => throw RangeError.range(frame, 1, 3, 'frame'),
+  };
+
+  static String goldNodeExhaustAsset(int frame) => switch (frame) {
+    1 || 2 || 3 || 4 =>
+      'assets/images/mining/nodes/node-gold-exhaust-${frame.toString().padLeft(2, '0')}.png',
+    _ => throw RangeError.range(frame, 1, 4, 'frame'),
+  };
+
   static const cashIcon = 'assets/images/mining/icons/cash.png';
   static const cargoIcon = 'assets/images/mining/icons/cargo.png';
   static const mergeIcon = 'assets/images/mining/icons/merge.png';

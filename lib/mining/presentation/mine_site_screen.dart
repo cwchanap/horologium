@@ -3,6 +3,7 @@ import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/presentation/fleet_dock.dart';
+import 'package:horologium/mining/presentation/landing_basin_mining_node_visual.dart';
 import 'package:horologium/mining/presentation/mining_dashed_border.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_hud.dart';
@@ -24,6 +25,7 @@ class MineSiteScreen extends StatelessWidget {
     this.onDestinationSelected,
     this.cash = 0,
     this.reducedMotion = false,
+    this.impactSequence = 0,
   });
 
   final MineSiteView view;
@@ -37,6 +39,7 @@ class MineSiteScreen extends StatelessWidget {
   final ValueChanged<MiningNavigationDestination>? onDestinationSelected;
   final int cash;
   final bool reducedMotion;
+  final int impactSequence;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +52,7 @@ class MineSiteScreen extends StatelessWidget {
                 fleetDock: fleetDock,
                 cash: cash,
                 reducedMotion: reducedMotion,
+                impactSequence: impactSequence,
                 onNodeTap: onNodeTap,
                 onBayTap: onBayTap,
                 onSpawnRig: onSpawnRig,
@@ -62,6 +66,7 @@ class MineSiteScreen extends StatelessWidget {
                 fleetDock: fleetDock,
                 cash: cash,
                 reducedMotion: reducedMotion,
+                impactSequence: impactSequence,
                 onNodeTap: onNodeTap,
                 onBayTap: onBayTap,
                 onSpawnRig: onSpawnRig,
@@ -81,6 +86,7 @@ class _PortraitMineSite extends StatelessWidget {
     required this.fleetDock,
     required this.cash,
     required this.reducedMotion,
+    required this.impactSequence,
     required this.onNodeTap,
     required this.onBayTap,
     required this.onSpawnRig,
@@ -94,6 +100,7 @@ class _PortraitMineSite extends StatelessWidget {
   final FleetDockView fleetDock;
   final int cash;
   final bool reducedMotion;
+  final int impactSequence;
   final ValueChanged<MiningNodeId> onNodeTap;
   final ValueChanged<DockBayId> onBayTap;
   final VoidCallback onSpawnRig;
@@ -137,6 +144,7 @@ class _PortraitMineSite extends StatelessWidget {
             child: _CavernScene(
               view: view,
               reducedMotion: reducedMotion,
+              impactSequence: impactSequence,
               onNodeTap: onNodeTap,
               onSellCargo: onSellCargo,
               portraitTopInset: pad.top,
@@ -189,6 +197,7 @@ class _LandscapeMineSite extends StatelessWidget {
     required this.fleetDock,
     required this.cash,
     required this.reducedMotion,
+    required this.impactSequence,
     required this.onNodeTap,
     required this.onBayTap,
     required this.onSpawnRig,
@@ -202,6 +211,7 @@ class _LandscapeMineSite extends StatelessWidget {
   final FleetDockView fleetDock;
   final int cash;
   final bool reducedMotion;
+  final int impactSequence;
   final ValueChanged<MiningNodeId> onNodeTap;
   final ValueChanged<DockBayId> onBayTap;
   final VoidCallback onSpawnRig;
@@ -236,6 +246,7 @@ class _LandscapeMineSite extends StatelessWidget {
             child: _CavernScene(
               view: view,
               reducedMotion: reducedMotion,
+              impactSequence: impactSequence,
               onNodeTap: onNodeTap,
               onSellCargo: onSellCargo,
               landscapeLeftInset: pad.left,
@@ -294,6 +305,7 @@ class _CavernScene extends StatelessWidget {
   const _CavernScene({
     required this.view,
     required this.reducedMotion,
+    required this.impactSequence,
     required this.onNodeTap,
     required this.onSellCargo,
     this.portraitTopInset = 0,
@@ -302,6 +314,7 @@ class _CavernScene extends StatelessWidget {
 
   final MineSiteView view;
   final bool reducedMotion;
+  final int impactSequence;
   final ValueChanged<MiningNodeId> onNodeTap;
   final VoidCallback onSellCargo;
   final double portraitTopInset;
@@ -319,6 +332,7 @@ class _CavernScene extends StatelessWidget {
                 view: view,
                 landscape: landscape,
                 reducedMotion: reducedMotion,
+                impactSequence: impactSequence,
                 onNodeTap: onNodeTap,
                 landscapeLeftInset: landscapeLeftInset,
                 cavernWidth: constraints.maxWidth,
@@ -363,6 +377,7 @@ class _MineCavern extends StatelessWidget {
     required this.view,
     required this.landscape,
     required this.reducedMotion,
+    required this.impactSequence,
     required this.onNodeTap,
     this.landscapeLeftInset = 0,
     this.cavernWidth = 0,
@@ -371,6 +386,7 @@ class _MineCavern extends StatelessWidget {
   final MineSiteView view;
   final bool landscape;
   final bool reducedMotion;
+  final int impactSequence;
   final ValueChanged<MiningNodeId> onNodeTap;
   final double landscapeLeftInset;
   final double cavernWidth;
@@ -501,13 +517,15 @@ class _MineCavern extends StatelessWidget {
       top: _nodeTop(index, landscape),
       child: _MineNodeButton(
         view: view.nodeList[index],
+        siteId: view.siteId,
         nodeAsset: view.definition.nodeAsset,
         nodeSize: _nodeSize(index, landscape),
         rigSize: _rigSize(index, landscape),
         progress: view.capacity <= 0
-            ? 0
-            : (view.cargo / view.capacity).clamp(0, 1),
+            ? 0.0
+            : (view.cargo / view.capacity).clamp(0.0, 1.0).toDouble(),
         reducedMotion: reducedMotion,
+        impactSequence: impactSequence,
         onTap: () => onNodeTap(view.nodeList[index].id),
       ),
     );
@@ -517,20 +535,24 @@ class _MineCavern extends StatelessWidget {
 class _MineNodeButton extends StatelessWidget {
   const _MineNodeButton({
     required this.view,
+    required this.siteId,
     required this.nodeAsset,
     required this.nodeSize,
     required this.rigSize,
     required this.progress,
     required this.reducedMotion,
+    required this.impactSequence,
     required this.onTap,
   });
 
   final MineSiteNodeView view;
+  final MiningSiteId siteId;
   final String nodeAsset;
   final double nodeSize;
   final double rigSize;
   final double progress;
   final bool reducedMotion;
+  final int impactSequence;
   final VoidCallback onTap;
 
   @override
@@ -538,6 +560,7 @@ class _MineNodeButton extends StatelessWidget {
     final enabled = view.canDeploy || view.canRecall;
     final canForwardDisabledTap = view.disabledReason != null;
     final label = _nodeLabel(view);
+    final useLandingBasinVisual = siteId == MiningSiteId.landingBasin;
     return Semantics(
       button: true,
       enabled: enabled,
@@ -556,52 +579,63 @@ class _MineNodeButton extends StatelessWidget {
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Image.asset(
-                          nodeAsset,
-                          width: nodeSize,
-                          height: nodeSize,
-                          opacity: view.rig == null
-                              ? const AlwaysStoppedAnimation(.62)
-                              : null,
-                        ),
-                        if (view.rig != null) ...[
-                          const SizedBox(width: 2),
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Image.asset(
-                                MiningVisuals.rigAsset(view.rig!),
-                                width: rigSize,
-                                height: rigSize,
-                              ),
-                              const SizedBox(height: 3),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 5,
-                                  vertical: 3,
+                    if (useLandingBasinVisual)
+                      LandingBasinMiningNodeVisual(
+                        nodeId: view.id,
+                        rig: view.rig,
+                        nodeSize: nodeSize,
+                        rigSize: rigSize,
+                        progress: progress,
+                        impactSequence: impactSequence,
+                        reducedMotion: reducedMotion,
+                      )
+                    else
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Image.asset(
+                            nodeAsset,
+                            width: nodeSize,
+                            height: nodeSize,
+                            opacity: view.rig == null
+                                ? const AlwaysStoppedAnimation(.62)
+                                : null,
+                          ),
+                          if (view.rig != null) ...[
+                            const SizedBox(width: 2),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Image.asset(
+                                  MiningVisuals.rigAsset(view.rig!),
+                                  width: rigSize,
+                                  height: rigSize,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: MiningTheme.accent,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  view.rig!.name.toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Color(0xFF04121A),
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w800,
+                                const SizedBox(height: 3),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 5,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: MiningTheme.accent,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    view.rig!.name.toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Color(0xFF04121A),
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
+                              ],
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
+                      ),
                     const SizedBox(height: 6),
                     Container(
                       width: nodeSize * .86,

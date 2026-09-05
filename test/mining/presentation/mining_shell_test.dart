@@ -7,6 +7,7 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_hud.dart';
+import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/mining_shell.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -136,6 +137,15 @@ Future<void> pumpShell(
     await tester.pump(const Duration(milliseconds: 100));
   }
   await tester.pump();
+}
+
+Future<void> pumpMiningTick(
+  WidgetTester tester,
+  TestClock clock, {
+  Duration elapsed = const Duration(seconds: 1),
+}) async {
+  clock.now = clock.now.add(elapsed);
+  await tester.pump(const Duration(seconds: 1));
 }
 
 MiningShellHandles shellHandles(WidgetTester tester) =>
@@ -577,6 +587,180 @@ void main() {
     );
   });
 
+  testWidgets('passive Landing Basin production increments one impact', (
+    tester,
+  ) async {
+    final clock = TestClock(_start);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingBasin(clock.now));
+    final savesBeforeTick = repository.saveCount;
+
+    await pumpShell(tester, repository: repository, clock: clock);
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+
+    final before = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+
+    await pumpMiningTick(tester, clock);
+
+    final after = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+    final gauge = tester.widget<MiningCargoGauge>(
+      find.byKey(const Key('mining-cargo-gauge')),
+    );
+
+    expect(after - before, 1);
+    expect(gauge.cargo, closeTo(.5, .0001));
+    expect(repository.saveCount, savesBeforeTick);
+  });
+
+  testWidgets('delayed foreground accrual still emits one impact', (
+    tester,
+  ) async {
+    final clock = TestClock(_start);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingBasin(clock.now));
+    await pumpShell(tester, repository: repository, clock: clock);
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+
+    final before = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+
+    await pumpMiningTick(tester, clock, elapsed: const Duration(seconds: 3));
+
+    final after = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+    expect(after - before, 1);
+    expect(
+      shellHandles(
+        tester,
+      ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+      closeTo(1.5, .0001),
+    );
+  });
+
+  testWidgets('final-fill production emits one impact and stops at capacity', (
+    tester,
+  ) async {
+    final clock = TestClock(_start);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingState(clock.now, cargo: 89.5));
+    await pumpShell(tester, repository: repository, clock: clock);
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+
+    final before = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+
+    await pumpMiningTick(tester, clock);
+
+    final after = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+    expect(after - before, 1);
+    expect(
+      shellHandles(
+        tester,
+      ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+      90,
+    );
+
+    await pumpMiningTick(tester, clock);
+
+    final afterFull = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+    expect(afterFull - after, 0);
+  });
+
+  testWidgets('closed Landing Basin production emits no impact', (
+    tester,
+  ) async {
+    final clock = TestClock(_start);
+    final initial = deployedLandingBasin(clock.now);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(
+      initial.copyWith(
+        sites: {
+          ...initial.sites,
+          MiningSiteId.carbonRidge: initial.sites[MiningSiteId.carbonRidge]!
+              .copyWith(unlocked: true, commissioned: true),
+        },
+      ),
+    );
+    await pumpShell(tester, repository: repository, clock: clock);
+    final carbonRidge = find.byKey(const Key('site-card-carbonRidge-enter'));
+    await tester.ensureVisible(carbonRidge);
+    await tester.tap(carbonRidge);
+    await tester.pump();
+
+    final before = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+    await pumpMiningTick(tester, clock);
+    final after = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+
+    expect(after - before, 0);
+  });
+
+  testWidgets('Landing Basin without a rig emits no impact', (tester) async {
+    final clock = TestClock(_start);
+    final initial = MiningSave.initial(nowUtc: clock.now);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(
+      initial.copyWith(
+        sites: {
+          ...initial.sites,
+          MiningSiteId.landingBasin: initial.sites[MiningSiteId.landingBasin]!
+              .copyWith(commissioned: true),
+        },
+      ),
+    );
+    await pumpShell(tester, repository: repository, clock: clock);
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+
+    final before = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+    await pumpMiningTick(tester, clock);
+    final after = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+
+    expect(after - before, 0);
+  });
+
+  testWidgets('already-full Landing Basin production emits no impact', (
+    tester,
+  ) async {
+    final clock = TestClock(_start);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingState(clock.now, cargo: 90));
+    await pumpShell(tester, repository: repository, clock: clock);
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+
+    final before = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+    await pumpMiningTick(tester, clock);
+    final after = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+
+    expect(after - before, 0);
+  });
+
   testWidgets('controller and audio identities survive rebuild and rotation', (
     tester,
   ) async {
@@ -758,4 +942,36 @@ void main() {
       expect(find.textContaining('Gold'), findsWidgets);
     },
   );
+
+  testWidgets('lifecycle resume does not replay passive impacts', (
+    tester,
+  ) async {
+    final clock = TestClock(_start);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingBasin(clock.now));
+    await pumpShell(tester, repository: repository, clock: clock);
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+
+    final before = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    clock.now = clock.now.add(const Duration(seconds: 10));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+
+    final after = tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+    expect(after - before, 0);
+    expect(
+      shellHandles(
+        tester,
+      ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+      greaterThan(0),
+    );
+  });
 }
