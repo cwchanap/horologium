@@ -55,11 +55,5 @@ abstract final class MiningVisuals {
   static const logisticsIcon = 'assets/images/mining/icons/logistics.png';
   static const surveyingIcon = 'assets/images/mining/icons/surveying.png';
   static const mergeBurst = 'assets/images/mining/effects/merge_burst.png';
-  static const goldNodeIdleStrip =
-      'assets/images/mining/nodes/node-gold-idle-strip.png';
-  static const goldNodeHitStrip =
-      'assets/images/mining/nodes/node-gold-hit-strip.png';
-  static const goldNodeExhaustStrip =
-      'assets/images/mining/nodes/node-gold-exhaust-strip.png';
   static const offlineHero = 'assets/images/mining/offline/hero.png';
 }
