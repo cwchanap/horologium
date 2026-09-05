@@ -46,8 +46,19 @@ class _LandingBasinMiningNodeVisualState
     animationBehavior: AnimationBehavior.preserve,
   );
 
+  /// Maximum wait for the finite gold frames to decode before playing the
+  /// first one-shot impact anyway. Production decode for these small PNGs
+  /// normally completes well under this budget, so the authored hit/exhaust
+  /// frames are ready before the first impact. The cap only triggers when
+  /// decode stalls (cold web, or headless tests where the platform asset
+  /// channel does not pump), so the visual never hangs waiting on images.
+  static const Duration _firstImpactDeferBudget = Duration(milliseconds: 200);
+
   int? _exhaustImpactSequence;
   bool _framesPrecached = false;
+  bool _framesReady = false;
+  int? _pendingImpactSequence;
+  bool _pendingExhaust = false;
 
   @override
   void initState() {
@@ -75,8 +86,47 @@ class _LandingBasinMiningNodeVisualState
       for (var frame = 1; frame <= 4; frame++)
         MiningVisuals.goldNodeExhaustAsset(frame),
     ];
-    for (final path in paths) {
-      unawaited(precacheImage(AssetImage(path), context));
+    final future = Future.wait([
+      for (final path in paths) precacheImage(AssetImage(path), context),
+    ]);
+    unawaited(
+      future.then((_) {
+        if (!mounted || _framesReady) return;
+        _framesReady = true;
+        _flushPendingImpact();
+      }),
+    );
+  }
+
+  void _fireImpact(bool shouldExhaust) {
+    _impactController.forward(from: 0);
+    _exhaustImpactSequence = shouldExhaust ? widget.impactSequence : null;
+  }
+
+  void _deferImpact(int sequence, bool shouldExhaust) {
+    _pendingImpactSequence = sequence;
+    _pendingExhaust = shouldExhaust;
+    // Park the controller at the start of the timeline so the authored
+    // wind-up (exhaust S3 hold) or the resting idle frame shows immediately
+    // while the finite hit/exhaust frames finish decoding. Only the forward
+    // that drives through those frames waits for decode.
+    _exhaustImpactSequence = shouldExhaust ? sequence : null;
+    _impactController.value = 0;
+    unawaited(
+      Future<void>.delayed(_firstImpactDeferBudget, () {
+        if (!mounted || _framesReady) return;
+        _framesReady = true;
+        _flushPendingImpact();
+      }),
+    );
+  }
+
+  void _flushPendingImpact() {
+    final pending = _pendingImpactSequence;
+    if (pending == null) return;
+    _pendingImpactSequence = null;
+    if (widget.impactSequence == pending && widget.rig != null) {
+      _fireImpact(_pendingExhaust);
     }
   }
 
@@ -87,12 +137,14 @@ class _LandingBasinMiningNodeVisualState
       _impactController.stop();
       _impactController.value = 1;
       _exhaustImpactSequence = null;
+      _pendingImpactSequence = null;
     } else if (widget.impactSequence != oldWidget.impactSequence) {
-      _impactController.forward(from: 0);
-      _exhaustImpactSequence =
-          oldWidget.progress < .90 && widget.progress >= .90
-          ? widget.impactSequence
-          : null;
+      final shouldExhaust = oldWidget.progress < .90 && widget.progress >= .90;
+      if (_framesReady) {
+        _fireImpact(shouldExhaust);
+      } else {
+        _deferImpact(widget.impactSequence, shouldExhaust);
+      }
     } else if (widget.progress < .90 &&
         _exhaustImpactSequence == widget.impactSequence) {
       _exhaustImpactSequence = null;
