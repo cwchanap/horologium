@@ -522,8 +522,8 @@ class _MineCavern extends StatelessWidget {
         nodeSize: _nodeSize(index, landscape),
         rigSize: _rigSize(index, landscape),
         progress: view.capacity <= 0
-            ? 0
-            : (view.cargo / view.capacity).clamp(0, 1),
+            ? 0.0
+            : (view.cargo / view.capacity).clamp(0.0, 1.0).toDouble(),
         reducedMotion: reducedMotion,
         impactSequence: impactSequence,
         onTap: () => onNodeTap(view.nodeList[index].id),
