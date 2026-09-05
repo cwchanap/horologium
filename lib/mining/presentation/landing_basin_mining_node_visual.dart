@@ -95,8 +95,20 @@ class _LandingBasinMiningNodeVisualState
       for (var frame = 1; frame <= 4; frame++)
         MiningVisuals.goldNodeExhaustAsset(frame),
     ];
+    final configuration = createLocalImageConfiguration(context);
+    final providers = [for (final path in paths) AssetImage(path)];
+    // If every frame is already cached and decoded (e.g. warmed by a prior
+    // precache or another node visual), mark ready synchronously. This avoids
+    // relying on [Future.wait] completion in fake-async test environments where
+    // [precacheImage] may not resolve during [tester.pump]; in production it
+    // skips a redundant async round-trip when the cache is already warm.
+    if (providers.every((p) => _isImageReady(p, configuration))) {
+      _framesReady = true;
+      _flushPendingImpact();
+      return;
+    }
     final future = Future.wait([
-      for (final path in paths) precacheImage(AssetImage(path), context),
+      for (final p in providers) precacheImage(p, context),
     ]);
     unawaited(
       future.then((_) {
@@ -105,6 +117,22 @@ class _LandingBasinMiningNodeVisualState
         _flushPendingImpact();
       }),
     );
+  }
+
+  /// Synchronously checks whether [provider] has a decoded image available in
+  /// the [ImageCache]. The [ImageStreamListener] fires with
+  /// `synchronousCall = true` when the completer already holds an [ImageInfo],
+  /// which only happens for cache hits that have finished decoding.
+  bool _isImageReady(ImageProvider provider, ImageConfiguration configuration) {
+    final stream = provider.resolve(configuration);
+    var ready = false;
+    late ImageStreamListener listener;
+    listener = ImageStreamListener((_, synchronousCall) {
+      if (synchronousCall) ready = true;
+    });
+    stream.addListener(listener);
+    stream.removeListener(listener);
+    return ready;
   }
 
   void _fireImpact(bool shouldExhaust) {
