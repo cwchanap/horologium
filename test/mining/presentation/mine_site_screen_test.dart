@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/fleet_dock_view.dart';
@@ -128,58 +129,87 @@ Future<void> _pumpMineSite(
   await tester.pump();
 }
 
-void main() {
-  testWidgets('uses the Landing Basin prototype for an occupied T1 node', (
-    tester,
-  ) async {
-    // Force a cold image cache so the visual's first-impact deferral takes
-    // its deterministic budget flush path (see landing_basin_mining_node_visual
-    // for the rationale).
-    imageCache.clear();
-    final state = _stateWith(
-      landing: _progress(
-        commissioned: true,
-        rigs: {MiningNodeId.n1: RigTier.t1},
-      ),
-    );
-    await _pumpMineSite(
-      tester,
-      size: const Size(402, 874),
-      view: _siteView(state),
-      dock: _dockView(state),
-    );
-
-    expect(find.byKey(const Key('landing-basin-deposit-n1')), findsOneWidget);
-    expect(find.byKey(const Key('landing-basin-robot-n1')), findsOneWidget);
-    expect(find.byKey(const Key('mine-site-node-n1')), findsOneWidget);
-
-    await _pumpMineSite(
-      tester,
-      size: const Size(402, 874),
-      impactSequence: 1,
-      view: _siteView(state),
-      dock: _dockView(state),
-    );
-    // The visual defers its first one-shot impact until the finite gold
-    // frames finish precaching (capped by its deferral budget). Pump the
-    // budget so the deferred impact fires, then advance into the S1 hit
-    // window.
-    await tester.pump(const Duration(milliseconds: 200));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('landing-basin-deposit-n1')),
-        matching: find.byWidgetPredicate(
-          (widget) =>
-              widget is Image &&
-              widget.image is AssetImage &&
-              (widget.image as AssetImage).assetName ==
-                  MiningVisuals.goldNodeHitAsset(1),
-        ),
-      ),
-      findsOneWidget,
-    );
+// Resolve the finite gold frame set in real async before the Landing Basin
+// visual mounts, so its _precacheFrames Future.wait completes from cache hits
+// and _framesReady becomes true via actual precache completion (the deferral
+// budget drops a stalled impact, it does not fire it). A bare host gives
+// precacheImage a Directionality context; the global image cache persists
+// across the subsequent pumpWidget that mounts the MineSiteScreen.
+Future<void> _warmGoldFrames(WidgetTester tester) async {
+  await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+  final context = tester.element(find.byType(MaterialApp));
+  await tester.runAsync(() async {
+    for (final path in [
+      for (var stage = 1; stage <= 4; stage++)
+        MiningVisuals.goldNodeStageAsset(stage),
+      for (var frame = 1; frame <= 4; frame++)
+        MiningVisuals.goldNodeIdleAsset(frame),
+      for (var frame = 1; frame <= 3; frame++)
+        MiningVisuals.goldNodeHitAsset(frame),
+      for (var frame = 1; frame <= 4; frame++)
+        MiningVisuals.goldNodeExhaustAsset(frame),
+    ]) {
+      await precacheImage(AssetImage(path), context);
+    }
   });
+  await tester.pump();
+}
+
+void main() {
+  testWidgets(
+    'uses the Landing Basin prototype for an occupied T1 node',
+    (tester) async {
+      // Warm the finite gold frames in real async so the visual's
+      // _framesReady becomes true via actual precache completion; the deferral
+      // budget drops a stalled impact rather than firing it (see
+      // landing_basin_mining_node_visual for the rationale).
+      await _warmGoldFrames(tester);
+      final state = _stateWith(
+        landing: _progress(
+          commissioned: true,
+          rigs: {MiningNodeId.n1: RigTier.t1},
+        ),
+      );
+      await _pumpMineSite(
+        tester,
+        size: const Size(402, 874),
+        view: _siteView(state),
+        dock: _dockView(state),
+      );
+
+      expect(find.byKey(const Key('landing-basin-deposit-n1')), findsOneWidget);
+      expect(find.byKey(const Key('landing-basin-robot-n1')), findsOneWidget);
+      expect(find.byKey(const Key('mine-site-node-n1')), findsOneWidget);
+
+      await _pumpMineSite(
+        tester,
+        size: const Size(402, 874),
+        impactSequence: 1,
+        view: _siteView(state),
+        dock: _dockView(state),
+      );
+      // With the finite frames warmed, _framesReady is true and the one-shot
+      // impact fires immediately on the sequence change (no deferral budget).
+      // Advance into the S1 hit window.
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('landing-basin-deposit-n1')),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Image &&
+                widget.image is AssetImage &&
+                (widget.image as AssetImage).assetName ==
+                    MiningVisuals.goldNodeHitAsset(1),
+          ),
+        ),
+        findsOneWidget,
+      );
+    },
+    // Finite-frame precache needs the VM asset channel; the structural Landing
+    // Basin keys are covered on web by the deposit-variants test below.
+    skip: kIsWeb,
+  );
 
   testWidgets(
     'selects Landing Basin deposit variants and articulated robot tiers per occupied node',
