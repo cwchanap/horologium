@@ -119,7 +119,7 @@ git commit -m "feat(mining): add staged gold node art"
 
 - [ ] **Step 1: Add failing consumer-visible widget tests**
 
-Extend `_pumpVisual` with `double progress = 0` and pass it to `LandingBasinMiningNodeVisual`. Add literal boundary cases that find the `Image` below `landing-basin-deposit-n1` and assert its `AssetImage.assetName`:
+Extend `_pumpVisual` with `double progress = 0` and pass it to `LandingBasinMiningNodeVisual`. Add literal boundary cases that find the `Image` below `landing-basin-gold-node` and assert its `AssetImage.assetName`:
 
 ```dart
 const cases = {
