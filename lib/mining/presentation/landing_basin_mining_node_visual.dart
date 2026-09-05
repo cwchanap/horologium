@@ -60,6 +60,12 @@ class _LandingBasinMiningNodeVisualState
   int? _pendingImpactSequence;
   bool _pendingExhaust = false;
 
+  /// The safety-cap timer for the deferred first impact. Tracked so it can be
+  /// cancelled in [dispose]; otherwise a cold-cache deferral that outlives the
+  /// widget (e.g. headless web tests where the asset channel never pumps)
+  /// leaves a pending timer after the tree is torn down.
+  Timer? _deferTimer;
+
   @override
   void initState() {
     super.initState();
@@ -112,13 +118,12 @@ class _LandingBasinMiningNodeVisualState
     // that drives through those frames waits for decode.
     _exhaustImpactSequence = shouldExhaust ? sequence : null;
     _impactController.value = 0;
-    unawaited(
-      Future<void>.delayed(_firstImpactDeferBudget, () {
-        if (!mounted || _framesReady) return;
-        _framesReady = true;
-        _flushPendingImpact();
-      }),
-    );
+    _deferTimer?.cancel();
+    _deferTimer = Timer(_firstImpactDeferBudget, () {
+      if (!mounted || _framesReady) return;
+      _framesReady = true;
+      _flushPendingImpact();
+    });
   }
 
   void _flushPendingImpact() {
@@ -138,6 +143,8 @@ class _LandingBasinMiningNodeVisualState
       _impactController.value = 1;
       _exhaustImpactSequence = null;
       _pendingImpactSequence = null;
+      _deferTimer?.cancel();
+      _deferTimer = null;
     } else if (widget.impactSequence != oldWidget.impactSequence) {
       final shouldExhaust = oldWidget.progress < .90 && widget.progress >= .90;
       if (_framesReady) {
@@ -349,6 +356,8 @@ class _LandingBasinMiningNodeVisualState
 
   @override
   void dispose() {
+    _deferTimer?.cancel();
+    _deferTimer = null;
     _impactController.dispose();
     _idleController.dispose();
     super.dispose();
