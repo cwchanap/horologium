@@ -1,0 +1,12 @@
+{
+  "name": "Horologium (Flutter)",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "flutter-web",
+      "command": "export PATH=\"/opt/flutter/bin:$PATH\" CHROME_EXECUTABLE=/usr/local/bin/google-chrome && flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080"
+    }
+  ],
+  "ports": [8080],
+  "chromeExecutablePath": "/usr/local/bin/google-chrome"
+}
