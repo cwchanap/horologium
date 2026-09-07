@@ -351,7 +351,9 @@ class _CavernScene extends StatelessWidget {
               ),
             ),
             Positioned(
-              left: landscape ? 236 : null,
+              left: landscape
+                  ? _landscapeX(236, .34, constraints.maxWidth)
+                  : null,
               right: landscape ? null : 18,
               top: landscape
                   ? null
@@ -508,7 +510,9 @@ class _MineCavern extends StatelessWidget {
       left = _landscapeN3ShiftedLeft(cavernWidth);
       right = null;
     } else {
-      left = _nodeLeft(index, landscape) + (landscape ? landscapeLeftInset : 0);
+      left =
+          _nodeLeft(index, landscape, cavernWidth) +
+          (landscape ? landscapeLeftInset : 0);
       right = null;
     }
     return Positioned(
@@ -779,21 +783,24 @@ class _SellControl extends StatelessWidget {
   );
 }
 
-// Landscape node left offsets are authored for the 874x402 prototype, whose
-// cavern is 770px wide (874 - 104 right rail). N1-N3 keep their authored
-// positions at every landscape width: their right edges (max 401 for N3) fit
-// inside any phone-width landscape cavern and stay clear of the fixed Sell
-// control (left 236, width 56 -> right 292). N4 (authored left 510) is the only
-// node that can overflow a narrower cavern; when it would, it is anchored to
-// the cavern's right edge instead of its authored left so its right side always
-// clears the Clip regardless of label width. When both N3 and N4 are occupied
-// N3 shifts left so N4 can right-anchor without painting over N3's tap target
-// (see _landscapeN4OverlapsOccupiedN3 and _landscapeN3ShiftedLeft); both
-// occupied tap targets then stay disjoint and fully contained. At 874x402
-// (cavern 770) the anchor does not engage and the authored prototype positions
-// are preserved.
-double _nodeLeft(int index, bool landscape) => landscape
-    ? const [22.0, 210.0, 307.0, 510.0][index]
+// Keep the proven compact layout through 667px, then expand to the mock's
+// percentage anchors at 874px. The 104px dock is outside cavernWidth.
+double _landscapeX(double compact, double fraction, double cavernWidth) {
+  if (cavernWidth <= 563) return compact;
+  if (cavernWidth < 770) {
+    final reference = 14 + 756 * fraction;
+    return compact + (reference - compact) * (cavernWidth - 563) / 207;
+  }
+  return 14 + (cavernWidth - 14) * fraction;
+}
+
+double _nodeLeft(int index, bool landscape, [double cavernWidth = 0]) =>
+    landscape
+    ? _landscapeX(
+        const [22.0, 210.0, 307.0, 510.0][index],
+        const [.01, .30, .45, .76][index],
+        cavernWidth,
+      )
     : const [18.0, 236.0, 86.0, 278.0][index];
 
 // Whether landscape N4 would overflow the cavern at its authored left. N4's
@@ -801,7 +808,7 @@ double _nodeLeft(int index, bool landscape) => landscape
 // a rig column), so reserve the max node width (image + gap + rig column)
 // against the available cavern width.
 bool _landscapeN4Overflows(double cavernWidth, double landscapeLeftInset) {
-  const authoredN4Left = 510.0;
+  final authoredN4Left = _nodeLeft(3, true, cavernWidth);
   final maxWidth = _nodeSize(3, true) + 2 + _rigSize(3, true);
   return authoredN4Left + landscapeLeftInset + maxWidth > cavernWidth;
 }
@@ -823,7 +830,8 @@ bool _landscapeN4OverlapsOccupiedN3(
   final n4OccupiedWidth = _nodeSize(3, true) + 2 + _rigSize(3, true);
   final n3OccupiedWidth = _nodeSize(2, true) + 2 + _rigSize(2, true);
   final rightAnchorLeft = cavernWidth - n4OccupiedWidth;
-  final n3Right = _nodeLeft(2, true) + landscapeLeftInset + n3OccupiedWidth;
+  final n3Right =
+      _nodeLeft(2, true, cavernWidth) + landscapeLeftInset + n3OccupiedWidth;
   return rightAnchorLeft < n3Right;
 }
 

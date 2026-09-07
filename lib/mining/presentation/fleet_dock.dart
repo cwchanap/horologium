@@ -47,12 +47,6 @@ class FleetDock extends StatelessWidget {
 
   List<Widget> _inlineChildren() => [
     const SizedBox(width: 54, child: _FleetLabel()),
-    SizedBox(
-      width: 48,
-      height: 54,
-      child: _SpawnHex(view: view, onSpawnRig: onSpawnRig),
-    ),
-    const SizedBox(width: 4),
     for (final bayId in DockBayId.values) ...[
       Expanded(
         child: SizedBox(
@@ -65,6 +59,12 @@ class FleetDock extends StatelessWidget {
       ),
       if (bayId != DockBayId.values.last) const SizedBox(width: 4),
     ],
+    const SizedBox(width: 4),
+    SizedBox(
+      width: 48,
+      height: 54,
+      child: _SpawnHex(view: view, onSpawnRig: onSpawnRig),
+    ),
   ];
 
   List<Widget> _horizontalChildren() => [
@@ -248,12 +248,7 @@ class _BayButton extends StatelessWidget {
             alignment: Alignment.center,
             children: [
               if (rig == null)
-                const Icon(
-                  Icons.add_circle_outline,
-                  color: Colors.white38,
-                  size: 27,
-                  semanticLabel: 'Empty bay',
-                )
+                Semantics(label: 'Empty bay', child: const SizedBox.expand())
               else
                 SizedBox(
                   width: rig.index >= RigTier.t3.index ? 38 : 36,

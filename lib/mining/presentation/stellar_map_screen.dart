@@ -238,7 +238,9 @@ class _PlanetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final definition = content.planet(view.id);
     final stateLabel = _stateLabel(view);
-    final height = view.isActive ? 264.0 : 290.0;
+    final height = view.isActive
+        ? 264.0
+        : (view.isUnlocked ? 290.0 : (view.isBusy ? 219.0 : 191.0));
     return Semantics(
       container: true,
       label: '${view.name}, ${stateLabel.toLowerCase()} planet',
@@ -325,7 +327,7 @@ class _PlanetCard extends StatelessWidget {
                 left: 14,
                 right: 14,
                 top: 54,
-                bottom: 70,
+                bottom: view.isUnlocked ? 70 : 60,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -349,23 +351,24 @@ class _PlanetCard extends StatelessWidget {
                           ),
                       ],
                     ),
-                    Row(
-                      children: [
-                        for (final indicator in view.siteIndicators) ...[
-                          Expanded(
-                            child: _SiteIndicator(
-                              key: Key(
-                                'stellar-map-site-${view.id.name}-${indicator.id.name}',
+                    if (view.isUnlocked)
+                      Row(
+                        children: [
+                          for (final indicator in view.siteIndicators) ...[
+                            Expanded(
+                              child: _SiteIndicator(
+                                key: Key(
+                                  'stellar-map-site-${view.id.name}-${indicator.id.name}',
+                                ),
+                                indicator: indicator,
+                                content: content,
                               ),
-                              indicator: indicator,
-                              content: content,
                             ),
-                          ),
-                          if (indicator != view.siteIndicators.last)
-                            const SizedBox(width: 8),
+                            if (indicator != view.siteIndicators.last)
+                              const SizedBox(width: 8),
+                          ],
                         ],
-                      ],
-                    ),
+                      ),
                   ],
                 ),
               ),
@@ -686,12 +689,18 @@ class _RequirementRow extends StatelessWidget {
             Image.asset(asset, width: 17, height: 17),
             const SizedBox(width: 7),
             Text(
-              '$value  ${requirement.isSatisfied ? '✓' : '×'}',
+              value,
               style: TextStyle(
                 color: color,
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
+            ),
+            const SizedBox(width: 7),
+            Icon(
+              requirement.isSatisfied ? Icons.check : Icons.close,
+              color: color,
+              size: 14,
             ),
           ],
         ),

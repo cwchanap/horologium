@@ -14,6 +14,49 @@ void main() {
     });
   });
 
+  testWidgets('portrait panel and right tab match the mock and dismiss', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(402, 874);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final manager = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+    );
+    addTearDown(manager.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                builder: (_) => MiningSettingsSheet(audioManager: manager),
+              ),
+              child: const Text('Open settings'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open settings'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(find.byKey(const Key('mining-sheet-panel'))).top,
+      392,
+    );
+    final close = find.bySemanticsLabel('Close Settings');
+    expect(tester.getRect(close).left, 320);
+    expect(tester.getRect(close).top, 362);
+    await tester.tap(close);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('mining-settings-sheet')), findsNothing);
+  });
+
   testWidgets('renders the injected AudioManager preferences and targets', (
     tester,
   ) async {
@@ -37,8 +80,9 @@ void main() {
 
     expect(
       tester
-          .widget<SwitchListTile>(find.byKey(const Key('mining-music-switch')))
-          .value,
+          .widget<Semantics>(find.byKey(const Key('mining-music-state')))
+          .properties
+          .toggled,
       isFalse,
     );
     expect(
@@ -54,6 +98,19 @@ void main() {
     expect(
       tester.getSize(find.byKey(const Key('mining-volume-slider'))).height,
       greaterThanOrEqualTo(48),
+    );
+    expect(
+      find.byKey(const Key('settings-accessibility-group')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('mining-music-switch')));
+    await tester.pump();
+    expect(manager.musicEnabled, isTrue);
+    expect(
+      tester
+          .widget<Slider>(find.byKey(const Key('mining-volume-slider')))
+          .onChanged,
+      isNotNull,
     );
     expect(tester.takeException(), isNull);
   });

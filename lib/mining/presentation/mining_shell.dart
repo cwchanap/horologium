@@ -13,6 +13,7 @@ import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
+import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_settings_sheet.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/offline_return_sheet.dart';
@@ -159,11 +160,51 @@ class _MiningShellState extends State<MiningShell>
   }
 
   Future<void> _showOfflineReturn(OfflineProductionSummary summary) {
+    return _showMiningSheet(
+      OfflineReturnSheet(
+        summary: summary,
+        content: _content,
+        logisticsLevel: _displayState.technology.logistics,
+        cash: _displayState.cash,
+      ),
+    );
+  }
+
+  Future<void> _showMiningSheet(Widget sheet) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => OfflineReturnSheet(summary: summary, content: _content),
+      barrierColor: Colors.black26,
+      constraints: const BoxConstraints(maxWidth: double.infinity),
+      builder: (sheetContext) {
+        if (sheet is! TechnologySheet && sheet is! MiningSettingsSheet) {
+          return sheet;
+        }
+        final settings = sheet is MiningSettingsSheet;
+        final deck = SiteDeckView.from(
+          state: _displayState,
+          content: _content,
+          isBusy: _controller.isBusy,
+        );
+        final site = _content.site(_openSiteId ?? deck.sites.first.id);
+        final destination = settings
+            ? MiningNavigationDestination.settings
+            : MiningNavigationDestination.technology;
+        return MiningSheetScene(
+          backgroundAsset: settings ? site.cardAsset : site.cavernAsset,
+          destination: destination,
+          cash: _displayState.cash,
+          cargo: deck.totalCargo,
+          capacity: deck.totalCapacity,
+          onDestinationSelected: (next) {
+            if (next == destination) return;
+            Navigator.of(sheetContext).pop();
+            _handleNavigation(next);
+          },
+          child: sheet,
+        );
+      },
     );
   }
 
@@ -172,12 +213,7 @@ class _MiningShellState extends State<MiningShell>
     if (!_initialized) return;
     unawaited(_audioManager.maybeStartBgm());
     unawaited(
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => MiningSettingsSheet(audioManager: _audioManager),
-      ),
+      _showMiningSheet(MiningSettingsSheet(audioManager: _audioManager)),
     );
   }
 
@@ -186,11 +222,8 @@ class _MiningShellState extends State<MiningShell>
     if (!_initialized) return;
     unawaited(_audioManager.maybeStartBgm());
     unawaited(
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => TechnologySheet(
+      _showMiningSheet(
+        TechnologySheet(
           view: TechnologySheetView.from(
             state: _controller.state,
             content: _content,

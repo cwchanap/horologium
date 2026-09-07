@@ -148,7 +148,7 @@ class _PortraitSiteDeck extends StatelessWidget {
               key: const Key('site-deck-header-art'),
               opacity: .55,
               child: Image.asset(
-                view.sites.first.cardAsset,
+                MiningVisuals.offlineHero,
                 fit: BoxFit.cover,
                 alignment: const Alignment(.2, 0),
               ),

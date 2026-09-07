@@ -4,7 +4,12 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/presentation/technology_sheet.dart';
 
-const _viewports = [Size(360, 640), Size(430, 932)];
+const _viewports = [
+  Size(360, 640),
+  Size(402, 874),
+  Size(430, 932),
+  Size(874, 402),
+];
 
 TechnologySheetView _view() => const TechnologySheetView(
   tracks: [
@@ -76,21 +81,33 @@ void main() {
       await _pumpSheet(tester, viewport);
 
       expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
-      expect(find.textContaining('Extraction · Level 0'), findsOneWidget);
-      expect(find.textContaining('Level 0'), findsWidgets);
-      expect(find.text('Mining rate ×1.00'), findsOneWidget);
-      expect(find.text('Next: Mining rate ×1.10'), findsOneWidget);
-      expect(find.text('Gate: Landing Basin commissioned'), findsNWidgets(2));
-
-      // Unmet gate reason flows straight from the view model.
       expect(
-        find.text('Commission the Landing Basin site first.'),
+        find.byKey(const Key('technology-node-extraction-1')),
         findsOneWidget,
       );
-
-      // Max level shows no next effect and no cost row.
+      if (viewport.width > viewport.height) {
+        expect(
+          tester.getRect(find.byKey(const Key('technology-root'))).right,
+          lessThan(
+            tester
+                .getRect(find.byKey(const Key('technology-node-extraction-1')))
+                .left,
+          ),
+        );
+        expect(
+          tester.getSize(find.byKey(const Key('technology-tree'))),
+          const Size(482, 196),
+        );
+      }
+      expect(find.text('×1.00'), findsOneWidget);
+      expect(find.text('×1.10'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('technology-track-logistics')));
+      await tester.pump();
+      expect(find.text('Commission Landing Basin'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('technology-track-surveying')));
+      await tester.pump();
       expect(find.text('9 of 9 sites revealable'), findsOneWidget);
-      expect(find.textContaining('Next:'), findsNWidgets(2));
+      expect(find.text('Max Level'), findsOneWidget);
 
       expect(tester.takeException(), isNull);
     });
@@ -101,6 +118,11 @@ void main() {
       await _pumpSheet(tester, viewport);
 
       for (final track in TechnologyTrack.values) {
+        await tester.ensureVisible(
+          find.byKey(Key('technology-track-${track.name}')),
+        );
+        await tester.tap(find.byKey(Key('technology-track-${track.name}')));
+        await tester.pump();
         final size = tester.getSize(
           find.byKey(Key('mining-technology-buy-${track.name}')),
         );
@@ -109,6 +131,27 @@ void main() {
       }
     });
   }
+
+  testWidgets('portrait upgrade action fits without scrolling', (tester) async {
+    await _pumpSheet(tester, const Size(402, 874));
+    final action = find.byKey(const Key('mining-technology-buy-extraction'));
+    expect(action.hitTestable(), findsOneWidget);
+    final root = find.byKey(const Key('technology-root'));
+    expect(root, findsOneWidget);
+    expect(
+      tester.getRect(root).top,
+      greaterThan(
+        tester
+            .getRect(find.byKey(const Key('technology-node-extraction-1')))
+            .bottom,
+      ),
+    );
+    expect(
+      tester.getRect(action).top,
+      greaterThan(tester.getRect(root).bottom),
+    );
+    expect(tester.getRect(action).bottom, lessThanOrEqualTo(874));
+  });
 
   testWidgets('enabled purchase buttons fire the callback with the track', (
     tester,
@@ -151,6 +194,9 @@ void main() {
 
     await openSheet();
 
+    await tester.ensureVisible(
+      find.byKey(const Key('mining-technology-buy-extraction')),
+    );
     await tester.tap(find.byKey(const Key('mining-technology-buy-extraction')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
@@ -158,6 +204,8 @@ void main() {
 
     // Gated and max-level tracks stay inert.
     await openSheet();
+    await tester.tap(find.byKey(const Key('technology-track-logistics')));
+    await tester.pump();
     final logistics = tester.widget<ElevatedButton>(
       find.descendant(
         of: find.byKey(const Key('mining-technology-buy-logistics')),
@@ -165,6 +213,8 @@ void main() {
       ),
     );
     expect(logistics.onPressed, isNull);
+    await tester.tap(find.byKey(const Key('technology-track-surveying')));
+    await tester.pump();
     final surveying = tester.widget<ElevatedButton>(
       find.descendant(
         of: find.byKey(const Key('mining-technology-buy-surveying')),

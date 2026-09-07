@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -117,6 +118,22 @@ void main() {
   testWidgets('every mining visual resolves with its authored dimensions', (
     tester,
   ) async {
+    final fonts =
+        jsonDecode(await rootBundle.loadString('FontManifest.json'))
+            as List<dynamic>;
+    for (final family in ['Orbitron', 'IBM Plex Mono']) {
+      final entries = fonts.where((entry) => entry['family'] == family);
+      expect(entries, hasLength(1), reason: '$family must be registered once');
+      final files = entries.single['fonts'] as List<dynamic>;
+      expect(files, isNotEmpty);
+      for (final file in files) {
+        expect(
+          file['asset'],
+          startsWith('assets/fonts/${family.replaceAll(' ', '')}'),
+        );
+        await rootBundle.load(file['asset'] as String);
+      }
+    }
     final framePaths = [
       for (var frame = 1; frame <= 4; frame++)
         MiningVisuals.goldNodeIdleAsset(frame),

@@ -72,6 +72,14 @@ flutter:
     - assets/audio/
 
   fonts:
+    - family: IBM Plex Mono
+      fonts:
+        - asset: assets/fonts/IBMPlexMono-400.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexMono-500.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexMono-600.ttf
+          weight: 600
     - family: Orbitron
       fonts:
         - asset: assets/fonts/Orbitron-Variable.ttf

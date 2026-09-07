@@ -7,6 +7,64 @@ import 'package:horologium/mining/presentation/offline_return_sheet.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 void main() {
+  testWidgets('landscape continue action is visible without scrolling', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(874, 402);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.bottomRight,
+            child: Padding(
+              padding: EdgeInsets.zero,
+              child: OfflineReturnSheet(
+                content: MiningContentRegistry.stellarMining(),
+                logisticsLevel: 3,
+                summary: const OfflineProductionSummary(
+                  elapsedUsed: Duration(hours: 16),
+                  produced: {ResourceType.gold: 742.5},
+                  productionByPlanet: {
+                    MiningPlanetId.homeworld: {
+                      ResourceType.gold: 742.5,
+                      ResourceType.coal: 318,
+                      ResourceType.stone: 96.4,
+                    },
+                  },
+                  fullSites: {MiningSiteId.landingBasin},
+                  wasOfflineCapped: true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    final button = find.byKey(const Key('offline-return-dismiss'));
+    expect(button.hitTestable(), findsOneWidget);
+    final report = find.byKey(const Key('offline-return-planet-homeworld'));
+    expect(tester.widget<Container>(report).decoration, isNull);
+    expect(tester.getRect(report).top, 52);
+    expect(tester.getRect(report).left, 421);
+    expect(tester.getRect(button).bottom, lessThanOrEqualTo(402));
+    expect(find.textContaining('Logistics LV 3'), findsOneWidget);
+    expect(
+      tester.getRect(find.byKey(const Key('offline-return-cap'))).bottom,
+      lessThanOrEqualTo(402),
+    );
+    expect(
+      tester.getRect(find.text('Storage full: Landing Basin.')).bottom,
+      lessThanOrEqualTo(402),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('renders one section per producing planet with catalog-resolved '
       'full sites', (tester) async {
     tester.view.devicePixelRatio = 1;
@@ -68,9 +126,7 @@ void main() {
     expect(
       find.descendant(
         of: homeworld,
-        matching: find.byIcon(
-          MiningContentRegistry.resourceSilhouettes[ResourceType.gold]!.icon,
-        ),
+        matching: find.byKey(const Key('offline-resource-gold')),
       ),
       findsOneWidget,
     );
@@ -165,10 +221,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(
-      find.text('Offline production was capped at 12h 0m.'),
-      findsOneWidget,
-    );
+    expect(find.text('Capped at 12h 00m'), findsOneWidget);
     expect(
       find.text('Offline production was capped at 8 hours.'),
       findsNothing,
