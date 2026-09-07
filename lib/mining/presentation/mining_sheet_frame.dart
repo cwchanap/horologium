@@ -123,6 +123,7 @@ class MiningSheetFrame extends StatelessWidget {
                 ),
               ),
             Positioned(
+              key: const Key('mining-sheet-close-tab'),
               top: landscape ? 58 : 0,
               left: landscape
                   ? 0
