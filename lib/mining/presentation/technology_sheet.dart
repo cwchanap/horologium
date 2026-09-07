@@ -78,6 +78,7 @@ class _TechnologySheetState extends State<TechnologySheet> {
                 height: horizontal ? 48 : 48,
                 child: Semantics(
                   selected: _selected == widget.view.tracks[index].track,
+                  label: horizontal ? widget.view.tracks[index].name : null,
                   child: InkWell(
                     key: Key(
                       'technology-track-${widget.view.tracks[index].track.name}',
