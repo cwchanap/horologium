@@ -73,6 +73,12 @@ Future<void> _pumpSheet(WidgetTester tester, Size viewport) async {
   await tester.pump();
 }
 
+String _trackDisplayName(TechnologyTrack track) => switch (track) {
+  TechnologyTrack.extraction => 'Extraction',
+  TechnologyTrack.logistics => 'Logistics',
+  TechnologyTrack.surveying => 'Surveying',
+};
+
 void main() {
   for (final viewport in _viewports) {
     testWidgets('renders track affordances from the view at $viewport', (
@@ -151,6 +157,33 @@ void main() {
       greaterThan(tester.getRect(root).bottom),
     );
     expect(tester.getRect(action).bottom, lessThanOrEqualTo(874));
+  });
+
+  testWidgets('landscape track selectors expose their name as semantics', (
+    tester,
+  ) async {
+    // In landscape the visible track-name Text is omitted and the icon has no
+    // semantic label, so the track selector must contribute its name through
+    // the wrapping Semantics node for screen readers.
+    await _pumpSheet(tester, const Size(874, 402));
+
+    for (final track in TechnologyTrack.values) {
+      expect(find.bySemanticsLabel(_trackDisplayName(track)), findsOneWidget);
+    }
+
+    // Selection toggles the `selected` flag on the named node.
+    await tester.tap(find.byKey(const Key('technology-track-logistics')));
+    await tester.pump();
+    final logistics = tester.widget<Semantics>(
+      find
+          .ancestor(
+            of: find.byKey(const Key('technology-track-logistics')),
+            matching: find.byType(Semantics),
+          )
+          .first,
+    );
+    expect(logistics.properties.selected, isTrue);
+    expect(logistics.properties.label, 'Logistics');
   });
 
   testWidgets('enabled purchase buttons fire the callback with the track', (

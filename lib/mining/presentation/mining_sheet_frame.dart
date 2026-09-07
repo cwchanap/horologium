@@ -26,6 +26,7 @@ class MiningSheetFrame extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final landscape = size.width > size.height;
+    final pad = MediaQuery.paddingOf(context);
     return Align(
       alignment: Alignment.bottomRight,
       heightFactor: 1,
@@ -150,7 +151,7 @@ class MiningSheetFrame extends StatelessWidget {
             if (landscape || !portraitTabOnRight)
               Positioned(
                 top: landscape ? 52 : 0,
-                right: 14,
+                right: 14 + pad.right,
                 child: SizedBox(
                   width: 52,
                   height: landscape ? 54 : 58,
