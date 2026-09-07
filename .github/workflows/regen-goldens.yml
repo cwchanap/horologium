@@ -1,7 +1,8 @@
 name: Regen goldens
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [codex/ui-mock-gameplay-parity]
 
 jobs:
   regen:
