@@ -226,6 +226,34 @@ void main() {
     },
   );
 
+  testWidgets(
+    'technology sheet HUD refreshes cargo while the foreground timer accrues',
+    (tester) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start));
+      final clock = TestClock(_start);
+      await pumpShell(tester, repository: repository, clock: clock);
+
+      shellHandles(tester).openTechnology();
+      await tester.pump();
+
+      MiningCargoGauge sheetGauge() => tester.widget<MiningCargoGauge>(
+        find.descendant(
+          of: find.byType(MiningSheetScene),
+          matching: find.byKey(const Key('mining-cargo-gauge')),
+        ),
+      );
+
+      expect(sheetGauge().cargo, 0);
+
+      await pumpMiningTick(tester, clock);
+      await tester.pump();
+
+      expect(sheetGauge().cargo, greaterThan(0));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('renders the Site Deck and active-planet HUD', (tester) async {
     await pumpShell(tester);
 

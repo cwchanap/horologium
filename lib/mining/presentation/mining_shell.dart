@@ -57,6 +57,7 @@ class _MiningShellState extends State<MiningShell>
   late final AudioManager _audioManager;
   late final bool _createdAudioManager;
   late MiningSave _displayState;
+  late final ValueNotifier<MiningSave> _displayNotifier;
   Timer? _refreshTimer;
   bool _initialized = false;
   bool _reducedMotion = false;
@@ -80,6 +81,7 @@ class _MiningShellState extends State<MiningShell>
       nowUtc: nowUtc,
     );
     _displayState = MiningSave.initial(nowUtc: nowUtc());
+    _displayNotifier = ValueNotifier<MiningSave>(_displayState);
     WidgetsBinding.instance.addObserver(this);
     unawaited(_initialize());
   }
@@ -140,6 +142,7 @@ class _MiningShellState extends State<MiningShell>
   void _refreshPresentation() {
     if (!_initialized) return;
     _displayState = _controller.state;
+    _displayNotifier.value = _controller.state;
     _reducedMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? _reducedMotion;
     if (mounted) setState(() {});
@@ -191,18 +194,32 @@ class _MiningShellState extends State<MiningShell>
         final destination = settings
             ? MiningNavigationDestination.settings
             : MiningNavigationDestination.technology;
-        return MiningSheetScene(
-          backgroundAsset: settings ? site.cardAsset : site.cavernAsset,
-          destination: destination,
-          cash: _displayState.cash,
-          cargo: deck.totalCargo,
-          capacity: deck.totalCapacity,
-          onDestinationSelected: (next) {
-            if (next == destination) return;
-            Navigator.of(sheetContext).pop();
-            _handleNavigation(next);
+        // The bottom-sheet route is a separate overlay route, so
+        // `MiningShell.setState` does not rebuild it. Consume the shell's
+        // display notifier so the scene HUD tracks live cash/cargo/capacity
+        // while the foreground timer accrues.
+        return ValueListenableBuilder<MiningSave>(
+          valueListenable: _displayNotifier,
+          builder: (context, state, _) {
+            final liveDeck = SiteDeckView.from(
+              state: state,
+              content: _content,
+              isBusy: _controller.isBusy,
+            );
+            return MiningSheetScene(
+              backgroundAsset: settings ? site.cardAsset : site.cavernAsset,
+              destination: destination,
+              cash: state.cash,
+              cargo: liveDeck.totalCargo,
+              capacity: liveDeck.totalCapacity,
+              onDestinationSelected: (next) {
+                if (next == destination) return;
+                Navigator.of(sheetContext).pop();
+                _handleNavigation(next);
+              },
+              child: sheet,
+            );
           },
-          child: sheet,
         );
       },
     );
@@ -475,6 +492,7 @@ class _MiningShellState extends State<MiningShell>
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _displayNotifier.dispose();
     WidgetsBinding.instance.removeObserver(this);
     if (_initialized) _checkpoint(accrue: false);
     if (_createdAudioManager) unawaited(_audioManager.dispose());
