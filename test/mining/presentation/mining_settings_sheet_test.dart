@@ -49,7 +49,11 @@ void main() {
       tester.getRect(find.byKey(const Key('mining-sheet-panel'))).top,
       392,
     );
-    final close = find.bySemanticsLabel('Close Settings');
+    // Rects are asserted through the key: 3.32 merges the labeled semantics
+    // node sheet-wide, so its rect is version-dependent while the tab layout
+    // is not. The label itself is still asserted for a11y coverage.
+    expect(find.bySemanticsLabel('Close Settings'), findsOneWidget);
+    final close = find.byKey(const Key('mining-sheet-close-tab'));
     expect(tester.getRect(close).left, 320);
     expect(tester.getRect(close).top, 362);
     await tester.tap(close);
