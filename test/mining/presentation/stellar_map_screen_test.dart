@@ -123,10 +123,22 @@ void main() {
     );
     expect(find.text('Mars Frontier'), findsOneWidget);
     expect(
+      find.byKey(const Key('stellar-map-site-lunarFrontier-frostShelf')),
+      findsNothing,
+    );
+    expect(
+      tester
+          .getRect(
+            find.byKey(const Key('mining-stellar-map-teaser-marsFrontier')),
+          )
+          .bottom,
+      lessThan(775),
+    );
+    expect(
       tester.getRect(
         find.byKey(const Key('mining-stellar-map-teaser-marsFrontier')),
       ),
-      const Rect.fromLTWH(14, 722, 374, 104),
+      const Rect.fromLTWH(14, 623, 374, 104),
     );
     expect(
       find.byKey(const Key('stellar-map-site-homeworld-landingBasin')),
@@ -192,7 +204,13 @@ void main() {
       ),
       isA<Row>(),
     );
-    expect(find.text('0/3'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('stellar-map-planet-homeworld-summary')),
+        matching: find.text('0/3'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('0.0/s'), findsOneWidget);
   });
 
@@ -228,15 +246,15 @@ void main() {
       findsNothing,
     );
     expect(
-      find.descendant(of: mars, matching: find.text('0/3  ×')),
+      find.descendant(of: mars, matching: find.text('0/3')),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: mars, matching: find.text('LV 5  ×')),
+      find.descendant(of: mars, matching: find.text('LV 5')),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: mars, matching: find.text('20000  ×')),
+      find.descendant(of: mars, matching: find.text('20000')),
       findsOneWidget,
     );
     expect(
@@ -248,24 +266,22 @@ void main() {
     );
     expect(
       find.byKey(const Key('stellar-map-site-marsFrontier-ochreBasin')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const Key('stellar-map-site-marsFrontier-silicaDunes')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const Key('stellar-map-site-marsFrontier-cobaltChasm')),
-      findsOneWidget,
+      findsNothing,
     );
   });
 
   testWidgets(
-    'non-active card keeps requirements and site indicators from overlapping',
+    'locked card keeps requirements and busy notice above its action',
     (tester) async {
-      // The densest non-active case: three requirement rows plus the busy
-      // notice plus three site indicators, pumped at 1.3x text scale. The
-      // requirement section and the indicator row must not collide.
+      // Three requirements and a busy notice must fit above the action.
       final view = StellarMapView.from(
         state: _stateWith(
           unlockedPlanets: {
@@ -283,13 +299,13 @@ void main() {
       );
       final requirementBottom = [
         tester
-            .getRect(find.descendant(of: mars, matching: find.text('0/3  ×')))
+            .getRect(find.descendant(of: mars, matching: find.text('0/3')))
             .bottom,
         tester
-            .getRect(find.descendant(of: mars, matching: find.text('LV 5  ×')))
+            .getRect(find.descendant(of: mars, matching: find.text('LV 5')))
             .bottom,
         tester
-            .getRect(find.descendant(of: mars, matching: find.text('20000  ×')))
+            .getRect(find.descendant(of: mars, matching: find.text('20000')))
             .bottom,
         tester
             .getRect(
@@ -300,28 +316,13 @@ void main() {
             )
             .bottom,
       ].reduce(math.max);
-      final indicatorTop = [
-        tester
-            .getRect(
-              find.byKey(const Key('stellar-map-site-marsFrontier-ochreBasin')),
-            )
-            .top,
-        tester
-            .getRect(
-              find.byKey(
-                const Key('stellar-map-site-marsFrontier-silicaDunes'),
-              ),
-            )
-            .top,
-        tester
-            .getRect(
-              find.byKey(
-                const Key('stellar-map-site-marsFrontier-cobaltChasm'),
-              ),
-            )
-            .top,
-      ].reduce(math.min);
-      expect(requirementBottom, lessThanOrEqualTo(indicatorTop));
+      final actionTop = tester
+          .getRect(
+            find.byKey(const Key('mining-stellar-map-unlock-marsFrontier')),
+          )
+          .top;
+      expect(requirementBottom, lessThanOrEqualTo(actionTop));
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -407,7 +408,7 @@ void main() {
                 'stellar-map-site-${planet.id.name}-',
               ),
         );
-        expect(indicators, findsNWidgets(3));
+        expect(indicators, findsNWidgets(planet.isUnlocked ? 3 : 0));
       }
     }
   });

@@ -348,6 +348,12 @@ void main() {
     }
 
     final spawn = find.byKey(const Key('fleet-dock-spawn'));
+    expect(
+      tester.getRect(spawn).left,
+      greaterThan(
+        tester.getRect(find.byKey(const ValueKey<String>('b4'))).right,
+      ),
+    );
     final spawnSize = tester.getSize(spawn);
     expect(spawnSize.width, greaterThanOrEqualTo(48));
     expect(spawnSize.height, greaterThanOrEqualTo(48));

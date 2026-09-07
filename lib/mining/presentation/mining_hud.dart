@@ -86,7 +86,7 @@ class MiningCashChip extends StatelessWidget {
       label: 'Cash $cash',
       child: Container(
         key: const Key('mining-cash-chip'),
-        height: compact ? 39 : null,
+        height: compact ? 39 : 46,
         constraints: BoxConstraints(minWidth: 76, minHeight: compact ? 39 : 46),
         padding: compact
             ? const EdgeInsets.fromLTRB(12, 9, 20, 9)
@@ -119,11 +119,14 @@ class MiningCashChip extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  '$cash',
+                  cash.toString().replaceAllMapped(
+                    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+                    (_) => ',',
+                  ),
                   style: TextStyle(
                     color: MiningTheme.warning,
                     fontSize: compact ? 19 : 22,
-                    height: compact ? 1 : null,
+                    height: 1,
                     fontWeight: FontWeight.w900,
                   ),
                 ),

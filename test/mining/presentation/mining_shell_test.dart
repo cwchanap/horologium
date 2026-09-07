@@ -7,6 +7,8 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_hud.dart';
+import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
+import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/mining_shell.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -155,6 +157,74 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
+
+  testWidgets(
+    'open technology sheet adapts to rotation and preserves the visor',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(430, 932);
+      final audio = AudioManager(
+        backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      );
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        await audio.dispose();
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MiningShell(nowUtc: () => _start, audioManager: audio),
+        ),
+      );
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      shellHandles(tester).openTechnology();
+      await tester.pumpAndSettle();
+      final sheet = find.byKey(const Key('mining-technology-sheet'));
+      expect(tester.getRect(sheet).top, greaterThan(130));
+      expect(tester.getSize(sheet).width, 430);
+      tester.view.physicalSize = const Size(874, 402);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(find.byKey(const Key('mining-sheet-panel'))).left,
+        greaterThan(300),
+      );
+      expect(
+        tester.getSize(find.byKey(const Key('mining-sheet-panel'))).width,
+        528,
+      );
+      final scene = find.byType(MiningSheetScene);
+      final navigation = tester.widget<MiningNavigationBar>(
+        find.descendant(of: scene, matching: find.byType(MiningNavigationBar)),
+      );
+      expect(navigation.selected, MiningNavigationDestination.technology);
+      expect(
+        tester
+            .widget<Image>(find.byKey(const Key('mining-sheet-background')))
+            .image,
+        AssetImage(
+          MiningContentRegistry.stellarMining()
+              .site(MiningSiteId.landingBasin)
+              .cavernAsset,
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.tap(
+        find.descendant(
+          of: scene,
+          matching: find.byKey(const Key('mining-nav-settings')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(sheet, findsNothing);
+      expect(find.byKey(const Key('mining-settings-sheet')), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Close Settings'));
+      await tester.pumpAndSettle();
+      expect(sheet, findsNothing);
+    },
+  );
 
   testWidgets('renders the Site Deck and active-planet HUD', (tester) async {
     await pumpShell(tester);
@@ -883,10 +953,9 @@ void main() {
     expect(sheet, findsOneWidget);
     expect(
       tester
-          .widget<SwitchListTile>(
-            find.descendant(of: sheet, matching: find.byType(SwitchListTile)),
-          )
-          .value,
+          .widget<Semantics>(find.byKey(const Key('mining-music-state')))
+          .properties
+          .toggled,
       isFalse,
     );
     expect(

@@ -645,6 +645,21 @@ void main() {
       );
       final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
       expect(cavern, const Rect.fromLTWH(0, 0, 770, 402));
+      for (final entry in {
+        'n1': 21.56,
+        'n2': 240.80,
+        'n3': 354.20,
+        'n4': 588.56,
+      }.entries) {
+        expect(
+          tester.getRect(find.byKey(Key('mine-site-node-${entry.key}'))).left,
+          closeTo(entry.value, .01),
+        );
+      }
+      expect(
+        tester.getRect(find.byKey(const Key('mine-site-sell'))).left,
+        closeTo(271.04, .01),
+      );
       expect(rail.width, 104);
       expect(cavern.right, lessThanOrEqualTo(rail.left));
       expect(
@@ -676,16 +691,8 @@ void main() {
     },
   );
 
-  // Landscape node left offsets are authored for the 874x402 prototype
-  // (cavern 770px). N1-N3 keep their authored positions at every width; only
-  // N4 (authored left 510) can overflow a narrower cavern, so when it would it
-  // is anchored to the cavern's right edge instead of its authored left. At
-  // 667x375 the cavern is 563px: N4's right edge sits at the cavern boundary
-  // while N1-N3 stay put. N3 (left 307, right 401) must also stay clear of the
-  // fixed Sell control (left 236, width 56 -> right 292), which is painted
-  // later in the cavern Stack and would otherwise mask N3's tap target. At
-  // 874x402 the right-anchor does not engage (covered by the 'fits landscape
-  // cavern and controls inside the fixed right rail' test).
+  // Narrow landscapes retain compact anchors and collision safeguards;
+  // the wider prototype uses percentage anchors checked above.
   testWidgets('keeps every landscape node inside the cavern at 667x375', (
     tester,
   ) async {

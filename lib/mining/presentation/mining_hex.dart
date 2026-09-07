@@ -43,7 +43,7 @@ class _HexClipper extends CustomClipper<Path> {
   const _HexClipper();
 
   @override
-  Path getClip(Size size) => _hexPath(size);
+  Path getClip(Size size) => miningHexPath(size);
 
   @override
   bool shouldReclip(_HexClipper oldClipper) => false;
@@ -57,7 +57,7 @@ class _HexBorderPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = _hexPath(size);
+    final path = miningHexPath(size);
     canvas.drawPath(path, Paint()..color = fill);
     canvas.drawPath(
       path,
@@ -73,7 +73,7 @@ class _HexBorderPainter extends CustomPainter {
       fill != oldDelegate.fill || border != oldDelegate.border;
 }
 
-Path _hexPath(Size size) => Path()
+Path miningHexPath(Size size) => Path()
   ..moveTo(size.width / 2, 0)
   ..lineTo(size.width, size.height * .25)
   ..lineTo(size.width, size.height * .75)

@@ -7,7 +7,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      const MaterialApp(home: Align(child: MiningCashChip(cash: 412))),
+      const MaterialApp(home: Align(child: MiningCashChip(cash: 1840))),
     );
 
     final container = tester.widget<Container>(
@@ -15,6 +15,9 @@ void main() {
     );
     final decoration = container.decoration! as ShapeDecoration;
     final rect = tester.getRect(find.byKey(const Key('mining-cash-chip')));
+    expect(rect.height, 46);
+    expect(find.text('1,840'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^Cash 1840')), findsOneWidget);
     final path = decoration.shape.getOuterPath(
       Rect.fromLTWH(0, 0, rect.width, rect.height),
     );
