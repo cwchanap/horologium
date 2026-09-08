@@ -625,7 +625,8 @@ This task is deliberately large. Do not split the identity removal into non-comp
 
 **Interfaces:**
 - `SiteProgress.rigPlacements: List<MiningRigPlacement>` replaces `rigByNode`.
-- `MiningRigPlacement` is a value object; placement lists are unmodifiable.
+- `MiningRigPlacement` is a value object; persisted/copied placement lists are unmodifiable.
+- `SiteProgress` intentionally loses its `const` constructor so construction can defensively wrap `rigPlacements` with `List.unmodifiable`; remove `const` from any affected fixtures during this atomic task.
 - Controller deploy/recall use `MiningGridCell`.
 - `SiteMetrics` and simulation read placement tiers.
 - `TechnologyTrackView` uses deposit vocabulary.
@@ -657,11 +658,11 @@ test('site progress serializes and protects rig placements', () {
     tier: RigTier.t2,
     cell: MiningGridCell(3, 2),
   );
-  const progress = SiteProgress(
+  final progress = SiteProgress(
     unlocked: true,
     commissioned: true,
     storedAmount: 12.5,
-    rigPlacements: [placement],
+    rigPlacements: const [placement],
   );
 
   expect(progress.toJson()['rigPlacements'], [
@@ -705,9 +706,33 @@ class MiningRigPlacement {
   @override
   int get hashCode => Object.hash(tier, cell);
 }
-```
 
-`SiteProgress` stores `List<MiningRigPlacement> rigPlacements`. In constructor/copy paths use `List.unmodifiable`.
+class SiteProgress {
+  SiteProgress({
+    required this.unlocked,
+    required this.commissioned,
+    required this.storedAmount,
+    required List<MiningRigPlacement> rigPlacements,
+  }) : rigPlacements = List<MiningRigPlacement>.unmodifiable(rigPlacements);
+
+  final bool unlocked;
+  final bool commissioned;
+  final double storedAmount;
+  final List<MiningRigPlacement> rigPlacements;
+
+  SiteProgress copyWith({
+    bool? unlocked,
+    bool? commissioned,
+    double? storedAmount,
+    List<MiningRigPlacement>? rigPlacements,
+  }) => SiteProgress(
+    unlocked: unlocked ?? this.unlocked,
+    commissioned: commissioned ?? this.commissioned,
+    storedAmount: storedAmount ?? this.storedAmount,
+    rigPlacements: rigPlacements ?? this.rigPlacements,
+  );
+}
+```
 
 Add:
 
@@ -721,7 +746,9 @@ bool _listsEqual<T>(List<T> first, List<T> second) {
 }
 ```
 
-`SiteProgress ==` uses `_listsEqual(rigPlacements, other.rigPlacements)` and its hash uses `Object.hashAll(rigPlacements)`. `_copySites` reconstructs each site with `List<MiningRigPlacement>.unmodifiable(entry.value.rigPlacements)`. Fresh sites use `rigPlacements: const []`.
+`SiteProgress ==` uses `_listsEqual(rigPlacements, other.rigPlacements)` and hash uses `Object.hashAll(rigPlacements)`. `_copySites` reconstructs each site through the constructor. Fresh sites pass `rigPlacements: const []`.
+
+Remove `const` from the existing `const SiteProgress(...)` fixture in `test/mining/mining_state_test.dart` and any other compile errors surfaced by the atomic cutover.
 
 - [ ] **Step 3: Write RED repository validation matrix**
 
@@ -830,7 +857,7 @@ if (!result.isAllowed) {
 }
 ```
 
-Return an unmodifiable list. Do not add a legacy reader.
+Return the resulting placements through `SiteProgress`, whose constructor makes the list unmodifiable. Do not add a legacy reader.
 
 - [ ] **Step 5: Cut controller deploy/recall to cells**
 
@@ -1206,6 +1233,23 @@ class MiningGridMap extends StatelessWidget {
                 child: Image.asset(
                   view.definition.cavernAsset,
                   fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF1D2B3D), Color(0xFF0B1420)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.terrain_rounded,
+                        color: Colors.white24,
+                        size: 48,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               Positioned.fill(child: IgnorePointer(child: _objectLayer())),
@@ -1220,7 +1264,8 @@ class MiningGridMap extends StatelessWidget {
                   ),
                 ),
               ),
-              // four lock/semantic overlays and <=4 rig semantic overlays
+              // Add exactly four deposit lock/semantics overlays and <=4 rig
+              // semantics overlays; these are object overlays, not tile widgets.
             ],
           ),
         ),
