@@ -17,11 +17,12 @@ This revision is grounded on current `main` commit `e1e8b394626622f43dce05fd13f2
 
 The grid/domain direction remains valid. The self-review found implementation-contract gaps rather than product-scope problems:
 
-1. `rigPlacements` must preserve the current immutable/value-state contract, so `MiningRigPlacement` needs equality/hash and `SiteProgress` must deep-copy, deep-compare, and hash an unmodifiable placement list;
-2. `MineSiteView.gridTapOutcome(...)` needs instance-level `isUnlocked` and `surveyingLevel`; those fields are part of the view contract rather than hidden factory locals;
-3. `MiningGridMap` and `LandingBasinGridVisualLayer` need one explicit composition seam so Landing Basin does not render generic deposits/rigs and animated deposits/rigs at the same time;
-4. the oversized resource art must remain visual-only while grid lines/highlights make logical 56px placement cells unambiguous;
-5. implementation steps must use concrete tests/functions instead of “cover these cases” placeholders.
+1. `rigPlacements` must preserve the current value-state contract, so `MiningRigPlacement` needs equality/hash and `SiteProgress` must defensively own an unmodifiable placement list;
+2. enforcing defensive list ownership means `SiteProgress` intentionally loses its `const` constructor during the atomic cutover; affected test fixtures drop `const` rather than weakening immutability;
+3. `MineSiteView.gridTapOutcome(...)` needs instance-level `isUnlocked` and `surveyingLevel`; those fields are part of the view contract rather than hidden factory locals;
+4. `MiningGridMap` and `LandingBasinGridVisualLayer` need one explicit composition seam so Landing Basin does not render generic deposits/rigs and animated deposits/rigs at the same time;
+5. oversized resource art stays visual-only while logical grid lines/highlights remain visible over it;
+6. implementation steps must pin concrete test inputs/results instead of leaving “cover these cases” placeholders.
 
 None of these changes adds a subsystem, dependency, save migration, or gameplay mechanic.
 
@@ -333,14 +334,7 @@ class MiningRigPlacement {
 final List<MiningRigPlacement> rigPlacements;
 ```
 
-The list is always unmodifiable after construction/copy/decode. `SiteProgress.copyWith`, `MiningSave._copySites`, equality, and hash code must preserve the current value-state semantics:
-
-```text
-copyWith       -> List.unmodifiable(...)
-_copySites     -> List.unmodifiable(...)
-SiteProgress == -> ordered element equality
-hashCode       -> Object.hashAll(rigPlacements)
-```
+`SiteProgress` intentionally becomes non-const so its constructor can defensively wrap `rigPlacements` with `List.unmodifiable`. `copyWith`, repository decode, and `MiningSave._copySites` all preserve that ownership. Equality compares placements in order and hash uses `Object.hashAll(rigPlacements)`.
 
 Order is deployment/save order and is preserved exactly; production math does not depend on it.
 
@@ -407,7 +401,7 @@ class MineSiteRigView {
 }
 ```
 
-`MineSiteView` must retain current economy/HUD fields and add/expose the context needed by instance tap resolution:
+`MineSiteView` must retain current economy/HUD fields and expose the context needed by instance tap resolution:
 
 ```dart
 final bool isUnlocked;
@@ -522,7 +516,7 @@ Keep 56px as the logical hit/placement unit, but center resource art at:
 3x3 -> 168 x 168 px visual
 ```
 
-Visual overflow never changes occupancy or tap mapping. To make that distinction visible, render the grid/highlight painter **after deposit art and before rig/badge overlays**, so logical cell boundaries/highlights stay visible over oversized resource art.
+Visual overflow never changes occupancy or tap mapping. Render the grid/highlight painter after object art so logical cell boundaries/highlights remain visible over oversized resource art; lock badges and semantic overlays sit above it.
 
 Locked deposits show an on-screen `Surveying N` badge and a matching semantic label. Deposit and rig semantics use logical footprint/cell bounds; do not create 432 semantic tile widgets.
 
