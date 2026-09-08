@@ -6,35 +6,24 @@ Implementation design for replacing each Mine Site's four fixed deployment nodes
 
 Planning, implementation, review, and verification stay on **one branch and one pull request**. Continue on draft PR #23; do not open a second implementation PR.
 
-This revision is grounded on `main` commit `c88ec833c48392781e09114c674011d8ba377f2a` after:
+This revision is grounded on current `main` commit `e1e8b394626622f43dce05fd13f206d5de5b0c1b` after:
 
 - PR #22 / HPA-451 landed the Landing Basin hit-synchronized robot/deposit animation;
 - PR #26 aligned gameplay presentation with the latest UI mock and regenerated the Mine Site Linux goldens;
-- PR #25 added the repository-managed Cloud Agent environment pinned to Flutter 3.32.5.
+- PR #25 added the repository-managed Cloud Agent environment pinned to Flutter 3.32.5;
+- the following `e1e8b394` spec-kit cleanup changed no mining/runtime files.
 
-## Latest-main review disposition
+## Self-review disposition
 
-The grid/domain direction remains valid. The eight commits since the previous baseline did **not** modify `mining_content.dart`, `mining_state.dart`, `mining_save_repository.dart`, `mining_controller.dart`, `mining_simulation.dart`, or `mine_site_view.dart`; all new movement is presentation, tests, and development tooling.
+The grid/domain direction remains valid. The self-review found implementation-contract gaps rather than product-scope problems:
 
-Keep the existing design decisions:
+1. `rigPlacements` must preserve the current immutable/value-state contract, so `MiningRigPlacement` needs equality/hash and `SiteProgress` must deep-copy, deep-compare, and hash an unmodifiable placement list;
+2. `MineSiteView.gridTapOutcome(...)` needs instance-level `isUnlocked` and `surveyingLevel`; those fields are part of the view contract rather than hidden factory locals;
+3. `MiningGridMap` and `LandingBasinGridVisualLayer` need one explicit composition seam so Landing Basin does not render generic deposits/rigs and animated deposits/rigs at the same time;
+4. the oversized resource art must remain visual-only while grid lines/highlights make logical 56px placement cells unambiguous;
+5. implementation steps must use concrete tests/functions instead of “cover these cases” placeholders.
 
-- one site = one resource map;
-- static authored `24 x 18` grids;
-- one small shared placement predicate in `mining_grid.dart`;
-- `rigByNode` -> `rigPlacements` as an intentional strict-save break with no migration;
-- max four deployed rigs per site;
-- target/facing derived rather than persisted;
-- infinite deposits; `maxMiners` is a simultaneous-rig cap;
-- aggregate deterministic `MiningSimulation` math;
-- Flutter `InteractiveViewer`, not Flame/ECS/pathfinding/tile-engine infrastructure;
-- one Landing Basin-specific animation layer, not a generic animation registry.
-
-Latest `main` adds four baseline contracts the implementation must preserve:
-
-1. `MiningShell` now owns `_displayNotifier` solely as a rebuild channel for live modal-sheet HUD values. `_displayState` and `MiningController.state` remain authoritative. The grid cutover may change the Landing Basin `hasRig` query and map tap handler, but it must not remove or bypass this notifier.
-2. PR #26 established the current Mine Site UI-mock parity baseline. The grid intentionally replaces fixed node geometry, but current cash/cargo/back/Sell/Fleet Dock/navigation chrome remains authoritative.
-3. `_landscapeX(...)` in `mine_site_screen.dart` now positions the **Sell** control as well as fixed nodes. Removing node geometry must not delete that responsive Sell interpolation.
-4. Linux golden setup is no longer an undefined external prerequisite: `.cursor/install.sh` installs Flutter 3.32.5 in the repository-managed Cloud Agent environment. Prefer that environment for Mine Site golden regeneration; do not re-add a temporary golden-regeneration workflow.
+None of these changes adds a subsystem, dependency, save migration, or gameplay mechanic.
 
 ## Goal
 
@@ -78,7 +67,7 @@ Do not combine every resource on a planet into one world map in this slice.
 
 Keep `RigTier { t1, t2, t3, t4, t5 }`, Fleet Dock, spawn, merge, rate/capacity multipliers, and current user-facing vocabulary. Do not combine this placement cutover with a Rig -> Robot domain rename.
 
-### Preserve peak throughput and Surveying pacing
+### Preserve peak envelope and Surveying pacing
 
 Every site remains capped at four deployed rigs:
 
@@ -86,18 +75,18 @@ Every site remains capped at four deployed rigs:
 static const int maxDeployedRigsPerSite = 4;
 ```
 
-Deposit shape/cap rules:
+Deposit sizes/caps are:
 
-| Deposit | Footprint | Max miners |
+| Deposit | Size | Max miners |
 | --- | ---: | ---: |
 | d1 | 1x1 | 1 |
 | d2 | 1x1 | 1 |
 | d3 | 2x2 | 1 |
 | d4 | 3x3 | 3 |
 
-`d4` demonstrates multi-rig mining. Keeping `d3.maxMiners == 1` preserves the current maximum-deployed-rigs-by-Surveying curve:
+`d4` demonstrates multiple rigs mining one resource. Keeping d3 at one miner preserves the current maximum-deployed-rigs-by-Surveying curve:
 
-| Site | Surveying 0..5 max deployed rigs |
+| Site | Surveying 0..5 max deployable rigs |
 | --- | --- |
 | Landing Basin | `2, 3, 4, 4, 4, 4` |
 | Carbon Ridge | `1, 2, 3, 4, 4, 4` |
@@ -109,9 +98,9 @@ Deposit shape/cap rules:
 | Silica Dunes | `0, 0, 0, 0, 0, 4` |
 | Cobalt Chasm | `0, 0, 0, 0, 0, 4` |
 
-## Ownership boundary
+## Reusable baseline
 
-Keep the current runtime:
+Keep the current ownership:
 
 ```text
 MiningShell
@@ -125,40 +114,55 @@ MiningShell
 
 Reuse rather than recreate:
 
-- `MiningShell` as the only long-lived presentation, foreground timer, lifecycle, and audio owner;
-- `_displayState` as the shell's authoritative presentation snapshot and `_displayNotifier` as a rebuild channel only;
+- `MiningShell` as the foreground refresh and presentation owner;
 - `_selectedBayId` as the selected dock rig;
+- `_displayState` / `MiningController.state` as authoritative state;
+- `_displayNotifier` solely as the live modal-sheet rebuild channel added on current `main`;
 - `MiningController._enqueueMutation`, save-before-publish, active-planet guards, commissioning, mastery, spawn/merge/sell/technology/travel;
 - `MiningSimulation` deterministic elapsed-time/offline-cap accrual;
-- `MiningSaveRepository` strict exact-key decoding, invalid-save recovery, and cargo clamping;
-- `MiningContentRegistry` as the only authored catalog;
-- `SiteMetrics` as the shared rate/capacity/card derivation;
-- Landing Basin `_landingBasinImpactSequence`, staged gold frames, articulated T1-T5 assets, reduced motion, finite-frame precache, and stalled-impact drop/no-replay behavior;
-- current PR #26 Mine Site chrome and responsive layout outside fixed-node geometry.
+- `MiningSaveRepository` strict exact-key decoding, validation, invalid-save recovery, and cargo clamping;
+- `MiningContentRegistry` as the only authored mining catalog;
+- `SiteMetrics` as the shared site economy/card derivation;
+- existing Landing Basin `_landingBasinImpactSequence`, staged gold frames, articulated T1-T5 body/arm assets, reduced-motion behavior, and cold-cache stalled-impact drop/no-replay behavior;
+- current PR #26 cash/cargo/back/Sell/Fleet Dock/navigation chrome.
 
-Do not add Provider, Riverpod, Bloc, service locators, command buses, another save layer, Flame, ECS, tile-map/pathfinding packages, or generic animation/requirements frameworks.
+Do not add Provider, Riverpod, Bloc, a service locator, command bus, ECS, Flame, a tile-map/pathfinding package, another save layer, or a generic animation registry.
 
 ## Compile-safe delivery sequence
 
-The final runtime has no dual node/grid model. The implementation still uses two runtime commits so each checkpoint can be genuinely green.
+The final runtime has no node/grid dual model, but the first implementation commit is deliberately additive so it can be tested independently.
 
 ### Additive contract commit
 
-Temporarily keep existing `MiningNodeId`, `MiningNodeDefinition`, `nodes`, `nodeAsset`, and `rigByNode` runtime consumers. Add only the grid/deposit types, authored grid fields, shared predicate, and tests.
+`MiningSiteDefinition` temporarily keeps:
 
-No production surface reads the new grid in this commit.
+```dart
+final List<MiningNodeDefinition> nodes;
+final String nodeAsset;
+```
 
-### Atomic identity cutover
+and adds:
 
-The next runtime commit changes every live consumer together: save state, repository, controller, simulation, `SiteMetrics`, progression projections, Mine Site view, Site Deck/Stellar Map asset reads, Mine Site screen, shell, Landing Basin visual path, tests, and the public Mars journey.
+```dart
+final int gridWidth;
+final int gridHeight;
+final List<MiningDepositDefinition> deposits;
+final String depositAsset;
+```
 
-That commit removes the node identity and `rigByNode`. There is no committed adapter or parallel save/runtime model.
+No production consumer switches to the grid in this commit.
+
+### Atomic runtime cutover
+
+The next commit changes every live consumer together: state, repository, controller, simulation, `SiteMetrics`, Mine Site view, progression views, Site Deck/Stellar Map asset consumers, Mine Site screen, shell, Landing Basin visual path, and the public integration journey.
+
+That commit removes `MiningNodeId`, `MiningNodeDefinition`, `nodes`, `nodeAsset`, `rigByNode`, and node-named public projection fields. There is no committed compatibility adapter or dual persisted model.
 
 ## Grid geometry and authored content
 
 ### Dimensions
 
-All nine current sites start at:
+All nine sites start at:
 
 ```text
 24 columns x 18 rows
@@ -166,12 +170,23 @@ All nine current sites start at:
 1344 x 1008 logical-pixel map surface
 ```
 
-Dimensions live on `MiningSiteDefinition`. Camera pan/zoom is presentation-only and is not persisted.
+Dimensions live on `MiningSiteDefinition`; camera state is presentation-only and not persisted.
 
-### Closed types
+### Closed identities
 
 ```dart
 enum MiningDepositId { d1, d2, d3, d4 }
+
+enum MiningPlacementRejection {
+  siteAtCapacity,
+  outsideGrid,
+  depositCell,
+  rigOccupied,
+  noAdjacentDeposit,
+  ambiguousAdjacentDeposit,
+  surveyingLocked,
+  depositAtCapacity,
+}
 
 class MiningGridCell {
   const MiningGridCell(this.x, this.y);
@@ -203,22 +218,22 @@ class MiningDepositDefinition {
   final int maxMiners;
   final int requiredSurveyingLevel;
 }
+
+class MiningPlacementResult {
+  const MiningPlacementResult.allowed(this.target) : rejection = null;
+  const MiningPlacementResult.rejected(this.rejection, {this.target});
+
+  final MiningDepositDefinition? target;
+  final MiningPlacementRejection? rejection;
+  bool get isAllowed => rejection == null;
+}
 ```
 
-`MiningSiteDefinition` final grid fields:
+Existing image files remain under `assets/images/mining/nodes/`; the final domain field is `depositAsset`. Do not rename asset directories.
 
-```dart
-final int gridWidth;
-final int gridHeight;
-final List<MiningDepositDefinition> deposits;
-final String depositAsset;
-```
+### Authored layouts
 
-Existing PNGs remain under `assets/images/mining/nodes/`; this is a domain-field rename, not an asset-directory migration.
-
-### Authored coordinates
-
-All coordinates are top-left grid cells:
+Coordinates are top-left cells:
 
 | Site | d1 | d2 | d3 | d4 |
 | --- | --- | --- | --- | --- |
@@ -232,7 +247,7 @@ All coordinates are top-left grid cells:
 | Silica Dunes | `(5,3)` | `(19,4)` | `(3,12)` | `(14,9)` |
 | Cobalt Chasm | `(3,2)` | `(18,6)` | `(7,12)` | `(14,10)` |
 
-Surveying requirements map current N1-N4 values to d1-d4:
+Surveying requirements map current N1-N4 gates to d1-d4:
 
 | Site | d1 | d2 | d3 | d4 |
 | --- | ---: | ---: | ---: | ---: |
@@ -246,42 +261,17 @@ Surveying requirements map current N1-N4 values to d1-d4:
 | Silica Dunes | 5 | 5 | 5 | 5 |
 | Cobalt Chasm | 5 | 5 | 5 | 5 |
 
-Tests freeze every `(x,y,size,maxMiners,surveying)` tuple and prove:
+Content tests freeze every `(x, y, size, maxMiners, surveying)` tuple and prove:
 
-- every footprint is in bounds;
-- footprints do not overlap;
-- footprint sizes are only 1/2/3;
-- every deposit has at least `maxMiners` legal perimeter cells;
+- every footprint lies inside 24x18;
+- footprints never overlap;
+- every deposit has at least `maxMiners` in-bounds orthogonally adjacent empty cells;
 - every empty cell is adjacent to at most one deposit;
-- the max-rigs-by-Surveying table above stays unchanged.
+- the max-rigs-by-Surveying table above remains exact.
 
-## Shared placement predicate
+## One shared placement predicate
 
-Keep one small pure result in `lib/mining/mining_grid.dart`. It accepts raw geometry/deposit data so the file does not import `mining_content.dart` or `mining_state.dart`.
-
-```dart
-enum MiningPlacementRejection {
-  siteAtCapacity,
-  outsideGrid,
-  depositCell,
-  rigOccupied,
-  noAdjacentDeposit,
-  ambiguousAdjacentDeposit,
-  surveyingLocked,
-  depositAtCapacity,
-}
-
-class MiningPlacementResult {
-  const MiningPlacementResult.allowed(this.target) : rejection = null;
-  const MiningPlacementResult.rejected(this.rejection, {this.target});
-
-  final MiningDepositDefinition? target;
-  final MiningPlacementRejection? rejection;
-  bool get isAllowed => rejection == null;
-}
-```
-
-Helpers:
+Keep these pure helpers in `lib/mining/mining_grid.dart`:
 
 ```dart
 MiningDepositDefinition? uniqueAdjacentDeposit({
@@ -313,31 +303,46 @@ The predicate owns only spatial legality:
 
 For a candidate inside a deposit footprint, return `depositCell` and attach that deposit as `target` so `MineSiteView` can prefer `Requires Surveying N.` for a locked deposit.
 
-`ambiguousAdjacentDeposit` remains an enum/invariant failure. Authored content forbids the state, so no player-facing copy is required.
+`ambiguousAdjacentDeposit` remains an enum/invariant failure. Authored content forbids it, so there is no player-facing string.
 
 Active planet, site unlock, selected dock rig, and recall capacity remain controller/view concerns because they are not grid geometry and are not valid save-decoder inputs.
 
 ## Mutable state and persistence
 
-Replace:
-
-```dart
-Map<MiningNodeId, RigTier?> rigByNode
-```
-
-with:
+Replace `rigByNode` with value placements:
 
 ```dart
 class MiningRigPlacement {
   const MiningRigPlacement({required this.tier, required this.cell});
+
   final RigTier tier;
   final MiningGridCell cell;
-}
 
+  @override
+  bool operator ==(Object other) =>
+      other is MiningRigPlacement && tier == other.tier && cell == other.cell;
+
+  @override
+  int get hashCode => Object.hash(tier, cell);
+}
+```
+
+`SiteProgress` stores:
+
+```dart
 final List<MiningRigPlacement> rigPlacements;
 ```
 
-At most four placements exist, so a list is simpler than a coordinate-keyed map.
+The list is always unmodifiable after construction/copy/decode. `SiteProgress.copyWith`, `MiningSave._copySites`, equality, and hash code must preserve the current value-state semantics:
+
+```text
+copyWith       -> List.unmodifiable(...)
+_copySites     -> List.unmodifiable(...)
+SiteProgress == -> ordered element equality
+hashCode       -> Object.hashAll(rigPlacements)
+```
+
+Order is deployment/save order and is preserved exactly; production math does not depend on it.
 
 JSON per site:
 
@@ -352,7 +357,9 @@ JSON per site:
 }
 ```
 
-The decoder keeps exact keys, validates list shape/types, and calls `evaluateMiningPlacement(...)` incrementally against already-decoded cells. Invalid current or old `rigByNode` documents recover through the existing invalid-save boundary. Add no schema version, compatibility reader, converter, or migration registry.
+The decoder keeps exact keys, validates list shape/types, and calls `evaluateMiningPlacement(...)` incrementally against already-decoded cells. Old `rigByNode` documents recover through the existing invalid-save boundary. Add no schema version, compatibility reader, converter, or migration registry.
+
+The existing “decoded nested state is unmodifiable” test becomes a placement-list mutation test and must still throw `UnsupportedError`.
 
 ## Production and progression
 
@@ -368,7 +375,7 @@ siteCapacity = baseCapacity
              * Σ capacityMultipliers[placement.tier]
 ```
 
-`MiningSimulation` continues to accrue elapsed time over every unlocked planet and caps aggregate site cargo. It does not tick individual rigs or deposits.
+`MiningSimulation` accrues elapsed time over every unlocked planet and caps aggregate site cargo. It does not tick individual rigs or deposits.
 
 Technology Surveying projection renames all node vocabulary:
 
@@ -400,9 +407,11 @@ class MineSiteRigView {
 }
 ```
 
-`MineSiteView` exposes:
+`MineSiteView` must retain current economy/HUD fields and add/expose the context needed by instance tap resolution:
 
 ```dart
+final bool isUnlocked;
+final int surveyingLevel;
 final List<MineSiteDepositView> deposits;
 final List<MineSiteRigView> rigs;
 final Set<MiningGridCell> deployableCells;
@@ -412,7 +421,7 @@ MiningPlacementResult placementAt(MiningGridCell cell);
 MineSiteGridTapOutcome gridTapOutcome(MiningGridCell cell);
 ```
 
-`deployableCells` scans the 432 cells only while a valid dock rig is selected and the site context permits deployment. Do not add an index/cache.
+`deployableCells` scans 432 cells only while a valid dock rig is selected and site context permits deployment. Do not add an index/cache.
 
 `gridTapOutcome(...)` is the single shell-facing tap interpretation and preserves current strings:
 
@@ -437,11 +446,12 @@ Keep fixed chrome outside the transformed surface:
 ```text
 MineSiteScreen
   -> cavern/map viewport
-      -> InteractiveViewer
-          -> cavern background
-          -> one grid CustomPainter
-          -> four deposits
-          -> <=4 rigs
+      -> MiningGridMap
+          -> InteractiveViewer
+              -> cavern background
+              -> exactly one site object layer
+              -> grid/highlight painter
+              -> lock badges + semantic overlays
   -> cash chip
   -> cargo gauge
   -> Sell
@@ -462,11 +472,35 @@ InteractiveViewer(
 )
 ```
 
-The first viewport must include d1. One map-level `GestureDetector` converts local positions to grid cells. A drag pans and must never deploy; taps after a transform must resolve the intended cell.
+The first viewport includes d1. One map-level `GestureDetector` converts local positions to grid cells. A drag pans and never deploys; taps after a transform resolve the intended cell.
+
+### One explicit object-layer seam
+
+`MiningGridMap` owns the branch. There is no registry and no builder abstraction:
+
+```dart
+Widget _objectLayer() => view.siteId == MiningSiteId.landingBasin
+    ? LandingBasinGridVisualLayer(
+        view: view,
+        impactSequence: impactSequence,
+        reducedMotion: reducedMotion,
+        cellSize: miningGridCellSize,
+      )
+    : StaticMiningGridVisualLayer(
+        view: view,
+        cellSize: miningGridCellSize,
+      );
+```
+
+`StaticMiningGridVisualLayer` is a private widget in `mining_grid_map.dart`, not a new file/framework. It renders each static deposit once and each rig once.
+
+`LandingBasinGridVisualLayer` renders each Landing Basin deposit once and each articulated rig once. `MiningGridMap` does **not** also render generic object art for Landing Basin.
+
+`MiningGridMap` separately owns lock badges, object semantics, grid highlights, and tap mapping so those interaction/accessibility rules are identical for Landing Basin and static sites.
 
 ### Preserve PR #26 Mine Site chrome
 
-The grid intentionally replaces fixed node positioning, but keep all non-node behavior from current `main`:
+The grid replaces fixed node positioning, but keeps:
 
 - portrait cash/cargo/back/Sell/Fleet Dock/navigation geometry;
 - landscape 104px Fleet Dock rail and compact toolbar;
@@ -476,11 +510,11 @@ The grid intentionally replaces fixed node positioning, but keep all non-node be
 
 When deleting fixed-node helpers, remove `_nodeLeft`, N3/N4 overflow/overlap helpers, and node-size/rig-size positioning helpers only when they no longer have callers. **Retain `_landscapeX(...)` while Sell uses it.**
 
-Do not modify `fleet_dock.dart`, `mining_hud.dart`, `mining_sheet_frame.dart`, Technology/Settings/Offline Return surfaces, or their PR #26 behavior for this feature.
+Do not modify `fleet_dock.dart`, `mining_hud.dart`, `mining_sheet_frame.dart`, Technology/Settings/Offline Return surfaces, or their PR #26 behavior.
 
 ### Visual footprint vs placement footprint
 
-Keep 56px as the grid hit/placement unit, but center resource art over the footprint at:
+Keep 56px as the logical hit/placement unit, but center resource art at:
 
 ```text
 1x1 -> 80 x 80 px visual
@@ -488,91 +522,122 @@ Keep 56px as the grid hit/placement unit, but center resource art over the footp
 3x3 -> 168 x 168 px visual
 ```
 
-This avoids shrinking the current gold art below its proven size while keeping logical geometry unchanged. Visual overflow does not change occupancy or tap mapping.
+Visual overflow never changes occupancy or tap mapping. To make that distinction visible, render the grid/highlight painter **after deposit art and before rig/badge overlays**, so logical cell boundaries/highlights stay visible over oversized resource art.
 
-Locked deposits show an on-screen `Surveying N` badge and a matching semantic label. Do not make lock information semantics-only.
-
-Deposit and rig objects receive semantics; do not create 432 semantic tile widgets.
+Locked deposits show an on-screen `Surveying N` badge and a matching semantic label. Deposit and rig semantics use logical footprint/cell bounds; do not create 432 semantic tile widgets.
 
 ## Landing Basin animation port
 
-Replace node-local `LandingBasinMiningNodeVisual` with one `LandingBasinGridVisualLayer` that receives `MineSiteView`, `impactSequence`, and `reducedMotion`.
+Replace node-local `LandingBasinMiningNodeVisual` with one `LandingBasinGridVisualLayer` receiving:
+
+```dart
+final MineSiteView view;
+final int impactSequence;
+final bool reducedMotion;
+final double cellSize;
+```
 
 Preserve:
 
 - one shell-owned impact sequence increment per eligible foreground refresh;
 - staged gold S1-S4 from `site cargo / site capacity`;
-- S1 idle, hit, and exhaust frame timing;
+- S1 idle, hit, and exhaust timing;
 - finite frame precache and 200ms stalled-first-impact drop/no replay;
 - articulated T1-T5 body/arm assets;
 - shoulder pivot `Alignment(.33, -.24)`;
 - reduced-motion static behavior;
 - presentation-only ownership: animation never grants cargo or calls controller mutations.
 
-Render each deposit once, then render all rigs targeting it. Do not duplicate a deposit per rig.
+Current node visuals all receive the same site impact sequence, so the site-level port intentionally drives every actively mined deposit from one impact controller. Do not create per-rig economy/impact clocks.
 
 ### Facing
 
-The existing robot art is authored facing left toward the resource.
-
-Keep chassis upright. Mirror the whole composed robot horizontally only when the target center is to the rig's right:
+The existing robot art is authored facing left toward the resource. Keep the chassis upright. Mirror the whole composed robot horizontally only when the target center is to the rig's right:
 
 ```dart
+final rigCenterX = rig.placement.cell.x + .5;
+final targetCenterX = rig.target.x + rig.target.size / 2;
 final mirror = targetCenterX > rigCenterX;
 ```
 
-Above/below placements use the same deterministic center-X rule; equal X keeps the authored left-facing orientation. Do not rotate the chassis 90/180 degrees and do not persist facing.
+Above/below placements use the same center-X rule; equal centers keep authored left-facing orientation. Do not persist facing.
 
-## Shell presentation invariants from latest main
+## Shell integration
 
-`MiningShell` now mirrors `_displayState` into `_displayNotifier` so Technology/Settings sheet HUDs continue to update while the separate bottom-sheet route is open.
+`MiningShell` keeps `_landingBasinImpactSequence` and changes only the deployed-rig query from `rigByNode` to `rigPlacements.isNotEmpty`.
 
-The grid cutover must preserve:
+The current `_displayNotifier` behavior is mandatory baseline behavior:
 
 ```text
-_controller.state / _displayState  = authoritative data
-_displayNotifier                   = rebuild channel only
+controller/display state remains authoritative
+-> _refreshPresentation updates _displayState
+-> _displayNotifier.value mirrors it
+-> modal MiningSheetScene ValueListenableBuilder refreshes HUD
 ```
 
-Keep `_displayNotifier.value = _controller.state` in `_refreshPresentation()` and dispose the notifier with the shell. Keep the existing widget regression proving a Technology sheet cargo gauge advances during foreground production.
+The grid cutover must not remove, bypass, or repurpose the notifier.
 
-Only update the Landing Basin `hasRig` query from `rigByNode` to `rigPlacements.isNotEmpty`; do not create another notifier or state owner.
+One `_handleSiteGridCellTap` asks `MineSiteView.gridTapOutcome(cell)` and then deploys, recalls, or surfaces the returned message. Do not duplicate placement-context branching in the shell.
 
-## Golden and environment contract
+## Accessibility
 
-Mine Site goldens remain skipped on macOS and enabled on Linux. PR #26 regenerated them on Linux/amd64 Flutter 3.32.5, so that is the canonical renderer.
+Do not create semantic nodes for empty grid cells.
 
-Preferred regeneration route after the grid cutover:
+Expose:
 
-1. use the repository-managed Cloud Agent environment;
-2. run `bash .cursor/install.sh` if needed;
-3. verify `uname -s == Linux`, `uname -m == x86_64`, and Flutter 3.32.5;
-4. update exactly the two Mine Site goldens;
-5. rerun the golden test without update mode.
+- four deposit semantics: resource/deposit identity, logical footprint, miner count/cap, and Surveying requirement while locked;
+- <=4 rig semantics: tier, grid coordinate, target deposit, recall action or disabled reason;
+- visible Surveying lock badges for sighted users.
 
-Do not re-add the temporary golden-regeneration workflow used during PR #26. `.cursor/install.sh` and `.cursor/environment.json` are infrastructure inputs for verification, not files this feature modifies.
+Physical taps remain owned by the map-level gesture surface. Semantic rig `onTap` forwards the rig's saved cell to the same `onCellTap` callback.
 
-The new goldens must retain current PR #26 non-grid chrome while showing the new grid/deposit/rig composition.
+## Golden and verification contract
+
+Mine Site goldens remain skipped on macOS and enabled on Linux. Canonical regeneration uses Linux/amd64 Flutter 3.32.5.
+
+Prefer the repository-managed Cloud Agent environment:
+
+```sh
+bash .cursor/install.sh
+export PATH="/opt/flutter/bin:$PATH"
+test "$(uname -s)" = Linux
+test "$(uname -m)" = x86_64
+flutter --version | grep 'Flutter 3.32.5'
+```
+
+Do not reintroduce PR #26's temporary golden-regeneration workflow.
+
+Regenerate exactly:
+
+```text
+test/mining/presentation/goldens/mine_site_430x932.png
+test/mining/presentation/goldens/mine_site_874x402.png
+```
+
+PR #26's non-node Mine Site chrome is the comparison baseline; fixed node coordinates are intentionally replaced.
 
 ## Non-goals
 
 Do not add:
 
 - robot movement/pathfinding;
-- drag-to-deploy or drag-to-move;
-- procedural resources;
-- finite/depleting deposits or respawn;
-- multiple resource types inside one site;
-- conveyors, power, crafting, routing;
-- deposit-specific rate modifiers;
+- drag deployment or movement;
+- procedural deposits;
+- finite reserves/respawn;
+- mixed resource types in one site;
+- conveyors, power, storage buildings, crafting;
+- deposit-specific speed modifiers;
 - diagonal mining;
+- terrain collision/buildability beyond deposit/rig occupancy;
 - persisted camera/target/facing;
-- a generic tile engine, ECS, animation registry, or placement service;
-- more than four deployed rigs per site;
-- save migration/backward compatibility;
-- secondary-surface UI changes unrelated to the grid.
+- a generic tile/world engine;
+- more than four deployed rigs/site;
+- `rigByNode` migration/backward compatibility;
+- a generic site-animation registry.
 
-## Final architecture
+## Delivery boundary
+
+Keep this one PR. The final implementation leaves one mining runtime:
 
 ```text
 MiningShell
@@ -582,7 +647,8 @@ MiningShell
       -> MiningContentRegistry
   -> MineSiteView
       -> MiningGridMap
-          -> LandingBasinGridVisualLayer   # Landing Basin only
+          -> StaticMiningGridVisualLayer (private, non-Landing sites)
+          -> LandingBasinGridVisualLayer (Landing Basin only)
 ```
 
-One mining runtime, one save, one controller, one simulation, one grid geometry/predicate file.
+with no parallel node runtime, no second state owner, and no second simulation clock.
