@@ -461,7 +461,7 @@ class OfflineReturnSheet extends StatelessWidget {
       child: site == null
           ? icon
           : Image.asset(
-              content.site(site).nodeAsset,
+              content.site(site).depositAsset,
               errorBuilder: (_, _, _) => icon,
             ),
     );

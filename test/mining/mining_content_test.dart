@@ -5,9 +5,14 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
 
 void main() {
-  test('keeps closed site, node, bay, and rig identities', () {
+  test('keeps closed site, deposit, bay, and rig identities', () {
     expect(MiningSiteId.values, hasLength(9));
-    expect(MiningNodeId.values.map((id) => id.name), ['n1', 'n2', 'n3', 'n4']);
+    expect(MiningDepositId.values.map((id) => id.name), [
+      'd1',
+      'd2',
+      'd3',
+      'd4',
+    ]);
     expect(DockBayId.values.map((id) => id.name), ['b1', 'b2', 'b3', 'b4']);
     expect(RigTier.values.map((tier) => tier.name), [
       't1',
@@ -62,7 +67,7 @@ void main() {
     ]);
   });
 
-  test('freezes all site economy and node availability values', () {
+  test('freezes all site economy and deposit availability values', () {
     final content = MiningContentRegistry.stellarMining();
 
     final expected = <MiningSiteId, Map<String, Object?>>{
@@ -74,7 +79,7 @@ void main() {
         'rate': 0.50,
         'capacity': 90,
         'sale': 4,
-        'nodes': [0, 0, 1, 2],
+        'deposits': [0, 0, 1, 2],
       },
       MiningSiteId.carbonRidge: {
         'resource': ResourceType.coal,
@@ -84,7 +89,7 @@ void main() {
         'rate': 0.75,
         'capacity': 120,
         'sale': 3,
-        'nodes': [0, 1, 2, 3],
+        'deposits': [0, 1, 2, 3],
       },
       MiningSiteId.graniteCrater: {
         'resource': ResourceType.stone,
@@ -94,7 +99,7 @@ void main() {
         'rate': 0.60,
         'capacity': 120,
         'sale': 5,
-        'nodes': [0, 1, 2, 3],
+        'deposits': [0, 1, 2, 3],
       },
       MiningSiteId.frozenBasin: {
         'resource': ResourceType.waterIce,
@@ -104,7 +109,7 @@ void main() {
         'rate': 1.00,
         'capacity': 150,
         'sale': 6,
-        'nodes': [3, 3, 4, 5],
+        'deposits': [3, 3, 4, 5],
       },
       MiningSiteId.titaniumHighlands: {
         'resource': ResourceType.titaniumOre,
@@ -114,7 +119,7 @@ void main() {
         'rate': 0.80,
         'capacity': 140,
         'sale': 12,
-        'nodes': [4, 4, 5, 5],
+        'deposits': [4, 4, 5, 5],
       },
       MiningSiteId.heliumMare: {
         'resource': ResourceType.helium3,
@@ -124,7 +129,7 @@ void main() {
         'rate': 0.55,
         'capacity': 120,
         'sale': 30,
-        'nodes': [5, 5, 5, 5],
+        'deposits': [5, 5, 5, 5],
       },
       MiningSiteId.ochreBasin: {
         'resource': ResourceType.ironOre,
@@ -134,7 +139,7 @@ void main() {
         'rate': 0.75,
         'capacity': 180,
         'sale': 32,
-        'nodes': [5, 5, 5, 5],
+        'deposits': [5, 5, 5, 5],
       },
       MiningSiteId.silicaDunes: {
         'resource': ResourceType.silica,
@@ -144,7 +149,7 @@ void main() {
         'rate': 0.55,
         'capacity': 160,
         'sale': 55,
-        'nodes': [5, 5, 5, 5],
+        'deposits': [5, 5, 5, 5],
       },
       MiningSiteId.cobaltChasm: {
         'resource': ResourceType.cobaltOre,
@@ -154,7 +159,7 @@ void main() {
         'rate': 0.35,
         'capacity': 130,
         'sale': 110,
-        'nodes': [5, 5, 5, 5],
+        'deposits': [5, 5, 5, 5],
       },
     };
 
@@ -169,12 +174,15 @@ void main() {
       expect(site.baseCapacity, values['capacity']);
       expect(site.saleValuePerUnit, values['sale']);
       expect(
-        site.nodes.map((node) => node.requiredSurveyingLevel),
-        values['nodes'],
+        site.deposits.map((deposit) => deposit.requiredSurveyingLevel),
+        values['deposits'],
       );
-      expect(site.nodes.map((node) => node.id), MiningNodeId.values);
+      expect(
+        site.deposits.map((deposit) => deposit.id),
+        MiningDepositId.values,
+      );
       expect(site.cavernAsset, startsWith('assets/images/mining/caverns/'));
-      expect(site.nodeAsset, startsWith('assets/images/mining/nodes/'));
+      expect(site.depositAsset, startsWith('assets/images/mining/nodes/'));
       expect(site.cardAsset, startsWith('assets/images/mining/'));
     }
   });
@@ -238,7 +246,7 @@ void main() {
       'iron-rich regolith supports the first heavy extraction rig.',
     );
     expect(ochre.cavernAsset, 'assets/images/mining/caverns/iron_ore.png');
-    expect(ochre.nodeAsset, 'assets/images/mining/nodes/iron_ore.png');
+    expect(ochre.depositAsset, 'assets/images/mining/nodes/iron_ore.png');
     expect(ochre.cardAsset, 'assets/images/mining/caverns/iron_ore.png');
   });
 

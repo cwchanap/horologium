@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_controller.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -75,28 +76,43 @@ Map<DockBayId, RigTier?> dock({
   RigTier? b4,
 }) => {DockBayId.b1: b1, DockBayId.b2: b2, DockBayId.b3: b3, DockBayId.b4: b4};
 
-Map<MiningNodeId, RigTier?> nodes({
+const n1Cell = MiningGridCell(3, 2);
+const n2Cell = MiningGridCell(16, 2);
+const n3Cell = MiningGridCell(5, 10);
+const n4Cell = MiningGridCell(16, 9);
+// First-deposit deploy cells for sites outside Homeworld, each adjacent to
+// that site's d1 under its authored Surveying gate.
+const frozenCell = MiningGridCell(4, 2);
+const carbonCell = MiningGridCell(5, 1);
+const graniteCell = MiningGridCell(2, 4);
+const cobaltCell = MiningGridCell(3, 1);
+
+List<MiningRigPlacement> siteRig(MiningGridCell cell, RigTier tier) => [
+  MiningRigPlacement(tier: tier, cell: cell),
+];
+
+List<MiningRigPlacement> placements({
   RigTier? n1,
   RigTier? n2,
   RigTier? n3,
   RigTier? n4,
-}) => {
-  MiningNodeId.n1: n1,
-  MiningNodeId.n2: n2,
-  MiningNodeId.n3: n3,
-  MiningNodeId.n4: n4,
-};
+}) => [
+  if (n1 != null) MiningRigPlacement(tier: n1, cell: n1Cell),
+  if (n2 != null) MiningRigPlacement(tier: n2, cell: n2Cell),
+  if (n3 != null) MiningRigPlacement(tier: n3, cell: n3Cell),
+  if (n4 != null) MiningRigPlacement(tier: n4, cell: n4Cell),
+];
 
 SiteProgress site({
   bool unlocked = false,
   bool commissioned = false,
   double storedAmount = 0,
-  Map<MiningNodeId, RigTier?>? rigByNode,
+  List<MiningRigPlacement> rigs = const [],
 }) => SiteProgress(
   unlocked: unlocked,
   commissioned: commissioned,
   storedAmount: storedAmount,
-  rigByNode: rigByNode ?? nodes(),
+  rigPlacements: rigs,
 );
 
 MiningSave seededSave(
@@ -158,7 +174,7 @@ Map<MiningSiteId, SiteProgress> sitesFor({
 MiningSave deployedLandingBasinState(
   DateTime now, {
   double storedAmount = 0,
-  Map<MiningNodeId, RigTier?>? rigByNode,
+  List<MiningRigPlacement>? rigs,
 }) => seededSave(
   now,
   docks: docksFor(homeworld: dock()),
@@ -167,7 +183,7 @@ MiningSave deployedLandingBasinState(
       unlocked: true,
       commissioned: true,
       storedAmount: storedAmount,
-      rigByNode: rigByNode ?? nodes(n1: RigTier.t1),
+      rigs: rigs ?? placements(n1: RigTier.t1),
     ),
   ),
 );
@@ -178,7 +194,7 @@ MiningSave landingWithTwoT1RigsAndCargo(
 }) => deployedLandingBasinState(
   now,
   storedAmount: storedAmount,
-  rigByNode: nodes(n1: RigTier.t1, n2: RigTier.t1),
+  rigs: placements(n1: RigTier.t1, n2: RigTier.t1),
 );
 
 MiningSave homeworldMasteredState(
@@ -539,7 +555,7 @@ void main() {
         final result = await controller.deployRig(
           DockBayId.b1,
           MiningSiteId.landingBasin,
-          MiningNodeId.n1,
+          n1Cell,
         );
 
         expect(result.isSuccess, isTrue);
@@ -549,7 +565,9 @@ void main() {
         );
         final landing = controller.state.sites[MiningSiteId.landingBasin]!;
         expect(landing.commissioned, isTrue);
-        expect(landing.rigByNode[MiningNodeId.n1], RigTier.t1);
+        expect(landing.rigPlacements, [
+          const MiningRigPlacement(tier: RigTier.t1, cell: n1Cell),
+        ]);
       },
     );
 
@@ -575,7 +593,7 @@ void main() {
               landing: site(
                 unlocked: true,
                 commissioned: true,
-                rigByNode: nodes(n1: RigTier.t1),
+                rigs: placements(n1: RigTier.t1),
               ),
             ),
           ),
@@ -585,7 +603,7 @@ void main() {
           (await controller.deployRig(
             DockBayId.b1,
             MiningSiteId.frozenBasin,
-            MiningNodeId.n1,
+            n1Cell,
           )).message,
           'Site is not on the active planet.',
         );
@@ -593,15 +611,15 @@ void main() {
           (await controller.deployRig(
             DockBayId.b1,
             MiningSiteId.landingBasin,
-            MiningNodeId.n1,
+            n1Cell,
           )).message,
-          'Node is already occupied.',
+          'Grid cell is already occupied.',
         );
         expect(
           (await controller.deployRig(
             DockBayId.b1,
             MiningSiteId.landingBasin,
-            MiningNodeId.n3,
+            n3Cell,
           )).message,
           'Requires Surveying 1.',
         );
@@ -618,7 +636,7 @@ void main() {
         (await controller.deployRig(
           DockBayId.b4,
           MiningSiteId.landingBasin,
-          MiningNodeId.n1,
+          n1Cell,
         )).message,
         'Dock bay is empty.',
       );
@@ -626,7 +644,7 @@ void main() {
         (await controller.deployRig(
           DockBayId.b1,
           MiningSiteId.carbonRidge,
-          MiningNodeId.n1,
+          n1Cell,
         )).message,
         'Unlock this site first.',
       );
@@ -642,16 +660,15 @@ void main() {
 
         final blocked = await controller.recallRig(
           MiningSiteId.landingBasin,
-          MiningNodeId.n2,
+          n2Cell,
         );
 
         expect(blocked.isSuccess, isFalse);
         expect(blocked.message, 'Sell cargo before recalling this rig.');
         expect(
-          controller
-              .state
-              .sites[MiningSiteId.landingBasin]!
-              .rigByNode[MiningNodeId.n2],
+          controller.state.sites[MiningSiteId.landingBasin]!.rigPlacements
+              .firstWhere((placement) => placement.cell == n2Cell)
+              .tier,
           RigTier.t1,
         );
 
@@ -659,7 +676,7 @@ void main() {
         expect(sale.isSuccess, isTrue);
         final recalled = await controller.recallRig(
           MiningSiteId.landingBasin,
-          MiningNodeId.n2,
+          n2Cell,
         );
         expect(recalled.isSuccess, isTrue);
         expect(
@@ -686,15 +703,12 @@ void main() {
             landing: site(
               unlocked: true,
               commissioned: true,
-              rigByNode: nodes(n1: RigTier.t1),
+              rigs: placements(n1: RigTier.t1),
             ),
           ),
         ),
       );
-      final result = await full.recallRig(
-        MiningSiteId.landingBasin,
-        MiningNodeId.n1,
-      );
+      final result = await full.recallRig(MiningSiteId.landingBasin, n1Cell);
       expect(result.isSuccess, isTrue);
       expect(
         full.state.docks[MiningPlanetId.homeworld]![DockBayId.b1],
@@ -717,15 +731,12 @@ void main() {
             landing: site(
               unlocked: true,
               commissioned: true,
-              rigByNode: nodes(n1: RigTier.t1),
+              rigs: placements(n1: RigTier.t1),
             ),
           ),
         ),
       );
-      final blocked = await noBay.recallRig(
-        MiningSiteId.landingBasin,
-        MiningNodeId.n1,
-      );
+      final blocked = await noBay.recallRig(MiningSiteId.landingBasin, n1Cell);
       expect(blocked.isSuccess, isFalse);
       expect(blocked.message, 'Dock is full.');
     });
@@ -805,12 +816,12 @@ void main() {
               landing: site(
                 unlocked: true,
                 commissioned: true,
-                rigByNode: nodes(n1: RigTier.t1),
+                rigs: placements(n1: RigTier.t1),
               ),
               frozen: site(
                 unlocked: true,
                 commissioned: true,
-                rigByNode: nodes(n1: RigTier.t1),
+                rigs: siteRig(frozenCell, RigTier.t1),
               ),
             ),
           ),
@@ -850,25 +861,25 @@ void main() {
               unlocked: true,
               commissioned: true,
               storedAmount: 0.9,
-              rigByNode: nodes(n1: RigTier.t1),
+              rigs: placements(n1: RigTier.t1),
             ),
             carbon: site(
               unlocked: true,
               commissioned: true,
               storedAmount: 0.9,
-              rigByNode: nodes(n1: RigTier.t1),
+              rigs: siteRig(carbonCell, RigTier.t1),
             ),
             granite: site(
               unlocked: true,
               commissioned: true,
               storedAmount: 0.9,
-              rigByNode: nodes(n1: RigTier.t1),
+              rigs: siteRig(graniteCell, RigTier.t1),
             ),
             frozen: site(
               unlocked: true,
               commissioned: true,
               storedAmount: 10,
-              rigByNode: nodes(n1: RigTier.t1),
+              rigs: siteRig(frozenCell, RigTier.t1),
             ),
           ),
         ),
@@ -922,20 +933,20 @@ void main() {
         final first = await controller.deployRig(
           DockBayId.b1,
           MiningSiteId.cobaltChasm,
-          MiningNodeId.n1,
+          cobaltCell,
         );
         expect(first.message, 'Mars mastered — +25,000 cash.');
         expect(controller.state.cash, 75000);
 
         final recall = await controller.recallRig(
           MiningSiteId.cobaltChasm,
-          MiningNodeId.n1,
+          cobaltCell,
         );
         expect(recall.isSuccess, isTrue);
         final redeploy = await controller.deployRig(
           DockBayId.b1,
           MiningSiteId.cobaltChasm,
-          MiningNodeId.n1,
+          cobaltCell,
         );
         expect(redeploy.isSuccess, isTrue);
         expect(redeploy.message, isNull);

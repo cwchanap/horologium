@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/presentation/fleet_dock.dart';
-import 'package:horologium/mining/presentation/landing_basin_mining_node_visual.dart';
-import 'package:horologium/mining/presentation/mining_dashed_border.dart';
+import 'package:horologium/mining/presentation/mining_grid_map.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
@@ -16,7 +16,7 @@ class MineSiteScreen extends StatelessWidget {
     super.key,
     required this.view,
     required this.fleetDock,
-    required this.onNodeTap,
+    required this.onGridCellTap,
     required this.onBayTap,
     required this.onSpawnRig,
     required this.onSellCargo,
@@ -30,7 +30,7 @@ class MineSiteScreen extends StatelessWidget {
 
   final MineSiteView view;
   final FleetDockView fleetDock;
-  final ValueChanged<MiningNodeId> onNodeTap;
+  final ValueChanged<MiningGridCell> onGridCellTap;
   final ValueChanged<DockBayId> onBayTap;
   final VoidCallback onSpawnRig;
   final VoidCallback onSellCargo;
@@ -53,7 +53,7 @@ class MineSiteScreen extends StatelessWidget {
                 cash: cash,
                 reducedMotion: reducedMotion,
                 impactSequence: impactSequence,
-                onNodeTap: onNodeTap,
+                onGridCellTap: onGridCellTap,
                 onBayTap: onBayTap,
                 onSpawnRig: onSpawnRig,
                 onSellCargo: onSellCargo,
@@ -67,7 +67,7 @@ class MineSiteScreen extends StatelessWidget {
                 cash: cash,
                 reducedMotion: reducedMotion,
                 impactSequence: impactSequence,
-                onNodeTap: onNodeTap,
+                onGridCellTap: onGridCellTap,
                 onBayTap: onBayTap,
                 onSpawnRig: onSpawnRig,
                 onSellCargo: onSellCargo,
@@ -87,7 +87,7 @@ class _PortraitMineSite extends StatelessWidget {
     required this.cash,
     required this.reducedMotion,
     required this.impactSequence,
-    required this.onNodeTap,
+    required this.onGridCellTap,
     required this.onBayTap,
     required this.onSpawnRig,
     required this.onSellCargo,
@@ -101,7 +101,7 @@ class _PortraitMineSite extends StatelessWidget {
   final int cash;
   final bool reducedMotion;
   final int impactSequence;
-  final ValueChanged<MiningNodeId> onNodeTap;
+  final ValueChanged<MiningGridCell> onGridCellTap;
   final ValueChanged<DockBayId> onBayTap;
   final VoidCallback onSpawnRig;
   final VoidCallback onSellCargo;
@@ -145,7 +145,7 @@ class _PortraitMineSite extends StatelessWidget {
               view: view,
               reducedMotion: reducedMotion,
               impactSequence: impactSequence,
-              onNodeTap: onNodeTap,
+              onGridCellTap: onGridCellTap,
               onSellCargo: onSellCargo,
               portraitTopInset: pad.top,
             ),
@@ -198,7 +198,7 @@ class _LandscapeMineSite extends StatelessWidget {
     required this.cash,
     required this.reducedMotion,
     required this.impactSequence,
-    required this.onNodeTap,
+    required this.onGridCellTap,
     required this.onBayTap,
     required this.onSpawnRig,
     required this.onSellCargo,
@@ -212,7 +212,7 @@ class _LandscapeMineSite extends StatelessWidget {
   final int cash;
   final bool reducedMotion;
   final int impactSequence;
-  final ValueChanged<MiningNodeId> onNodeTap;
+  final ValueChanged<MiningGridCell> onGridCellTap;
   final ValueChanged<DockBayId> onBayTap;
   final VoidCallback onSpawnRig;
   final VoidCallback onSellCargo;
@@ -247,7 +247,7 @@ class _LandscapeMineSite extends StatelessWidget {
               view: view,
               reducedMotion: reducedMotion,
               impactSequence: impactSequence,
-              onNodeTap: onNodeTap,
+              onGridCellTap: onGridCellTap,
               onSellCargo: onSellCargo,
               landscapeLeftInset: pad.left,
             ),
@@ -306,7 +306,7 @@ class _CavernScene extends StatelessWidget {
     required this.view,
     required this.reducedMotion,
     required this.impactSequence,
-    required this.onNodeTap,
+    required this.onGridCellTap,
     required this.onSellCargo,
     this.portraitTopInset = 0,
     this.landscapeLeftInset = 0,
@@ -315,7 +315,7 @@ class _CavernScene extends StatelessWidget {
   final MineSiteView view;
   final bool reducedMotion;
   final int impactSequence;
-  final ValueChanged<MiningNodeId> onNodeTap;
+  final ValueChanged<MiningGridCell> onGridCellTap;
   final VoidCallback onSellCargo;
   final double portraitTopInset;
   final double landscapeLeftInset;
@@ -333,7 +333,7 @@ class _CavernScene extends StatelessWidget {
                 landscape: landscape,
                 reducedMotion: reducedMotion,
                 impactSequence: impactSequence,
-                onNodeTap: onNodeTap,
+                onGridCellTap: onGridCellTap,
                 landscapeLeftInset: landscapeLeftInset,
                 cavernWidth: constraints.maxWidth,
               ),
@@ -380,7 +380,7 @@ class _MineCavern extends StatelessWidget {
     required this.landscape,
     required this.reducedMotion,
     required this.impactSequence,
-    required this.onNodeTap,
+    required this.onGridCellTap,
     this.landscapeLeftInset = 0,
     this.cavernWidth = 0,
   });
@@ -389,7 +389,7 @@ class _MineCavern extends StatelessWidget {
   final bool landscape;
   final bool reducedMotion;
   final int impactSequence;
-  final ValueChanged<MiningNodeId> onNodeTap;
+  final ValueChanged<MiningGridCell> onGridCellTap;
   final double landscapeLeftInset;
   final double cavernWidth;
 
@@ -402,25 +402,11 @@ class _MineCavern extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            view.definition.cavernAsset,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF1D2B3D), Color(0xFF0B1420)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.terrain_rounded,
-                  color: Colors.white24,
-                  size: 48,
-                ),
-              ),
-            ),
+          MiningGridMap(
+            view: view,
+            onCellTap: onGridCellTap,
+            impactSequence: impactSequence,
+            reducedMotion: reducedMotion,
           ),
           if (!landscape) ...[
             const Positioned(
@@ -428,17 +414,19 @@ class _MineCavern extends StatelessWidget {
               right: 0,
               top: 0,
               height: 180,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color.fromRGBO(6, 10, 16, .85),
-                      Color.fromRGBO(6, 10, 16, .3),
-                      Color.fromRGBO(6, 10, 16, 0),
-                    ],
-                    stops: [0, .66, 1],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Color.fromRGBO(6, 10, 16, .85),
+                        Color.fromRGBO(6, 10, 16, .3),
+                        Color.fromRGBO(6, 10, 16, 0),
+                      ],
+                      stops: [0, .66, 1],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
                   ),
                 ),
               ),
@@ -448,279 +436,45 @@ class _MineCavern extends StatelessWidget {
               right: 0,
               bottom: 0,
               height: 290,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color.fromRGBO(6, 10, 16, .95),
-                      Color.fromRGBO(6, 10, 16, .62),
-                      Color.fromRGBO(6, 10, 16, 0),
-                    ],
-                    stops: [0, .48, 1],
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Color.fromRGBO(6, 10, 16, .95),
+                        Color.fromRGBO(6, 10, 16, .62),
+                        Color.fromRGBO(6, 10, 16, 0),
+                      ],
+                      stops: [0, .48, 1],
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                    ),
                   ),
                 ),
               ),
             ),
           ] else
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Color.fromRGBO(6, 10, 16, .9),
-                    Color.fromRGBO(6, 10, 16, .28),
-                    Color.fromRGBO(6, 10, 16, .32),
-                    Color.fromRGBO(6, 10, 16, .92),
-                  ],
-                  stops: [0, .24, .62, 1],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
+            const IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color.fromRGBO(6, 10, 16, .9),
+                      Color.fromRGBO(6, 10, 16, .28),
+                      Color.fromRGBO(6, 10, 16, .32),
+                      Color.fromRGBO(6, 10, 16, .92),
+                    ],
+                    stops: [0, .24, .62, 1],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
                 ),
               ),
             ),
-          for (var index = 0; index < view.nodeList.length; index++)
-            _positionedNode(index),
         ],
       ),
     );
   }
-
-  Widget _positionedNode(int index) {
-    // N4 is the only landscape node that can overflow a narrower cavern. When
-    // it would, anchor its right edge to the cavern's right edge (right: 0) so
-    // it clears the Clip regardless of its rendered label width. When both N3
-    // and N4 are occupied, right-anchoring N4 would slide it under N3 (N4 is
-    // later in the Stack and would steal N3's tap target); in that case N3
-    // shifts left so N4 can still right-anchor and both occupied tap targets
-    // stay disjoint AND fully contained, instead of clipping N4's rig column
-    // past the cavern's right edge. At 874x402 the anchor never engages and the
-    // authored prototype positions are preserved.
-    final n4Overflows =
-        landscape && _landscapeN4Overflows(cavernWidth, landscapeLeftInset);
-    final bothOccupiedShift =
-        n4Overflows &&
-        _landscapeN4OverlapsOccupiedN3(view, cavernWidth, landscapeLeftInset);
-    final double? left;
-    final double? right;
-    if (index == 3 && n4Overflows) {
-      left = null;
-      right = 0;
-    } else if (index == 2 && bothOccupiedShift) {
-      left = _landscapeN3ShiftedLeft(cavernWidth);
-      right = null;
-    } else {
-      left =
-          _nodeLeft(index, landscape, cavernWidth) +
-          (landscape ? landscapeLeftInset : 0);
-      right = null;
-    }
-    return Positioned(
-      left: left,
-      right: right,
-      top: _nodeTop(index, landscape),
-      child: _MineNodeButton(
-        view: view.nodeList[index],
-        siteId: view.siteId,
-        nodeAsset: view.definition.nodeAsset,
-        nodeSize: _nodeSize(index, landscape),
-        rigSize: _rigSize(index, landscape),
-        progress: view.capacity <= 0
-            ? 0.0
-            : (view.cargo / view.capacity).clamp(0.0, 1.0).toDouble(),
-        reducedMotion: reducedMotion,
-        impactSequence: impactSequence,
-        onTap: () => onNodeTap(view.nodeList[index].id),
-      ),
-    );
-  }
-}
-
-class _MineNodeButton extends StatelessWidget {
-  const _MineNodeButton({
-    required this.view,
-    required this.siteId,
-    required this.nodeAsset,
-    required this.nodeSize,
-    required this.rigSize,
-    required this.progress,
-    required this.reducedMotion,
-    required this.impactSequence,
-    required this.onTap,
-  });
-
-  final MineSiteNodeView view;
-  final MiningSiteId siteId;
-  final String nodeAsset;
-  final double nodeSize;
-  final double rigSize;
-  final double progress;
-  final bool reducedMotion;
-  final int impactSequence;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = view.canDeploy || view.canRecall;
-    final canForwardDisabledTap = view.disabledReason != null;
-    final label = _nodeLabel(view);
-    final useLandingBasinVisual = siteId == MiningSiteId.landingBasin;
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: label,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          key: Key('mine-site-node-${view.id.name}'),
-          onTap: enabled || canForwardDisabledTap ? onTap : null,
-          borderRadius: BorderRadius.circular(14),
-          child: view.isLocked
-              ? _LockedNode(
-                  size: nodeSize,
-                  requiredSurveyingLevel: view.requiredSurveyingLevel,
-                )
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (useLandingBasinVisual)
-                      LandingBasinMiningNodeVisual(
-                        nodeId: view.id,
-                        rig: view.rig,
-                        nodeSize: nodeSize,
-                        rigSize: rigSize,
-                        progress: progress,
-                        impactSequence: impactSequence,
-                        reducedMotion: reducedMotion,
-                      )
-                    else
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Image.asset(
-                            nodeAsset,
-                            width: nodeSize,
-                            height: nodeSize,
-                            opacity: view.rig == null
-                                ? const AlwaysStoppedAnimation(.62)
-                                : null,
-                          ),
-                          if (view.rig != null) ...[
-                            const SizedBox(width: 2),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Image.asset(
-                                  MiningVisuals.rigAsset(view.rig!),
-                                  width: rigSize,
-                                  height: rigSize,
-                                ),
-                                const SizedBox(height: 3),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 5,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: MiningTheme.accent,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    view.rig!.name.toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Color(0xFF04121A),
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    const SizedBox(height: 6),
-                    Container(
-                      width: nodeSize * .86,
-                      height: 7,
-                      clipBehavior: Clip.antiAlias,
-                      decoration: BoxDecoration(
-                        color: const Color.fromRGBO(0, 0, 0, .6),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: view.rig == null
-                              ? Colors.white24
-                              : MiningTheme.accent,
-                        ),
-                      ),
-                      alignment: Alignment.centerLeft,
-                      child: FractionallySizedBox(
-                        widthFactor: progress,
-                        heightFactor: 1,
-                        child: const ColoredBox(color: MiningTheme.warning),
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LockedNode extends StatelessWidget {
-  const _LockedNode({required this.size, required this.requiredSurveyingLevel});
-
-  final double size;
-  final int requiredSurveyingLevel;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      CustomPaint(
-        foregroundPainter: MiningDashedRoundedBorderPainter(
-          color: const Color.fromRGBO(255, 255, 255, .24),
-          radius: size / 2,
-          strokeWidth: 2,
-        ),
-        child: Container(
-          width: size,
-          height: size,
-          decoration: const BoxDecoration(
-            color: Color.fromRGBO(6, 10, 16, .72),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.lock_rounded,
-            color: Colors.white38,
-            size: 27,
-          ),
-        ),
-      ),
-      const SizedBox(height: 9),
-      Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.biotech_rounded,
-            size: 15,
-            color: MiningTheme.accent,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            'LV $requiredSurveyingLevel',
-            style: const TextStyle(
-              color: Colors.white54,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    ],
-  );
 }
 
 class _SellControl extends StatelessWidget {
@@ -794,75 +548,6 @@ double _landscapeX(double compact, double fraction, double cavernWidth) {
   return 14 + (cavernWidth - 14) * fraction;
 }
 
-double _nodeLeft(int index, bool landscape, [double cavernWidth = 0]) =>
-    landscape
-    ? _landscapeX(
-        const [22.0, 210.0, 307.0, 510.0][index],
-        const [.01, .30, .45, .76][index],
-        cavernWidth,
-      )
-    : const [18.0, 236.0, 86.0, 278.0][index];
-
-// Whether landscape N4 would overflow the cavern at its authored left. N4's
-// widget can be wider than its 70px circle (lock/rig labels add a label row or
-// a rig column), so reserve the max node width (image + gap + rig column)
-// against the available cavern width.
-bool _landscapeN4Overflows(double cavernWidth, double landscapeLeftInset) {
-  final authoredN4Left = _nodeLeft(3, true, cavernWidth);
-  final maxWidth = _nodeSize(3, true) + 2 + _rigSize(3, true);
-  return authoredN4Left + landscapeLeftInset + maxWidth > cavernWidth;
-}
-
-// Whether an occupied N4 right-anchored to the cavern's right edge would
-// overlap an occupied N3 (and so steal part of N3's tap target, since N4 is
-// painted later in the cavern Stack). Only the occupied case is deterministic
-// (image + 2px gap + rig column); a non-occupied N4 renders at the image width
-// plus a short label row that stays clear of N3 at phone landscape widths, so
-// it keeps the right anchor.
-bool _landscapeN4OverlapsOccupiedN3(
-  MineSiteView view,
-  double cavernWidth,
-  double landscapeLeftInset,
-) {
-  final n4 = view.nodeList[3];
-  final n3 = view.nodeList[2];
-  if (n4.rig == null || n3.rig == null) return false;
-  final n4OccupiedWidth = _nodeSize(3, true) + 2 + _rigSize(3, true);
-  final n3OccupiedWidth = _nodeSize(2, true) + 2 + _rigSize(2, true);
-  final rightAnchorLeft = cavernWidth - n4OccupiedWidth;
-  final n3Right =
-      _nodeLeft(2, true, cavernWidth) + landscapeLeftInset + n3OccupiedWidth;
-  return rightAnchorLeft < n3Right;
-}
-
-// N3's left when both N3 and N4 are occupied and N4 must right-anchor: shift
-// N3 left so its occupied right edge plus a gap reaches N4's right-anchored
-// left edge. N4 then right-anchors to the cavern's right edge, keeping both
-// occupied tap targets disjoint and fully contained (N4 no longer clips the
-// cavern). At 667x375 (cavern 563): N4 left = 563 - 116 = 447, N3 left =
-// 447 - 4 - 150 = 293, so N3 right = 443 with a 4px gap to N4 and a 1px gap
-// to the fixed Sell control (right 292). The result stays right of the left
-// safe-area inset at phone landscape widths, so no clamp is needed.
-double _landscapeN3ShiftedLeft(double cavernWidth) {
-  final n4OccupiedWidth = _nodeSize(3, true) + 2 + _rigSize(3, true);
-  final n3OccupiedWidth = _nodeSize(2, true) + 2 + _rigSize(2, true);
-  final n4Left = cavernWidth - n4OccupiedWidth;
-  const gap = 4.0;
-  return n4Left - gap - n3OccupiedWidth;
-}
-
-double _nodeTop(int index, bool landscape) => landscape
-    ? const [132.0, 118.0, 194.0, 138.0][index]
-    : const [222.0, 186.0, 372.0, 404.0][index];
-
-double _nodeSize(int index, bool landscape) => landscape
-    ? const [80.0, 66.0, 94.0, 70.0][index]
-    : const [88.0, 70.0, 102.0, 78.0][index];
-
-double _rigSize(int index, bool landscape) => landscape
-    ? const [48.0, 44.0, 54.0, 44.0][index]
-    : const [52.0, 48.0, 58.0, 48.0][index];
-
 class _MineChromeButton extends StatelessWidget {
   const _MineChromeButton({
     super.key,
@@ -887,18 +572,6 @@ class _MineChromeButton extends StatelessWidget {
       child: Icon(icon, color: MiningTheme.accent, size: 22),
     ),
   );
-}
-
-String _nodeLabel(MineSiteNodeView view) {
-  final state = switch (view.state) {
-    MineSiteNodeState.locked => 'Locked',
-    MineSiteNodeState.available => 'Available',
-    MineSiteNodeState.deployable => 'Ready to deploy',
-    MineSiteNodeState.occupied => 'Occupied',
-  };
-  final reason = view.disabledReason;
-  final rig = view.rig == null ? '' : ' ${view.rig!.name.toUpperCase()} rig.';
-  return 'Node ${view.id.name.toUpperCase()}: $state.$rig${reason == null ? '' : ' $reason'}';
 }
 
 String _saleLabel(MineSiteView view) => view.isBusy

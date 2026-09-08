@@ -15,8 +15,8 @@ class TechnologyTrackView {
     required this.isAffordable,
     required this.isMaxLevel,
     required this.disabledReason,
-    this.nodeAvailability,
-    this.nextNodeAvailability,
+    this.depositAvailability,
+    this.nextDepositAvailability,
   });
 
   final TechnologyTrack track;
@@ -30,12 +30,12 @@ class TechnologyTrackView {
   final bool isAffordable;
   final bool isMaxLevel;
   final String? disabledReason;
-  final String? nodeAvailability;
-  final String? nextNodeAvailability;
+  final String? depositAvailability;
+  final String? nextDepositAvailability;
 
   bool get canPurchase => !isMaxLevel && isGateSatisfied && isAffordable;
 
-  String? get surveyingNodeAvailability => nodeAvailability;
+  String? get surveyingDepositAvailability => depositAvailability;
 }
 
 class TechnologySheetView {
@@ -77,10 +77,10 @@ class TechnologySheetView {
         isAffordable: true,
         isMaxLevel: true,
         disabledReason: 'Technology is at max level.',
-        nodeAvailability: track == TechnologyTrack.surveying
-            ? _nodeAvailability(state, content, level)
+        depositAvailability: track == TechnologyTrack.surveying
+            ? _depositAvailability(state, content, level)
             : null,
-        nextNodeAvailability: null,
+        nextDepositAvailability: null,
       );
     }
 
@@ -105,11 +105,11 @@ class TechnologySheetView {
           : !affordable
           ? 'Need $cost cash.'
           : null,
-      nodeAvailability: track == TechnologyTrack.surveying
-          ? _nodeAvailability(state, content, level)
+      depositAvailability: track == TechnologyTrack.surveying
+          ? _depositAvailability(state, content, level)
           : null,
-      nextNodeAvailability: track == TechnologyTrack.surveying
-          ? _nodeAvailability(state, content, level + 1)
+      nextDepositAvailability: track == TechnologyTrack.surveying
+          ? _depositAvailability(state, content, level + 1)
           : null,
     );
   }
@@ -144,7 +144,7 @@ class TechnologySheetView {
     }
   }
 
-  static String _nodeAvailability(
+  static String _depositAvailability(
     MiningSave state,
     MiningContentRegistry content,
     int level,
@@ -154,13 +154,13 @@ class TechnologySheetView {
     for (final planet in content.planets.values) {
       if (!state.unlockedPlanetIds.contains(planet.id)) continue;
       for (final site in planet.sites) {
-        for (final node in site.nodes) {
+        for (final deposit in site.deposits) {
           total++;
-          if (node.requiredSurveyingLevel <= level) available++;
+          if (deposit.requiredSurveyingLevel <= level) available++;
         }
       }
     }
-    return '$available of $total nodes available';
+    return '$available of $total deposits available';
   }
 }
 

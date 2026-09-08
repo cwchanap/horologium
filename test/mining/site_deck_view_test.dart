@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/site_deck_view.dart';
 
@@ -7,12 +8,12 @@ SiteProgress progress({
   bool unlocked = false,
   bool commissioned = false,
   double storedAmount = 0,
-  Map<MiningNodeId, RigTier?>? rigs,
+  List<MiningRigPlacement> rigs = const [],
 }) => SiteProgress(
   unlocked: unlocked,
   commissioned: commissioned,
   storedAmount: storedAmount,
-  rigByNode: rigs ?? {for (final node in MiningNodeId.values) node: null},
+  rigPlacements: rigs,
 );
 
 MiningSave stateWith({Map<MiningSiteId, SiteProgress>? sites}) {
@@ -39,7 +40,12 @@ void main() {
             unlocked: true,
             commissioned: true,
             storedAmount: 3,
-            rigs: {MiningNodeId.n1: RigTier.t1},
+            rigs: [
+              MiningRigPlacement(
+                tier: RigTier.t1,
+                cell: const MiningGridCell(2, 4),
+              ),
+            ],
           ),
         },
       ),

@@ -8,6 +8,7 @@ import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_controller.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_simulation.dart';
@@ -119,7 +120,7 @@ class _MiningShellState extends State<MiningShell>
     _controller.refresh();
 
     final landing = _controller.state.sites[MiningSiteId.landingBasin]!;
-    final hasRig = landing.rigByNode.values.any((tier) => tier != null);
+    final hasRig = landing.rigPlacements.isNotEmpty;
 
     if (_openSiteId == MiningSiteId.landingBasin &&
         hasRig &&
@@ -327,9 +328,10 @@ class _MiningShellState extends State<MiningShell>
     setState(() => _openSiteId = null);
   }
 
-  void _handleSiteNodeTap(MiningNodeId nodeId) {
+  void _handleSiteGridCellTap(MiningGridCell cell) {
     final siteId = _openSiteId;
     if (!_initialized || siteId == null) return;
+
     final view = MineSiteView.from(
       state: _controller.state,
       content: _content,
@@ -337,20 +339,25 @@ class _MiningShellState extends State<MiningShell>
       selectedBayId: _selectedBayId,
       isBusy: _controller.isBusy,
     );
-    final node = view.node(nodeId);
-    final selectedBayId = _selectedBayId;
-    if (node.canDeploy && selectedBayId != null) {
-      _runSheetAction(
-        () => _controller.deployRig(selectedBayId, siteId, nodeId),
-        successMessage: 'Rig deployed.',
-      );
-    } else if (node.canRecall) {
-      _runSheetAction(
-        () => _controller.recallRig(siteId, nodeId),
-        successMessage: 'Rig recalled.',
-      );
-    } else if (node.disabledReason != null) {
-      _showResult(node.disabledReason!);
+    final outcome = view.gridTapOutcome(cell);
+
+    switch (outcome.action) {
+      case MineSiteGridTapAction.deploy:
+        final bay = _selectedBayId!;
+        _runSheetAction(
+          () => _controller.deployRig(bay, siteId, cell),
+          successMessage: 'Rig deployed.',
+        );
+        break;
+      case MineSiteGridTapAction.recall:
+        _runSheetAction(
+          () => _controller.recallRig(siteId, cell),
+          successMessage: 'Rig recalled.',
+        );
+        break;
+      case MineSiteGridTapAction.blocked:
+        _showResult(outcome.message!);
+        break;
     }
   }
 
@@ -583,7 +590,7 @@ class _MiningShellState extends State<MiningShell>
           cash: _displayState.cash,
           reducedMotion: _reducedMotion,
           impactSequence: _landingBasinImpactSequence,
-          onNodeTap: _handleSiteNodeTap,
+          onGridCellTap: _handleSiteGridCellTap,
           onBayTap: _handleDockBayTap,
           onSpawnRig: _spawnRig,
           onSellCargo: _sellCargo,

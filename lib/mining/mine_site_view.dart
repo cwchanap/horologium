@@ -1,45 +1,57 @@
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/site_deck_view.dart';
 
-enum MineSiteNodeState { locked, available, deployable, occupied }
+class MineSiteDepositView {
+  const MineSiteDepositView({
+    required this.definition,
+    required this.minerCount,
+    required this.isSurveyed,
+  });
+  final MiningDepositDefinition definition;
+  final int minerCount;
+  final bool isSurveyed;
+}
 
-class MineSiteNodeView {
-  const MineSiteNodeView({
-    required this.id,
-    required this.state,
-    required this.rig,
-    required this.requiredSurveyingLevel,
-    required this.canDeploy,
+class MineSiteRigView {
+  const MineSiteRigView({
+    required this.placement,
+    required this.target,
     required this.canRecall,
     required this.disabledReason,
-    required this.isBusy,
   });
-
-  final MiningNodeId id;
-  final MineSiteNodeState state;
-  final RigTier? rig;
-  final int requiredSurveyingLevel;
-  final bool canDeploy;
+  final MiningRigPlacement placement;
+  final MiningDepositDefinition target;
   final bool canRecall;
   final String? disabledReason;
-  final bool isBusy;
+}
 
-  RigTier? get rigTier => rig;
-  bool get isLocked => state == MineSiteNodeState.locked;
-  bool get isAvailable => state == MineSiteNodeState.available;
-  bool get isDeployable => state == MineSiteNodeState.deployable;
-  bool get isOccupied => state == MineSiteNodeState.occupied;
-  String? get hint => disabledReason;
+enum MineSiteGridTapAction { deploy, recall, blocked }
+
+class MineSiteGridTapOutcome {
+  const MineSiteGridTapOutcome.deploy()
+    : action = MineSiteGridTapAction.deploy,
+      message = null;
+  const MineSiteGridTapOutcome.recall()
+    : action = MineSiteGridTapAction.recall,
+      message = null;
+  const MineSiteGridTapOutcome.blocked(this.message)
+    : action = MineSiteGridTapAction.blocked;
+
+  final MineSiteGridTapAction action;
+  final String? message;
 }
 
 class MineSiteView {
-  const MineSiteView({
+  MineSiteView({
     required this.siteId,
     required this.planetId,
     required this.definition,
-    required this.nodes,
-    required this.nodeList,
+    required this.isUnlocked,
+    required this.surveyingLevel,
+    required this.deposits,
+    required this.rigs,
     required this.deployedRigs,
     required this.rate,
     required this.capacity,
@@ -52,13 +64,17 @@ class MineSiteView {
     required this.selectedBayId,
     required this.selectedRig,
     required this.isBusy,
-  });
+    required Set<MiningGridCell> deployableCells,
+  }) : deployableCells = Set.unmodifiable(deployableCells);
 
   final MiningSiteId siteId;
   final MiningPlanetId planetId;
   final MiningSiteDefinition definition;
-  final Map<MiningNodeId, MineSiteNodeView> nodes;
-  final List<MineSiteNodeView> nodeList;
+  final bool isUnlocked;
+  final int surveyingLevel;
+  final List<MineSiteDepositView> deposits;
+  final List<MineSiteRigView> rigs;
+  final Set<MiningGridCell> deployableCells;
   final List<RigTier> deployedRigs;
   final double rate;
   final double capacity;
@@ -74,7 +90,93 @@ class MineSiteView {
 
   String get name => definition.name;
 
-  MineSiteNodeView node(MiningNodeId id) => nodes[id]!;
+  MineSiteRigView? rigAt(MiningGridCell cell) {
+    for (final rig in rigs) {
+      if (rig.placement.cell == cell) return rig;
+    }
+    return null;
+  }
+
+  MiningPlacementResult placementAt(MiningGridCell cell) =>
+      evaluateMiningPlacement(
+        gridWidth: definition.gridWidth,
+        gridHeight: definition.gridHeight,
+        deposits: definition.deposits,
+        occupiedRigCells: rigs.map((rig) => rig.placement.cell),
+        candidate: cell,
+        surveyingLevel: surveyingLevel,
+        maxRigCount: MiningContentRegistry.maxDeployedRigsPerSite,
+      );
+
+  MineSiteGridTapOutcome gridTapOutcome(MiningGridCell cell) {
+    if (isBusy) {
+      return const MineSiteGridTapOutcome.blocked('Finishing previous action…');
+    }
+    if (!isUnlocked) {
+      return const MineSiteGridTapOutcome.blocked('Unlock this site first.');
+    }
+
+    final containing = definition.deposits
+        .where((deposit) => deposit.contains(cell))
+        .toList(growable: false);
+    if (containing.length == 1 &&
+        surveyingLevel < containing.single.requiredSurveyingLevel) {
+      return MineSiteGridTapOutcome.blocked(
+        'Requires Surveying ${containing.single.requiredSurveyingLevel}.',
+      );
+    }
+
+    if (!isActivePlanet) {
+      return const MineSiteGridTapOutcome.blocked(
+        'Travel to this planet first.',
+      );
+    }
+
+    final rig = rigAt(cell);
+    if (rig != null) {
+      if (rig.canRecall) return const MineSiteGridTapOutcome.recall();
+      return MineSiteGridTapOutcome.blocked(
+        rig.disabledReason ?? 'Finishing previous action…',
+      );
+    }
+
+    if (selectedRig == null) {
+      return const MineSiteGridTapOutcome.blocked(
+        'Select a rig from the dock.',
+      );
+    }
+
+    final placement = placementAt(cell);
+    if (placement.isAllowed) return const MineSiteGridTapOutcome.deploy();
+
+    return switch (placement.rejection!) {
+      MiningPlacementRejection.siteAtCapacity =>
+        const MineSiteGridTapOutcome.blocked(
+          'This site already has its maximum rigs.',
+        ),
+      MiningPlacementRejection.outsideGrid =>
+        const MineSiteGridTapOutcome.blocked('Choose a valid grid cell.'),
+      MiningPlacementRejection.depositCell =>
+        const MineSiteGridTapOutcome.blocked('Resources occupy this cell.'),
+      MiningPlacementRejection.rigOccupied =>
+        const MineSiteGridTapOutcome.blocked('Grid cell is already occupied.'),
+      MiningPlacementRejection.noAdjacentDeposit =>
+        const MineSiteGridTapOutcome.blocked(
+          'Place the rig next to a resource.',
+        ),
+      MiningPlacementRejection.surveyingLocked =>
+        MineSiteGridTapOutcome.blocked(
+          'Requires Surveying ${placement.target!.requiredSurveyingLevel}.',
+        ),
+      MiningPlacementRejection.depositAtCapacity =>
+        const MineSiteGridTapOutcome.blocked(
+          'This resource already has its maximum miners.',
+        ),
+      MiningPlacementRejection.ambiguousAdjacentDeposit => throw StateError(
+        'Authored mining grid has ambiguous adjacency.',
+      ),
+    };
+  }
 
   /// Active-planet cargo is present but its floored aggregate sale value is
   /// 0 cash, so selling would clear cargo without awarding any cash.
@@ -106,83 +208,102 @@ class MineSiteView {
     final dock = state.docks[state.activePlanetId]!;
     final selectedRig = selectedBayId == null ? null : dock[selectedBayId];
     final hasEmptyDockBay = DockBayId.values.any((id) => dock[id] == null);
+    final surveyingLevel = state.technology.surveying;
     final metrics = SiteMetrics.of(
       content: content,
       site: definition,
       progress: progress,
       technology: state.technology,
     );
-    final deployedRigs = metrics.deployedRigs;
-    final capacity = metrics.capacity;
-    final rate = metrics.rate;
-    final nodeViews = <MiningNodeId, MineSiteNodeView>{};
-    for (final nodeDefinition in definition.nodes) {
-      final rig = progress.rigByNode[nodeDefinition.id];
-      final stateForNode = rig != null
-          ? MineSiteNodeState.occupied
-          : !progress.unlocked ||
-                state.technology.surveying <
-                    nodeDefinition.requiredSurveyingLevel
-          ? MineSiteNodeState.locked
-          : selectedRig != null && active
-          ? MineSiteNodeState.deployable
-          : MineSiteNodeState.available;
-      final recallCapacity = rig == null
-          ? null
-          : content.effectiveSiteCapacity(
-              siteId,
-              progress.rigByNode.entries
-                  .where((entry) => entry.key != nodeDefinition.id)
-                  .map((entry) => entry.value)
-                  .whereType<RigTier>(),
-              state.technology.logistics,
+
+    final deposits = List<MineSiteDepositView>.unmodifiable([
+      for (final deposit in definition.deposits)
+        MineSiteDepositView(
+          definition: deposit,
+          minerCount: progress.rigPlacements
+              .where(
+                (placement) =>
+                    uniqueAdjacentDeposit(
+                      deposits: definition.deposits,
+                      cell: placement.cell,
+                    )?.id ==
+                    deposit.id,
+              )
+              .length,
+          isSurveyed: surveyingLevel >= deposit.requiredSurveyingLevel,
+        ),
+    ]);
+
+    final rigViews = List<MineSiteRigView>.unmodifiable([
+      for (final placement in progress.rigPlacements)
+        () {
+          final target = uniqueAdjacentDeposit(
+            deposits: definition.deposits,
+            cell: placement.cell,
+          );
+          if (target == null) {
+            throw StateError(
+              'Saved rig placement without a unique adjacent deposit.',
             );
-      final disabledReason = isBusy
-          ? 'Finishing previous action…'
-          : stateForNode == MineSiteNodeState.locked
-          ? !progress.unlocked
-                ? 'Unlock this site first.'
-                : 'Requires Surveying ${nodeDefinition.requiredSurveyingLevel}.'
-          : stateForNode == MineSiteNodeState.available
-          ? !active
-                ? 'Travel to this planet first.'
-                : 'Select a rig from the dock.'
-          : stateForNode == MineSiteNodeState.occupied &&
-                recallCapacity != null &&
-                progress.storedAmount > recallCapacity
-          ? 'Sell cargo before recalling this rig.'
-          : stateForNode == MineSiteNodeState.occupied && !hasEmptyDockBay
-          ? 'Dock is full.'
-          : null;
-      final canDeploy =
-          !isBusy && stateForNode == MineSiteNodeState.deployable && active;
-      final canRecall =
-          !isBusy &&
-          stateForNode == MineSiteNodeState.occupied &&
-          active &&
-          hasEmptyDockBay &&
-          (recallCapacity == null || progress.storedAmount <= recallCapacity);
-      nodeViews[nodeDefinition.id] = MineSiteNodeView(
-        id: nodeDefinition.id,
-        state: stateForNode,
-        rig: rig,
-        requiredSurveyingLevel: nodeDefinition.requiredSurveyingLevel,
-        canDeploy: canDeploy,
-        canRecall: canRecall,
-        disabledReason: disabledReason,
-        isBusy: isBusy,
-      );
-    }
+          }
+          final recallCapacity = content.effectiveSiteCapacity(
+            siteId,
+            progress.rigPlacements
+                .where((other) => other.cell != placement.cell)
+                .map((other) => other.tier),
+            state.technology.logistics,
+          );
+          final cargoBlocked = progress.storedAmount > recallCapacity;
+          final canRecall =
+              !isBusy && active && hasEmptyDockBay && !cargoBlocked;
+          final String? disabledReason = isBusy
+              ? 'Finishing previous action…'
+              : !active
+              ? 'Travel to this planet first.'
+              : cargoBlocked
+              ? 'Sell cargo before recalling this rig.'
+              : !hasEmptyDockBay
+              ? 'Dock is full.'
+              : null;
+          return MineSiteRigView(
+            placement: placement,
+            target: target,
+            canRecall: canRecall,
+            disabledReason: disabledReason,
+          );
+        }(),
+    ]);
+
+    final canDeployAnywhere =
+        !isBusy && progress.unlocked && active && selectedRig != null;
+    final deployableCells = <MiningGridCell>{
+      if (canDeployAnywhere)
+        for (var x = 0; x < definition.gridWidth; x++)
+          for (var y = 0; y < definition.gridHeight; y++)
+            if (evaluateMiningPlacement(
+              gridWidth: definition.gridWidth,
+              gridHeight: definition.gridHeight,
+              deposits: definition.deposits,
+              occupiedRigCells: rigViews.map((rig) => rig.placement.cell),
+              candidate: MiningGridCell(x, y),
+              surveyingLevel: surveyingLevel,
+              maxRigCount: MiningContentRegistry.maxDeployedRigsPerSite,
+            ).isAllowed)
+              MiningGridCell(x, y),
+    };
 
     return MineSiteView(
       siteId: siteId,
       planetId: planetId,
       definition: definition,
-      nodes: Map<MiningNodeId, MineSiteNodeView>.unmodifiable(nodeViews),
-      nodeList: List<MineSiteNodeView>.unmodifiable(nodeViews.values),
-      deployedRigs: List<RigTier>.unmodifiable(deployedRigs),
-      rate: rate,
-      capacity: capacity,
+      isUnlocked: progress.unlocked,
+      surveyingLevel: surveyingLevel,
+      deposits: deposits,
+      rigs: rigViews,
+      deployableCells: deployableCells,
+      deployedRigs: List<RigTier>.unmodifiable(metrics.deployedRigs),
+      rate: metrics.rate,
+      capacity: metrics.capacity,
       cargo: progress.storedAmount,
       projectedSale: active
           ? (progress.storedAmount * definition.saleValuePerUnit).floor()

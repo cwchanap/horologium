@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -120,9 +121,8 @@ class MiningSaveRepository {
       _decodeUnlockedPlanets(raw['unlockedPlanetIds']),
     );
     final activePlanetId = _decodePlanetId(raw['activePlanetId']);
-    final logistics = technology.levelFor(TechnologyTrack.logistics);
     final docks = _decodeDocks(raw['docks']);
-    final sites = _decodeSites(raw['sites'], logistics);
+    final sites = _decodeSites(raw['sites'], technology);
     _validateInvariants(
       activePlanetId: activePlanetId,
       unlockedPlanetIds: unlockedPlanetIds,
@@ -240,7 +240,10 @@ class MiningSaveRepository {
     return docks;
   }
 
-  Map<MiningSiteId, SiteProgress> _decodeSites(Object? raw, int logistics) {
+  Map<MiningSiteId, SiteProgress> _decodeSites(
+    Object? raw,
+    TechnologyLevels technology,
+  ) {
     if (raw is! Map<String, Object?>) {
       throw const FormatException('sites must be an object');
     }
@@ -251,6 +254,7 @@ class MiningSaveRepository {
       );
     }
 
+    final logistics = technology.levelFor(TechnologyTrack.logistics);
     final sites = <MiningSiteId, SiteProgress>{};
     for (final id in MiningSiteId.values) {
       final siteRaw = raw[id.name];
@@ -261,11 +265,11 @@ class MiningSaveRepository {
         'unlocked',
         'commissioned',
         'storedAmount',
-        'rigByNode',
+        'rigPlacements',
       })) {
         throw FormatException(
           'site ${id.name} keys must be exactly unlocked, commissioned, '
-          'storedAmount, rigByNode',
+          'storedAmount, rigPlacements',
         );
       }
       final unlocked = siteRaw['unlocked'];
@@ -282,15 +286,20 @@ class MiningSaveRepository {
           'site ${id.name} storedAmount must be a non-negative number',
         );
       }
-      final rigByNode = _decodeRigByNode(siteRaw['rigByNode'], id);
+      final definition = content.site(id);
+      final rigPlacements = _decodeRigPlacements(
+        siteRaw['rigPlacements'],
+        definition,
+        technology,
+      );
       if (!unlocked &&
-          (commissioned ||
-              storedAmount != 0 ||
-              rigByNode.values.any((tier) => tier != null))) {
+          (commissioned || storedAmount != 0 || rigPlacements.isNotEmpty)) {
         throw FormatException('locked site ${id.name} must be pristine');
       }
 
-      final deployedRigs = rigByNode.values.whereType<RigTier>();
+      final deployedRigs = rigPlacements
+          .map((placement) => placement.tier)
+          .toList();
       final capacity = content.effectiveSiteCapacity(
         id,
         deployedRigs,
@@ -301,29 +310,76 @@ class MiningSaveRepository {
         unlocked: unlocked,
         commissioned: commissioned,
         storedAmount: normalizedStored,
-        rigByNode: rigByNode,
+        rigPlacements: rigPlacements,
       );
     }
     return sites;
   }
 
-  Map<MiningNodeId, RigTier?> _decodeRigByNode(
+  List<MiningRigPlacement> _decodeRigPlacements(
     Object? raw,
-    MiningSiteId siteId,
+    MiningSiteDefinition definition,
+    TechnologyLevels technology,
   ) {
-    if (raw is! Map<String, Object?>) {
-      throw FormatException('site ${siteId.name} rigByNode must be an object');
-    }
-    final expectedNodeKeys = MiningNodeId.values.map((id) => id.name).toSet();
-    if (!hasExactKeys(raw, expectedNodeKeys)) {
+    if (raw is! List<Object?>) {
       throw FormatException(
-        'site ${siteId.name} node keys must be exactly n1, n2, n3, n4',
+        'site ${definition.id.name} rigPlacements must be a list',
       );
     }
-    return Map.unmodifiable({
-      for (final nodeId in MiningNodeId.values)
-        nodeId: _decodeRigTier(raw[nodeId.name]),
-    });
+    if (raw.length > MiningContentRegistry.maxDeployedRigsPerSite) {
+      throw FormatException(
+        'site ${definition.id.name} deploys more than '
+        '${MiningContentRegistry.maxDeployedRigsPerSite} rigs',
+      );
+    }
+    final decoded = <MiningRigPlacement>[];
+    for (final entryRaw in raw) {
+      if (entryRaw is! Map<String, Object?>) {
+        throw FormatException(
+          'site ${definition.id.name} rig placement must be an object',
+        );
+      }
+      if (!hasExactKeys(entryRaw, const {'tier', 'x', 'y'})) {
+        throw FormatException(
+          'site ${definition.id.name} rig placement keys must be exactly '
+          'tier, x, y',
+        );
+      }
+      final tierRaw = entryRaw['tier'];
+      if (tierRaw is! String) {
+        throw FormatException(
+          'site ${definition.id.name} rig placement tier must be a string',
+        );
+      }
+      final tier = RigTier.values.asNameMap()[tierRaw];
+      if (tier == null) {
+        throw FormatException('unknown rig tier $tierRaw');
+      }
+      final x = entryRaw['x'];
+      final y = entryRaw['y'];
+      if (x is! int || y is! int) {
+        throw FormatException(
+          'site ${definition.id.name} rig placement x/y must be integers',
+        );
+      }
+      final cell = MiningGridCell(x, y);
+      final result = evaluateMiningPlacement(
+        gridWidth: definition.gridWidth,
+        gridHeight: definition.gridHeight,
+        deposits: definition.deposits,
+        occupiedRigCells: decoded.map((placement) => placement.cell),
+        candidate: cell,
+        surveyingLevel: technology.surveying,
+        maxRigCount: MiningContentRegistry.maxDeployedRigsPerSite,
+      );
+      if (!result.isAllowed) {
+        throw FormatException(
+          'Invalid rig placement for ${definition.id.name}: ${result.rejection}',
+        );
+      }
+      decoded.add(MiningRigPlacement(tier: tier, cell: cell));
+    }
+    return decoded;
   }
 
   RigTier? _decodeRigTier(Object? raw) {
@@ -385,7 +441,7 @@ class MiningSaveRepository {
             (progress.unlocked ||
                 progress.commissioned ||
                 progress.storedAmount != 0 ||
-                progress.rigByNode.values.any((tier) => tier != null))) {
+                progress.rigPlacements.isNotEmpty)) {
           throw FormatException(
             '${planet.name} sites must be pristine while the planet is locked',
           );
@@ -402,16 +458,6 @@ class MiningSaveRepository {
           throw FormatException(
             '${definition.name} requires ${content.site(requiredSite).name}',
           );
-        }
-        for (final node in definition.nodes) {
-          final tier = progress.rigByNode[node.id];
-          if (tier != null &&
-              technology.surveying < node.requiredSurveyingLevel) {
-            throw FormatException(
-              '${definition.name} ${node.id.name} requires Surveying '
-              '${node.requiredSurveyingLevel}',
-            );
-          }
         }
       }
     }

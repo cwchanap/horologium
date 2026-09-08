@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_controller.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -60,6 +61,18 @@ Future<void> earnUntil(
     'sales=${revenues.join('/')} cash=${controller.state.cash}',
   );
 }
+
+const journeyCell = <MiningSiteId, MiningGridCell>{
+  MiningSiteId.landingBasin: MiningGridCell(3, 2),
+  MiningSiteId.carbonRidge: MiningGridCell(5, 1),
+  MiningSiteId.graniteCrater: MiningGridCell(2, 4),
+  MiningSiteId.frozenBasin: MiningGridCell(4, 2),
+  MiningSiteId.titaniumHighlands: MiningGridCell(2, 1),
+  MiningSiteId.heliumMare: MiningGridCell(6, 1),
+  MiningSiteId.ochreBasin: MiningGridCell(2, 3),
+  MiningSiteId.silicaDunes: MiningGridCell(5, 2),
+  MiningSiteId.cobaltChasm: MiningGridCell(3, 1),
+};
 
 void main() {
   test(
@@ -138,7 +151,7 @@ void main() {
         controller.deployRig(
           DockBayId.b2,
           MiningSiteId.landingBasin,
-          MiningNodeId.n1,
+          journeyCell[MiningSiteId.landingBasin]!,
         ),
       );
       expect(
@@ -163,7 +176,7 @@ void main() {
         controller.deployRig(
           DockBayId.b1,
           MiningSiteId.carbonRidge,
-          MiningNodeId.n1,
+          journeyCell[MiningSiteId.carbonRidge]!,
         ),
       );
       expect(
@@ -187,7 +200,7 @@ void main() {
         controller.deployRig(
           DockBayId.b1,
           MiningSiteId.graniteCrater,
-          MiningNodeId.n1,
+          journeyCell[MiningSiteId.graniteCrater]!,
         ),
       );
       expect(
@@ -265,7 +278,7 @@ void main() {
         controller.deployRig(
           DockBayId.b2,
           MiningSiteId.frozenBasin,
-          MiningNodeId.n1,
+          journeyCell[MiningSiteId.frozenBasin]!,
         ),
       );
       debugPrint('SEQUENCE Lunar merge t1+t1->t2; deploy Frozen Basin');
@@ -290,7 +303,7 @@ void main() {
         controller.deployRig(
           DockBayId.b1,
           MiningSiteId.titaniumHighlands,
-          MiningNodeId.n1,
+          journeyCell[MiningSiteId.titaniumHighlands]!,
         ),
       );
 
@@ -314,7 +327,7 @@ void main() {
         controller.deployRig(
           DockBayId.b1,
           MiningSiteId.heliumMare,
-          MiningNodeId.n1,
+          journeyCell[MiningSiteId.heliumMare]!,
         ),
       );
       expect(
@@ -355,7 +368,7 @@ void main() {
         controller.deployRig(
           DockBayId.b2,
           MiningSiteId.ochreBasin,
-          MiningNodeId.n1,
+          journeyCell[MiningSiteId.ochreBasin]!,
         ),
       );
       debugPrint('SEQUENCE Mars merge t1+t1->t2; deploy Ochre Basin');
@@ -376,7 +389,7 @@ void main() {
         controller.deployRig(
           DockBayId.b1,
           MiningSiteId.silicaDunes,
-          MiningNodeId.n1,
+          journeyCell[MiningSiteId.silicaDunes]!,
         ),
       );
 
@@ -395,7 +408,7 @@ void main() {
       final mastery = await controller.deployRig(
         DockBayId.b1,
         MiningSiteId.cobaltChasm,
-        MiningNodeId.n1,
+        journeyCell[MiningSiteId.cobaltChasm]!,
       );
       expect(mastery.isSuccess, isTrue);
       expect(mastery.message, 'Mars mastered — +25,000 cash.');
@@ -414,12 +427,15 @@ void main() {
       final cashAfterFirstMastery = controller.state.cash;
       await expectAction(
         'recall the mastered Cobalt Chasm rig',
-        controller.recallRig(MiningSiteId.cobaltChasm, MiningNodeId.n1),
+        controller.recallRig(
+          MiningSiteId.cobaltChasm,
+          journeyCell[MiningSiteId.cobaltChasm]!,
+        ),
       );
       final redeploy = await controller.deployRig(
         DockBayId.b1,
         MiningSiteId.cobaltChasm,
-        MiningNodeId.n1,
+        journeyCell[MiningSiteId.cobaltChasm]!,
       );
       expect(redeploy.isSuccess, isTrue);
       expect(redeploy.message, isNull);

@@ -70,8 +70,8 @@ class SiteMetrics {
     required SiteProgress progress,
     required TechnologyLevels technology,
   }) {
-    final deployedRigs = progress.rigByNode.values
-        .whereType<RigTier>()
+    final deployedRigs = progress.rigPlacements
+        .map((placement) => placement.tier)
         .toList();
     final hasRigs = deployedRigs.isNotEmpty;
     final capacity = hasRigs

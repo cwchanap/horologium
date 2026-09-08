@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
@@ -27,12 +28,12 @@ MiningSave _operationalState() {
         unlocked: true,
         commissioned: true,
         storedAmount: 20,
-        rigByNode: {
-          MiningNodeId.n1: RigTier.t2,
-          MiningNodeId.n2: null,
-          MiningNodeId.n3: null,
-          MiningNodeId.n4: null,
-        },
+        rigPlacements: [
+          MiningRigPlacement(
+            tier: RigTier.t2,
+            cell: const MiningGridCell(3, 2),
+          ),
+        ],
       ),
     },
   );
@@ -140,7 +141,7 @@ void main() {
             cash: state.cash,
             reducedMotion: true,
             impactSequence: 0,
-            onNodeTap: (_) {},
+            onGridCellTap: (_) {},
             onBayTap: (_) {},
             onSpawnRig: () {},
             onSellCargo: () {},

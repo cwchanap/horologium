@@ -1,28 +1,29 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_state.dart';
 
-Map<MiningNodeId, RigTier?> rigMap(Map<MiningNodeId, RigTier> rigs) => {
-  for (final node in MiningNodeId.values) node: rigs[node],
-};
+List<MiningRigPlacement> placements(List<(MiningGridCell, RigTier)> rigs) => [
+  for (final (cell, tier) in rigs) MiningRigPlacement(tier: tier, cell: cell),
+];
 
 SiteProgress progress({
   bool unlocked = true,
   bool commissioned = false,
   double storedAmount = 0,
-  Map<MiningNodeId, RigTier> rigs = const {},
+  List<MiningRigPlacement> rigs = const [],
 }) => SiteProgress(
   unlocked: unlocked,
   commissioned: commissioned,
   storedAmount: storedAmount,
-  rigByNode: rigMap(rigs),
+  rigPlacements: rigs,
 );
 
 MiningSave stateWithLandingRigs({
   required DateTime now,
-  Map<MiningNodeId, RigTier> rigs = const {},
+  List<MiningRigPlacement> rigs = const [],
   int extraction = 0,
   int logistics = 0,
   double storedAmount = 0,
@@ -46,11 +47,15 @@ MiningSave threePlanetState(
   double homeworldStored = 0,
   double lunarStored = 0,
   double marsStored = 0,
-  Map<MiningNodeId, RigTier> homeworldRigs = const {
-    MiningNodeId.n1: RigTier.t1,
-  },
-  Map<MiningNodeId, RigTier> lunarRigs = const {MiningNodeId.n1: RigTier.t1},
-  Map<MiningNodeId, RigTier> marsRigs = const {MiningNodeId.n1: RigTier.t1},
+  List<MiningRigPlacement> homeworldRigs = const [
+    MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+  ],
+  List<MiningRigPlacement> lunarRigs = const [
+    MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(4, 2)),
+  ],
+  List<MiningRigPlacement> marsRigs = const [
+    MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(2, 3)),
+  ],
   MiningPlanetId activePlanet = MiningPlanetId.marsFrontier,
 }) {
   final base = MiningSave.initial(nowUtc: now);
@@ -88,7 +93,7 @@ void main() {
   test('one T1 keeps Landing Basin roughly 180 seconds to full', () {
     final state = stateWithLandingRigs(
       now: start,
-      rigs: const {MiningNodeId.n1: RigTier.t1},
+      rigs: placements(const [(MiningGridCell(3, 2), RigTier.t1)]),
     );
     final result = simulation.accrue(
       state,
@@ -102,12 +107,12 @@ void main() {
   test('four max rigs preserve the old max-tier fill curve', () {
     final state = stateWithLandingRigs(
       now: start,
-      rigs: const {
-        MiningNodeId.n1: RigTier.t5,
-        MiningNodeId.n2: RigTier.t5,
-        MiningNodeId.n3: RigTier.t5,
-        MiningNodeId.n4: RigTier.t5,
-      },
+      rigs: placements(const [
+        (MiningGridCell(3, 2), RigTier.t5),
+        (MiningGridCell(16, 2), RigTier.t5),
+        (MiningGridCell(5, 10), RigTier.t5),
+        (MiningGridCell(16, 9), RigTier.t5),
+      ]),
       extraction: 5,
       logistics: 5,
     );
@@ -123,7 +128,10 @@ void main() {
   test('mixed rig tiers sum rate and capacity shares', () {
     final state = stateWithLandingRigs(
       now: start,
-      rigs: const {MiningNodeId.n1: RigTier.t1, MiningNodeId.n2: RigTier.t2},
+      rigs: placements(const [
+        (MiningGridCell(3, 2), RigTier.t1),
+        (MiningGridCell(16, 2), RigTier.t2),
+      ]),
     );
     final result = simulation.accrue(
       state,
@@ -187,7 +195,7 @@ void main() {
   test('locked and empty sites do not accrue', () {
     final base = stateWithLandingRigs(
       now: start,
-      rigs: const {MiningNodeId.n1: RigTier.t1},
+      rigs: placements(const [(MiningGridCell(3, 2), RigTier.t1)]),
     );
     final state = base.copyWith(
       sites: {
@@ -195,7 +203,7 @@ void main() {
         MiningSiteId.carbonRidge: progress(
           unlocked: false,
           storedAmount: 4,
-          rigs: const {MiningNodeId.n1: RigTier.t5},
+          rigs: placements(const [(MiningGridCell(5, 1), RigTier.t5)]),
         ),
         MiningSiteId.graniteCrater: progress(storedAmount: 8),
       },
@@ -215,7 +223,7 @@ void main() {
   test('zero elapsed returns the same state and empty summary', () {
     final state = stateWithLandingRigs(
       now: start,
-      rigs: const {MiningNodeId.n1: RigTier.t1},
+      rigs: placements(const [(MiningGridCell(3, 2), RigTier.t1)]),
       storedAmount: 10,
     );
     final result = simulation.accrue(state, start);
@@ -231,7 +239,7 @@ void main() {
   test('negative elapsed does not move time backward or accrue', () {
     final state = stateWithLandingRigs(
       now: start,
-      rigs: const {MiningNodeId.n1: RigTier.t1},
+      rigs: placements(const [(MiningGridCell(3, 2), RigTier.t1)]),
       storedAmount: 10,
     );
     final result = simulation.accrue(
@@ -248,7 +256,7 @@ void main() {
     final result = simulation.accrue(
       stateWithLandingRigs(
         now: start,
-        rigs: const {MiningNodeId.n1: RigTier.t1},
+        rigs: placements(const [(MiningGridCell(3, 2), RigTier.t1)]),
         storedAmount: 90,
       ),
       start.add(const Duration(seconds: 10)),
@@ -263,7 +271,7 @@ void main() {
     final result = simulation.accrue(
       stateWithLandingRigs(
         now: start,
-        rigs: const {MiningNodeId.n1: RigTier.t1},
+        rigs: placements(const [(MiningGridCell(3, 2), RigTier.t1)]),
         logistics: 2,
       ),
       start.add(const Duration(hours: 13)),
@@ -286,7 +294,10 @@ void main() {
   test('identical inputs and clock produce identical immutable results', () {
     final state = stateWithLandingRigs(
       now: start,
-      rigs: const {MiningNodeId.n1: RigTier.t1, MiningNodeId.n2: RigTier.t3},
+      rigs: placements(const [
+        (MiningGridCell(3, 2), RigTier.t1),
+        (MiningGridCell(16, 2), RigTier.t3),
+      ]),
       storedAmount: 10,
     );
     final now = start.add(const Duration(hours: 1));

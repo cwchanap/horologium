@@ -1,21 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:horologium/mining/mining_content.dart';
 
 abstract final class MiningVisuals {
-  static const portraitNodeAnchors = <Alignment>[
-    Alignment(-0.55, -0.30),
-    Alignment(0.50, -0.24),
-    Alignment(-0.42, 0.36),
-    Alignment(0.48, 0.40),
-  ];
-
-  static const landscapeNodeAnchors = <Alignment>[
-    Alignment(-0.56, -0.38),
-    Alignment(0.34, -0.34),
-    Alignment(-0.40, 0.35),
-    Alignment(0.40, 0.36),
-  ];
-
   static String rigAsset(RigTier tier) =>
       'assets/images/mining/rigs/${tier.name}.png';
 

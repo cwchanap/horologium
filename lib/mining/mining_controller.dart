@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_state.dart';
@@ -246,10 +247,29 @@ class MiningController {
     return const MiningActionResult.success();
   });
 
+  String _placementFailureMessage(MiningPlacementResult result) =>
+      switch (result.rejection!) {
+        MiningPlacementRejection.siteAtCapacity =>
+          'This site already has its maximum rigs.',
+        MiningPlacementRejection.outsideGrid => 'Choose a valid grid cell.',
+        MiningPlacementRejection.depositCell => 'Resources occupy this cell.',
+        MiningPlacementRejection.rigOccupied =>
+          'Grid cell is already occupied.',
+        MiningPlacementRejection.noAdjacentDeposit =>
+          'Place the rig next to a resource.',
+        MiningPlacementRejection.surveyingLocked =>
+          'Requires Surveying ${result.target!.requiredSurveyingLevel}.',
+        MiningPlacementRejection.depositAtCapacity =>
+          'This resource already has its maximum miners.',
+        MiningPlacementRejection.ambiguousAdjacentDeposit => throw StateError(
+          'Authored mining grid has ambiguous adjacency.',
+        ),
+      };
+
   Future<MiningActionResult> deployRig(
     DockBayId sourceBay,
     MiningSiteId siteId,
-    MiningNodeId nodeId,
+    MiningGridCell cell,
   ) => _enqueueMutation(() async {
     final candidate = simulation.accrue(_state, _nowUtc().toUtc());
     final activePlanetFailure = _activePlanetSiteFailure(
@@ -269,14 +289,19 @@ class MiningController {
     if (!progress.unlocked) {
       return const MiningActionResult.failure('Unlock this site first.');
     }
-    final node = definition.nodes.singleWhere((node) => node.id == nodeId);
-    if (candidate.state.technology.surveying < node.requiredSurveyingLevel) {
-      return MiningActionResult.failure(
-        'Requires Surveying ${node.requiredSurveyingLevel}.',
-      );
-    }
-    if (progress.rigByNode[nodeId] != null) {
-      return const MiningActionResult.failure('Node is already occupied.');
+    final placement = evaluateMiningPlacement(
+      gridWidth: definition.gridWidth,
+      gridHeight: definition.gridHeight,
+      deposits: definition.deposits,
+      occupiedRigCells: progress.rigPlacements.map(
+        (placement) => placement.cell,
+      ),
+      candidate: cell,
+      surveyingLevel: candidate.state.technology.surveying,
+      maxRigCount: MiningContentRegistry.maxDeployedRigsPerSite,
+    );
+    if (!placement.isAllowed) {
+      return MiningActionResult.failure(_placementFailureMessage(placement));
     }
 
     final docks = <MiningPlanetId, Map<DockBayId, RigTier?>>{
@@ -284,10 +309,14 @@ class MiningController {
         entry.key: <DockBayId, RigTier?>{...entry.value},
     };
     docks[planetId]![sourceBay] = null;
-    final rigByNode = <MiningNodeId, RigTier?>{...progress.rigByNode};
-    rigByNode[nodeId] = sourceTier;
     final sites = <MiningSiteId, SiteProgress>{...candidate.state.sites};
-    sites[siteId] = progress.copyWith(commissioned: true, rigByNode: rigByNode);
+    sites[siteId] = progress.copyWith(
+      commissioned: true,
+      rigPlacements: [
+        ...progress.rigPlacements,
+        MiningRigPlacement(tier: sourceTier, cell: cell),
+      ],
+    );
     final wasMastered = content.isPlanetMastered(
       planetId,
       _commissionedSiteIds(candidate.state),
@@ -319,7 +348,7 @@ class MiningController {
 
   Future<MiningActionResult> recallRig(
     MiningSiteId siteId,
-    MiningNodeId nodeId,
+    MiningGridCell cell,
   ) => _enqueueMutation(() async {
     final candidate = simulation.accrue(_state, _nowUtc().toUtc());
     final activePlanetFailure = _activePlanetSiteFailure(
@@ -327,6 +356,14 @@ class MiningController {
       candidate.state,
     );
     if (activePlanetFailure != null) return activePlanetFailure;
+
+    final progress = candidate.state.sites[siteId]!;
+    final placementIndex = progress.rigPlacements.indexWhere(
+      (placement) => placement.cell == cell,
+    );
+    if (placementIndex < 0) {
+      return const MiningActionResult.failure('Grid cell is empty.');
+    }
 
     final planetId = candidate.state.activePlanetId;
     final planetDocks = candidate.state.docks[planetId]!;
@@ -341,15 +378,11 @@ class MiningController {
       return const MiningActionResult.failure('Dock is full.');
     }
 
-    final progress = candidate.state.sites[siteId]!;
-    final tier = progress.rigByNode[nodeId];
-    if (tier == null) {
-      return const MiningActionResult.failure('Node is empty.');
-    }
-    final remainingRigs = progress.rigByNode.entries
-        .where((entry) => entry.key != nodeId)
-        .map((entry) => entry.value)
-        .whereType<RigTier>();
+    final tier = progress.rigPlacements[placementIndex].tier;
+    final remainingRigs = progress.rigPlacements
+        .where((placement) => placement.cell != cell)
+        .map((placement) => placement.tier)
+        .toList();
     final postRecallCapacity = content.effectiveSiteCapacity(
       siteId,
       remainingRigs,
@@ -366,10 +399,13 @@ class MiningController {
         entry.key: <DockBayId, RigTier?>{...entry.value},
     };
     docks[planetId]![emptyBay] = tier;
-    final rigByNode = <MiningNodeId, RigTier?>{...progress.rigByNode};
-    rigByNode[nodeId] = null;
     final sites = <MiningSiteId, SiteProgress>{...candidate.state.sites};
-    sites[siteId] = progress.copyWith(rigByNode: rigByNode);
+    sites[siteId] = progress.copyWith(
+      rigPlacements: [
+        for (var i = 0; i < progress.rigPlacements.length; i++)
+          if (i != placementIndex) progress.rigPlacements[i],
+      ],
+    );
     final next = candidate.state.copyWith(docks: docks, sites: sites);
     await repository.save(next);
     _state = next;
