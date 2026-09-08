@@ -604,7 +604,7 @@ class _SiteIndicator extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Image.asset(
-                      site.nodeAsset,
+                      site.depositAsset,
                       width: 30,
                       height: 30,
                       opacity: indicator.isUnlocked

@@ -60,8 +60,8 @@ class MiningSimulation {
       final planetId = entry.key;
       for (final definition in content.planet(planetId).sites) {
         final progress = sites[definition.id]!;
-        final deployedRigs = progress.rigByNode.values
-            .whereType<RigTier>()
+        final deployedRigs = progress.rigPlacements
+            .map((placement) => placement.tier)
             .toList();
         if (!progress.unlocked || deployedRigs.isEmpty) continue;
 

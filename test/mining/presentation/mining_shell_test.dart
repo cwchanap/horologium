@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/audio_manager.dart';
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
+import 'package:horologium/mining/presentation/mining_grid_map.dart';
 import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
@@ -68,13 +70,15 @@ class TestClock {
 const _viewport = Size(360, 640);
 final _start = DateTime.utc(2026, 8, 26, 12);
 
+const landingRigCell = MiningGridCell(3, 2);
+
 MiningSave deployedLandingBasin(DateTime now) {
   final base = MiningSave.initial(nowUtc: now);
   final landing = base.sites[MiningSiteId.landingBasin]!;
   final sites = <MiningSiteId, SiteProgress>{...base.sites};
   sites[MiningSiteId.landingBasin] = landing.copyWith(
     commissioned: true,
-    rigByNode: {...landing.rigByNode, MiningNodeId.n1: RigTier.t1},
+    rigPlacements: [MiningRigPlacement(tier: RigTier.t1, cell: landingRigCell)],
   );
   return base.copyWith(sites: sites);
 }
@@ -86,7 +90,7 @@ MiningSave deployedLandingState(DateTime now, {double cargo = 0}) {
   sites[MiningSiteId.landingBasin] = landing.copyWith(
     commissioned: true,
     storedAmount: cargo,
-    rigByNode: {...landing.rigByNode, MiningNodeId.n1: RigTier.t1},
+    rigPlacements: [MiningRigPlacement(tier: RigTier.t1, cell: landingRigCell)],
   );
   return base.copyWith(
     sites: sites,
@@ -99,6 +103,20 @@ MiningSave deployedLandingState(DateTime now, {double cargo = 0}) {
     },
   );
 }
+
+/// Taps the center of a grid cell through the pannable mine-site transform.
+Future<void> tapGridCell(WidgetTester tester, MiningGridCell cell) async {
+  final surface = tester.getRect(find.byKey(const Key('mining-grid-surface')));
+  await tester.tapAt(
+    surface.topLeft +
+        Offset(
+          (cell.x + .5) * miningGridCellSize,
+          (cell.y + .5) * miningGridCellSize,
+        ),
+  );
+}
+
+const frozenRigCell = MiningGridCell(4, 2);
 
 Future<void> pumpShell(
   WidgetTester tester, {
@@ -379,17 +397,12 @@ void main() {
       await tester.pump();
       await tester.tap(find.byKey(const Key('site-card-frozenBasin-enter')));
       await tester.pump();
-      final node = find.byKey(const Key('mine-site-node-n1'));
-      expect(tester.widget<InkWell>(node).onTap, isNotNull);
-      await tester.tap(node);
+      await tapGridCell(tester, frozenRigCell);
       await tester.pump(const Duration(milliseconds: 300));
 
       final state = shellHandles(tester).controller.state;
       expect(state.activePlanetId, MiningPlanetId.lunarFrontier);
-      expect(
-        state.sites[MiningSiteId.frozenBasin]!.rigByNode[MiningNodeId.n1],
-        isNull,
-      );
+      expect(state.sites[MiningSiteId.frozenBasin]!.rigPlacements, isEmpty);
     },
   );
 
@@ -430,17 +443,12 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const Key('site-card-frozenBasin-enter')));
     await tester.pump();
-    final node = find.byKey(const Key('mine-site-node-n1'));
-    expect(tester.widget<InkWell>(node).onTap, isNotNull);
-    await tester.tap(node);
+    await tapGridCell(tester, frozenRigCell);
     await tester.pump(const Duration(milliseconds: 300));
 
     final state = shellHandles(tester).controller.state;
     expect(state.activePlanetId, MiningPlanetId.lunarFrontier);
-    expect(
-      state.sites[MiningSiteId.frozenBasin]!.rigByNode[MiningNodeId.n1],
-      isNull,
-    );
+    expect(state.sites[MiningSiteId.frozenBasin]!.rigPlacements, isEmpty);
   });
 
   testWidgets('missing save attempts initial persistence', (tester) async {
@@ -499,27 +507,23 @@ void main() {
 
     await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
     await tester.pump();
-    await tester.tap(find.byKey(const Key('mine-site-node-n1')));
+    await tapGridCell(tester, landingRigCell);
     await tester.pump(const Duration(milliseconds: 300));
 
     var state = shellHandles(tester).controller.state;
-    expect(
-      state.sites[MiningSiteId.landingBasin]!.rigByNode[MiningNodeId.n1],
-      isNull,
-    );
+    expect(state.sites[MiningSiteId.landingBasin]!.rigPlacements, isEmpty);
     expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b1], RigTier.t1);
     expect(find.text('Rig recalled.'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey<String>('b1')));
     await tester.pump();
-    await tester.tap(find.byKey(const Key('mine-site-node-n1')));
+    await tapGridCell(tester, landingRigCell);
     await tester.pump(const Duration(milliseconds: 300));
 
     state = shellHandles(tester).controller.state;
-    expect(
-      state.sites[MiningSiteId.landingBasin]!.rigByNode[MiningNodeId.n1],
-      RigTier.t1,
-    );
+    expect(state.sites[MiningSiteId.landingBasin]!.rigPlacements, [
+      MiningRigPlacement(tier: RigTier.t1, cell: landingRigCell),
+    ]);
     expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b1], isNull);
     expect(find.text('Rig deployed.'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -543,7 +547,7 @@ void main() {
     expect(find.text('Sold 40 cash.'), findsOneWidget);
   });
 
-  testWidgets('blocked occupied node tap shows its disabled reason', (
+  testWidgets('blocked occupied cell tap shows its disabled reason', (
     tester,
   ) async {
     final repository = CountingMiningSaveRepository();
@@ -552,7 +556,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
     await tester.pump();
-    await tester.tap(find.byKey(const Key('mine-site-node-n1')));
+    await tapGridCell(tester, landingRigCell);
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Sell cargo before recalling this rig.'), findsOneWidget);
@@ -575,7 +579,7 @@ void main() {
     expect(shellHandles(tester).controller.isBusy, isTrue);
     expect(repository.saveCount, 2);
     try {
-      await tester.tap(find.byKey(const Key('mine-site-node-n1')));
+      await tapGridCell(tester, landingRigCell);
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Finishing previous action…'), findsOneWidget);

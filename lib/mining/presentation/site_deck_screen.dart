@@ -385,7 +385,7 @@ class _PrototypeSiteCard extends StatelessWidget {
                       child: Row(
                         children: [
                           Image.asset(
-                            card.definition.nodeAsset,
+                            card.definition.depositAsset,
                             width: 22,
                             height: 22,
                           ),

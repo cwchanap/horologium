@@ -1,4 +1,5 @@
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_grid.dart';
 
 class TechnologyLevels {
   const TechnologyLevels({
@@ -62,38 +63,57 @@ class TechnologyLevels {
   int get hashCode => Object.hash(extraction, logistics, surveying);
 }
 
+class MiningRigPlacement {
+  const MiningRigPlacement({required this.tier, required this.cell});
+  final RigTier tier;
+  final MiningGridCell cell;
+
+  Map<String, Object?> toJson() => {
+    'tier': tier.name,
+    'x': cell.x,
+    'y': cell.y,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is MiningRigPlacement && tier == other.tier && cell == other.cell;
+
+  @override
+  int get hashCode => Object.hash(tier, cell);
+}
+
 class SiteProgress {
-  const SiteProgress({
+  SiteProgress({
     required this.unlocked,
     required this.commissioned,
     required this.storedAmount,
-    required this.rigByNode,
-  });
+    required List<MiningRigPlacement> rigPlacements,
+  }) : rigPlacements = List<MiningRigPlacement>.unmodifiable(rigPlacements);
 
   final bool unlocked;
   final bool commissioned;
   final double storedAmount;
-  final Map<MiningNodeId, RigTier?> rigByNode;
+  final List<MiningRigPlacement> rigPlacements;
 
   SiteProgress copyWith({
     bool? unlocked,
     bool? commissioned,
     double? storedAmount,
-    Map<MiningNodeId, RigTier?>? rigByNode,
+    List<MiningRigPlacement>? rigPlacements,
   }) => SiteProgress(
     unlocked: unlocked ?? this.unlocked,
     commissioned: commissioned ?? this.commissioned,
     storedAmount: storedAmount ?? this.storedAmount,
-    rigByNode: Map<MiningNodeId, RigTier?>.unmodifiable(
-      rigByNode ?? this.rigByNode,
-    ),
+    rigPlacements: rigPlacements ?? this.rigPlacements,
   );
 
   Map<String, Object?> toJson() => {
     'unlocked': unlocked,
     'commissioned': commissioned,
     'storedAmount': storedAmount,
-    'rigByNode': rigByNode.map((id, tier) => MapEntry(id.name, tier?.name)),
+    'rigPlacements': rigPlacements
+        .map((placement) => placement.toJson())
+        .toList(),
   };
 
   @override
@@ -102,16 +122,14 @@ class SiteProgress {
       unlocked == other.unlocked &&
       commissioned == other.commissioned &&
       storedAmount == other.storedAmount &&
-      _mapsEqual(rigByNode, other.rigByNode);
+      _listsEqual(rigPlacements, other.rigPlacements);
 
   @override
   int get hashCode => Object.hash(
     unlocked,
     commissioned,
     storedAmount,
-    Object.hashAllUnordered(
-      rigByNode.entries.map((entry) => Object.hash(entry.key, entry.value)),
-    ),
+    Object.hashAll(rigPlacements),
   );
 }
 
@@ -159,7 +177,7 @@ class MiningSave {
           unlocked: id == MiningSiteId.landingBasin,
           commissioned: false,
           storedAmount: 0,
-          rigByNode: {for (final node in MiningNodeId.values) node: null},
+          rigPlacements: const [],
         ),
     },
   );
@@ -260,11 +278,17 @@ Map<MiningSiteId, SiteProgress> _copySites(
       unlocked: entry.value.unlocked,
       commissioned: entry.value.commissioned,
       storedAmount: entry.value.storedAmount,
-      rigByNode: Map<MiningNodeId, RigTier?>.unmodifiable(
-        entry.value.rigByNode,
-      ),
+      rigPlacements: entry.value.rigPlacements,
     ),
 });
+
+bool _listsEqual<T>(List<T> first, List<T> second) {
+  if (first.length != second.length) return false;
+  for (var i = 0; i < first.length; i++) {
+    if (first[i] != second[i]) return false;
+  }
+  return true;
+}
 
 bool _mapsEqual<K, V>(Map<K, V> first, Map<K, V> second) {
   if (first.length != second.length) return false;

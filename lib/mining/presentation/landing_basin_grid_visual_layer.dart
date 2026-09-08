@@ -1,37 +1,35 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:horologium/mining/mining_content.dart';
-import 'package:horologium/mining/presentation/mining_theme.dart';
+import 'package:horologium/mining/mine_site_view.dart';
+import 'package:horologium/mining/presentation/mining_grid_map.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
-class LandingBasinMiningNodeVisual extends StatefulWidget {
-  const LandingBasinMiningNodeVisual({
+/// HPA-451 authored art/animation for the Landing Basin mine site grid.
+/// Owns only visuals: one impact controller, one S1 idle controller, finite
+/// frame precache, and the stalled-first-impact drop. The grid map renders no
+/// generic deposit/rig art for Landing Basin; this layer is the object layer.
+class LandingBasinGridVisualLayer extends StatefulWidget {
+  const LandingBasinGridVisualLayer({
     super.key,
-    required this.nodeId,
-    required this.rig,
-    required this.nodeSize,
-    required this.rigSize,
-    required this.progress,
+    required this.view,
     required this.impactSequence,
     required this.reducedMotion,
+    required this.cellSize,
   });
 
-  final MiningNodeId nodeId;
-  final RigTier? rig;
-  final double nodeSize;
-  final double rigSize;
-  final double progress;
+  final MineSiteView view;
   final int impactSequence;
   final bool reducedMotion;
+  final double cellSize;
 
   @override
-  State<LandingBasinMiningNodeVisual> createState() =>
-      _LandingBasinMiningNodeVisualState();
+  State<LandingBasinGridVisualLayer> createState() =>
+      _LandingBasinGridVisualLayerState();
 }
 
-class _LandingBasinMiningNodeVisualState
-    extends State<LandingBasinMiningNodeVisual>
+class _LandingBasinGridVisualLayerState
+    extends State<LandingBasinGridVisualLayer>
     with TickerProviderStateMixin {
   late final AnimationController _impactController = AnimationController(
     vsync: this,
@@ -69,6 +67,10 @@ class _LandingBasinMiningNodeVisualState
   /// leaves a pending timer after the tree is torn down.
   Timer? _deferTimer;
 
+  double get _progress => widget.view.capacity <= 0
+      ? 0.0
+      : (widget.view.cargo / widget.view.capacity).clamp(0.0, 1.0).toDouble();
+
   @override
   void initState() {
     super.initState();
@@ -98,7 +100,7 @@ class _LandingBasinMiningNodeVisualState
     final configuration = createLocalImageConfiguration(context);
     final providers = [for (final path in paths) AssetImage(path)];
     // If every frame is already cached and decoded (e.g. warmed by a prior
-    // precache or another node visual), mark ready synchronously. This avoids
+    // precache or another visual), mark ready synchronously. This avoids
     // relying on [Future.wait] completion in fake-async test environments where
     // [precacheImage] may not resolve during [tester.pump]; in production it
     // skips a redundant async round-trip when the cache is already warm.
@@ -153,7 +155,7 @@ class _LandingBasinMiningNodeVisualState
     _deferTimer = Timer(_firstImpactDeferBudget, () {
       if (!mounted || _framesReady) return;
       // Decode stalled past the safety budget. Drop this one impact and keep
-      // the node static instead of firing the one-shot against unresolved
+      // the grid static instead of firing the one-shot against unresolved
       // frames. Readiness stays owned by the precache [Future.wait] completion
       // above, so later impacts animate correctly once the frames really
       // decode. No historical replay: the pending sequence is discarded.
@@ -169,15 +171,15 @@ class _LandingBasinMiningNodeVisualState
     final pending = _pendingImpactSequence;
     if (pending == null) return;
     _pendingImpactSequence = null;
-    if (widget.impactSequence == pending && widget.rig != null) {
+    if (widget.impactSequence == pending && widget.view.rigs.isNotEmpty) {
       _fireImpact(_pendingExhaust);
     }
   }
 
   @override
-  void didUpdateWidget(LandingBasinMiningNodeVisual oldWidget) {
+  void didUpdateWidget(LandingBasinGridVisualLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.rig == null) {
+    if (widget.view.rigs.isEmpty) {
       _impactController.stop();
       _impactController.value = 1;
       _exhaustImpactSequence = null;
@@ -185,13 +187,18 @@ class _LandingBasinMiningNodeVisualState
       _deferTimer?.cancel();
       _deferTimer = null;
     } else if (widget.impactSequence != oldWidget.impactSequence) {
-      final shouldExhaust = oldWidget.progress < .90 && widget.progress >= .90;
+      final oldProgress = oldWidget.view.capacity <= 0
+          ? 0.0
+          : (oldWidget.view.cargo / oldWidget.view.capacity)
+                .clamp(0.0, 1.0)
+                .toDouble();
+      final shouldExhaust = oldProgress < .90 && _progress >= .90;
       if (_framesReady) {
         _fireImpact(shouldExhaust);
       } else {
         _deferImpact(widget.impactSequence, shouldExhaust);
       }
-    } else if (widget.progress < .90 &&
+    } else if (_progress < .90 &&
         _exhaustImpactSequence == widget.impactSequence) {
       _exhaustImpactSequence = null;
     }
@@ -203,106 +210,99 @@ class _LandingBasinMiningNodeVisualState
     animation: Listenable.merge([_impactController, _idleController]),
     builder: (context, child) {
       final t = _impactController.value.clamp(0.0, 1.0).toDouble();
-      final rig = widget.rig;
+      final hasRig = widget.view.rigs.isNotEmpty;
+      final cell = widget.cellSize;
 
       return Stack(
         clipBehavior: Clip.none,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              SizedBox(
-                width: widget.nodeSize,
-                height: widget.nodeSize,
-                child: Transform.translate(
-                  key: Key(
-                    'landing-basin-deposit-response-${widget.nodeId.name}',
-                  ),
-                  offset: Offset.zero,
-                  child: Transform.rotate(
-                    key: Key(
-                      'landing-basin-deposit-rotation-${widget.nodeId.name}',
-                    ),
-                    angle: 0,
-                    child: Transform.scale(
-                      key: Key('landing-basin-deposit-${widget.nodeId.name}'),
-                      scale: 1,
-                      child: Image.asset(
-                        _nodeAsset(t),
-                        width: widget.nodeSize,
-                        height: widget.nodeSize,
-                        gaplessPlayback: true,
-                        opacity: rig == null
-                            ? const AlwaysStoppedAnimation(.62)
-                            : null,
-                      ),
-                    ),
-                  ),
+          for (final deposit in widget.view.deposits)
+            Positioned(
+              key: Key('landing-basin-deposit-${deposit.definition.id.name}'),
+              left: deposit.definition.x * cell,
+              top: deposit.definition.y * cell,
+              width: deposit.definition.size * cell,
+              height: deposit.definition.size * cell,
+              child: OverflowBox(
+                maxWidth: depositVisualSize(deposit.definition.size),
+                maxHeight: depositVisualSize(deposit.definition.size),
+                alignment: Alignment.center,
+                child: Image.asset(
+                  _depositAsset(t),
+                  width: depositVisualSize(deposit.definition.size),
+                  height: depositVisualSize(deposit.definition.size),
+                  fit: BoxFit.contain,
+                  gaplessPlayback: true,
+                  opacity: hasRig ? null : const AlwaysStoppedAnimation(.62),
                 ),
               ),
-              if (rig != null) ...[
-                const SizedBox(width: 2),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: widget.rigSize,
-                      height: widget.rigSize,
-                      child: Transform.translate(
-                        key: Key('landing-basin-robot-${widget.nodeId.name}'),
-                        offset: Offset.zero,
-                        child: Transform.rotate(
-                          key: Key(
-                            'landing-basin-robot-response-${widget.nodeId.name}',
-                          ),
-                          angle: 0,
-                          child: Transform.scale(
-                            key: Key(
-                              'landing-basin-robot-scale-${widget.nodeId.name}',
-                            ),
-                            scale: 1,
-                            child: _articulatedRobot(
-                              rig,
-                              t,
-                              widget.reducedMotion,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: MiningTheme.accent,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        rig.name.toUpperCase(),
-                        style: const TextStyle(
-                          color: Color(0xFF04121A),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
+            ),
+          for (final rig in widget.view.rigs)
+            Positioned(
+              left: rig.placement.cell.x * cell,
+              top: rig.placement.cell.y * cell,
+              width: cell,
+              height: cell,
+              child: OverflowBox(
+                maxWidth: cell + 12,
+                maxHeight: cell + 12,
+                alignment: Alignment.center,
+                child: _rigRobot(rig, t, cell),
+              ),
+            ),
         ],
       );
     },
   );
 
-  String _nodeAsset(double t) {
-    final stage = _stageForProgress(widget.progress);
-    if (widget.rig == null || widget.reducedMotion) {
+  /// The robot mirrors horizontally only when its deposit sits to its right,
+  /// so the articulated arm always strikes toward the resource. The chassis is
+  /// never rotated vertically for deposits above or below.
+  Widget _rigRobot(MineSiteRigView rig, double t, double cell) {
+    final rigCenterX = rig.placement.cell.x + .5;
+    final targetCenterX = rig.target.x + rig.target.size / 2;
+    final mirror = targetCenterX > rigCenterX;
+    final cellKey = '${rig.placement.cell.x}-${rig.placement.cell.y}';
+    return Transform(
+      key: Key('landing-basin-robot-flip-$cellKey'),
+      alignment: Alignment.center,
+      transform: Matrix4.diagonal3Values(mirror ? -1 : 1, 1, 1),
+      child: SizedBox(
+        key: Key('landing-basin-robot-$cellKey'),
+        width: cell + 12,
+        height: cell + 12,
+        child: Stack(
+          fit: StackFit.expand,
+          clipBehavior: Clip.none,
+          children: [
+            Transform(
+              key: Key('landing-basin-robot-body-transform-$cellKey'),
+              transform: Matrix4.identity(),
+              child: Image.asset(
+                MiningVisuals.landingBasinRobotBodyAsset(rig.placement.tier),
+                width: cell + 12,
+                height: cell + 12,
+              ),
+            ),
+            Transform.rotate(
+              key: Key('landing-basin-robot-arm-transform-$cellKey'),
+              alignment: const Alignment(.33, -.24),
+              angle: widget.reducedMotion ? 0 : _armAngle(t),
+              child: Image.asset(
+                MiningVisuals.landingBasinRobotArmAsset(rig.placement.tier),
+                width: cell + 12,
+                height: cell + 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _depositAsset(double t) {
+    final stage = _stageForProgress(_progress);
+    if (widget.view.rigs.isEmpty || widget.reducedMotion) {
       return MiningVisuals.goldNodeStageAsset(stage);
     }
     if (_exhaustImpactSequence == widget.impactSequence) {
@@ -333,9 +333,9 @@ class _LandingBasinMiningNodeVisualState
 
   void _syncIdleController() {
     final shouldAnimate =
-        widget.rig != null &&
+        widget.view.rigs.isNotEmpty &&
         !widget.reducedMotion &&
-        _stageForProgress(widget.progress) == 1;
+        _stageForProgress(_progress) == 1;
     if (shouldAnimate) {
       if (!_idleController.isAnimating) {
         _idleController.value = 0;
@@ -345,34 +345,6 @@ class _LandingBasinMiningNodeVisualState
       _idleController.stop();
       _idleController.value = 0;
     }
-  }
-
-  Widget _articulatedRobot(RigTier tier, double t, bool reducedMotion) {
-    return Stack(
-      fit: StackFit.expand,
-      clipBehavior: Clip.none,
-      children: [
-        Transform(
-          key: Key('landing-basin-robot-body-transform-${widget.nodeId.name}'),
-          transform: Matrix4.identity(),
-          child: Image.asset(
-            MiningVisuals.landingBasinRobotBodyAsset(tier),
-            width: widget.rigSize,
-            height: widget.rigSize,
-          ),
-        ),
-        Transform.rotate(
-          key: Key('landing-basin-robot-arm-transform-${widget.nodeId.name}'),
-          alignment: const Alignment(.33, -.24),
-          angle: reducedMotion ? 0 : _armAngle(t),
-          child: Image.asset(
-            MiningVisuals.landingBasinRobotArmAsset(tier),
-            width: widget.rigSize,
-            height: widget.rigSize,
-          ),
-        ),
-      ],
-    );
   }
 
   double _armAngle(double t) {

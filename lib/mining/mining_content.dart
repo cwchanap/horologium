@@ -16,23 +16,11 @@ enum MiningSiteId {
   cobaltChasm,
 }
 
-enum MiningNodeId { n1, n2, n3, n4 }
-
 enum DockBayId { b1, b2, b3, b4 }
 
 enum RigTier { t1, t2, t3, t4, t5 }
 
 enum TechnologyTrack { extraction, logistics, surveying }
-
-class MiningNodeDefinition {
-  const MiningNodeDefinition({
-    required this.id,
-    required this.requiredSurveyingLevel,
-  });
-
-  final MiningNodeId id;
-  final int requiredSurveyingLevel;
-}
 
 class MiningSiteDefinition {
   const MiningSiteDefinition({
@@ -45,12 +33,10 @@ class MiningSiteDefinition {
     required this.baseRatePerSecond,
     required this.baseCapacity,
     required this.saleValuePerUnit,
-    required this.nodes,
     required this.gridWidth,
     required this.gridHeight,
     required this.deposits,
     required this.cavernAsset,
-    required this.nodeAsset,
     required this.depositAsset,
     required this.cardAsset,
     this.facilityName,
@@ -66,12 +52,10 @@ class MiningSiteDefinition {
   final double baseRatePerSecond;
   final double baseCapacity;
   final int saleValuePerUnit;
-  final List<MiningNodeDefinition> nodes;
   final int gridWidth;
   final int gridHeight;
   final List<MiningDepositDefinition> deposits;
   final String cavernAsset;
-  final String nodeAsset;
   final String depositAsset;
   final String cardAsset;
   final String? facilityName;
@@ -227,24 +211,6 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.50,
           baseCapacity: 90,
           saleValuePerUnit: 4,
-          nodes: [
-            MiningNodeDefinition(
-              id: MiningNodeId.n1,
-              requiredSurveyingLevel: 0,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n2,
-              requiredSurveyingLevel: 0,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n3,
-              requiredSurveyingLevel: 1,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n4,
-              requiredSurveyingLevel: 2,
-            ),
-          ],
           gridWidth: 24,
           gridHeight: 18,
           deposits: [
@@ -282,7 +248,6 @@ class MiningContentRegistry {
             ),
           ],
           cavernAsset: 'assets/images/mining/caverns/gold.png',
-          nodeAsset: 'assets/images/mining/nodes/gold.png',
           depositAsset: 'assets/images/mining/nodes/gold.png',
           cardAsset: 'assets/images/mining/sites/landing_basin.png',
         ),
@@ -296,24 +261,6 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.75,
           baseCapacity: 120,
           saleValuePerUnit: 3,
-          nodes: [
-            MiningNodeDefinition(
-              id: MiningNodeId.n1,
-              requiredSurveyingLevel: 0,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n2,
-              requiredSurveyingLevel: 1,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n3,
-              requiredSurveyingLevel: 2,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n4,
-              requiredSurveyingLevel: 3,
-            ),
-          ],
           gridWidth: 24,
           gridHeight: 18,
           deposits: [
@@ -351,7 +298,6 @@ class MiningContentRegistry {
             ),
           ],
           cavernAsset: 'assets/images/mining/caverns/coal.png',
-          nodeAsset: 'assets/images/mining/nodes/coal.png',
           depositAsset: 'assets/images/mining/nodes/coal.png',
           cardAsset: 'assets/images/mining/sites/carbon_ridge.png',
         ),
@@ -365,24 +311,6 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.60,
           baseCapacity: 120,
           saleValuePerUnit: 5,
-          nodes: [
-            MiningNodeDefinition(
-              id: MiningNodeId.n1,
-              requiredSurveyingLevel: 0,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n2,
-              requiredSurveyingLevel: 1,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n3,
-              requiredSurveyingLevel: 2,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n4,
-              requiredSurveyingLevel: 3,
-            ),
-          ],
           gridWidth: 24,
           gridHeight: 18,
           deposits: [
@@ -420,7 +348,6 @@ class MiningContentRegistry {
             ),
           ],
           cavernAsset: 'assets/images/mining/caverns/stone.png',
-          nodeAsset: 'assets/images/mining/nodes/stone.png',
           depositAsset: 'assets/images/mining/nodes/stone.png',
           cardAsset: 'assets/images/mining/sites/granite_crater.png',
         ),
@@ -446,24 +373,6 @@ class MiningContentRegistry {
           baseRatePerSecond: 1.00,
           baseCapacity: 150,
           saleValuePerUnit: 6,
-          nodes: [
-            MiningNodeDefinition(
-              id: MiningNodeId.n1,
-              requiredSurveyingLevel: 3,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n2,
-              requiredSurveyingLevel: 3,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n3,
-              requiredSurveyingLevel: 4,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n4,
-              requiredSurveyingLevel: 5,
-            ),
-          ],
           gridWidth: 24,
           gridHeight: 18,
           deposits: [
@@ -501,7 +410,6 @@ class MiningContentRegistry {
             ),
           ],
           cavernAsset: 'assets/images/mining/caverns/water_ice.png',
-          nodeAsset: 'assets/images/mining/nodes/water_ice.png',
           depositAsset: 'assets/images/mining/nodes/water_ice.png',
           cardAsset: 'assets/images/mining/caverns/water_ice.png',
         ),
@@ -515,24 +423,6 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.80,
           baseCapacity: 140,
           saleValuePerUnit: 12,
-          nodes: [
-            MiningNodeDefinition(
-              id: MiningNodeId.n1,
-              requiredSurveyingLevel: 4,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n2,
-              requiredSurveyingLevel: 4,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n3,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n4,
-              requiredSurveyingLevel: 5,
-            ),
-          ],
           gridWidth: 24,
           gridHeight: 18,
           deposits: [
@@ -570,7 +460,6 @@ class MiningContentRegistry {
             ),
           ],
           cavernAsset: 'assets/images/mining/caverns/titanium_ore.png',
-          nodeAsset: 'assets/images/mining/nodes/titanium_ore.png',
           depositAsset: 'assets/images/mining/nodes/titanium_ore.png',
           cardAsset: 'assets/images/mining/caverns/titanium_ore.png',
         ),
@@ -584,24 +473,6 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.55,
           baseCapacity: 120,
           saleValuePerUnit: 30,
-          nodes: [
-            MiningNodeDefinition(
-              id: MiningNodeId.n1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n2,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n3,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n4,
-              requiredSurveyingLevel: 5,
-            ),
-          ],
           gridWidth: 24,
           gridHeight: 18,
           deposits: [
@@ -639,7 +510,6 @@ class MiningContentRegistry {
             ),
           ],
           cavernAsset: 'assets/images/mining/caverns/helium_3.png',
-          nodeAsset: 'assets/images/mining/nodes/helium_3.png',
           depositAsset: 'assets/images/mining/nodes/helium_3.png',
           cardAsset: 'assets/images/mining/caverns/helium_3.png',
         ),
@@ -665,24 +535,6 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.75,
           baseCapacity: 180,
           saleValuePerUnit: 32,
-          nodes: [
-            MiningNodeDefinition(
-              id: MiningNodeId.n1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n2,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n3,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n4,
-              requiredSurveyingLevel: 5,
-            ),
-          ],
           gridWidth: 24,
           gridHeight: 18,
           deposits: [
@@ -720,7 +572,6 @@ class MiningContentRegistry {
             ),
           ],
           cavernAsset: 'assets/images/mining/caverns/iron_ore.png',
-          nodeAsset: 'assets/images/mining/nodes/iron_ore.png',
           depositAsset: 'assets/images/mining/nodes/iron_ore.png',
           cardAsset: 'assets/images/mining/caverns/iron_ore.png',
           facilityName: 'Iron Rig',
@@ -737,24 +588,6 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.55,
           baseCapacity: 160,
           saleValuePerUnit: 55,
-          nodes: [
-            MiningNodeDefinition(
-              id: MiningNodeId.n1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n2,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n3,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n4,
-              requiredSurveyingLevel: 5,
-            ),
-          ],
           gridWidth: 24,
           gridHeight: 18,
           deposits: [
@@ -792,7 +625,6 @@ class MiningContentRegistry {
             ),
           ],
           cavernAsset: 'assets/images/mining/caverns/silica.png',
-          nodeAsset: 'assets/images/mining/nodes/silica.png',
           depositAsset: 'assets/images/mining/nodes/silica.png',
           cardAsset: 'assets/images/mining/caverns/silica.png',
           facilityName: 'Silica Extractor',
@@ -809,24 +641,6 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.35,
           baseCapacity: 130,
           saleValuePerUnit: 110,
-          nodes: [
-            MiningNodeDefinition(
-              id: MiningNodeId.n1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n2,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n3,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningNodeDefinition(
-              id: MiningNodeId.n4,
-              requiredSurveyingLevel: 5,
-            ),
-          ],
           gridWidth: 24,
           gridHeight: 18,
           deposits: [
@@ -864,7 +678,6 @@ class MiningContentRegistry {
             ),
           ],
           cavernAsset: 'assets/images/mining/caverns/cobalt_ore.png',
-          nodeAsset: 'assets/images/mining/nodes/cobalt_ore.png',
           depositAsset: 'assets/images/mining/nodes/cobalt_ore.png',
           cardAsset: 'assets/images/mining/caverns/cobalt_ore.png',
           facilityName: 'Cobalt Drill',

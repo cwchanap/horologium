@@ -15,12 +15,12 @@ SiteProgress _progress({
   bool unlocked = false,
   bool commissioned = false,
   double storedAmount = 0,
-  Map<MiningNodeId, RigTier?>? rigs,
+  List<MiningRigPlacement> rigs = const [],
 }) => SiteProgress(
   unlocked: unlocked,
   commissioned: commissioned,
   storedAmount: storedAmount,
-  rigByNode: rigs ?? {for (final node in MiningNodeId.values) node: null},
+  rigPlacements: rigs,
 );
 
 MiningSave _stateWith({

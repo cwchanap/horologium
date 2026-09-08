@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,7 +16,7 @@ MiningSave _progressedState(DateTime now) {
   final sites = <MiningSiteId, SiteProgress>{
     for (final entry in initial.sites.entries)
       entry.key: entry.value.copyWith(
-        rigByNode: Map<MiningNodeId, RigTier?>.from(entry.value.rigByNode),
+        rigPlacements: entry.value.rigPlacements.toList(),
       ),
   };
 
@@ -27,28 +28,25 @@ MiningSave _progressedState(DateTime now) {
   sites[MiningSiteId.landingBasin] = sites[MiningSiteId.landingBasin]!.copyWith(
     commissioned: true,
     storedAmount: 80,
-    rigByNode: {
-      ...sites[MiningSiteId.landingBasin]!.rigByNode,
-      MiningNodeId.n1: RigTier.t1,
-    },
+    rigPlacements: [
+      MiningRigPlacement(tier: RigTier.t1, cell: const MiningGridCell(3, 2)),
+    ],
   );
   sites[MiningSiteId.carbonRidge] = sites[MiningSiteId.carbonRidge]!.copyWith(
     unlocked: true,
     commissioned: true,
     storedAmount: 40,
-    rigByNode: {
-      ...sites[MiningSiteId.carbonRidge]!.rigByNode,
-      MiningNodeId.n1: RigTier.t1,
-    },
+    rigPlacements: [
+      MiningRigPlacement(tier: RigTier.t1, cell: const MiningGridCell(5, 1)),
+    ],
   );
   sites[MiningSiteId.frozenBasin] = sites[MiningSiteId.frozenBasin]!.copyWith(
     unlocked: true,
     commissioned: true,
     storedAmount: 60,
-    rigByNode: {
-      ...sites[MiningSiteId.frozenBasin]!.rigByNode,
-      MiningNodeId.n1: RigTier.t2,
-    },
+    rigPlacements: [
+      MiningRigPlacement(tier: RigTier.t2, cell: const MiningGridCell(4, 2)),
+    ],
   );
 
   return initial.copyWith(
@@ -236,12 +234,12 @@ void main() {
         throwsUnsupportedError,
       );
       expect(
-        () =>
-            result
-                    .state
-                    .sites[MiningSiteId.landingBasin]!
-                    .rigByNode[MiningNodeId.n1] =
-                RigTier.t1,
+        () => result.state.sites[MiningSiteId.landingBasin]!.rigPlacements.add(
+          MiningRigPlacement(
+            tier: RigTier.t1,
+            cell: const MiningGridCell(3, 2),
+          ),
+        ),
         throwsUnsupportedError,
       );
     });
@@ -258,10 +256,12 @@ void main() {
               .copyWith(
                 commissioned: true,
                 storedAmount: 120,
-                rigByNode: {
-                  for (final node in MiningNodeId.values)
-                    node: node == MiningNodeId.n1 ? RigTier.t1 : null,
-                },
+                rigPlacements: [
+                  MiningRigPlacement(
+                    tier: RigTier.t1,
+                    cell: const MiningGridCell(3, 2),
+                  ),
+                ],
               ),
         },
       );
@@ -285,9 +285,24 @@ void main() {
               .copyWith(
                 commissioned: true,
                 storedAmount: 359,
-                rigByNode: {
-                  for (final node in MiningNodeId.values) node: RigTier.t1,
-                },
+                rigPlacements: [
+                  const MiningRigPlacement(
+                    tier: RigTier.t1,
+                    cell: MiningGridCell(3, 2),
+                  ),
+                  MiningRigPlacement(
+                    tier: RigTier.t1,
+                    cell: const MiningGridCell(16, 2),
+                  ),
+                  MiningRigPlacement(
+                    tier: RigTier.t1,
+                    cell: const MiningGridCell(5, 10),
+                  ),
+                  MiningRigPlacement(
+                    tier: RigTier.t1,
+                    cell: const MiningGridCell(16, 9),
+                  ),
+                ],
               ),
         },
       );
@@ -356,49 +371,51 @@ void main() {
       await expectRecovered(invalidDockTier);
     });
 
-    test('sites and rigByNode use exact site and node enum names', () async {
-      final missingSite = _rawDocument(nowUtc: now);
-      (missingSite['sites']! as Map<String, Object?>).remove('cobaltChasm');
-      await expectRecovered(missingSite);
+    test(
+      'sites use exact site enum names and strict placement entries',
+      () async {
+        final missingSite = _rawDocument(nowUtc: now);
+        (missingSite['sites']! as Map<String, Object?>).remove('cobaltChasm');
+        await expectRecovered(missingSite);
 
-      final extraSite = _rawDocument(nowUtc: now);
-      (extraSite['sites']! as Map<String, Object?>)['venus'] =
-          <String, Object?>{};
-      await expectRecovered(extraSite);
+        final extraSite = _rawDocument(nowUtc: now);
+        (extraSite['sites']! as Map<String, Object?>)['venus'] =
+            <String, Object?>{};
+        await expectRecovered(extraSite);
 
-      final missingField = _rawDocument(nowUtc: now);
-      ((missingField['sites']! as Map<String, Object?>)['landingBasin']!
-              as Map<String, Object?>)
-          .remove('commissioned');
-      await expectRecovered(missingField);
+        final missingField = _rawDocument(nowUtc: now);
+        ((missingField['sites']! as Map<String, Object?>)['landingBasin']!
+                as Map<String, Object?>)
+            .remove('commissioned');
+        await expectRecovered(missingField);
 
-      final extraField = _rawDocument(nowUtc: now);
-      ((extraField['sites']! as Map<String, Object?>)['landingBasin']!
-              as Map<String, Object?>)['extra'] =
-          true;
-      await expectRecovered(extraField);
+        final extraField = _rawDocument(nowUtc: now);
+        ((extraField['sites']! as Map<String, Object?>)['landingBasin']!
+                as Map<String, Object?>)['extra'] =
+            true;
+        await expectRecovered(extraField);
 
-      final missingNode = _rawDocument(nowUtc: now);
-      (((missingNode['sites']! as Map<String, Object?>)['landingBasin']!
-                  as Map<String, Object?>)['rigByNode']!
-              as Map<String, Object?>)
-          .remove('n4');
-      await expectRecovered(missingNode);
+        final missingPlacements = _rawDocument(nowUtc: now);
+        ((missingPlacements['sites']! as Map<String, Object?>)['landingBasin']!
+                as Map<String, Object?>)
+            .remove('rigPlacements');
+        await expectRecovered(missingPlacements);
 
-      final extraNode = _rawDocument(nowUtc: now);
-      (((extraNode['sites']! as Map<String, Object?>)['landingBasin']!
-                  as Map<String, Object?>)['rigByNode']!
-              as Map<String, Object?>)['n5'] =
-          null;
-      await expectRecovered(extraNode);
+        final nonListPlacements = _rawDocument(nowUtc: now);
+        ((nonListPlacements['sites']! as Map<String, Object?>)['landingBasin']!
+                as Map<String, Object?>)['rigPlacements'] =
+            {};
+        await expectRecovered(nonListPlacements);
 
-      final invalidNodeTier = _rawDocument(nowUtc: now);
-      (((invalidNodeTier['sites']! as Map<String, Object?>)['landingBasin']!
-                  as Map<String, Object?>)['rigByNode']!
-              as Map<String, Object?>)['n1'] =
-          't6';
-      await expectRecovered(invalidNodeTier);
-    });
+        final extraPlacementField = _rawDocument(nowUtc: now);
+        ((extraPlacementField['sites']!
+                as Map<String, Object?>)['landingBasin']!
+            as Map<String, Object?>)['rigPlacements'] = [
+          {'tier': 't1', 'x': 3, 'y': 2, 'extra': true},
+        ];
+        await expectRecovered(extraPlacementField);
+      },
+    );
 
     final cases = <String, Map<String, Object?>>{
       'negative cash': _rawDocument(nowUtc: now)..['cash'] = -5,
@@ -453,7 +470,7 @@ void main() {
             'unlocked': false,
             'commissioned': false,
             'storedAmount': 1,
-            'rigByNode': {'n1': null, 'n2': null, 'n3': null, 'n4': null},
+            'rigPlacements': <Object?>[],
           },
         },
       'locked site is commissioned': _rawDocument(nowUtc: now)
@@ -463,7 +480,7 @@ void main() {
             'unlocked': false,
             'commissioned': true,
             'storedAmount': 0,
-            'rigByNode': {'n1': null, 'n2': null, 'n3': null, 'n4': null},
+            'rigPlacements': <Object?>[],
           },
         },
       'commissioned site is locked': _rawDocument(nowUtc: now)
@@ -473,7 +490,7 @@ void main() {
             'unlocked': false,
             'commissioned': true,
             'storedAmount': 0,
-            'rigByNode': {'n1': null, 'n2': null, 'n3': null, 'n4': null},
+            'rigPlacements': <Object?>[],
           },
         },
       'later site unlocked before prerequisite': _rawDocument(nowUtc: now)
@@ -483,7 +500,7 @@ void main() {
             'unlocked': true,
             'commissioned': false,
             'storedAmount': 0,
-            'rigByNode': {'n1': null, 'n2': null, 'n3': null, 'n4': null},
+            'rigPlacements': <Object?>[],
           },
         },
       'unlocked planet first site is locked': _rawDocument(nowUtc: now)
@@ -496,7 +513,9 @@ void main() {
             'unlocked': true,
             'commissioned': true,
             'storedAmount': 0,
-            'rigByNode': {'n1': null, 'n2': null, 'n3': 't1', 'n4': null},
+            'rigPlacements': [
+              {'tier': 't1', 'x': 5, 'y': 10},
+            ],
           },
         },
       'negative cargo': _rawDocument(nowUtc: now)
@@ -506,7 +525,7 @@ void main() {
             'unlocked': true,
             'commissioned': false,
             'storedAmount': -1,
-            'rigByNode': {'n1': null, 'n2': null, 'n3': null, 'n4': null},
+            'rigPlacements': <Object?>[],
           },
         },
       'non-numeric cargo': _rawDocument(nowUtc: now)
@@ -516,13 +535,134 @@ void main() {
             'unlocked': true,
             'commissioned': false,
             'storedAmount': 'abc',
-            'rigByNode': {'n1': null, 'n2': null, 'n3': null, 'n4': null},
+            'rigPlacements': <Object?>[],
           },
         },
     };
 
     cases.forEach((name, raw) {
       test(name, () => expectRecovered(raw));
+    });
+  });
+
+  group('rig placement decoding', () {
+    Map<String, Object?> rawWithLandingPlacements(
+      List<Object?> placements, {
+      int surveying = 5,
+    }) {
+      final raw = _rawDocument(nowUtc: now);
+      final technology = Map<String, Object?>.from(
+        raw['technology']! as Map<String, Object?>,
+      )..['surveying'] = surveying;
+      final sites = Map<String, Object?>.from(
+        raw['sites']! as Map<String, Object?>,
+      );
+      final landing =
+          Map<String, Object?>.from(
+              sites[MiningSiteId.landingBasin.name]! as Map<String, Object?>,
+            )
+            ..['unlocked'] = true
+            ..['commissioned'] = true
+            ..['rigPlacements'] = placements;
+      sites[MiningSiteId.landingBasin.name] = landing;
+      raw['technology'] = technology;
+      raw['sites'] = sites;
+      return raw;
+    }
+
+    Future<void> expectRecovered(Map<String, Object?> raw) async {
+      SharedPreferences.setMockInitialValues({
+        MiningSaveRepository.saveKey: jsonEncode(raw),
+      });
+      final result = await MiningSaveRepository().load(nowUtc: now);
+      expect(result.recoveredFromInvalidSave, isTrue);
+      expect(result.state, MiningSave.initial(nowUtc: now));
+    }
+
+    test(
+      'invalid rig placements recover through the strict boundary',
+      () async {
+        final invalid = <Map<String, Object?>>[
+          rawWithLandingPlacements([
+            {'tier': 't1', 'x': 3, 'y': 2},
+            {'tier': 't2', 'x': 3, 'y': 2},
+          ]),
+          rawWithLandingPlacements([
+            {'tier': 't1', 'x': 3, 'y': 3},
+          ]),
+          rawWithLandingPlacements([
+            {'tier': 't1', 'x': 5, 'y': 10},
+          ], surveying: 0),
+          rawWithLandingPlacements([
+            {'tier': 't1', 'x': 16, 'y': 9},
+            {'tier': 't1', 'x': 17, 'y': 9},
+            {'tier': 't1', 'x': 18, 'y': 9},
+            {'tier': 't1', 'x': 15, 'y': 10},
+          ], surveying: 2),
+          rawWithLandingPlacements([
+            {'tier': 't1', 'x': 3, 'y': 2},
+            {'tier': 't1', 'x': 16, 'y': 2},
+            {'tier': 't1', 'x': 5, 'y': 10},
+            {'tier': 't1', 'x': 16, 'y': 9},
+            {'tier': 't1', 'x': 17, 'y': 9},
+          ], surveying: 2),
+          rawWithLandingPlacements([
+            {'tier': 't9', 'x': 3, 'y': 2},
+          ]),
+          rawWithLandingPlacements([
+            {'tier': 't1', 'x': 3.5, 'y': 2},
+          ]),
+        ];
+
+        for (final raw in invalid) {
+          await expectRecovered(raw);
+        }
+      },
+    );
+
+    test('legacy rigByNode site shape recovers as incompatible', () async {
+      final raw = _rawDocument(nowUtc: now);
+      final sites = Map<String, Object?>.from(
+        raw['sites']! as Map<String, Object?>,
+      );
+      final landing =
+          Map<String, Object?>.from(
+              sites[MiningSiteId.landingBasin.name]! as Map<String, Object?>,
+            )
+            ..remove('rigPlacements')
+            ..['rigByNode'] = {'n1': 't1', 'n2': null, 'n3': null, 'n4': null};
+      sites[MiningSiteId.landingBasin.name] = landing;
+      raw['sites'] = sites;
+
+      await expectRecovered(raw);
+    });
+
+    test('valid placements decode in order into an immutable list', () async {
+      final raw = rawWithLandingPlacements([
+        {'tier': 't1', 'x': 3, 'y': 2},
+        {'tier': 't2', 'x': 16, 'y': 2},
+      ]);
+      SharedPreferences.setMockInitialValues({
+        MiningSaveRepository.saveKey: jsonEncode(raw),
+      });
+
+      final result = await MiningSaveRepository().load(nowUtc: now);
+
+      expect(result.recoveredFromInvalidSave, isFalse);
+      final landing = result.state.sites[MiningSiteId.landingBasin]!;
+      expect(landing.rigPlacements, [
+        MiningRigPlacement(tier: RigTier.t1, cell: const MiningGridCell(3, 2)),
+        MiningRigPlacement(tier: RigTier.t2, cell: const MiningGridCell(16, 2)),
+      ]);
+      expect(
+        () => landing.rigPlacements.add(
+          MiningRigPlacement(
+            tier: RigTier.t1,
+            cell: const MiningGridCell(5, 10),
+          ),
+        ),
+        throwsUnsupportedError,
+      );
     });
   });
 

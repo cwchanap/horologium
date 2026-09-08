@@ -9,7 +9,7 @@ SiteProgress progress({bool unlocked = false, bool commissioned = false}) =>
       unlocked: unlocked,
       commissioned: commissioned,
       storedAmount: 0,
-      rigByNode: {for (final node in MiningNodeId.values) node: null},
+      rigPlacements: const [],
     );
 
 MiningSave stateWith({

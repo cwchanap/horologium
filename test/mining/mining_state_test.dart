@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
 
 void main() {
@@ -12,6 +13,39 @@ void main() {
     expect(
       levels.withLevel(TechnologyTrack.extraction, 4),
       const TechnologyLevels(extraction: 4, logistics: 2, surveying: 3),
+    );
+  });
+
+  test('rig placement has value equality', () {
+    expect(
+      const MiningRigPlacement(tier: RigTier.t2, cell: MiningGridCell(3, 2)),
+      const MiningRigPlacement(tier: RigTier.t2, cell: MiningGridCell(3, 2)),
+    );
+  });
+
+  test('site progress serializes and protects rig placements', () {
+    const placement = MiningRigPlacement(
+      tier: RigTier.t2,
+      cell: MiningGridCell(3, 2),
+    );
+    final progress = SiteProgress(
+      unlocked: true,
+      commissioned: true,
+      storedAmount: 12.5,
+      rigPlacements: const [placement],
+    );
+
+    expect(progress.toJson()['rigPlacements'], [
+      {'tier': 't2', 'x': 3, 'y': 2},
+    ]);
+
+    final copy = progress.copyWith();
+    expect(copy, progress);
+    expect(
+      () => copy.rigPlacements.add(
+        const MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(16, 2)),
+      ),
+      throwsUnsupportedError,
     );
   });
 
@@ -30,12 +64,10 @@ void main() {
     expect(state.sites[MiningSiteId.landingBasin]!.unlocked, isTrue);
     expect(state.sites[MiningSiteId.landingBasin]!.commissioned, isFalse);
     expect(state.sites[MiningSiteId.landingBasin]!.storedAmount, 0);
-    expect(state.sites[MiningSiteId.landingBasin]!.rigByNode, {
-      for (final id in MiningNodeId.values) id: null,
-    });
+    expect(state.sites[MiningSiteId.landingBasin]!.rigPlacements, isEmpty);
   });
 
-  test('fresh state has exact bay and node keys on every planet and site', () {
+  test('fresh state has exact bay keys on every planet and empty sites', () {
     final state = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 26, 12));
 
     expect(state.docks.keys.toSet(), MiningPlanetId.values.toSet());
@@ -44,7 +76,7 @@ void main() {
     }
     expect(state.sites.keys.toSet(), MiningSiteId.values.toSet());
     for (final progress in state.sites.values) {
-      expect(progress.rigByNode.keys.toSet(), MiningNodeId.values.toSet());
+      expect(progress.rigPlacements, isEmpty);
     }
 
     for (final id in [
@@ -59,7 +91,7 @@ void main() {
       expect(progress.unlocked, isFalse);
       expect(progress.commissioned, isFalse);
       expect(progress.storedAmount, 0);
-      expect(progress.rigByNode.values, everyElement(isNull));
+      expect(progress.rigPlacements, isEmpty);
     }
   });
 
@@ -70,16 +102,14 @@ void main() {
           for (final bay in DockBayId.values) bay: null,
         },
     };
-    final rigByNode = <MiningNodeId, RigTier?>{
-      for (final node in MiningNodeId.values) node: null,
-    };
+    final placements = <MiningRigPlacement>[];
     final sites = <MiningSiteId, SiteProgress>{
       for (final site in MiningSiteId.values)
         site: SiteProgress(
           unlocked: site == MiningSiteId.landingBasin,
           commissioned: false,
           storedAmount: 0,
-          rigByNode: rigByNode,
+          rigPlacements: placements,
         ),
     };
     final state = MiningSave(
@@ -93,19 +123,18 @@ void main() {
     );
 
     docks[MiningPlanetId.homeworld]![DockBayId.b1] = RigTier.t5;
-    rigByNode[MiningNodeId.n1] = RigTier.t5;
-    sites[MiningSiteId.landingBasin] = const SiteProgress(
+    placements.add(
+      const MiningRigPlacement(tier: RigTier.t5, cell: MiningGridCell(0, 0)),
+    );
+    sites[MiningSiteId.landingBasin] = SiteProgress(
       unlocked: false,
       commissioned: false,
       storedAmount: 20,
-      rigByNode: {},
+      rigPlacements: const [],
     );
 
     expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b1], isNull);
-    expect(
-      state.sites[MiningSiteId.landingBasin]!.rigByNode[MiningNodeId.n1],
-      isNull,
-    );
+    expect(state.sites[MiningSiteId.landingBasin]!.rigPlacements, isEmpty);
     expect(state.sites[MiningSiteId.landingBasin]!.storedAmount, 0);
 
     final copiedDocks = {
@@ -115,11 +144,11 @@ void main() {
     final copiedSites = Map<MiningSiteId, SiteProgress>.from(state.sites);
     final copy = state.copyWith(docks: copiedDocks, sites: copiedSites);
     copiedDocks[MiningPlanetId.homeworld]![DockBayId.b1] = RigTier.t4;
-    copiedSites[MiningSiteId.landingBasin] = const SiteProgress(
+    copiedSites[MiningSiteId.landingBasin] = SiteProgress(
       unlocked: true,
       commissioned: true,
       storedAmount: 40,
-      rigByNode: {},
+      rigPlacements: const [],
     );
 
     expect(copy.docks[MiningPlanetId.homeworld]![DockBayId.b1], isNull);
@@ -135,27 +164,28 @@ void main() {
       throwsUnsupportedError,
     );
     expect(
-      () => state.sites[MiningSiteId.landingBasin]!.rigByNode[MiningNodeId.n1] =
-          RigTier.t1,
+      () => state.sites[MiningSiteId.landingBasin]!.rigPlacements.add(
+        const MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+      ),
       throwsUnsupportedError,
     );
   });
 
-  test('SiteProgress copyWith snapshots its node map', () {
-    final rigByNode = <MiningNodeId, RigTier?>{
-      for (final node in MiningNodeId.values) node: null,
-    };
+  test('SiteProgress copyWith snapshots its placement list', () {
+    final placements = <MiningRigPlacement>[];
     final progress = SiteProgress(
       unlocked: true,
       commissioned: false,
       storedAmount: 0,
-      rigByNode: rigByNode,
+      rigPlacements: placements,
     );
     final copy = progress.copyWith();
 
-    rigByNode[MiningNodeId.n1] = RigTier.t1;
+    placements.add(
+      const MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+    );
 
-    expect(copy.rigByNode[MiningNodeId.n1], isNull);
+    expect(copy.rigPlacements, isEmpty);
   });
 
   test('save JSON uses flat sites and enum-keyed docks', () {
