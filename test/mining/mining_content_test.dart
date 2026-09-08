@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_grid.dart';
 
 void main() {
   test('keeps closed site, node, bay, and rig identities', () {
@@ -340,5 +341,158 @@ void main() {
     expect({water.name, titanium.name, helium.name}.length, 3);
     expect({water.color, titanium.color, helium.color}.length, 3);
     expect(water.icon, isA<IconData>());
+  });
+
+  test('freezes authored grid deposits and map invariants', () {
+    final content = MiningContentRegistry.stellarMining();
+
+    final expectedDeposits = <MiningSiteId, List<(int, int, int, int, int)>>{
+      MiningSiteId.landingBasin: [
+        (3, 3, 1, 1, 0),
+        (16, 3, 1, 1, 0),
+        (5, 11, 2, 1, 1),
+        (16, 10, 3, 3, 2),
+      ],
+      MiningSiteId.carbonRidge: [
+        (5, 2, 1, 1, 0),
+        (17, 5, 1, 1, 1),
+        (13, 12, 2, 1, 2),
+        (2, 11, 3, 3, 3),
+      ],
+      MiningSiteId.graniteCrater: [
+        (2, 5, 1, 1, 0),
+        (18, 2, 1, 1, 1),
+        (5, 12, 2, 1, 2),
+        (15, 10, 3, 3, 3),
+      ],
+      MiningSiteId.frozenBasin: [
+        (4, 3, 1, 1, 3),
+        (15, 2, 1, 1, 3),
+        (3, 12, 2, 1, 4),
+        (16, 10, 3, 3, 5),
+      ],
+      MiningSiteId.titaniumHighlands: [
+        (2, 2, 1, 1, 4),
+        (19, 6, 1, 1, 4),
+        (12, 3, 2, 1, 5),
+        (5, 11, 3, 3, 5),
+      ],
+      MiningSiteId.heliumMare: [
+        (6, 2, 1, 1, 5),
+        (18, 3, 1, 1, 5),
+        (3, 10, 2, 1, 5),
+        (14, 11, 3, 3, 5),
+      ],
+      MiningSiteId.ochreBasin: [
+        (2, 4, 1, 1, 5),
+        (17, 2, 1, 1, 5),
+        (14, 12, 2, 1, 5),
+        (4, 11, 3, 3, 5),
+      ],
+      MiningSiteId.silicaDunes: [
+        (5, 3, 1, 1, 5),
+        (19, 4, 1, 1, 5),
+        (3, 12, 2, 1, 5),
+        (14, 9, 3, 3, 5),
+      ],
+      MiningSiteId.cobaltChasm: [
+        (3, 2, 1, 1, 5),
+        (18, 6, 1, 1, 5),
+        (7, 12, 2, 1, 5),
+        (14, 10, 3, 3, 5),
+      ],
+    };
+
+    for (final entry in expectedDeposits.entries) {
+      final site = content.site(entry.key);
+      expect(site.gridWidth, 24, reason: site.name);
+      expect(site.gridHeight, 18, reason: site.name);
+      expect(
+        site.deposits
+            .map(
+              (d) => (d.x, d.y, d.size, d.maxMiners, d.requiredSurveyingLevel),
+            )
+            .toList(),
+        entry.value,
+        reason: site.name,
+      );
+
+      for (final deposit in site.deposits) {
+        expect(deposit.x, greaterThanOrEqualTo(0));
+        expect(deposit.y, greaterThanOrEqualTo(0));
+        expect(deposit.x + deposit.size, lessThanOrEqualTo(site.gridWidth));
+        expect(deposit.y + deposit.size, lessThanOrEqualTo(site.gridHeight));
+      }
+
+      for (var x = 0; x < site.gridWidth; x++) {
+        for (var y = 0; y < site.gridHeight; y++) {
+          final cell = MiningGridCell(x, y);
+          final containing = site.deposits
+              .where((d) => d.contains(cell))
+              .toList();
+          expect(
+            containing.length,
+            lessThanOrEqualTo(1),
+            reason: '${site.name} $cell',
+          );
+          if (containing.isEmpty) {
+            final adjacent = site.deposits
+                .where((d) => d.isOrthogonallyAdjacent(cell))
+                .toList();
+            expect(
+              adjacent.length,
+              lessThanOrEqualTo(1),
+              reason: '${site.name} $cell',
+            );
+          }
+        }
+      }
+
+      for (final deposit in site.deposits) {
+        var legalPerimeter = 0;
+        for (var x = 0; x < site.gridWidth; x++) {
+          for (var y = 0; y < site.gridHeight; y++) {
+            final cell = MiningGridCell(x, y);
+            if (deposit.isOrthogonallyAdjacent(cell) &&
+                !site.deposits.any((d) => d.contains(cell))) {
+              legalPerimeter++;
+            }
+          }
+        }
+        expect(
+          legalPerimeter,
+          greaterThanOrEqualTo(deposit.maxMiners),
+          reason: '${site.name} ${deposit.id.name}',
+        );
+      }
+    }
+  });
+
+  test('freezes Surveying pacing toward the deployed-rig cap', () {
+    final content = MiningContentRegistry.stellarMining();
+
+    final expectedBySite = <MiningSiteId, List<int>>{
+      MiningSiteId.landingBasin: [2, 3, 4, 4, 4, 4],
+      MiningSiteId.carbonRidge: [1, 2, 3, 4, 4, 4],
+      MiningSiteId.graniteCrater: [1, 2, 3, 4, 4, 4],
+      MiningSiteId.frozenBasin: [0, 0, 0, 2, 3, 4],
+      MiningSiteId.titaniumHighlands: [0, 0, 0, 0, 2, 4],
+      MiningSiteId.heliumMare: [0, 0, 0, 0, 0, 4],
+      MiningSiteId.ochreBasin: [0, 0, 0, 0, 0, 4],
+      MiningSiteId.silicaDunes: [0, 0, 0, 0, 0, 4],
+      MiningSiteId.cobaltChasm: [0, 0, 0, 0, 0, 4],
+    };
+
+    for (final entry in expectedBySite.entries) {
+      final site = content.site(entry.key);
+      final actual = [
+        for (var level = 0; level <= 5; level++)
+          site.deposits
+              .where((d) => d.requiredSurveyingLevel <= level)
+              .fold<int>(0, (sum, d) => sum + d.maxMiners)
+              .clamp(0, MiningContentRegistry.maxDeployedRigsPerSite),
+      ];
+      expect(actual, entry.value, reason: site.name);
+    }
   });
 }
