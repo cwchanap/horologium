@@ -826,7 +826,27 @@ test('invalid rig placements recover through the strict boundary', () async {
 });
 ```
 
-Also mutate one current site document by deleting `rigPlacements` and adding legacy `rigByNode`; assert the same recovery path.
+Add the legacy-shape test explicitly:
+
+```dart
+test('legacy rigByNode site shape recovers as incompatible', () async {
+  final raw = _rawDocument(nowUtc: now);
+  final sites = Map<String, Object?>.from(
+    raw['sites']! as Map<String, Object?>,
+  );
+  final landing = Map<String, Object?>.from(
+    sites[MiningSiteId.landingBasin.name]! as Map<String, Object?>,
+  )
+    ..remove('rigPlacements')
+    ..['rigByNode'] = {
+      'n1': 't1', 'n2': null, 'n3': null, 'n4': null,
+    };
+  sites[MiningSiteId.landingBasin.name] = landing;
+  raw['sites'] = sites;
+
+  await expectRecovered(raw);
+});
+```
 
 Update the existing decoded-nested-state test so `result.state.sites[...].rigPlacements.add(...)` throws `UnsupportedError`.
 
