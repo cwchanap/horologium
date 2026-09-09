@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -9,12 +10,18 @@ import 'package:horologium/mining/presentation/mining_grid_map.dart';
 final _content = MiningContentRegistry.stellarMining();
 final _start = DateTime.utc(2026, 8, 26, 12);
 
-MineSiteView _view(MiningSiteId siteId) {
+MineSiteView _view(
+  MiningSiteId siteId, {
+  List<MiningRigPlacement> rigs = const [],
+}) {
   final initial = MiningSave.initial(nowUtc: _start);
   final state = initial.copyWith(
     sites: {
       ...initial.sites,
-      siteId: initial.sites[siteId]!.copyWith(unlocked: true),
+      siteId: initial.sites[siteId]!.copyWith(
+        unlocked: true,
+        rigPlacements: rigs,
+      ),
     },
   );
   return MineSiteView.from(
@@ -117,5 +124,44 @@ void main() {
     await tester.tapAt(const Offset(30, 30));
     await tester.pump();
     expect(taps.single, const MiningGridCell(0, 0));
+  });
+
+  testWidgets('exposes the rig recall tap action to semantics', (tester) async {
+    final handle = tester.ensureSemantics();
+    final taps = <MiningGridCell>[];
+    await _pumpMap(
+      tester,
+      _view(
+        MiningSiteId.landingBasin,
+        rigs: const [
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+        ],
+      ),
+      taps.add,
+    );
+
+    // performAction throws unless the node exposes SemanticsAction.tap, so
+    // this both asserts the action survives the overlay IgnorePointer and
+    // proves it forwards the rig's saved cell through onCellTap.
+    tester.semantics.performAction(
+      find.semantics.byLabel(RegExp(r'T1 rig at \(3,2\) mining D1')),
+      SemanticsAction.tap,
+    );
+    expect(taps.single, const MiningGridCell(3, 2));
+    handle.dispose();
+  });
+
+  testWidgets('labels deposits with resource and surveying identity', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await _pumpMap(tester, _view(MiningSiteId.landingBasin), (_) {});
+
+    expect(find.bySemanticsLabel(RegExp('Gold deposit D1:')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp(r'deposit D3.*Requires Surveying 1')),
+      findsOneWidget,
+    );
+    handle.dispose();
   });
 }

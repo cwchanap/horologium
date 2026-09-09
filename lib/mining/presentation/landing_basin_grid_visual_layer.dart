@@ -210,7 +210,6 @@ class _LandingBasinGridVisualLayerState
     animation: Listenable.merge([_impactController, _idleController]),
     builder: (context, child) {
       final t = _impactController.value.clamp(0.0, 1.0).toDouble();
-      final hasRig = widget.view.rigs.isNotEmpty;
       final cell = widget.cellSize;
 
       return Stack(
@@ -228,12 +227,14 @@ class _LandingBasinGridVisualLayerState
                 maxHeight: depositVisualSize(deposit.definition.size),
                 alignment: Alignment.center,
                 child: Image.asset(
-                  _depositAsset(t),
+                  _depositAsset(deposit, t),
                   width: depositVisualSize(deposit.definition.size),
                   height: depositVisualSize(deposit.definition.size),
                   fit: BoxFit.contain,
                   gaplessPlayback: true,
-                  opacity: hasRig ? null : const AlwaysStoppedAnimation(.62),
+                  opacity: deposit.minerCount > 0
+                      ? null
+                      : const AlwaysStoppedAnimation(.62),
                 ),
               ),
             ),
@@ -300,9 +301,9 @@ class _LandingBasinGridVisualLayerState
     );
   }
 
-  String _depositAsset(double t) {
+  String _depositAsset(MineSiteDepositView deposit, double t) {
     final stage = _stageForProgress(_progress);
-    if (widget.view.rigs.isEmpty || widget.reducedMotion) {
+    if (deposit.minerCount == 0 || widget.reducedMotion) {
       return MiningVisuals.goldNodeStageAsset(stage);
     }
     if (_exhaustImpactSequence == widget.impactSequence) {

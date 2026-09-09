@@ -149,14 +149,15 @@ class MiningGridMap extends StatelessWidget {
                   top: rig.placement.cell.y * miningGridCellSize,
                   width: miningGridCellSize,
                   height: miningGridCellSize,
-                  child: IgnorePointer(
-                    child: Semantics(
-                      button: true,
-                      enabled: rig.canRecall,
-                      label: _rigLabel(rig),
-                      onTap: () => onCellTap(rig.placement.cell),
-                      child: const SizedBox.expand(),
-                    ),
+                  child: Semantics(
+                    button: true,
+                    enabled: rig.canRecall,
+                    label: _rigLabel(rig),
+                    onTap: () => onCellTap(rig.placement.cell),
+                    // IgnorePointer sits below the Semantics node so physical
+                    // taps stay with the map-level gesture surface while the
+                    // semantic tap action survives for assistive tech.
+                    child: IgnorePointer(child: const SizedBox.expand()),
                   ),
                 ),
             ],
@@ -168,10 +169,13 @@ class MiningGridMap extends StatelessWidget {
 
   String _depositLabel(MineSiteDepositView deposit) {
     final definition = deposit.definition;
+    final resource = MiningContentRegistry
+        .resourceSilhouettes[view.definition.resource]!
+        .name;
     final locked = deposit.isSurveyed
         ? ''
         : ' Requires Surveying ${definition.requiredSurveyingLevel}.';
-    return 'Deposit ${definition.id.name.toUpperCase()}: '
+    return '$resource deposit ${definition.id.name.toUpperCase()}: '
         '${definition.size}x${definition.size}, '
         '${deposit.minerCount} of ${definition.maxMiners} miners.$locked';
   }
@@ -203,7 +207,7 @@ class _DepositLockBadge extends StatelessWidget {
         const Icon(Icons.biotech_rounded, size: 12, color: MiningTheme.accent),
         const SizedBox(width: 4),
         Text(
-          'LV $requiredSurveyingLevel',
+          'Surveying $requiredSurveyingLevel',
           style: const TextStyle(
             color: Colors.white70,
             fontSize: 10,
