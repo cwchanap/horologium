@@ -67,9 +67,11 @@ class _LandingBasinGridVisualLayerState
   /// leaves a pending timer after the tree is torn down.
   Timer? _deferTimer;
 
-  double get _progress => widget.view.capacity <= 0
+  double get _progress => _progressOf(widget.view);
+
+  static double _progressOf(MineSiteView view) => view.capacity <= 0
       ? 0.0
-      : (widget.view.cargo / widget.view.capacity).clamp(0.0, 1.0).toDouble();
+      : (view.cargo / view.capacity).clamp(0.0, 1.0).toDouble();
 
   @override
   void initState() {
@@ -187,11 +189,7 @@ class _LandingBasinGridVisualLayerState
       _deferTimer?.cancel();
       _deferTimer = null;
     } else if (widget.impactSequence != oldWidget.impactSequence) {
-      final oldProgress = oldWidget.view.capacity <= 0
-          ? 0.0
-          : (oldWidget.view.cargo / oldWidget.view.capacity)
-                .clamp(0.0, 1.0)
-                .toDouble();
+      final oldProgress = _progressOf(oldWidget.view);
       final shouldExhaust = oldProgress < .90 && _progress >= .90;
       if (_framesReady) {
         _fireImpact(shouldExhaust);

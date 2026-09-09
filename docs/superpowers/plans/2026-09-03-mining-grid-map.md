@@ -101,7 +101,9 @@ lib/mining/presentation/mining_hud.dart
 lib/mining/presentation/mining_sheet_frame.dart
 lib/mining/presentation/technology_sheet.dart
 lib/mining/presentation/mining_settings_sheet.dart
-lib/mining/presentation/offline_return_sheet.dart
+lib/mining/presentation/offline_return_sheet.dart  # except the single
+#   'Next: sell cargo, or fill a free cell.' Text literal, updated from
+#   retired 'node' to grid 'cell' terminology (key/layout/behavior preserved)
 .cursor/install.sh
 .cursor/environment.json
 ```

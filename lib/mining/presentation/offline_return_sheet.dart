@@ -162,7 +162,7 @@ class OfflineReturnSheet extends StatelessWidget {
                         const Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            'Next: sell cargo, or fill a free node.',
+                            'Next: sell cargo, or fill a free cell.',
                             key: Key('offline-return-next-action'),
                             style: TextStyle(
                               fontFamily: 'IBM Plex Mono',
