@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -319,5 +320,5 @@ class MiningGridPainter extends CustomPainter {
   bool shouldRepaint(MiningGridPainter oldDelegate) =>
       oldDelegate.width != width ||
       oldDelegate.height != height ||
-      oldDelegate.deployableCells != deployableCells;
+      !setEquals(oldDelegate.deployableCells, deployableCells);
 }

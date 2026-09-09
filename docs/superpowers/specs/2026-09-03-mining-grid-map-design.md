@@ -504,7 +504,7 @@ The grid replaces fixed node positioning, but keeps:
 
 When deleting fixed-node helpers, remove `_nodeLeft`, N3/N4 overflow/overlap helpers, and node-size/rig-size positioning helpers only when they no longer have callers. **Retain `_landscapeX(...)` while Sell uses it.**
 
-Do not modify `fleet_dock.dart`, `mining_hud.dart`, `mining_sheet_frame.dart`, Technology/Settings/Offline Return surfaces, or their PR #26 behavior.
+Do not modify `fleet_dock.dart`, `mining_hud.dart`, `mining_sheet_frame.dart`, Technology/Settings/Offline Return surfaces, or their PR #26 behavior. The single exception is the Offline Return "Next:" Text literal, whose retired `node` wording was updated to grid `cell` terminology with key/layout/behavior preserved.
 
 ### Visual footprint vs placement footprint
 
