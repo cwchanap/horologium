@@ -101,9 +101,12 @@ lib/mining/presentation/mining_hud.dart
 lib/mining/presentation/mining_sheet_frame.dart
 lib/mining/presentation/technology_sheet.dart
 lib/mining/presentation/mining_settings_sheet.dart
-lib/mining/presentation/offline_return_sheet.dart  # except the single
-#   'Next: sell cargo, or fill a free cell.' Text literal, updated from
-#   retired 'node' to grid 'cell' terminology (key/layout/behavior preserved)
+lib/mining/presentation/offline_return_sheet.dart  # except two atomic-cutover
+#   mechanical changes only: (1) the 'Next: sell cargo, or fill a free cell.'
+#   Text literal, updated from retired 'node' to grid 'cell' terminology
+#   (key/layout/behavior preserved); (2) the single Image.asset asset-field
+#   rename `content.site(site).nodeAsset` -> `depositAsset` in `_resourceIcon`,
+#   required once the old node field is removed. No other runtime redesign.
 .cursor/install.sh
 .cursor/environment.json
 ```
