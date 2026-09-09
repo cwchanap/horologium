@@ -35,6 +35,12 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
 - Landing Basin robot/deposit animation never calls the controller or persists animation/variant state. Cold-load/resume production is never replayed as historical strikes.
 - Add another site-specific visual path only when a concrete second animated site needs it; do not pre-build a generic resource visual registry.
 
+Mine Site is a Flutter InteractiveViewer over an authored 24x18 grid. Each site owns four static deposits; rigs occupy one cell and mine the unique orthogonally adjacent deposit. Placement legality is centralized in mining_grid.dart, state persists immutable rigPlacements, and production remains aggregate/deterministic in MiningSimulation. Sites remain capped at four rigs. Landing Basin owns the only site-specific animated grid layer; its shell impact sequence is presentation-only.
+
+- old rigByNode saves intentionally recover fresh through the invalid-save boundary
+- `_displayNotifier` remains a shell rebuild channel for live modal HUDs, not state ownership
+- PR #26 non-grid Mine Site chrome remains the presentation baseline
+
 Do not add a second state owner, direct widget/repository writes, a parallel
 mutation path, or a speculative processing/sink/currency layer.
 
@@ -51,7 +57,7 @@ cash, lastAccruedAtUtc, technology, unlockedPlanetIds, activePlanetId, docks, si
 `technology` has exactly `extraction`, `logistics`, and `surveying`. `sites` is
 one flat map containing all nine authored `MiningSiteId` values. `docks` is a
 separate map from each `MiningPlanetId` to four `DockBayId` slots. Each site
-tracks unlock/commission state, node rig assignments, and stored cargo; each
+tracks unlock/commission state, grid rig placements, and stored cargo; each
 dock stores a `RigTier` or null.
 
 - Missing data creates and persists a fresh initial state.
