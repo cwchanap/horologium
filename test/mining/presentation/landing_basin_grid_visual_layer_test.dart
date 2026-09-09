@@ -88,6 +88,16 @@ Future<void> _pumpLayer(
   await tester.pump();
 }
 
+Animation<double>? _depositOpacity(WidgetTester tester, {String id = 'd1'}) =>
+    tester
+        .widget<Image>(
+          find.descendant(
+            of: find.byKey(Key('landing-basin-deposit-$id')),
+            matching: find.byType(Image),
+          ),
+        )
+        .opacity;
+
 String _depositAsset(WidgetTester tester, {String id = 'd1'}) {
   final images = tester
       .widgetList<Image>(
@@ -172,6 +182,35 @@ void main() {
     expect(_depositAsset(tester), MiningVisuals.goldNodeStageAsset(1));
   });
 
+  testWidgets('animates only the mined deposit and keeps others static', (
+    tester,
+  ) async {
+    // The default rig at (2,3) mines d1 only: d1 runs its idle loop while
+    // unmined d2 stays on its static stage plate.
+    await _pumpLayer(tester, reducedMotion: false);
+    expect(_depositAsset(tester, id: 'd1'), MiningVisuals.goldNodeIdleAsset(1));
+    expect(
+      _depositAsset(tester, id: 'd2'),
+      MiningVisuals.goldNodeStageAsset(1),
+    );
+
+    await tester.pump(const Duration(milliseconds: 125));
+    expect(_depositAsset(tester, id: 'd1'), MiningVisuals.goldNodeIdleAsset(2));
+    expect(
+      _depositAsset(tester, id: 'd2'),
+      MiningVisuals.goldNodeStageAsset(1),
+    );
+  });
+
+  testWidgets('dims only deposits without a miner', (tester) async {
+    await _pumpLayer(tester, reducedMotion: true);
+
+    expect(_depositOpacity(tester, id: 'd1'), isNull);
+    final dimmed = _depositOpacity(tester, id: 'd2');
+    expect(dimmed, isA<AlwaysStoppedAnimation<double>>());
+    expect(dimmed!.value, .62);
+  });
+
   testWidgets('keeps gapless playback on the changing deposit image', (
     tester,
   ) async {
@@ -249,6 +288,11 @@ void main() {
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 240));
       expect(_depositAsset(tester), MiningVisuals.goldNodeHitAsset(1));
+      // The impact one-shot animates the mined d1, never unmined d2.
+      expect(
+        _depositAsset(tester, id: 'd2'),
+        MiningVisuals.goldNodeStageAsset(1),
+      );
       expect(
         _robotBodyTransform(tester, _defaultCell).transform,
         equals(restBody),

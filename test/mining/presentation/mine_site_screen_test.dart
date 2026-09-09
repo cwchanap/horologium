@@ -446,7 +446,7 @@ void main() {
     );
 
     expect(find.bySemanticsLabel(RegExp(r'Dock bay B1')), findsOneWidget);
-    expect(find.bySemanticsLabel(RegExp(r'Deposit D1')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'Gold deposit D1')), findsOneWidget);
     expect(find.bySemanticsLabel(RegExp(r'T1 rig at \(3,2\)')), findsOneWidget);
     final d1 = tester.getRect(find.byKey(const Key('mining-deposit-d1')));
     expect(d1.width, miningGridCellSize);
@@ -736,15 +736,15 @@ void main() {
     tester,
   ) async {
     // Landing Basin d3 requires Surveying 1 and d4 requires Surveying 2; with
-    // default Surveying 0 both show their authored LV badges, not a hard-coded
-    // 'LV 1' for every locked deposit.
+    // default Surveying 0 both show their authored Surveying badges, not a
+    // hard-coded 'Surveying 1' for every locked deposit.
     final state = _stateWith(landing: _progress(commissioned: true));
     await _pumpMineSite(tester, view: _siteView(state), dock: _dockView(state));
 
-    expect(find.text('LV 1'), findsOneWidget);
-    expect(find.text('LV 2'), findsOneWidget);
+    expect(find.text('Surveying 1'), findsOneWidget);
+    expect(find.text('Surveying 2'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(RegExp(r'Deposit D3.*Surveying 1')),
+      find.bySemanticsLabel(RegExp(r'deposit D3.*Surveying 1')),
       findsOneWidget,
     );
   });
