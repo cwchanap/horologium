@@ -50,7 +50,6 @@ app.*.map.json
 
 assets/**/original
 coverage/
-specs/
 .worktrees/
 
 # Generated web files
