@@ -2,51 +2,50 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Move Horologium's Android/iOS scaffold and every existing repository-managed Flutter pin from the 3.32.5-era baseline to Flutter 3.47.2 without changing Dart/gameplay behavior.
+**Goal:** Move Horologium from its Flutter 3.32.5-era Android/iOS scaffold and repository pins to the current Flutter 3.47 stable hotfix while preserving application behavior.
 
-**Architecture:** This is a generated-platform cutover, not a toolchain rewrite. Keep the Flutter application/domain untouched; accept the nine already-observed Android/iOS migration files, update the two existing GitHub Actions pins plus the existing Cloud Agent pin, and hard-stop on unexplained generated drift. The migrated iOS host must be compiled on macOS and its successful simulator-build evidence must be visible on the PR.
+**Architecture:** This is a generated-platform cutover, not a toolchain rewrite. Use Flutter's normal build commands to produce the expected nine-file scaffold migration, update the three existing repository pin surfaces, add native-iOS compilation to the existing macOS CI row, and perform one simulator runtime smoke for the native audio/persistence plugins. Keep hard stops for unrelated generated drift and application-code changes.
 
-**Tech Stack:** Flutter 3.47.2 stable, Dart bundled with Flutter 3.47.2, Android Gradle project, iOS/Xcode, CocoaPods, GitHub Actions, Cloud Agent bootstrap.
+**Tech Stack:** Flutter 3.47 stable, bundled Dart SDK, Android Gradle project, iOS/Xcode, CocoaPods + Flutter-generated local Swift package, GitHub Actions, Cloud Agent bootstrap.
 
 **Spec:** `docs/superpowers/specs/2026-09-10-hpa-453-flutter-platform-toolchain-migration-design.md`
 
 ## Global Constraints
 
 - One Linear task and one implementation PR: HPA-453.
-- Target Flutter version is exactly `3.47.2` on the stable channel.
-- Jump directly from 3.32.5 to 3.47.2; do not add intermediate-version PRs or a 3.32.5 compatibility layer.
-- Do not add FVM, mise, asdf, `.flutter-version`, reusable workflows, or another toolchain abstraction.
-- Do not intentionally change `pubspec.yaml`, `lib/`, `test/`, or `assets/`.
-- Do not upgrade hosted package versions/hashes, Gradle, AGP, Kotlin, or CocoaPods as separate modernization work.
-- Normal production/configuration changes are limited to the nine platform scaffold paths plus `.github/workflows/flutter_ci.yml`, `.github/workflows/flutter_tests.yml`, and `.cursor/install.sh`.
-- `.metadata` and an SDK-constraint-only `pubspec.lock` diff are conditional reviewed exceptions only; neither is blanket-allowed.
-- The reverted HPA-451 commit `3855f0e3c75ec0626a1f38454910e7c0e545826d` is the semantic review oracle for the platform migration.
-- Retain `android.builtInKotlin=false` and `android.newDsl=false`; do not perform the built-in Kotlin/new Gradle DSL migration here.
-- Do not add a custom `SceneDelegate.swift` unless Flutter 3.47.2 proves the stock migration is insufficient; that result would require scope reassessment.
+- Target the latest stable **3.47.x** hotfix at implementation start; pin the exact resolved patch version everywhere. As of 2026-09-10 the expected version is `3.47.3`.
+- If `flutter upgrade` resolves to Flutter 3.50 or another feature line, stop and reassess instead of silently broadening this PR.
+- Do not add FVM, mise, asdf, `.flutter-version`, reusable workflows, or another pin mechanism.
+- Do not edit `lib/`, `test/`, or `assets/` to accommodate the SDK bump.
+- Do not upgrade hosted packages.
+- Retain `android.builtInKotlin=false` and `android.newDsl=false`; do not perform the built-in Kotlin/new Gradle DSL migration.
+- The reverted HPA-451 commit `3855f0e3c75ec0626a1f38454910e7c0e545826d` is the semantic oracle for the expected platform migration.
+- A tool-enforced minimum Android compatibility bump is allowed only when Flutter 3.47.x explicitly requires it; discretionary Android modernization remains out of scope.
+- `.metadata` must not change. `pubspec.lock` may change only in its terminal `sdks:` block; any package name/version/source/hash change is a hard stop.
 - Backward compatibility with Flutter 3.32.5 is not required after this PR.
 
 ---
 
-### Task 0: Prove the starting baseline and select the target SDK
+### Task 0: Resolve the target SDK and preflight platform compatibility
 
 **Files:**
 - Read only: `.github/workflows/flutter_ci.yml`
 - Read only: `.github/workflows/flutter_tests.yml`
 - Read only: `.cursor/install.sh`
+- Read only: `android/settings.gradle.kts`
+- Read only: `android/gradle/wrapper/gradle-wrapper.properties`
+- Read only: `android/app/build.gradle.kts`
 - Read only: `android/gradle.properties`
-- Read only: `ios/Podfile`
 - Read only: `ios/Runner.xcodeproj/project.pbxproj`
+- Read only: `ios/Flutter/AppFrameworkInfo.plist`
 - Read only: `ios/Runner/AppDelegate.swift`
 - Read only: `ios/Runner/Info.plist`
-- Read only: `ios/Flutter/AppFrameworkInfo.plist`
-- Read only: `pubspec.lock`
-- Read only: `.metadata`
 
 **Interfaces:**
-- Consumes: clean branch created from current `main`.
-- Produces: verified Flutter 3.47.2 execution environment and evidence that all existing pins and native scaffold are still on the pre-migration baseline.
+- Consumes: clean HPA-453 branch based on current `main`.
+- Produces: exact target Flutter 3.47.x version plus an explicit decision on whether the current Android floor is already compatible.
 
-- [ ] **Step 1: Verify the branch is clean before generated tooling runs**
+- [ ] **Step 1: Verify the worktree is clean before SDK/tooling changes**
 
 Run:
 
@@ -55,16 +54,9 @@ git status --short
 git rev-parse --abbrev-ref HEAD
 ```
 
-Expected:
+Expected: no status output and the HPA-453 implementation branch.
 
-```text
-<no git status output>
-<the HPA-453 implementation branch>
-```
-
-Do not continue from a dirty worktree because generated platform changes become impossible to attribute safely.
-
-- [ ] **Step 2: Verify all three repository-managed Flutter pins are still 3.32.5**
+- [ ] **Step 2: Prove the four existing 3.32.5 pin occurrences**
 
 Run:
 
@@ -81,59 +73,81 @@ Expected:
 - two matches in `flutter_tests.yml`;
 - one `FLUTTER_VERSION="3.32.5"` match in `.cursor/install.sh`.
 
-The Cloud Agent bootstrap is an existing pin and must move with CI; do not leave it on 3.32.5.
-
-- [ ] **Step 3: Verify the real pre-migration iOS 12 baseline**
+- [ ] **Step 3: Prove the pre-migration native baselines**
 
 Run:
 
 ```sh
-grep -n "platform :ios, '12.0'" ios/Podfile
-grep -n "IPHONEOS_DEPLOYMENT_TARGET = 12.0;" ios/Runner.xcodeproj/project.pbxproj
-count="$(grep -c "IPHONEOS_DEPLOYMENT_TARGET = 12.0;" ios/Runner.xcodeproj/project.pbxproj)"
-test "$count" -eq 3
+test "$(grep -c "IPHONEOS_DEPLOYMENT_TARGET = 12.0;" ios/Runner.xcodeproj/project.pbxproj)" -eq 3
 grep -n "MinimumOSVersion" ios/Flutter/AppFrameworkInfo.plist
-```
-
-Expected: the Podfile comment exists, exactly three Xcode build configurations have a 12.0 deployment target, and `AppFrameworkInfo.plist` still contains the old `MinimumOSVersion` key.
-
-The three pbxproj settings are the authoritative deployment-target assertion; the Podfile line is only a generated comment.
-
-- [ ] **Step 4: Verify the remaining pre-migration markers**
-
-Run:
-
-```sh
 grep -n "GeneratedPluginRegistrant.register(with: self)" ios/Runner/AppDelegate.swift
-! grep -q "FlutterImplicitEngineDelegate" ios/Runner/AppDelegate.swift
 ! grep -q "UIApplicationSceneManifest" ios/Runner/Info.plist
 ! grep -q "android.builtInKotlin" android/gradle.properties
 ! grep -q "android.newDsl" android/gradle.properties
 ```
 
-Expected: all commands succeed.
+Expected: all checks succeed.
 
-- [ ] **Step 5: Snapshot generated metadata before migration**
+- [ ] **Step 4: Record the existing Android build-tool floor**
 
 Run:
 
 ```sh
-cp pubspec.lock /tmp/hpa-453-pubspec.lock.before
-cp .metadata /tmp/hpa-453-metadata.before
+grep -n 'com.android.application' android/settings.gradle.kts
+grep -n 'org.jetbrains.kotlin.android' android/settings.gradle.kts
+grep -n 'distributionUrl' android/gradle/wrapper/gradle-wrapper.properties
+grep -n 'JavaVersion.VERSION_' android/app/build.gradle.kts
 ```
 
-These copies are only review aids; do not add them to git.
+Expected current values:
 
-- [ ] **Step 6: Select Flutter 3.47.2 without adding repository-managed version tooling**
+```text
+AGP 8.7.3
+KGP 2.1.0
+Gradle 8.12
+Java source/target 11
+```
 
-Use the developer/agent machine's existing SDK-management method, then run:
+Do not change them yet.
+
+- [ ] **Step 5: Upgrade the local SDK checkout to stable and resolve the exact 3.47 hotfix**
+
+Run:
 
 ```sh
+flutter channel stable
+flutter upgrade
 flutter --version
-flutter channel
 ```
 
-Expected: Flutter `3.47.2` on the stable channel. If the machine cannot provide exactly 3.47.2, stop; do not substitute a newer/older SDK and do not add another version-manager file to the repo.
+Then capture the exact version:
+
+```sh
+TARGET_FLUTTER_VERSION="$(flutter --version | sed -E -n 's/^Flutter ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p')"
+case "$TARGET_FLUTTER_VERSION" in
+  3.47.*) printf 'Using Flutter %s\n' "$TARGET_FLUTTER_VERSION" ;;
+  *) printf 'Expected stable Flutter 3.47.x, got %s\n' "$TARGET_FLUTTER_VERSION" >&2; exit 1 ;;
+esac
+```
+
+Expected as of plan review: `Using Flutter 3.47.3`.
+
+The implementation must use this exact resolved version for both GitHub Actions pins and `.cursor/install.sh`.
+
+- [ ] **Step 6: Preflight Android compatibility before any migration build**
+
+Run:
+
+```sh
+flutter doctor -v
+flutter analyze --suggestions
+```
+
+Interpretation:
+
+- if Flutter reports the existing AGP 8.7.3 / KGP 2.1.0 / Gradle 8.12 / host JDK combination as compatible, keep those versions unchanged;
+- if Flutter explicitly requires a higher AGP, KGP, Gradle, JDK, or Java source/target floor, record the reported minimum and allow only that minimum bump in HPA-453;
+- do not upgrade to template/latest versions merely because Flutter 3.47 generates newer projects that way.
 
 ---
 
@@ -149,63 +163,47 @@ Expected: Flutter `3.47.2` on the stable channel. If the machine cannot provide 
 - Modify: `ios/Runner.xcworkspace/contents.xcworkspacedata`
 - Modify: `ios/Runner/AppDelegate.swift`
 - Modify: `ios/Runner/Info.plist`
-- Conditional review only: `.metadata`
+- Conditional only if Task 0 proves a minimum bump is required: `android/settings.gradle.kts`
+- Conditional only if Task 0 proves a minimum bump is required: `android/gradle/wrapper/gradle-wrapper.properties`
+- Conditional only if Task 0 proves a minimum bump is required: `android/app/build.gradle.kts`
 - Conditional review only: `pubspec.lock`
 
 **Interfaces:**
-- Consumes: Flutter 3.47.2 environment and baseline evidence from Task 0.
-- Produces: the intentional nine-file platform scaffold migration validated by Android and iOS build tooling, with any metadata-only drift explicitly classified.
+- Consumes: exact stable Flutter 3.47.x version and Android compatibility decision from Task 0.
+- Produces: the intended generated scaffold cutover with no application-code changes.
 
-- [ ] **Step 1: Resolve the existing dependency graph without upgrading packages**
+- [ ] **Step 1: Resolve dependencies and inspect lockfile metadata directly**
 
 Run:
 
 ```sh
 flutter pub get
-```
-
-Then inspect manifests immediately:
-
-```sh
 git diff -- pubspec.yaml pubspec.lock .metadata
 ```
 
 Required result:
 
-- `pubspec.yaml` must not change;
-- no package name/version/source/hash entry in `pubspec.lock` may change;
-- `.metadata` and `pubspec.lock` may remain unchanged, which is preferred.
+- `pubspec.yaml` is unchanged;
+- `.metadata` is unchanged; if it changed, stop and determine what invoked project migration tooling;
+- any `pubspec.lock` package name/version/source/hash change is a hard stop;
+- an `sdks:`-only lockfile delta may be retained after direct review, but it is not automatically required or automatically forbidden.
 
-If `pubspec.lock` changes only under its terminal `sdks:` block, do **not** classify it as a package upgrade or automatically accept it. Confirm all package entries are byte-for-byte unchanged:
+Do not add a custom comparator script; the lockfile diff is small enough to review directly.
 
-```sh
-python3 - <<'PY'
-from pathlib import Path
+- [ ] **Step 2: Apply a required Android minimum-floor fix only if Task 0 identified one**
 
-def package_block(text: str) -> str:
-    return text.split('\nsdks:\n', 1)[0]
+If Task 0 reported no incompatibility, make no changes in this step.
 
-before = Path('/tmp/hpa-453-pubspec.lock.before').read_text()
-after = Path('pubspec.lock').read_text()
-if package_block(before) != package_block(after):
-    raise SystemExit('package portion of pubspec.lock changed')
-print('package portion unchanged; inspect sdks: delta manually')
-PY
+If Task 0 reported a concrete minimum requirement, change only the file/value that owns that requirement:
 
-git diff -- pubspec.lock
-```
+- AGP or KGP: `android/settings.gradle.kts`;
+- Gradle: `android/gradle/wrapper/gradle-wrapper.properties`;
+- Java source/target: `android/app/build.gradle.kts`;
+- host JDK only: change the execution environment, not repository files.
 
-Accept an SDK-constraint-only delta only if it is generated by Flutter 3.47.2, required for a successful unchanged dependency graph, and its rationale is recorded in the PR. Otherwise restore `pubspec.lock`.
+Set the minimum compatible version reported by Flutter tooling; do not jump to newest available versions.
 
-If `.metadata` changes, inspect it separately:
-
-```sh
-git diff -- .metadata
-```
-
-Only Flutter-generated revision/channel/migration bookkeeping is potentially acceptable. A change to project type, unmanaged files, or platform capabilities is a stop condition.
-
-- [ ] **Step 2: Trigger the Android project migrator under Flutter 3.47.2**
+- [ ] **Step 3: Trigger the Android migrator**
 
 Run:
 
@@ -213,7 +211,7 @@ Run:
 flutter build apk --debug
 ```
 
-Expected: successful debug APK build and these exact compatibility additions in `android/gradle.properties`:
+Expected: successful APK build and these generated compatibility flags in `android/gradle.properties`:
 
 ```properties
 # This builtInKotlin flag was added automatically by Flutter migrator
@@ -222,51 +220,53 @@ android.builtInKotlin=false
 android.newDsl=false
 ```
 
-Do not manually update Gradle, AGP, Kotlin, or convert to the new DSL in this ticket.
+If Flutter attempts the built-in Kotlin/new DSL conversion despite these opt-outs, stop rather than accepting the wider migration.
 
-- [ ] **Step 3: Trigger the iOS project migrator under Flutter 3.47.2 and compile Runner.app**
+- [ ] **Step 4: Trigger the iOS migrator and native compile**
 
 On macOS, run:
 
 ```sh
-set -o pipefail
-flutter build ios --simulator --debug 2>&1 | tee /tmp/hpa-453-ios-build.log
+flutter build ios --simulator --debug
 ```
 
-Expected: successful simulator `Runner.app` build. This command is both the migrator trigger and the native compile gate.
+Expected: successful simulator `Runner.app` build and a migration semantically matching `3855f0e`:
 
-The generated migration must semantically match `3855f0e3c75ec0626a1f38454910e7c0e545826d`:
+- Podfile baseline comment 12.0 -> 13.0;
+- exactly three `IPHONEOS_DEPLOYMENT_TARGET` entries 12.0 -> 13.0;
+- `ios/Podfile.lock` created;
+- Pods build phases/framework references and `FlutterGeneratedPluginSwiftPackage` added to the Xcode project;
+- workspace includes Pods;
+- Runner scheme gains generated Flutter preparation;
+- `AppDelegate` moves registration to `FlutterImplicitEngineDelegate` / `FlutterImplicitEngineBridge.pluginRegistry`;
+- `Info.plist` gains the default `FlutterSceneDelegate` manifest;
+- `AppFrameworkInfo.plist` removes `MinimumOSVersion` rather than rewriting it.
 
-- the Podfile baseline comment moves 12.0 -> 13.0;
-- all three `IPHONEOS_DEPLOYMENT_TARGET` settings move 12.0 -> 13.0;
-- `ios/Podfile.lock` is generated/committed;
-- Xcode project/workspace gains the generated Pods and `FlutterGeneratedPluginSwiftPackage` wiring;
-- Runner scheme gains the generated Flutter pre-action/build preparation;
-- `AppDelegate` adopts `FlutterImplicitEngineDelegate` and registers plugins through `FlutterImplicitEngineBridge.pluginRegistry`;
-- `Info.plist` gains `UIApplicationSceneManifest` with Flutter's default scene delegate;
-- `AppFrameworkInfo.plist` removes the old `MinimumOSVersion` entry rather than rewriting it to 13.0.
+Do not create a custom `SceneDelegate.swift`.
 
-Do not create `SceneDelegate.swift` unless Flutter explicitly proves the stock migration cannot apply; that is a stop/rescope signal.
+- [ ] **Step 5: Assert the iOS migration and preserve existing Info.plist behavior**
 
-- [ ] **Step 4: Assert the migrated iOS baseline rather than trusting the generated diff visually**
-
-Run:
+Run on macOS:
 
 ```sh
-grep -n "platform :ios, '13.0'" ios/Podfile
-count="$(grep -c "IPHONEOS_DEPLOYMENT_TARGET = 13.0;" ios/Runner.xcodeproj/project.pbxproj)"
-test "$count" -eq 3
+plutil -lint ios/Runner/Info.plist
+test "$(grep -c "IPHONEOS_DEPLOYMENT_TARGET = 13.0;" ios/Runner.xcodeproj/project.pbxproj)" -eq 3
 ! grep -q "IPHONEOS_DEPLOYMENT_TARGET = 12.0;" ios/Runner.xcodeproj/project.pbxproj
 ! grep -q "MinimumOSVersion" ios/Flutter/AppFrameworkInfo.plist
 grep -q "FlutterImplicitEngineDelegate" ios/Runner/AppDelegate.swift
 grep -q "FlutterImplicitEngineBridge" ios/Runner/AppDelegate.swift
 grep -q "UIApplicationSceneManifest" ios/Runner/Info.plist
 grep -q "FlutterSceneDelegate" ios/Runner/Info.plist
+grep -q '<string>Horologium</string>' ios/Runner/Info.plist
+grep -q 'CADisableMinimumFrameDurationOnPhone' ios/Runner/Info.plist
+grep -q 'UIApplicationSupportsIndirectInputEvents' ios/Runner/Info.plist
+test "$(grep -c '<key>UISupportedInterfaceOrientations' ios/Runner/Info.plist)" -eq 2
+test "$(grep -c '<string>UIInterfaceOrientation' ios/Runner/Info.plist)" -eq 7
 ```
 
-Expected: all commands succeed and the 13.0 deployment-target count is exactly 3.
+Expected: all commands pass. The orientation value count is seven: three phone values plus four iPad values.
 
-- [ ] **Step 5: Enforce the generated-file allowlist before accepting anything else**
+- [ ] **Step 6: Enforce the generated-file boundary**
 
 Run:
 
@@ -275,7 +275,7 @@ git status --short
 git diff --name-only | sort
 ```
 
-Ignoring the already-committed HPA-453 planning docs, the normal changed platform files at this point are exactly:
+Normal generated platform files are exactly:
 
 ```text
 android/gradle.properties
@@ -289,62 +289,41 @@ ios/Runner/AppDelegate.swift
 ios/Runner/Info.plist
 ```
 
-Conditional exceptions:
+Allowed conditional additions are only:
 
-- `.metadata` only under the narrow generated-bookkeeping rule from Step 1;
-- `pubspec.lock` only when its package portion is identical and only `sdks:` changed under the reviewed rule from Step 1.
+- a Task-0-proven minimum Android compatibility file from Step 2;
+- `pubspec.lock` with an `sdks:`-only delta.
 
-Any other Android/iOS/config file is a hard stop. Do not accept extra migration because Flutter generated it.
+`.metadata`, any application file, any new native source file, or any other generated platform file is a hard stop.
 
-- [ ] **Step 6: Compare the semantic migration with the rejected HPA-451 patch**
+- [ ] **Step 7: Compare semantics with the HPA-451 oracle**
 
-Inspect commit:
+Inspect commit `3855f0e3c75ec0626a1f38454910e7c0e545826d` and confirm the same nine generated file roles. Generated Xcode IDs/checksums may differ; do not hand-normalize them.
 
-```text
-3855f0e3c75ec0626a1f38454910e7c0e545826d
-```
-
-Expected: the same nine file roles and migration intent. Generated Xcode object IDs/checksums may differ, but there must be no new product behavior, custom scene delegate, built-in Kotlin migration, or unrelated native customization.
-
-- [ ] **Step 7: Re-run both platform builds after the generated files settle**
+- [ ] **Step 8: Re-run both platform builds after generated state settles**
 
 Run:
 
 ```sh
 flutter build apk --debug
-set -o pipefail
-flutter build ios --simulator --debug 2>&1 | tee /tmp/hpa-453-ios-build-final.log
+flutter build ios --simulator --debug
 ```
 
-Expected: both pass without a second wave of unreviewed scaffold changes.
+Expected: both pass without producing a second wave of unexplained files.
 
-- [ ] **Step 8: Commit the platform scaffold cutover**
+- [ ] **Step 9: Commit the scaffold migration**
 
-Stage the nine expected scaffold files plus only an explicitly approved metadata exception, if one exists:
-
-```sh
-git add android/gradle.properties \
-  ios/Flutter/AppFrameworkInfo.plist \
-  ios/Podfile \
-  ios/Podfile.lock \
-  ios/Runner.xcodeproj/project.pbxproj \
-  ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme \
-  ios/Runner.xcworkspace/contents.xcworkspacedata \
-  ios/Runner/AppDelegate.swift \
-  ios/Runner/Info.plist
-```
-
-If a reviewed `.metadata` or SDK-constraint-only `pubspec.lock` delta was accepted, add that file explicitly after documenting why.
+Stage the nine expected files, plus only a Task-0-proven Android minimum-floor file or reviewed `pubspec.lock` SDK-only delta if one actually exists.
 
 Commit:
 
 ```sh
-git commit -m "chore(ios,android): migrate platform scaffold for Flutter 3.47.2"
+git commit -m "chore(ios,android): migrate platform scaffold to Flutter 3.47"
 ```
 
 ---
 
-### Task 2: Pin CI and Cloud Agent to Flutter 3.47.2
+### Task 2: Pin the resolved Flutter version and make the existing macOS CI row compile iOS
 
 **Files:**
 - Modify: `.github/workflows/flutter_ci.yml`
@@ -352,60 +331,47 @@ git commit -m "chore(ios,android): migrate platform scaffold for Flutter 3.47.2"
 - Modify: `.cursor/install.sh`
 
 **Interfaces:**
-- Consumes: platform scaffold that builds on Flutter 3.47.2.
-- Produces: every existing repository-managed execution environment selecting the same Flutter 3.47.2 SDK.
+- Consumes: exact resolved `3.47.x` version from Task 0 and migrated native scaffold from Task 1.
+- Produces: one exact SDK version across CI/Cloud Agent plus persistent native-iOS compile coverage.
 
-- [ ] **Step 1: Change the build workflow's matrix version only**
+- [ ] **Step 1: Replace every existing 3.32.5 pin with the exact Task 0 version**
 
-In `.github/workflows/flutter_ci.yml`, replace:
+Use the exact version printed by `flutter --version` in Task 0. As of plan review this is `3.47.3`.
 
-```yaml
-flutter-version: ['3.32.5']
-```
-
-with:
+Update:
 
 ```yaml
-flutter-version: ['3.47.2']
+# .github/workflows/flutter_ci.yml
+flutter-version: ['3.47.3']
 ```
-
-Do not restructure the matrix or workflow steps.
-
-- [ ] **Step 2: Change both mobile/web test workflow pins only**
-
-In `.github/workflows/flutter_tests.yml`, replace both occurrences of:
 
 ```yaml
-flutter-version: '3.32.5'
+# both occurrences in .github/workflows/flutter_tests.yml
+flutter-version: '3.47.3'
 ```
-
-with:
-
-```yaml
-flutter-version: '3.47.2'
-```
-
-Do not add a new workflow, new job, reusable workflow, or permanent iOS build step in the normal path. HPA-453's native iOS compile evidence is supplied by the required local macOS build in Tasks 1 and 3.
-
-- [ ] **Step 3: Change the existing Cloud Agent bootstrap pin**
-
-In `.cursor/install.sh`, replace:
 
 ```bash
-FLUTTER_VERSION="3.32.5"
+# .cursor/install.sh
+FLUTTER_VERSION="3.47.3"
 ```
 
-with:
+If Task 0 resolved a later `3.47.x` hotfix, substitute that exact version in all four occurrences instead. Never use a range in these files.
 
-```bash
-FLUTTER_VERSION="3.47.2"
+- [ ] **Step 2: Add iOS compilation to the existing macOS matrix row**
+
+In `.github/workflows/flutter_tests.yml`, immediately after the existing test step, add:
+
+```yaml
+      - name: Build iOS (simulator, debug)
+        if: matrix.platform == 'ios'
+        run: flutter build ios --simulator --debug
 ```
 
-Keep the existing download URL construction, install location, profile setup, and dependency resolution logic unchanged.
+Do not add a workflow, job, matrix dimension, or artifact upload.
 
-- [ ] **Step 4: Prove no active 3.32.5 repository pin remains**
+- [ ] **Step 3: Verify pins and installer syntax**
 
-Run:
+Run, replacing `3.47.3` below only if Task 0 resolved a later 3.47.x hotfix:
 
 ```sh
 ! grep -R "3\.32\.5" \
@@ -413,50 +379,88 @@ Run:
   .github/workflows/flutter_tests.yml \
   .cursor/install.sh
 
-grep -R "3\.47\.2" \
+grep -R "3\.47\.3" \
   .github/workflows/flutter_ci.yml \
   .github/workflows/flutter_tests.yml \
   .cursor/install.sh
-```
-
-Expected: no 3.32.5 matches; four 3.47.2 matches across the three files.
-
-- [ ] **Step 5: Verify the Cloud Agent URL shape still resolves to the stable Linux tarball name**
-
-Run:
-
-```sh
 bash -n .cursor/install.sh
 grep -n 'flutter_linux_${FLUTTER_VERSION}-stable.tar.xz' .cursor/install.sh
 ```
 
-Expected: shell syntax passes and the installer still derives the tarball from `FLUTTER_VERSION` rather than introducing another pin.
+Expected: zero old pins, four exact new pins, valid shell syntax, unchanged tarball construction.
 
-- [ ] **Step 6: Commit the explicit toolchain pins**
+- [ ] **Step 4: Review the workflow diff for one-purpose changes**
 
 Run:
 
 ```sh
-git add \
+git diff -- \
   .github/workflows/flutter_ci.yml \
   .github/workflows/flutter_tests.yml \
   .cursor/install.sh
-git commit -m "ci: pin Flutter 3.47.2 across repo environments"
+```
+
+Expected changes only:
+
+- 3.32.5 -> exact resolved 3.47.x pins;
+- one conditional iOS simulator build step on the existing macOS/iOS row.
+
+- [ ] **Step 5: Commit the pin and CI changes**
+
+Commit:
+
+```sh
+git commit -am "ci: pin current Flutter 3.47 and compile iOS"
 ```
 
 ---
 
-### Task 3: Run the full migration gate and publish iOS compile evidence
+### Task 3: Prove runtime plugin registration and run the final repository gate
 
 **Files:**
-- Verify only; no new production files should be introduced.
-- Update: existing HPA-453 PR body/comment with verification evidence.
+- Verify only; no application code should be added.
+- Update: existing PR description/comment with the two manual smoke results and any conditional Android-floor rationale.
 
 **Interfaces:**
-- Consumes: Tasks 1-2.
-- Produces: review-ready HPA-453 implementation with repository-wide regression evidence and a PR-visible native iOS compile result.
+- Consumes: migrated scaffold and exact pinned SDK from Tasks 1-2.
+- Produces: review-ready HPA-453 branch with native compile coverage and runtime proof for audio + persistence.
 
-- [ ] **Step 1: Run formatting and static analysis**
+- [ ] **Step 1: Perform the real iOS plugin smoke on a fresh simulator install**
+
+Boot an iOS simulator, then run:
+
+```sh
+open -a Simulator
+flutter devices
+xcrun simctl uninstall booted com.example.horologium || true
+```
+
+Use the booted simulator ID shown by `flutter devices`:
+
+```sh
+flutter run -d <booted-simulator-id>
+```
+
+Manual assertions in the running app:
+
+1. fresh mining state starts with the normal two T1 rigs;
+2. open Settings, toggle music off and back on, and hear playback respond;
+3. merge the two T1 rigs;
+4. deploy the resulting T2 rig to Landing Basin;
+5. quit the app completely without uninstalling it;
+6. run the app again on the same simulator;
+7. confirm Landing Basin remains commissioned/deployed.
+
+Record exactly these two results on PR #27:
+
+```text
+iOS runtime smoke: audio PASS
+SharedPreferences mining reload: PASS
+```
+
+If either native plugin throws `MissingPluginException`, fails to respond, or loses state, stop. Do not patch around it in Dart tests.
+
+- [ ] **Step 2: Run formatting and analyzer gates**
 
 Run:
 
@@ -465,51 +469,58 @@ dart format --output=none --set-exit-if-changed .
 flutter analyze --fatal-infos
 ```
 
-Expected: both pass.
+Expected: both pass. If the newer analyzer requires `lib/` or `test/` edits, stop and rescope those application-code fixes separately.
 
-If the newer analyzer requires edits under `lib/` or `test/`, stop. Do not silently fix application code in this platform migration.
-
-- [ ] **Step 2: Run VM/widget and coverage tests**
+- [ ] **Step 3: Run VM/widget, coverage, and Chrome tests**
 
 Run:
 
 ```sh
 flutter test
 flutter test --coverage
-```
-
-Expected: both pass. Existing skipped visual goldens remain skipped; do not regenerate them for this ticket.
-
-- [ ] **Step 3: Run Chrome tests**
-
-Run:
-
-```sh
 flutter test --platform chrome
 ```
 
-Expected: pass.
+Expected: all pass. Existing skipped visual goldens remain skipped; do not regenerate them.
 
-- [ ] **Step 4: Run all supported build gates under Flutter 3.47.2**
+- [ ] **Step 4: Run local build gates once more**
 
 Run:
 
 ```sh
 flutter build apk --debug
 flutter build web
-set -o pipefail
-flutter build ios --simulator --debug 2>&1 | tee /tmp/hpa-453-ios-build-merge-gate.log
+flutter build ios --simulator --debug
 ```
 
-Expected: all pass. The iOS command must execute on macOS and must produce the simulator app successfully.
+Expected: all pass under the exact pinned Flutter 3.47.x SDK.
 
-- [ ] **Step 5: Verify the PR did not drift into application code or dependency upgrades**
+- [ ] **Step 5: Reassert the native migration contract**
+
+Run:
+
+```sh
+test "$(grep -c "IPHONEOS_DEPLOYMENT_TARGET = 13.0;" ios/Runner.xcodeproj/project.pbxproj)" -eq 3
+! grep -q "IPHONEOS_DEPLOYMENT_TARGET = 12.0;" ios/Runner.xcodeproj/project.pbxproj
+! grep -q "MinimumOSVersion" ios/Flutter/AppFrameworkInfo.plist
+grep -q "FlutterImplicitEngineDelegate" ios/Runner/AppDelegate.swift
+grep -q "FlutterSceneDelegate" ios/Runner/Info.plist
+grep -q '<string>Horologium</string>' ios/Runner/Info.plist
+grep -q 'CADisableMinimumFrameDurationOnPhone' ios/Runner/Info.plist
+grep -q 'UIApplicationSupportsIndirectInputEvents' ios/Runner/Info.plist
+test "$(grep -c '<key>UISupportedInterfaceOrientations' ios/Runner/Info.plist)" -eq 2
+test "$(grep -c '<string>UIInterfaceOrientation' ios/Runner/Info.plist)" -eq 7
+```
+
+Expected: all pass.
+
+- [ ] **Step 6: Review the whole branch for scope drift**
 
 Run:
 
 ```sh
 git diff main...HEAD --name-only | sort
-git diff --exit-code main...HEAD -- lib test assets pubspec.yaml
+git diff --exit-code main...HEAD -- lib test assets pubspec.yaml .metadata
 ```
 
 Expected: the second command is empty/successful.
@@ -517,107 +528,56 @@ Expected: the second command is empty/successful.
 The first command may contain only:
 
 - the two HPA-453 planning docs;
-- the nine allowed platform scaffold paths;
+- the nine expected platform scaffold paths;
 - `.github/workflows/flutter_ci.yml`;
 - `.github/workflows/flutter_tests.yml`;
 - `.cursor/install.sh`;
-- optional `.metadata` only if the narrow generated-bookkeeping exception was explicitly accepted;
-- optional `pubspec.lock` only if its package section is identical and only the reviewed `sdks:` constraint block changed.
+- `pubspec.lock` only for an `sdks:`-only delta;
+- a documented minimum-floor Android file only when Task 0 proved it was required.
 
-If `pubspec.lock` is present, rerun the package-section equality check from Task 1 against `main` before merge.
-
-- [ ] **Step 6: Reassert the deployment target and scene migration after all edits**
-
-Run:
+Review any `pubspec.lock` diff directly:
 
 ```sh
-count="$(grep -c "IPHONEOS_DEPLOYMENT_TARGET = 13.0;" ios/Runner.xcodeproj/project.pbxproj)"
-test "$count" -eq 3
-! grep -q "IPHONEOS_DEPLOYMENT_TARGET = 12.0;" ios/Runner.xcodeproj/project.pbxproj
-! grep -q "MinimumOSVersion" ios/Flutter/AppFrameworkInfo.plist
-grep -q "FlutterImplicitEngineDelegate" ios/Runner/AppDelegate.swift
-grep -q "FlutterSceneDelegate" ios/Runner/Info.plist
+git diff main...HEAD -- pubspec.lock
 ```
 
-Expected: all checks pass.
+Any package entry change is a stop.
 
-- [ ] **Step 7: Review every non-doc diff against the ticket boundary**
+- [ ] **Step 7: Verify CI, especially the existing macOS/iOS row**
 
-Run:
-
-```sh
-git diff main...HEAD -- \
-  android/gradle.properties \
-  ios/Flutter/AppFrameworkInfo.plist \
-  ios/Podfile \
-  ios/Podfile.lock \
-  ios/Runner.xcodeproj/project.pbxproj \
-  ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme \
-  ios/Runner.xcworkspace/contents.xcworkspacedata \
-  ios/Runner/AppDelegate.swift \
-  ios/Runner/Info.plist \
-  .github/workflows/flutter_ci.yml \
-  .github/workflows/flutter_tests.yml \
-  .cursor/install.sh \
-  .metadata \
-  pubspec.lock
-```
-
-Confirm every hunk is one of:
-
-- the semantic nine-file Flutter scaffold migration;
-- the literal 3.32.5 -> 3.47.2 pin changes;
-- a specifically reviewed generated `.metadata` bookkeeping delta;
-- a specifically reviewed `pubspec.lock` SDK-constraint-only delta with identical package entries.
-
-- [ ] **Step 8: Publish required PR-visible iOS compile evidence**
-
-Read the final build log:
-
-```sh
-tail -n 50 /tmp/hpa-453-ios-build-merge-gate.log
-flutter --version
-```
-
-Update the existing HPA-453 PR body or add a PR comment containing a fenced verification block with:
+Push the same draft PR branch and require the existing workflows to pass. Confirm the `platform: ios` / `macos-latest` matrix execution includes and passes:
 
 ```text
-Flutter: 3.47.2 stable
-Command: flutter build ios --simulator --debug
-Result: exit 0
-Success line: <exact final Flutter/Xcode line showing the simulator Runner.app build completed>
+Build iOS (simulator, debug)
 ```
 
-Include any accepted `.metadata` or `pubspec.lock` conditional-exception rationale in the same verification note.
+This CI result is the merge-time native compile gate; no separate PR evidence protocol or new workflow is needed.
 
-Do not write only "iOS tested locally". The command/version/result must be review-visible.
+- [ ] **Step 8: Perform final one-PR review**
 
-If local macOS execution is unavailable, the only fallback is to add a conditional `flutter build ios --simulator --debug` step to the existing `macos-latest` / `platform: ios` matrix row. Do not create a new workflow or job.
-
-- [ ] **Step 9: Keep implementation on the existing HPA-453 draft PR**
-
-Do not create a second PR for Cloud Agent pinning, iOS verification, CI, or generated scaffold follow-up work.
+Confirm PR #27 contains the planning docs and implementation. Do not create follow-up PRs for the Cloud Agent pin, iOS build step, runtime smoke, or generated scaffold changes.
 
 ## Expected risks / hard stops
 
-- **UIScene:** Flutter 3.41+ should auto-migrate Horologium's stock AppDelegate to the oracle's implicit-engine/default `FlutterSceneDelegate` shape. Custom native lifecycle source is a rescope.
-- **Built-in Kotlin/new DSL:** keep the two Android compatibility opt-outs. Extra Android migration files or Gradle/AGP/Kotlin upgrades are a rescope.
-- **Analyzer drift:** new `--fatal-infos` diagnostics that require `lib/` or `test/` edits are not permission to broaden this PR.
-- **Generated metadata:** `.metadata` and `pubspec.lock` are inspect-first conditional exceptions; package changes are still prohibited.
-- **Xcode/CocoaPods identifiers:** generated IDs/checksums may differ from `3855f0e`; compare semantics, not byte identity.
-- **iOS compile:** a green `flutter test` on macOS is not native-host verification. A successful simulator build must be visible in PR evidence.
+- **SPM plugin registration:** compile success is insufficient; the mandatory simulator smoke must prove `audioplayers` and `shared_preferences` work through the new generated Swift-package/implicit-engine path.
+- **UIScene:** custom native lifecycle source or `SceneDelegate.swift` is not expected and requires reassessment.
+- **Android floor:** a Flutter-reported minimum AGP/Gradle/KGP/JDK/Java bump is allowed at exactly the minimum; unrelated modernization is not.
+- **Built-in Kotlin/new DSL:** retain both opt-outs; do not accept the larger migration.
+- **Analyzer drift:** application-code edits are not part of this PR.
+- **Metadata:** `.metadata` must stay unchanged; `pubspec.lock` is direct-review only and package changes are prohibited.
+- **Info.plist:** generated reserialization is allowed only if display name, both orientation arrays, and the existing frame/input flags survive.
+- **Generated Xcode IDs:** compare semantics, not byte identity.
 
 ## Final review checklist
 
-- [ ] Flutter target is exactly 3.47.2 stable.
-- [ ] Both GitHub Actions workflows and `.cursor/install.sh` use 3.47.2; no active 3.32.5 pin remains.
-- [ ] Android contains only the two expected migrator compatibility flags; no built-in Kotlin/new DSL modernization was accepted.
-- [ ] Exactly three Xcode project deployment targets moved from 12.0 to 13.0.
-- [ ] `AppFrameworkInfo.plist` removed the old `MinimumOSVersion` entry rather than manually rewriting it.
-- [ ] UIScene uses the generated `FlutterImplicitEngineDelegate` + default `FlutterSceneDelegate` path; no custom SceneDelegate was added.
-- [ ] iOS simulator `Runner.app` compiles successfully under Flutter 3.47.2 and the PR contains command/version/success evidence.
-- [ ] CocoaPods/Swift-package/Xcode workspace changes are generated scaffold changes, not hand-built architecture.
-- [ ] No Dart/gameplay/save/UI/assets/golden/hosted-package changes exist.
-- [ ] Any `.metadata` or `pubspec.lock` exception is narrow, documented, and independently reviewed.
-- [ ] Full repository gate passes.
-- [ ] One HPA-453 PR contains the entire migration.
+- [ ] The exact pinned SDK is the latest stable Flutter 3.47.x hotfix resolved at implementation start (3.47.3 as of plan review).
+- [ ] Both GitHub Actions workflows and `.cursor/install.sh` use that same exact version; no 3.32.5 pin remains.
+- [ ] The expected nine-file scaffold migration is present, with only a proven minimum Android-floor addition if required.
+- [ ] Both Android migration opt-out flags remain false; no built-in Kotlin/new DSL migration landed.
+- [ ] Exactly three Xcode deployment targets are 13.0 and `MinimumOSVersion` is removed.
+- [ ] Info.plist retains Horologium display name, two orientation arrays/seven values, and existing frame/input keys.
+- [ ] The existing macOS/iOS CI row compiles the simulator app.
+- [ ] Manual iOS runtime smoke records `audio PASS` and `SharedPreferences mining reload: PASS`.
+- [ ] No `lib/`, `test/`, `assets/`, `.metadata`, hosted-package, custom SceneDelegate, or golden-regeneration changes exist.
+- [ ] Full repository format/analyze/test/build gates pass.
+- [ ] One HPA-453 PR contains the complete cutover.
