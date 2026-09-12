@@ -3,7 +3,7 @@
 # Installs the CI-pinned Flutter SDK (if missing) and resolves dependencies.
 set -euo pipefail
 
-FLUTTER_VERSION="3.32.5"
+FLUTTER_VERSION="3.47.4"
 FLUTTER_HOME="/opt/flutter"
 FLUTTER_TARBALL="flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
 FLUTTER_URL="https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/${FLUTTER_TARBALL}"
