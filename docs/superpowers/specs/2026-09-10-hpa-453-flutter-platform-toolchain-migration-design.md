@@ -18,7 +18,8 @@ As of 2026-09-10:
 - Flutter `3.47.4` is the current 3.47 stable hotfix;
 - Flutter 3.41+ uses the UIScene lifecycle by default and auto-migrates eligible stock AppDelegate apps when `flutter build ios`/`flutter run` executes;
 - Horologium's `AppDelegate.swift` is still the stock registration shape and does not need a custom `SceneDelegate.swift`;
-- the known migration raises the real Xcode iOS deployment target from 12.0 to 15.0 (the resolved 3.47.4 SDK's generated floor; the earlier oracle SDK generated 13.0), adopts the implicit-engine/UIScene lifecycle, moves generated iOS plugin resolution into `FlutterGeneratedPluginSwiftPackage`, keeps Flutter itself wired through CocoaPods, and adds the Android migrator compatibility flags;
+- the known migration raises the real Xcode iOS deployment target from 12.0 to 15.0 (the resolved 3.47.4 SDK's generated floor; the earlier oracle SDK generated 13.0), adopts the implicit-engine/UIScene lifecycle, moves all iOS plugin resolution and the Flutter framework itself into `FlutterGeneratedPluginSwiftPackage`, removes CocoaPods integration entirely (the 3.47.4 app template ships no Podfile and the tool recommends `pod deintegrate` once every plugin is a Swift Package), and adds the Android migrator compatibility flags;
+- `flutter pub get` under Flutter 3.47.4 rewrites `analysis_options.yaml` in place, adding `analyzer.exclude` entries for `build/**`, `android/**`, `ios/**`, and `web/**`; that generated rewrite is committed so fresh checkouts stay clean after dependency resolution;
 - Horologium relies on native iOS plugins for both `audioplayers` audio and `shared_preferences` persistence, so a native compile alone does not prove the new plugin-registration path works at runtime.
 
 HPA-453 is the existing task for this work. It remains one ticket and one PR.
@@ -43,28 +44,32 @@ Do not introduce a fourth pin mechanism or a compatibility layer for Flutter 3.3
 
 ### Generated platform scaffold
 
-These nine paths are the expected generated scaffold migration:
+These paths are the expected generated scaffold migration:
 
 1. `android/gradle.properties`
    - add `android.builtInKotlin=false` and `android.newDsl=false`;
 2. `ios/Podfile`
-   - update the Flutter-generated iOS baseline comment from 12.0 to 15.0;
-3. `ios/Podfile.lock`
-   - commit the generated CocoaPods lock; Flutter remains the CocoaPods dependency while Flutter plugins are represented through the generated local Swift package;
-4. `ios/Runner.xcodeproj/project.pbxproj`
+   - delete the file; with all iOS plugins resolved as Swift Packages, CocoaPods integration is removed rather than retained;
+3. `ios/Flutter/Debug.xcconfig`
+   - remove the `#include?` line for the Pods debug xcconfig;
+4. `ios/Flutter/Release.xcconfig`
+   - remove the `#include?` line for the Pods release xcconfig;
+5. `ios/Runner.xcodeproj/project.pbxproj`
    - change all three `IPHONEOS_DEPLOYMENT_TARGET = 12.0` settings to `15.0`;
-   - adopt generated CocoaPods build phases/framework references and `FlutterGeneratedPluginSwiftPackage` integration;
-5. `ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme`
+   - adopt `FlutterGeneratedPluginSwiftPackage` integration (`XCLocalSwiftPackageReference`, package product dependency, and frameworks entries) with no CocoaPods build phases, Pods xcconfigs, or `Pods_*.framework` references;
+6. `ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme`
    - adopt the generated Flutter scheme preparation changes;
-6. `ios/Runner.xcworkspace/contents.xcworkspacedata`
-   - wire the Pods project into the workspace;
 7. `ios/Runner/AppDelegate.swift`
    - conform to `FlutterImplicitEngineDelegate` and register plugins through `FlutterImplicitEngineBridge.pluginRegistry`;
 8. `ios/Runner/Info.plist`
    - add the generated `UIApplicationSceneManifest` using Flutter's default `FlutterSceneDelegate`;
    - preserve the Horologium display name, both orientation arrays, `CADisableMinimumFrameDurationOnPhone`, and `UIApplicationSupportsIndirectInputEvents`;
 9. `ios/Flutter/AppFrameworkInfo.plist`
-   - match the oracle: remove the old `MinimumOSVersion` key/value rather than hand-writing it to 15.0.
+   - match the oracle: remove the old `MinimumOSVersion` key/value rather than hand-writing it to 15.0;
+10. `analysis_options.yaml`
+    - commit the `flutter pub get` rewrite adding `analyzer.exclude` for `build/**`, `android/**`, `ios/**`, and `web/**` so the tracked tree stays clean after dependency resolution.
+
+`ios/Podfile.lock` is never committed and `ios/Runner.xcworkspace/contents.xcworkspacedata` no longer changes: with CocoaPods removed there is no Pods project to lock or wire into the workspace.
 
 A custom `SceneDelegate.swift` is not part of the expected migration. If Flutter requests custom lifecycle source because it detects app-specific lifecycle behavior, stop and reassess.
 
@@ -99,6 +104,7 @@ Any such conditional bump must be documented in the PR and limited to the Androi
 Keep this simple:
 
 - `.metadata` should not change because this plan does not run `flutter create` or `flutter migrate`. If it changes, stop and identify what wrote it rather than accepting it as normal migration noise.
+- `flutter pub get` under Flutter 3.47.4 rewrites `analysis_options.yaml` to add the generated `analyzer.exclude` block (`build/**`, `android/**`, `ios/**`, `web/**`). Commit that rewrite so every fresh checkout stays clean after the normal dependency step; a persistent post-`pub get` diff in `analysis_options.yaml` means the committed copy is stale.
 - Run `git diff -- pubspec.lock` after `flutter pub get`. The resolved Flutter 3.47.4 SDK pins four `flutter_test` transitive entries whose version/hash changes are expected: `test_api` 0.7.12, `matcher` 0.12.20, `meta` 1.19.0, and `vector_math` 2.4.2. The terminal `sdks:` constraint block may also move when the target SDK requires it; review that small diff directly. Any other package name/version/source/hash change is a stop.
 
 The committed lockfile already has a Dart SDK constraint newer than the currently pinned Flutter 3.32.5 / Dart 3.8.1 environment, so do not assume either that the lockfile must change or that it must stay byte-identical.
@@ -152,7 +158,7 @@ Do not use `flutter create .` as a blanket regeneration command.
 
 ### Swift Package Manager plugin resolution
 
-The oracle moves Flutter plugin resolution to `FlutterGeneratedPluginSwiftPackage` while Flutter itself remains in the CocoaPods workspace. The compile gate catches Xcode/SPM/Pods wiring failures; the simulator smoke catches plugin-registration failures that would otherwise leave audio or SharedPreferences unavailable.
+The migration moves all iOS plugin resolution — including the `FlutterFramework` engine dependency — to `FlutterGeneratedPluginSwiftPackage`, and CocoaPods is removed entirely via `pod deintegrate`. If a future plugin lands without SwiftPM support, Flutter re-adds CocoaPods integration and this contract must be revisited. The compile gate catches Xcode/SPM wiring failures; the simulator smoke catches plugin-registration failures that would otherwise leave audio or SharedPreferences unavailable.
 
 ### UIScene lifecycle cutover
 
@@ -229,7 +235,7 @@ CI must independently compile the iOS simulator app on the existing macOS row.
 HPA-453 is complete when:
 
 - GitHub Actions and Cloud Agent bootstrap all pin the same exact current Flutter 3.47.x stable hotfix;
-- the known nine-file Android/iOS scaffold migration is intentionally present, plus only a documented minimum Android compatibility bump if the Flutter tooling requires one;
+- the known Android/iOS scaffold migration is intentionally present — including the `analysis_options.yaml` analyzer excludes, the removed iOS CocoaPods integration, and deleted `ios/Podfile` — plus only a documented minimum Android compatibility bump if the Flutter tooling requires one;
 - all three Xcode deployment targets are 15.0;
 - `AppFrameworkInfo.plist` no longer carries the old `MinimumOSVersion` entry;
 - Info.plist retains Horologium's display name, both orientation arrays, and existing frame/input flags;
