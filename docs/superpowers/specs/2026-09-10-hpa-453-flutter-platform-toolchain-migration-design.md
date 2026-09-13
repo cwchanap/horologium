@@ -147,7 +147,7 @@ Do not:
 4. Run `flutter doctor -v` and `flutter analyze --suggestions`; allow only a forced minimum Android compatibility bump if required.
 5. Run `flutter pub get`; inspect `pubspec.lock` directly and require `.metadata` to remain unchanged.
 6. Trigger the scoped migration with `flutter build apk --debug` and `flutter build ios --simulator --debug`.
-7. Inspect the generated file list before accepting changes. Compare the expected nine scaffold files semantically to `3855f0e`.
+7. Inspect the generated file list before accepting changes. Compare the expected scaffold changes listed under **Generated platform scaffold** semantically to `3855f0e`.
 8. Update all three repository pin surfaces to the exact resolved 3.47.x hotfix.
 9. Add the conditional iOS simulator build step to the existing macOS test matrix row.
 10. Run the full repository gate, then perform the one manual iOS runtime smoke for audio and save persistence.
