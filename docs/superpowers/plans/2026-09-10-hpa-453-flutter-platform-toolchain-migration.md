@@ -4,9 +4,9 @@
 
 **Goal:** Move Horologium from its Flutter 3.32.5-era Android/iOS scaffold and repository pins to the current Flutter 3.47 stable hotfix while preserving application behavior.
 
-**Architecture:** This is a generated-platform cutover, not a toolchain rewrite. Use Flutter's normal build commands to produce the expected nine-file scaffold migration, update the three existing repository pin surfaces, add native-iOS compilation to the existing macOS CI row, and perform one simulator runtime smoke for the native audio/persistence plugins. Keep hard stops for unrelated generated drift and application-code changes.
+**Architecture:** This is a generated-platform cutover, not a toolchain rewrite. Use Flutter's normal build commands to produce the expected scaffold migration — including removal of the iOS CocoaPods integration now that every plugin resolves through the generated Swift package — update the three existing repository pin surfaces, add native-iOS compilation to the existing macOS CI row, and perform one simulator runtime smoke for the native audio/persistence plugins. Keep hard stops for unrelated generated drift and application-code changes.
 
-**Tech Stack:** Flutter 3.47 stable, bundled Dart SDK, Android Gradle project, iOS/Xcode, CocoaPods + Flutter-generated local Swift package, GitHub Actions, Cloud Agent bootstrap.
+**Tech Stack:** Flutter 3.47 stable, bundled Dart SDK, Android Gradle project, iOS/Xcode, Flutter-generated local Swift package (Swift Package Manager only; no CocoaPods), GitHub Actions, Cloud Agent bootstrap.
 
 **Spec:** `docs/superpowers/specs/2026-09-10-hpa-453-flutter-platform-toolchain-migration-design.md`
 
@@ -155,12 +155,14 @@ Interpretation:
 
 **Files:**
 - Modify: `android/gradle.properties`
+- Modify: `analysis_options.yaml`
 - Modify: `ios/Flutter/AppFrameworkInfo.plist`
-- Modify: `ios/Podfile`
-- Create: `ios/Podfile.lock`
+- Modify: `ios/Flutter/Debug.xcconfig`
+- Modify: `ios/Flutter/Release.xcconfig`
+- Delete: `ios/Podfile`
+- Delete: `ios/Podfile.lock` if a previous step created it
 - Modify: `ios/Runner.xcodeproj/project.pbxproj`
 - Modify: `ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme`
-- Modify: `ios/Runner.xcworkspace/contents.xcworkspacedata`
 - Modify: `ios/Runner/AppDelegate.swift`
 - Modify: `ios/Runner/Info.plist`
 - Conditional only if Task 0 proves a minimum bump is required: `android/settings.gradle.kts`
@@ -178,13 +180,14 @@ Run:
 
 ```sh
 flutter pub get
-git diff -- pubspec.yaml pubspec.lock .metadata
+git diff -- pubspec.yaml pubspec.lock .metadata analysis_options.yaml
 ```
 
 Required result:
 
 - `pubspec.yaml` is unchanged;
 - `.metadata` is unchanged; if it changed, stop and determine what invoked project migration tooling;
+- `analysis_options.yaml` gains exactly the generated `analyzer.exclude` block (`build/**`, `android/**`, `ios/**`, `web/**`) that `flutter pub get` writes under Flutter 3.47.4; commit it so fresh checkouts stay clean after dependency resolution;
 - the only allowed `pubspec.lock` package entries are the four `flutter_test` transitives pinned by Flutter 3.47.4 (`test_api` 0.7.12, `matcher` 0.12.20, `meta` 1.19.0, `vector_math` 2.4.2); any other package name/version/source/hash change is a hard stop;
 - a terminal `sdks:` lockfile delta may be retained after direct review, but it is not automatically required or automatically forbidden.
 
@@ -230,19 +233,20 @@ On macOS, run:
 flutter build ios --simulator --debug
 ```
 
-Expected: successful simulator `Runner.app` build and a migration semantically matching `3855f0e`:
+Expected: successful simulator `Runner.app` build and a migration semantically matching `3855f0e` except for the CocoaPods removal:
 
-- Podfile baseline comment 12.0 -> 15.0;
 - exactly three `IPHONEOS_DEPLOYMENT_TARGET` entries 12.0 -> 15.0;
-- `ios/Podfile.lock` created;
-- Pods build phases/framework references and `FlutterGeneratedPluginSwiftPackage` added to the Xcode project;
-- workspace includes Pods;
+- `FlutterGeneratedPluginSwiftPackage` added to the Xcode project (`XCLocalSwiftPackageReference`, package product dependency, frameworks entries);
+- `pod deintegrate` run in `ios/` once the build reports all plugins are Swift Packages, removing every Pods build phase, framework reference, and Pods xcconfig hook;
+- `ios/Podfile` deleted and `ios/Podfile.lock` absent;
+- Pods `#include?` lines removed from `ios/Flutter/Debug.xcconfig` and `ios/Flutter/Release.xcconfig`;
+- `ios/Runner.xcworkspace/contents.xcworkspacedata` keeps only the Runner project reference;
 - Runner scheme gains generated Flutter preparation;
 - `AppDelegate` moves registration to `FlutterImplicitEngineDelegate` / `FlutterImplicitEngineBridge.pluginRegistry`;
 - `Info.plist` gains the default `FlutterSceneDelegate` manifest;
 - `AppFrameworkInfo.plist` removes `MinimumOSVersion` rather than rewriting it.
 
-Flutter 3.47.4 generates the 15.0 iOS floor; the oracle's earlier SDK generated 13.0, so this value intentionally differs from `3855f0e`.
+Flutter 3.47.4 generates the 15.0 iOS floor; the oracle's earlier SDK generated 13.0, so this value intentionally differs from `3855f0e`. The oracle also kept a vestigial CocoaPods path; 3.47.4's own build output recommends `pod deintegrate` when all plugins are Swift Packages, so this PR finishes that cutover instead of carrying two package managers.
 
 Do not create a custom `SceneDelegate.swift`.
 
@@ -280,13 +284,14 @@ git diff --name-only | sort
 Normal generated platform files are exactly:
 
 ```text
+analysis_options.yaml
 android/gradle.properties
 ios/Flutter/AppFrameworkInfo.plist
-ios/Podfile
-ios/Podfile.lock
+ios/Flutter/Debug.xcconfig
+ios/Flutter/Release.xcconfig
+ios/Podfile (deleted)
 ios/Runner.xcodeproj/project.pbxproj
 ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme
-ios/Runner.xcworkspace/contents.xcworkspacedata
 ios/Runner/AppDelegate.swift
 ios/Runner/Info.plist
 ```
@@ -300,7 +305,7 @@ Allowed conditional additions are only:
 
 - [ ] **Step 7: Compare semantics with the HPA-451 oracle**
 
-Inspect commit `3855f0e3c75ec0626a1f38454910e7c0e545826d` and confirm the same nine generated file roles. Generated Xcode IDs/checksums may differ; do not hand-normalize them.
+Inspect commit `3855f0e3c75ec0626a1f38454910e7c0e545826d` and confirm the same generated file roles, minus the CocoaPods artifacts the oracle still carried (Podfile, Podfile.lock, Pods project wiring, Pods xcconfig includes). Generated Xcode IDs/checksums may differ; do not hand-normalize them.
 
 - [ ] **Step 8: Re-run both platform builds after generated state settles**
 
@@ -315,7 +320,7 @@ Expected: both pass without producing a second wave of unexplained files.
 
 - [ ] **Step 9: Commit the scaffold migration**
 
-Stage the nine expected files, plus only a Task-0-proven Android minimum-floor file or a reviewed `pubspec.lock` delta (terminal `sdks:` block plus the four expected `flutter_test` transitive entries) if one actually exists.
+Stage the expected files — including the `analysis_options.yaml` analyzer excludes and the CocoaPods removal (`ios/Podfile` deleted, both xcconfigs, deintegrated project/workspace) — plus only a Task-0-proven Android minimum-floor file or a reviewed `pubspec.lock` delta (terminal `sdks:` block plus the four expected `flutter_test` transitive entries) if one actually exists.
 
 Commit:
 
@@ -530,7 +535,8 @@ Expected: the second command is empty/successful.
 The first command may contain only:
 
 - the two HPA-453 planning docs;
-- the nine expected platform scaffold paths;
+- the expected platform scaffold paths, including the deleted `ios/Podfile` and the two `ios/Flutter/*.xcconfig` Pods-include removals;
+- `analysis_options.yaml` for the generated analyzer excludes;
 - `.github/workflows/flutter_ci.yml`;
 - `.github/workflows/flutter_tests.yml`;
 - `.cursor/install.sh`;
@@ -574,7 +580,7 @@ Confirm PR #27 contains the planning docs and implementation. Do not create foll
 
 - [ ] The exact pinned SDK is the latest stable Flutter 3.47.x hotfix resolved at implementation start (3.47.4 as resolved).
 - [ ] Both GitHub Actions workflows and `.cursor/install.sh` use that same exact version; no 3.32.5 pin remains.
-- [ ] The expected nine-file scaffold migration is present, with only a proven minimum Android-floor addition if required.
+- [ ] The expected scaffold migration is present — `analysis_options.yaml` analyzer excludes committed, iOS CocoaPods integration fully removed — with only a proven minimum Android-floor addition if required.
 - [ ] Both Android migration opt-out flags remain false; no built-in Kotlin/new DSL migration landed.
 - [ ] Exactly three Xcode deployment targets are 15.0 and `MinimumOSVersion` is removed.
 - [ ] Info.plist retains Horologium display name, two orientation arrays/seven values, and existing frame/input keys.
