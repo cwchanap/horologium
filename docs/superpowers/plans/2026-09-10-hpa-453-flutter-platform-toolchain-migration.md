@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - One Linear task and one implementation PR: HPA-453.
-- Target the latest stable **3.47.x** hotfix at implementation start; pin the exact resolved patch version everywhere. As of 2026-09-10 the expected version is `3.47.3`.
+- Target the latest stable **3.47.x** hotfix at implementation start; pin the exact resolved patch version everywhere. As of 2026-09-10 the expected version is `3.47.4`.
 - If `flutter upgrade` resolves to Flutter 3.50 or another feature line, stop and reassess instead of silently broadening this PR.
 - Do not add FVM, mise, asdf, `.flutter-version`, reusable workflows, or another pin mechanism.
 - Do not edit `lib/`, `test/`, or `assets/` to accommodate the SDK bump.
@@ -21,7 +21,7 @@
 - Retain `android.builtInKotlin=false` and `android.newDsl=false`; do not perform the built-in Kotlin/new Gradle DSL migration.
 - The reverted HPA-451 commit `3855f0e3c75ec0626a1f38454910e7c0e545826d` is the semantic oracle for the expected platform migration.
 - A tool-enforced minimum Android compatibility bump is allowed only when Flutter 3.47.x explicitly requires it; discretionary Android modernization remains out of scope.
-- `.metadata` must not change. `pubspec.lock` may change only in its terminal `sdks:` block; any package name/version/source/hash change is a hard stop.
+- `.metadata` must not change. `pubspec.lock` may change only in its terminal `sdks:` block and in exactly the four `flutter_test` transitive entries pinned by Flutter 3.47.4 (`test_api` 0.7.12, `matcher` 0.12.20, `meta` 1.19.0, `vector_math` 2.4.2); any other package name/version/source/hash change is a hard stop.
 - Backward compatibility with Flutter 3.32.5 is not required after this PR.
 
 ---
@@ -130,7 +130,7 @@ case "$TARGET_FLUTTER_VERSION" in
 esac
 ```
 
-Expected as of plan review: `Using Flutter 3.47.3`.
+Expected as of plan review: `Using Flutter 3.47.4`.
 
 The implementation must use this exact resolved version for both GitHub Actions pins and `.cursor/install.sh`.
 
@@ -185,8 +185,8 @@ Required result:
 
 - `pubspec.yaml` is unchanged;
 - `.metadata` is unchanged; if it changed, stop and determine what invoked project migration tooling;
-- any `pubspec.lock` package name/version/source/hash change is a hard stop;
-- an `sdks:`-only lockfile delta may be retained after direct review, but it is not automatically required or automatically forbidden.
+- the only allowed `pubspec.lock` package entries are the four `flutter_test` transitives pinned by Flutter 3.47.4 (`test_api` 0.7.12, `matcher` 0.12.20, `meta` 1.19.0, `vector_math` 2.4.2); any other package name/version/source/hash change is a hard stop;
+- a terminal `sdks:` lockfile delta may be retained after direct review, but it is not automatically required or automatically forbidden.
 
 Do not add a custom comparator script; the lockfile diff is small enough to review directly.
 
@@ -232,8 +232,8 @@ flutter build ios --simulator --debug
 
 Expected: successful simulator `Runner.app` build and a migration semantically matching `3855f0e`:
 
-- Podfile baseline comment 12.0 -> 13.0;
-- exactly three `IPHONEOS_DEPLOYMENT_TARGET` entries 12.0 -> 13.0;
+- Podfile baseline comment 12.0 -> 15.0;
+- exactly three `IPHONEOS_DEPLOYMENT_TARGET` entries 12.0 -> 15.0;
 - `ios/Podfile.lock` created;
 - Pods build phases/framework references and `FlutterGeneratedPluginSwiftPackage` added to the Xcode project;
 - workspace includes Pods;
@@ -241,6 +241,8 @@ Expected: successful simulator `Runner.app` build and a migration semantically m
 - `AppDelegate` moves registration to `FlutterImplicitEngineDelegate` / `FlutterImplicitEngineBridge.pluginRegistry`;
 - `Info.plist` gains the default `FlutterSceneDelegate` manifest;
 - `AppFrameworkInfo.plist` removes `MinimumOSVersion` rather than rewriting it.
+
+Flutter 3.47.4 generates the 15.0 iOS floor; the oracle's earlier SDK generated 13.0, so this value intentionally differs from `3855f0e`.
 
 Do not create a custom `SceneDelegate.swift`.
 
@@ -250,7 +252,7 @@ Run on macOS:
 
 ```sh
 plutil -lint ios/Runner/Info.plist
-test "$(grep -c "IPHONEOS_DEPLOYMENT_TARGET = 13.0;" ios/Runner.xcodeproj/project.pbxproj)" -eq 3
+test "$(grep -c "IPHONEOS_DEPLOYMENT_TARGET = 15.0;" ios/Runner.xcodeproj/project.pbxproj)" -eq 3
 ! grep -q "IPHONEOS_DEPLOYMENT_TARGET = 12.0;" ios/Runner.xcodeproj/project.pbxproj
 ! grep -q "MinimumOSVersion" ios/Flutter/AppFrameworkInfo.plist
 grep -q "FlutterImplicitEngineDelegate" ios/Runner/AppDelegate.swift
@@ -292,7 +294,7 @@ ios/Runner/Info.plist
 Allowed conditional additions are only:
 
 - a Task-0-proven minimum Android compatibility file from Step 2;
-- `pubspec.lock` with an `sdks:`-only delta.
+- `pubspec.lock` with a terminal `sdks:` delta and/or the four expected `flutter_test` transitive entries.
 
 `.metadata`, any application file, any new native source file, or any other generated platform file is a hard stop.
 
@@ -313,7 +315,7 @@ Expected: both pass without producing a second wave of unexplained files.
 
 - [ ] **Step 9: Commit the scaffold migration**
 
-Stage the nine expected files, plus only a Task-0-proven Android minimum-floor file or reviewed `pubspec.lock` SDK-only delta if one actually exists.
+Stage the nine expected files, plus only a Task-0-proven Android minimum-floor file or a reviewed `pubspec.lock` delta (terminal `sdks:` block plus the four expected `flutter_test` transitive entries) if one actually exists.
 
 Commit:
 
@@ -336,23 +338,23 @@ git commit -m "chore(ios,android): migrate platform scaffold to Flutter 3.47"
 
 - [ ] **Step 1: Replace every existing 3.32.5 pin with the exact Task 0 version**
 
-Use the exact version printed by `flutter --version` in Task 0. As of plan review this is `3.47.3`.
+Use the exact version printed by `flutter --version` in Task 0. As of plan review this is `3.47.4`.
 
 Update:
 
 ```yaml
 # .github/workflows/flutter_ci.yml
-flutter-version: ['3.47.3']
+flutter-version: ['3.47.4']
 ```
 
 ```yaml
 # both occurrences in .github/workflows/flutter_tests.yml
-flutter-version: '3.47.3'
+flutter-version: '3.47.4'
 ```
 
 ```bash
 # .cursor/install.sh
-FLUTTER_VERSION="3.47.3"
+FLUTTER_VERSION="3.47.4"
 ```
 
 If Task 0 resolved a later `3.47.x` hotfix, substitute that exact version in all four occurrences instead. Never use a range in these files.
@@ -371,7 +373,7 @@ Do not add a workflow, job, matrix dimension, or artifact upload.
 
 - [ ] **Step 3: Verify pins and installer syntax**
 
-Run, replacing `3.47.3` below only if Task 0 resolved a later 3.47.x hotfix:
+Run, replacing `3.47.4` below only if Task 0 resolved a later 3.47.x hotfix:
 
 ```sh
 ! grep -R "3\.32\.5" \
@@ -379,7 +381,7 @@ Run, replacing `3.47.3` below only if Task 0 resolved a later 3.47.x hotfix:
   .github/workflows/flutter_tests.yml \
   .cursor/install.sh
 
-grep -R "3\.47\.3" \
+grep -R "3\.47\.4" \
   .github/workflows/flutter_ci.yml \
   .github/workflows/flutter_tests.yml \
   .cursor/install.sh
@@ -500,7 +502,7 @@ Expected: all pass under the exact pinned Flutter 3.47.x SDK.
 Run:
 
 ```sh
-test "$(grep -c "IPHONEOS_DEPLOYMENT_TARGET = 13.0;" ios/Runner.xcodeproj/project.pbxproj)" -eq 3
+test "$(grep -c "IPHONEOS_DEPLOYMENT_TARGET = 15.0;" ios/Runner.xcodeproj/project.pbxproj)" -eq 3
 ! grep -q "IPHONEOS_DEPLOYMENT_TARGET = 12.0;" ios/Runner.xcodeproj/project.pbxproj
 ! grep -q "MinimumOSVersion" ios/Flutter/AppFrameworkInfo.plist
 grep -q "FlutterImplicitEngineDelegate" ios/Runner/AppDelegate.swift
@@ -532,7 +534,7 @@ The first command may contain only:
 - `.github/workflows/flutter_ci.yml`;
 - `.github/workflows/flutter_tests.yml`;
 - `.cursor/install.sh`;
-- `pubspec.lock` only for an `sdks:`-only delta;
+- `pubspec.lock` only for a terminal `sdks:` delta and the four expected `flutter_test` transitive entries;
 - a documented minimum-floor Android file only when Task 0 proved it was required.
 
 Review any `pubspec.lock` diff directly:
@@ -541,7 +543,7 @@ Review any `pubspec.lock` diff directly:
 git diff main...HEAD -- pubspec.lock
 ```
 
-Any package entry change is a stop.
+Any package entry change beyond the four expected `flutter_test` transitives is a stop.
 
 - [ ] **Step 7: Verify CI, especially the existing macOS/iOS row**
 
@@ -564,17 +566,17 @@ Confirm PR #27 contains the planning docs and implementation. Do not create foll
 - **Android floor:** a Flutter-reported minimum AGP/Gradle/KGP/JDK/Java bump is allowed at exactly the minimum; unrelated modernization is not.
 - **Built-in Kotlin/new DSL:** retain both opt-outs; do not accept the larger migration.
 - **Analyzer drift:** application-code edits are not part of this PR.
-- **Metadata:** `.metadata` must stay unchanged; `pubspec.lock` is direct-review only and package changes are prohibited.
+- **Metadata:** `.metadata` must stay unchanged; `pubspec.lock` is direct-review only and package changes beyond the four expected `flutter_test` transitives are prohibited.
 - **Info.plist:** generated reserialization is allowed only if display name, both orientation arrays, and the existing frame/input flags survive.
 - **Generated Xcode IDs:** compare semantics, not byte identity.
 
 ## Final review checklist
 
-- [ ] The exact pinned SDK is the latest stable Flutter 3.47.x hotfix resolved at implementation start (3.47.3 as of plan review).
+- [ ] The exact pinned SDK is the latest stable Flutter 3.47.x hotfix resolved at implementation start (3.47.4 as resolved).
 - [ ] Both GitHub Actions workflows and `.cursor/install.sh` use that same exact version; no 3.32.5 pin remains.
 - [ ] The expected nine-file scaffold migration is present, with only a proven minimum Android-floor addition if required.
 - [ ] Both Android migration opt-out flags remain false; no built-in Kotlin/new DSL migration landed.
-- [ ] Exactly three Xcode deployment targets are 13.0 and `MinimumOSVersion` is removed.
+- [ ] Exactly three Xcode deployment targets are 15.0 and `MinimumOSVersion` is removed.
 - [ ] Info.plist retains Horologium display name, two orientation arrays/seven values, and existing frame/input keys.
 - [ ] The existing macOS/iOS CI row compiles the simulator app.
 - [ ] Manual iOS runtime smoke records `audio PASS` and `SharedPreferences mining reload: PASS`.

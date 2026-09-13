@@ -15,17 +15,17 @@ As of 2026-09-10:
 - `main` is still on the pre-migration platform scaffold;
 - `.github/workflows/flutter_ci.yml` and `.github/workflows/flutter_tests.yml` pin Flutter `3.32.5`;
 - `.cursor/install.sh` also pins `FLUTTER_VERSION="3.32.5"` for Cloud Agent environments;
-- Flutter `3.47.3` is the current 3.47 stable hotfix;
+- Flutter `3.47.4` is the current 3.47 stable hotfix;
 - Flutter 3.41+ uses the UIScene lifecycle by default and auto-migrates eligible stock AppDelegate apps when `flutter build ios`/`flutter run` executes;
 - Horologium's `AppDelegate.swift` is still the stock registration shape and does not need a custom `SceneDelegate.swift`;
-- the known migration raises the real Xcode iOS deployment target from 12.0 to 13.0, adopts the implicit-engine/UIScene lifecycle, moves generated iOS plugin resolution into `FlutterGeneratedPluginSwiftPackage`, keeps Flutter itself wired through CocoaPods, and adds the Android migrator compatibility flags;
+- the known migration raises the real Xcode iOS deployment target from 12.0 to 15.0 (the resolved 3.47.4 SDK's generated floor; the earlier oracle SDK generated 13.0), adopts the implicit-engine/UIScene lifecycle, moves generated iOS plugin resolution into `FlutterGeneratedPluginSwiftPackage`, keeps Flutter itself wired through CocoaPods, and adds the Android migrator compatibility flags;
 - Horologium relies on native iOS plugins for both `audioplayers` audio and `shared_preferences` persistence, so a native compile alone does not prove the new plugin-registration path works at runtime.
 
 HPA-453 is the existing task for this work. It remains one ticket and one PR.
 
 ## Decision
 
-Cut the repository over in one jump from Flutter **3.32.5** to the **latest stable hotfix in the Flutter 3.47 line at implementation start**. As of this review that exact version is **3.47.3**.
+Cut the repository over in one jump from Flutter **3.32.5** to the **latest stable hotfix in the Flutter 3.47 line at implementation start**. As of this review that exact version is **3.47.4**.
 
 At implementation start, run `flutter channel stable && flutter upgrade`, record `flutter --version`, and require the result to be `3.47.x`. Pin that exact resolved version in all repository-managed environments. If stable has moved to a later `3.47.x` hotfix, use that exact hotfix consistently. If stable has moved to Flutter 3.50 or another feature line, stop and reassess rather than silently broadening HPA-453.
 
@@ -48,11 +48,11 @@ These nine paths are the expected generated scaffold migration:
 1. `android/gradle.properties`
    - add `android.builtInKotlin=false` and `android.newDsl=false`;
 2. `ios/Podfile`
-   - update the Flutter-generated iOS baseline comment from 12.0 to 13.0;
+   - update the Flutter-generated iOS baseline comment from 12.0 to 15.0;
 3. `ios/Podfile.lock`
    - commit the generated CocoaPods lock; Flutter remains the CocoaPods dependency while Flutter plugins are represented through the generated local Swift package;
 4. `ios/Runner.xcodeproj/project.pbxproj`
-   - change all three `IPHONEOS_DEPLOYMENT_TARGET = 12.0` settings to `13.0`;
+   - change all three `IPHONEOS_DEPLOYMENT_TARGET = 12.0` settings to `15.0`;
    - adopt generated CocoaPods build phases/framework references and `FlutterGeneratedPluginSwiftPackage` integration;
 5. `ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme`
    - adopt the generated Flutter scheme preparation changes;
@@ -64,7 +64,7 @@ These nine paths are the expected generated scaffold migration:
    - add the generated `UIApplicationSceneManifest` using Flutter's default `FlutterSceneDelegate`;
    - preserve the Horologium display name, both orientation arrays, `CADisableMinimumFrameDurationOnPhone`, and `UIApplicationSupportsIndirectInputEvents`;
 9. `ios/Flutter/AppFrameworkInfo.plist`
-   - match the oracle: remove the old `MinimumOSVersion` key/value rather than hand-writing it to 13.0.
+   - match the oracle: remove the old `MinimumOSVersion` key/value rather than hand-writing it to 15.0.
 
 A custom `SceneDelegate.swift` is not part of the expected migration. If Flutter requests custom lifecycle source because it detects app-specific lifecycle behavior, stop and reassess.
 
@@ -99,7 +99,7 @@ Any such conditional bump must be documented in the PR and limited to the Androi
 Keep this simple:
 
 - `.metadata` should not change because this plan does not run `flutter create` or `flutter migrate`. If it changes, stop and identify what wrote it rather than accepting it as normal migration noise.
-- Run `git diff -- pubspec.lock` after `flutter pub get`. Any package name/version/source/hash change is a stop. If only the terminal `sdks:` constraint block changes, review that small diff directly and keep it only if the target SDK requires it.
+- Run `git diff -- pubspec.lock` after `flutter pub get`. The resolved Flutter 3.47.4 SDK pins four `flutter_test` transitive entries whose version/hash changes are expected: `test_api` 0.7.12, `matcher` 0.12.20, `meta` 1.19.0, and `vector_math` 2.4.2. The terminal `sdks:` constraint block may also move when the target SDK requires it; review that small diff directly. Any other package name/version/source/hash change is a stop.
 
 The committed lockfile already has a Dart SDK constraint newer than the currently pinned Flutter 3.32.5 / Dart 3.8.1 environment, so do not assume either that the lockfile must change or that it must stay byte-identical.
 
@@ -192,7 +192,7 @@ grep -n "GeneratedPluginRegistrant.register(with: self)" ios/Runner/AppDelegate.
 After migration:
 
 ```sh
-test "$(grep -c "IPHONEOS_DEPLOYMENT_TARGET = 13.0;" ios/Runner.xcodeproj/project.pbxproj)" -eq 3
+test "$(grep -c "IPHONEOS_DEPLOYMENT_TARGET = 15.0;" ios/Runner.xcodeproj/project.pbxproj)" -eq 3
 ! grep -q "IPHONEOS_DEPLOYMENT_TARGET = 12.0;" ios/Runner.xcodeproj/project.pbxproj
 ! grep -q "MinimumOSVersion" ios/Flutter/AppFrameworkInfo.plist
 grep -q "FlutterImplicitEngineDelegate" ios/Runner/AppDelegate.swift
@@ -230,7 +230,7 @@ HPA-453 is complete when:
 
 - GitHub Actions and Cloud Agent bootstrap all pin the same exact current Flutter 3.47.x stable hotfix;
 - the known nine-file Android/iOS scaffold migration is intentionally present, plus only a documented minimum Android compatibility bump if the Flutter tooling requires one;
-- all three Xcode deployment targets are 13.0;
+- all three Xcode deployment targets are 15.0;
 - `AppFrameworkInfo.plist` no longer carries the old `MinimumOSVersion` entry;
 - Info.plist retains Horologium's display name, both orientation arrays, and existing frame/input flags;
 - the existing macOS CI row compiles `Runner.app` for the iOS simulator;
