@@ -36,6 +36,7 @@ class AudioManager {
   BackgroundMusicPlayer? _bgm;
   BackgroundMusicPlayer? _sfx;
   Future<void>? _sfxQueue;
+  bool _sfxContextConfigured = false;
   int _sfxGeneration = 0;
   GameSound? _activeSound;
   StreamSubscription<void>? _sfxCompletion;
@@ -195,6 +196,17 @@ class AudioManager {
       // ponytail: one voice; add a pool only if simultaneous action cues are needed.
       final player = _sfx ??= AudioPlayerBackgroundMusicPlayer();
       try {
+        if (!_sfxContextConfigured) {
+          // The effect player must not take audio focus: the default
+          // AndroidAudioFocus.gain request would steal focus and silence BGM.
+          await player.setAudioContext(
+            AudioContextConfig(
+              focus: AudioContextConfigFocus.mixWithOthers,
+            ).build(),
+          );
+          if (generation != _sfxGeneration) return;
+          _sfxContextConfigured = true;
+        }
         _cancelSoundCompletion();
         await player.stop();
         await player.setReleaseMode(ReleaseMode.stop);

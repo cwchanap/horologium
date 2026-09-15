@@ -2,6 +2,7 @@ import 'package:audioplayers/audioplayers.dart';
 
 abstract class BackgroundMusicPlayer {
   Stream<void> get onComplete;
+  Future<void> setAudioContext(AudioContext context);
   Future<void> setReleaseMode(ReleaseMode mode);
   Future<void> setVolume(double volume);
   Future<void> playAsset(String path);
@@ -31,6 +32,10 @@ class AudioPlayerBackgroundMusicPlayer implements BackgroundMusicPlayer {
 
   @override
   Future<void> resume() => _player.resume();
+
+  @override
+  Future<void> setAudioContext(AudioContext context) =>
+      _player.setAudioContext(context);
 
   @override
   Future<void> setReleaseMode(ReleaseMode mode) => _player.setReleaseMode(mode);

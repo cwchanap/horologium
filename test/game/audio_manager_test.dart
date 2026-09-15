@@ -59,6 +59,30 @@ void main() {
       },
     );
 
+    test(
+      'configures the effect player to mix so cues never steal BGM focus',
+      () async {
+        final bgm = FakeBackgroundMusicPlayer();
+        final effects = FakeBackgroundMusicPlayer();
+        final manager = AudioManager(
+          backgroundMusicPlayer: bgm,
+          soundEffectPlayer: effects,
+        );
+        addTearDown(manager.dispose);
+        await manager.maybeStartBgm();
+
+        await manager.playSound(GameSound.tap);
+        await manager.playSound(GameSound.merge);
+
+        expect(effects.audioContextCalls, hasLength(1));
+        expect(
+          effects.audioContextCalls.single.android.audioFocus,
+          AndroidAudioFocus.none,
+        );
+        expect(bgm.audioContextCalls, isEmpty);
+      },
+    );
+
     test('rapid input drops stale cues instead of queuing a burst', () async {
       final player = FakeBackgroundMusicPlayer();
       final manager = AudioManager(soundEffectPlayer: player);
