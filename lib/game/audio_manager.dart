@@ -199,10 +199,14 @@ class AudioManager {
         if (!_sfxContextConfigured) {
           // The effect player must not take audio focus: the default
           // AndroidAudioFocus.gain request would steal focus and silence BGM.
+          // Only Android is overridden; on iOS the shared AVAudioSession keeps
+          // the default playback category with no mixing options.
           await player.setAudioContext(
-            AudioContextConfig(
-              focus: AudioContextConfigFocus.mixWithOthers,
-            ).build(),
+            AudioContext(
+              android: const AudioContextAndroid(
+                audioFocus: AndroidAudioFocus.none,
+              ),
+            ),
           );
           if (generation != _sfxGeneration) return;
           _sfxContextConfigured = true;

@@ -75,9 +75,11 @@ void main() {
         await manager.playSound(GameSound.merge);
 
         expect(effects.audioContextCalls, hasLength(1));
+        final context = effects.audioContextCalls.single;
+        expect(context.android.audioFocus, AndroidAudioFocus.none);
         expect(
-          effects.audioContextCalls.single.android.audioFocus,
-          AndroidAudioFocus.none,
+          context.iOS.options,
+          isNot(contains(AVAudioSessionOptions.mixWithOthers)),
         );
         expect(bgm.audioContextCalls, isEmpty);
       },
