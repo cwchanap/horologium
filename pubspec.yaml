@@ -69,7 +69,17 @@ flutter:
     - assets/images/mining/icons/
     - assets/images/mining/effects/
     - assets/images/mining/offline/
-    - assets/audio/
+    - assets/audio/orbital_foundry.mp3
+    - assets/audio/tap.wav
+    - assets/audio/rig.wav
+    - assets/audio/merge.wav
+    - assets/audio/sale.wav
+    - assets/audio/upgrade.wav
+    - assets/audio/travel.wav
+    - assets/audio/mining.wav
+    - assets/audio/cargoFull.wav
+    - assets/audio/milestone.wav
+    - assets/audio/reject.wav
 
   fonts:
     - family: IBM Plex Mono

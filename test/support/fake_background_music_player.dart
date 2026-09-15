@@ -5,6 +5,7 @@ import 'package:horologium/game/background_music_player.dart';
 
 class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
   FakeBackgroundMusicPlayer({
+    this.autoComplete = true,
     this.playCompleter,
     this.stopCompleter,
     this.setVolumeError,
@@ -13,6 +14,20 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
     this.stopError,
   });
 
+  final bool autoComplete;
+  final _completion = StreamController<void>.broadcast(sync: true);
+
+  @override
+  Stream<void> get onComplete => _completion.stream;
+
+  void complete() {
+    if (!_completion.isClosed) _completion.add(null);
+  }
+
+  void completeWithError(Object error) {
+    if (!_completion.isClosed) _completion.addError(error);
+  }
+
   Completer<void>? playCompleter;
   Completer<void>? stopCompleter;
   Object? setVolumeError;
@@ -20,6 +35,7 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
   Object? resumeError;
   Object? stopError;
   ReleaseMode? releaseMode;
+  final List<AudioContext> audioContextCalls = <AudioContext>[];
   final List<double> volumeCalls = <double>[];
   final List<String> playedAssets = <String>[];
   int pauseCalls = 0;
@@ -30,6 +46,7 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
   @override
   Future<void> dispose() async {
     disposeCalls++;
+    await _completion.close();
   }
 
   @override
@@ -46,6 +63,7 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
     if (playCompleter != null) {
       await playCompleter!.future;
     }
+    if (autoComplete) complete();
   }
 
   @override
@@ -54,6 +72,11 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
     if (resumeError != null) {
       throw resumeError!;
     }
+  }
+
+  @override
+  Future<void> setAudioContext(AudioContext context) async {
+    audioContextCalls.add(context);
   }
 
   @override

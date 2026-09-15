@@ -11,9 +11,11 @@ class TechnologySheet extends StatefulWidget {
     super.key,
     required this.view,
     required this.onPurchase,
+    this.onSelectionChanged,
   });
   final TechnologySheetView view;
   final ValueChanged<TechnologyTrack> onPurchase;
+  final VoidCallback? onSelectionChanged;
 
   @override
   State<TechnologySheet> createState() => _TechnologySheetState();
@@ -21,6 +23,12 @@ class TechnologySheet extends StatefulWidget {
 
 class _TechnologySheetState extends State<TechnologySheet> {
   TechnologyTrack _selected = TechnologyTrack.extraction;
+
+  void _selectTrack(TechnologyTrack track) {
+    if (_selected == track) return;
+    setState(() => _selected = track);
+    widget.onSelectionChanged?.call();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,9 +91,7 @@ class _TechnologySheetState extends State<TechnologySheet> {
                     key: Key(
                       'technology-track-${widget.view.tracks[index].track.name}',
                     ),
-                    onTap: () => setState(
-                      () => _selected = widget.view.tracks[index].track,
-                    ),
+                    onTap: () => _selectTrack(widget.view.tracks[index].track),
                     child: Column(
                       children: [
                         _trackIcon(widget.view.tracks[index].track),
@@ -186,7 +192,7 @@ class _TechnologySheetState extends State<TechnologySheet> {
                     : next
                     ? (track.isGateSatisfied ? 'next' : 'gated')
                     : 'locked'}',
-            onTap: () => setState(() => _selected = track.track),
+            onTap: () => _selectTrack(track.track),
             child: next && !track.isGateSatisfied
                 ? Icon(
                     Icons.lock_outline,

@@ -48,7 +48,7 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
                         ),
                         SizedBox(height: 6),
                         Text(
-                          'Cavern ambience',
+                          'Orbital Foundry',
                           style: TextStyle(color: Colors.white54, fontSize: 11),
                         ),
                       ],
@@ -75,6 +75,7 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
                       ),
                       onPressed: () {
                         unawaited(audio.setMusicEnabled(!audio.musicEnabled));
+                        unawaited(audio.playSound(GameSound.tap));
                         setState(() {});
                       },
                       child: Row(
@@ -113,7 +114,7 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Volume',
+                    'Music volume',
                     style: TextStyle(
                       fontFamily: 'Orbitron',
                       color: Colors.white,
@@ -142,6 +143,7 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
                   key: const Key('mining-volume-slider'),
                   value: audio.musicVolume,
                   divisions: 20,
+                  onChangeEnd: (_) => unawaited(audio.playSound(GameSound.tap)),
                   label: '${(audio.musicVolume * 100).round()}%',
                   onChanged: audio.musicEnabled
                       ? (value) {
@@ -154,6 +156,32 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
               const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [Text('0'), Text('20 steps'), Text('100')],
+              ),
+              const Divider(color: Colors.white12, height: 24),
+              Material(
+                color: Colors.transparent,
+                child: SwitchListTile(
+                  key: const Key('mining-sound-switch'),
+                  contentPadding: EdgeInsets.zero,
+                  thumbColor: const WidgetStatePropertyAll(
+                    MiningTheme.highlight,
+                  ),
+                  activeTrackColor: MiningTheme.accent.withAlpha(90),
+                  title: const Text(
+                    'Sound effects',
+                    style: TextStyle(
+                      fontFamily: 'Orbitron',
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                  value: audio.soundEnabled,
+                  onChanged: (value) {
+                    unawaited(audio.setSoundEnabled(value));
+                    if (value) unawaited(audio.playSound(GameSound.tap));
+                    setState(() {});
+                  },
+                ),
               ),
             ],
           ),

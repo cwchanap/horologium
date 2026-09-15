@@ -8,6 +8,8 @@ import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/landing_basin_grid_visual_layer.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
+import '../../support/mining_visual_frames.dart';
+
 final _content = MiningContentRegistry.stellarMining();
 final _start = DateTime.utc(2026, 8, 26, 12);
 const _defaultCell = MiningGridCell(2, 3);
@@ -60,6 +62,7 @@ Future<void> _pumpLayer(
   bool withRig = true,
   double progress = 0,
   int impactSequence = 0,
+  VoidCallback? onMiningImpact,
   bool reducedMotion = false,
   List<(RigTier, MiningGridCell)> rigs = const [],
 }) async {
@@ -80,6 +83,7 @@ Future<void> _pumpLayer(
           rigs: rigs,
         ),
         impactSequence: impactSequence,
+        onMiningImpact: onMiningImpact,
         reducedMotion: reducedMotion,
         cellSize: 56,
       ),
@@ -133,32 +137,6 @@ Transform _robotArmTransform(WidgetTester tester, MiningGridCell cell) =>
       find.byKey(Key('landing-basin-robot-arm-transform-${cell.x}-${cell.y}')),
     );
 
-// Resolve the finite gold frame set in real async before the layer mounts,
-// so its _precacheFrames Future.wait completes from cache hits and
-// _framesReady becomes true via actual precache completion (the deferral
-// budget drops a stalled impact, it does not fire it). A bare host gives
-// precacheImage a Directionality context; the global image cache persists
-// across the subsequent pumpWidget that mounts the layer.
-Future<void> warmGoldFrames(WidgetTester tester) async {
-  await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
-  final context = tester.element(find.byType(MaterialApp));
-  await tester.runAsync(() async {
-    for (final path in [
-      for (var stage = 1; stage <= 4; stage++)
-        MiningVisuals.goldNodeStageAsset(stage),
-      for (var frame = 1; frame <= 4; frame++)
-        MiningVisuals.goldNodeIdleAsset(frame),
-      for (var frame = 1; frame <= 3; frame++)
-        MiningVisuals.goldNodeHitAsset(frame),
-      for (var frame = 1; frame <= 4; frame++)
-        MiningVisuals.goldNodeExhaustAsset(frame),
-    ]) {
-      await precacheImage(AssetImage(path), context);
-    }
-  });
-  await tester.pump();
-}
-
 void main() {
   // The layer defers its first one-shot impact until the finite gold frames
   // finish precaching, and readiness is tied only to actual Future.wait
@@ -171,6 +149,46 @@ void main() {
     imageCache.clear();
     imageCache.clearLiveImages();
   });
+
+  testWidgets(
+    'emits one sound at a visible strike, never on load or reduced motion',
+    (tester) async {
+      await warmGoldFrames(tester);
+      var impacts = 0;
+      void onImpact() => impacts++;
+      await _pumpLayer(tester, impactSequence: 8, onMiningImpact: onImpact);
+      await tester.pump(const Duration(seconds: 1));
+      expect(impacts, 0);
+      await _pumpLayer(tester, impactSequence: 9, onMiningImpact: onImpact);
+      await tester.pump(const Duration(milliseconds: 450));
+      expect(impacts, 0);
+      await tester.pump(const Duration(milliseconds: 20));
+      expect(impacts, 1);
+      await tester.pump(const Duration(seconds: 1));
+      expect(impacts, 1);
+      await _pumpLayer(
+        tester,
+        impactSequence: 10,
+        reducedMotion: true,
+        onMiningImpact: onImpact,
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(impacts, 1);
+      await _pumpLayer(tester, impactSequence: 11, onMiningImpact: onImpact);
+      await _pumpLayer(
+        tester,
+        impactSequence: 11,
+        withRig: false,
+        onMiningImpact: onImpact,
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(impacts, 1);
+      await _pumpLayer(tester, impactSequence: 12, onMiningImpact: onImpact);
+      await tester.pump(const Duration(seconds: 1));
+      expect(impacts, 1, reason: 'A missed strike must not play late.');
+    },
+    skip: kIsWeb,
+  );
 
   testWidgets('renders the staged plate and omits the rig without a rig', (
     tester,

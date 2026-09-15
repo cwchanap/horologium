@@ -6,11 +6,41 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'background_music_player.dart';
 
+enum GameSound {
+  mining,
+  tap,
+  rig,
+  merge,
+  sale,
+  upgrade,
+  travel,
+  cargoFull,
+  milestone,
+  reject;
+
+  int get priority => switch (this) {
+    mining => 0,
+    tap => 1,
+    milestone => 3,
+    _ => 2,
+  };
+}
+
 class AudioManager {
-  AudioManager({BackgroundMusicPlayer? backgroundMusicPlayer})
-    : _bgm = backgroundMusicPlayer;
+  AudioManager({
+    BackgroundMusicPlayer? backgroundMusicPlayer,
+    BackgroundMusicPlayer? soundEffectPlayer,
+  }) : _bgm = backgroundMusicPlayer,
+       _sfx = soundEffectPlayer;
 
   BackgroundMusicPlayer? _bgm;
+  BackgroundMusicPlayer? _sfx;
+  Future<void>? _sfxQueue;
+  bool _sfxContextConfigured = false;
+  int _sfxGeneration = 0;
+  GameSound? _activeSound;
+  StreamSubscription<void>? _sfxCompletion;
+  bool _soundEnabled = true;
   bool _bgmStarted = false;
   bool _bgmInitializing = false;
   bool _musicEnabled = true;
@@ -21,6 +51,7 @@ class AudioManager {
   bool get bgmStarted => _bgmStarted;
   bool get musicEnabled => _musicEnabled;
   double get musicVolume => _musicVolume;
+  bool get soundEnabled => _soundEnabled;
 
   Future<void> loadPrefs() async {
     try {
@@ -29,6 +60,7 @@ class AudioManager {
       final volume = prefs.getDouble('audio.musicVolume');
       if (enabled != null) _musicEnabled = enabled;
       if (volume != null) _musicVolume = volume.clamp(0.0, 1.0);
+      _soundEnabled = prefs.getBool('audio.soundEnabled') ?? true;
     } catch (e) {
       debugPrint('Failed to load audio prefs: $e');
     }
@@ -39,6 +71,7 @@ class AudioManager {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('audio.musicEnabled', _musicEnabled);
       await prefs.setDouble('audio.musicVolume', _musicVolume);
+      await prefs.setBool('audio.soundEnabled', _soundEnabled);
     } catch (e) {
       debugPrint('Failed to save audio prefs: $e');
     }
@@ -55,7 +88,7 @@ class AudioManager {
     try {
       await player.setReleaseMode(ReleaseMode.loop);
       await player.setVolume(_musicVolume);
-      await player.playAsset('audio/background.mp3');
+      await player.playAsset('audio/orbital_foundry.mp3');
       // Reapply the latest volume after playAsset completes. A slider move
       // during the awaited play call updates _musicVolume but cannot reach
       // the player until _bgmStarted flips, which happens only after this
@@ -70,7 +103,13 @@ class AudioManager {
   }
 
   Future<void> maybeStartBgm() async {
-    if (_bgmStarted || !_musicEnabled || _bgmInitializing || _disposed) return;
+    if (_bgmStarted ||
+        !_musicEnabled ||
+        _bgmInitializing ||
+        _disposed ||
+        _lifecycleBlocksPlayback) {
+      return;
+    }
     _bgmInitializing = true;
 
     try {
@@ -136,15 +175,106 @@ class AudioManager {
     }
   }
 
+  Future<void> setSoundEnabled(bool value) async {
+    if (_disposed) return;
+    _soundEnabled = value;
+    unawaited(_savePrefs());
+    if (!value) await _stopSounds();
+  }
+
+  Future<void> playSound(GameSound sound) {
+    if (_disposed ||
+        !_soundEnabled ||
+        _lifecycleBlocksPlayback ||
+        sound.priority < (_activeSound?.priority ?? -1)) {
+      return Future<void>.value();
+    }
+    _activeSound = sound;
+    final generation = ++_sfxGeneration;
+    return _queueSound(() async {
+      if (generation != _sfxGeneration) return;
+      // ponytail: one voice; add a pool only if simultaneous action cues are needed.
+      final player = _sfx ??= AudioPlayerBackgroundMusicPlayer();
+      try {
+        if (!_sfxContextConfigured) {
+          // The effect player must not take audio focus: the default
+          // AndroidAudioFocus.gain request would steal focus and silence BGM.
+          // Only Android is overridden; on iOS the shared AVAudioSession keeps
+          // the default playback category with no mixing options.
+          await player.setAudioContext(
+            AudioContext(
+              android: const AudioContextAndroid(
+                audioFocus: AndroidAudioFocus.none,
+              ),
+            ),
+          );
+          if (generation != _sfxGeneration) return;
+          _sfxContextConfigured = true;
+        }
+        _cancelSoundCompletion();
+        await player.stop();
+        await player.setReleaseMode(ReleaseMode.stop);
+        await player.setVolume(0.7);
+        if (generation != _sfxGeneration) return;
+        _sfxCompletion = player.onComplete.listen(
+          (_) {
+            if (generation == _sfxGeneration) _activeSound = null;
+          },
+          onError: (Object error) {
+            if (generation == _sfxGeneration) _activeSound = null;
+            debugPrint('Sound playback failed: $error');
+          },
+        );
+        await player.playAsset('audio/${sound.name}.wav');
+      } catch (_) {
+        if (generation == _sfxGeneration) _activeSound = null;
+        rethrow;
+      }
+    });
+  }
+
+  Future<void> _queueSound(Future<void> Function() operation) {
+    late final Future<void> command;
+    command = (_sfxQueue ?? Future<void>.value())
+        .then((_) => operation())
+        .catchError((Object e) => debugPrint('Sound effect failed: $e'))
+        .whenComplete(() {
+          if (identical(_sfxQueue, command)) _sfxQueue = null;
+        });
+    return _sfxQueue = command;
+  }
+
+  void _cancelSoundCompletion() {
+    // Cancelling the event subscription stops delivery synchronously. Player
+    // teardown remains ordered through the command queue below.
+    unawaited(
+      _sfxCompletion?.cancel().catchError((Object e) {
+        debugPrint('Sound completion cleanup failed: $e');
+      }),
+    );
+    _sfxCompletion = null;
+  }
+
+  Future<void> _stopSounds() {
+    _sfxGeneration++;
+    _activeSound = null;
+    return _queueSound(() async {
+      _cancelSoundCompletion();
+      await _sfx?.stop();
+    });
+  }
+
   void handleLifecycleChange(AppLifecycleState state) {
+    if (_disposed) return;
+    _lifecycleState = state;
+    if (_lifecycleBlocksPlayback) unawaited(_stopSounds());
     switch (state) {
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
-        _lifecycleState = state;
+      case AppLifecycleState.hidden:
         if (_bgmStarted) _pauseForLifecycle();
         break;
       case AppLifecycleState.resumed:
-        _lifecycleState = state;
         if (_bgmStarted && _musicEnabled) {
           final resumeFuture = _bgm?.resume();
           if (resumeFuture != null) {
@@ -175,12 +305,24 @@ class AudioManager {
           );
         }
         break;
-      default:
-        break;
     }
   }
 
   Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
+    _sfxGeneration++;
+    _activeSound = null;
+    final soundDisposal = _queueSound(() async {
+      _cancelSoundCompletion();
+      final player = _sfx;
+      _sfx = null;
+      try {
+        await player?.stop();
+      } finally {
+        await player?.dispose();
+      }
+    });
     final bgm = _bgm;
     final started = _bgmStarted;
 
@@ -200,11 +342,14 @@ class AudioManager {
       _lifecycleState = null;
       _disposed = true;
     }
+    await soundDisposal;
   }
 
   bool get _lifecycleBlocksPlayback =>
       _lifecycleState == AppLifecycleState.paused ||
-      _lifecycleState == AppLifecycleState.inactive;
+      _lifecycleState == AppLifecycleState.inactive ||
+      _lifecycleState == AppLifecycleState.hidden ||
+      _lifecycleState == AppLifecycleState.detached;
 
   void _pauseForLifecycle() {
     final pauseFuture = _bgm?.pause();
