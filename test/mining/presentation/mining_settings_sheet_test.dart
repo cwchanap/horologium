@@ -151,4 +151,30 @@ void main() {
     expect(effects.playedAssets, ['audio/tap.wav']);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('finishing a volume drag plays the tap cue', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'audio.musicEnabled': true,
+      'audio.musicVolume': 0.5,
+    });
+    final effects = FakeBackgroundMusicPlayer();
+    final manager = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(manager.dispose);
+    await manager.loadPrefs();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: MiningSettingsSheet(audioManager: manager)),
+      ),
+    );
+    final slider = find.byKey(const Key('mining-volume-slider'));
+    await tester.ensureVisible(slider);
+    await tester.drag(slider, const Offset(40, 0));
+    await tester.pump();
+    expect(manager.musicVolume, greaterThan(0.5));
+    expect(effects.playedAssets, ['audio/tap.wav']);
+    expect(tester.takeException(), isNull);
+  });
 }
