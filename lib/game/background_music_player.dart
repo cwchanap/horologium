@@ -1,6 +1,7 @@
 import 'package:audioplayers/audioplayers.dart';
 
 abstract class BackgroundMusicPlayer {
+  Stream<void> get onComplete;
   Future<void> setReleaseMode(ReleaseMode mode);
   Future<void> setVolume(double volume);
   Future<void> playAsset(String path);
@@ -15,6 +16,9 @@ class AudioPlayerBackgroundMusicPlayer implements BackgroundMusicPlayer {
     : _player = player ?? AudioPlayer();
 
   final AudioPlayer _player;
+
+  @override
+  Stream<void> get onComplete => _player.onPlayerComplete;
 
   @override
   Future<void> dispose() => _player.dispose();

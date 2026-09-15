@@ -26,6 +26,7 @@ class MineSiteScreen extends StatelessWidget {
     this.cash = 0,
     this.reducedMotion = false,
     this.impactSequence = 0,
+    this.onMiningImpact,
   });
 
   final MineSiteView view;
@@ -40,6 +41,7 @@ class MineSiteScreen extends StatelessWidget {
   final int cash;
   final bool reducedMotion;
   final int impactSequence;
+  final VoidCallback? onMiningImpact;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +55,7 @@ class MineSiteScreen extends StatelessWidget {
                 cash: cash,
                 reducedMotion: reducedMotion,
                 impactSequence: impactSequence,
+                onMiningImpact: onMiningImpact,
                 onGridCellTap: onGridCellTap,
                 onBayTap: onBayTap,
                 onSpawnRig: onSpawnRig,
@@ -67,6 +70,7 @@ class MineSiteScreen extends StatelessWidget {
                 cash: cash,
                 reducedMotion: reducedMotion,
                 impactSequence: impactSequence,
+                onMiningImpact: onMiningImpact,
                 onGridCellTap: onGridCellTap,
                 onBayTap: onBayTap,
                 onSpawnRig: onSpawnRig,
@@ -87,6 +91,7 @@ class _PortraitMineSite extends StatelessWidget {
     required this.cash,
     required this.reducedMotion,
     required this.impactSequence,
+    this.onMiningImpact,
     required this.onGridCellTap,
     required this.onBayTap,
     required this.onSpawnRig,
@@ -101,6 +106,7 @@ class _PortraitMineSite extends StatelessWidget {
   final int cash;
   final bool reducedMotion;
   final int impactSequence;
+  final VoidCallback? onMiningImpact;
   final ValueChanged<MiningGridCell> onGridCellTap;
   final ValueChanged<DockBayId> onBayTap;
   final VoidCallback onSpawnRig;
@@ -145,6 +151,7 @@ class _PortraitMineSite extends StatelessWidget {
               view: view,
               reducedMotion: reducedMotion,
               impactSequence: impactSequence,
+              onMiningImpact: onMiningImpact,
               onGridCellTap: onGridCellTap,
               onSellCargo: onSellCargo,
               portraitTopInset: pad.top,
@@ -198,6 +205,7 @@ class _LandscapeMineSite extends StatelessWidget {
     required this.cash,
     required this.reducedMotion,
     required this.impactSequence,
+    this.onMiningImpact,
     required this.onGridCellTap,
     required this.onBayTap,
     required this.onSpawnRig,
@@ -212,6 +220,7 @@ class _LandscapeMineSite extends StatelessWidget {
   final int cash;
   final bool reducedMotion;
   final int impactSequence;
+  final VoidCallback? onMiningImpact;
   final ValueChanged<MiningGridCell> onGridCellTap;
   final ValueChanged<DockBayId> onBayTap;
   final VoidCallback onSpawnRig;
@@ -247,6 +256,7 @@ class _LandscapeMineSite extends StatelessWidget {
               view: view,
               reducedMotion: reducedMotion,
               impactSequence: impactSequence,
+              onMiningImpact: onMiningImpact,
               onGridCellTap: onGridCellTap,
               onSellCargo: onSellCargo,
               landscapeLeftInset: pad.left,
@@ -306,6 +316,7 @@ class _CavernScene extends StatelessWidget {
     required this.view,
     required this.reducedMotion,
     required this.impactSequence,
+    this.onMiningImpact,
     required this.onGridCellTap,
     required this.onSellCargo,
     this.portraitTopInset = 0,
@@ -315,6 +326,7 @@ class _CavernScene extends StatelessWidget {
   final MineSiteView view;
   final bool reducedMotion;
   final int impactSequence;
+  final VoidCallback? onMiningImpact;
   final ValueChanged<MiningGridCell> onGridCellTap;
   final VoidCallback onSellCargo;
   final double portraitTopInset;
@@ -333,6 +345,7 @@ class _CavernScene extends StatelessWidget {
                 landscape: landscape,
                 reducedMotion: reducedMotion,
                 impactSequence: impactSequence,
+                onMiningImpact: onMiningImpact,
                 onGridCellTap: onGridCellTap,
                 landscapeLeftInset: landscapeLeftInset,
                 cavernWidth: constraints.maxWidth,
@@ -380,6 +393,7 @@ class _MineCavern extends StatelessWidget {
     required this.landscape,
     required this.reducedMotion,
     required this.impactSequence,
+    this.onMiningImpact,
     required this.onGridCellTap,
     this.landscapeLeftInset = 0,
     this.cavernWidth = 0,
@@ -389,6 +403,7 @@ class _MineCavern extends StatelessWidget {
   final bool landscape;
   final bool reducedMotion;
   final int impactSequence;
+  final VoidCallback? onMiningImpact;
   final ValueChanged<MiningGridCell> onGridCellTap;
   final double landscapeLeftInset;
   final double cavernWidth;
@@ -406,6 +421,7 @@ class _MineCavern extends StatelessWidget {
             view: view,
             onCellTap: onGridCellTap,
             impactSequence: impactSequence,
+            onMiningImpact: onMiningImpact,
             reducedMotion: reducedMotion,
           ),
           if (!landscape) ...[

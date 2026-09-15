@@ -16,12 +16,14 @@ class LandingBasinGridVisualLayer extends StatefulWidget {
     required this.impactSequence,
     required this.reducedMotion,
     required this.cellSize,
+    this.onMiningImpact,
   });
 
   final MineSiteView view;
   final int impactSequence;
   final bool reducedMotion;
   final double cellSize;
+  final VoidCallback? onMiningImpact;
 
   @override
   State<LandingBasinGridVisualLayer> createState() =>
@@ -60,6 +62,7 @@ class _LandingBasinGridVisualLayerState
   bool _framesReady = false;
   int? _pendingImpactSequence;
   bool _pendingExhaust = false;
+  bool _impactSoundFired = true;
 
   /// The safety-cap timer for the deferred first impact. Tracked so it can be
   /// cancelled in [dispose]; otherwise a cold-cache deferral that outlives the
@@ -76,7 +79,18 @@ class _LandingBasinGridVisualLayerState
   @override
   void initState() {
     super.initState();
+    _impactController.addListener(_notifyMiningImpact);
     _syncIdleController();
+  }
+
+  void _notifyMiningImpact() {
+    if (_impactSoundFired || _impactController.value < .46) return;
+    _impactSoundFired = true;
+    // A frame delayed past the strike (including background/resume) stays quiet.
+    if (_impactController.value >= .62) return;
+    if (!widget.reducedMotion && widget.view.rigs.isNotEmpty) {
+      widget.onMiningImpact?.call();
+    }
   }
 
   @override
@@ -140,11 +154,13 @@ class _LandingBasinGridVisualLayerState
   }
 
   void _fireImpact(bool shouldExhaust) {
+    _impactSoundFired = false;
     _impactController.forward(from: 0);
     _exhaustImpactSequence = shouldExhaust ? widget.impactSequence : null;
   }
 
   void _deferImpact(int sequence, bool shouldExhaust) {
+    _impactSoundFired = true;
     _pendingImpactSequence = sequence;
     _pendingExhaust = shouldExhaust;
     // Park the controller at the start of the timeline so the authored
@@ -182,6 +198,7 @@ class _LandingBasinGridVisualLayerState
   void didUpdateWidget(LandingBasinGridVisualLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.view.rigs.isEmpty) {
+      _impactSoundFired = true;
       _impactController.stop();
       _impactController.value = 1;
       _exhaustImpactSequence = null;

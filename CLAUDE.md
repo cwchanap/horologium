@@ -93,9 +93,14 @@ contract change.
 
 ## Audio, accessibility, and assets
 
-`AudioManager` owns `audio.musicEnabled` and `audio.musicVolume`, and the shell
+`AudioManager` owns music and SFX players plus `audio.musicEnabled`,
+`audio.musicVolume`, and `audio.soundEnabled`, and the shell
 loads preferences, forwards gestures/lifecycle events, supplies Settings, and
 disposes it. Mining code must not create audio players independently.
+The Landing Basin visual reports its visible strike through `onMiningImpact`;
+the shell decides whether to play it. Cargo-full cues are foreground transitions,
+and commissioning/mastery cues follow successful persistence. Taps and mining
+must not interrupt action/milestone audio; offline accrual never replays SFX.
 
 Flutter's `MediaQuery.disableAnimations` is the reduced-motion source of truth.
 The shell propagates it to presentation feedback. Do not query accessibility

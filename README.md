@@ -56,7 +56,10 @@ Missing data creates and persists the initial save. Malformed, incompatible,
 or pre-release data is clean-reset to a fresh initial save and marked as
 recovered; it is not migrated. Legacy preference keys are ignored. Audio is
 separate from mining state and is owned by `AudioManager` through
-`audio.musicEnabled` and `audio.musicVolume`.
+`audio.musicEnabled`, `audio.musicVolume`, and `audio.soundEnabled`.
+The generated Orbital Foundry music loop and ten gameplay effects are bundled
+locally; Settings mutes music and effects independently. See
+[audio assets](docs/audio-assets.md) for source takes and playback behavior.
 
 ## Assets and resource identity
 

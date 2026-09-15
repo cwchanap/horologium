@@ -5,6 +5,7 @@ import 'package:horologium/game/background_music_player.dart';
 
 class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
   FakeBackgroundMusicPlayer({
+    this.autoComplete = true,
     this.playCompleter,
     this.stopCompleter,
     this.setVolumeError,
@@ -12,6 +13,16 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
     this.resumeError,
     this.stopError,
   });
+
+  final bool autoComplete;
+  final _completion = StreamController<void>.broadcast(sync: true);
+
+  @override
+  Stream<void> get onComplete => _completion.stream;
+
+  void complete() {
+    if (!_completion.isClosed) _completion.add(null);
+  }
 
   Completer<void>? playCompleter;
   Completer<void>? stopCompleter;
@@ -30,6 +41,7 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
   @override
   Future<void> dispose() async {
     disposeCalls++;
+    await _completion.close();
   }
 
   @override
@@ -46,6 +58,7 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
     if (playCompleter != null) {
       await playCompleter!.future;
     }
+    if (autoComplete) complete();
   }
 
   @override

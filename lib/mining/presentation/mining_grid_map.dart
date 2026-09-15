@@ -25,12 +25,14 @@ class MiningGridMap extends StatelessWidget {
     required this.view,
     required this.onCellTap,
     required this.impactSequence,
+    this.onMiningImpact,
     required this.reducedMotion,
   });
 
   final MineSiteView view;
   final ValueChanged<MiningGridCell> onCellTap;
   final int impactSequence;
+  final VoidCallback? onMiningImpact;
   final bool reducedMotion;
 
   Widget _objectLayer() => view.siteId == MiningSiteId.landingBasin
@@ -38,6 +40,7 @@ class MiningGridMap extends StatelessWidget {
           key: const Key('landing-basin-grid-visual-layer'),
           view: view,
           impactSequence: impactSequence,
+          onMiningImpact: onMiningImpact,
           reducedMotion: reducedMotion,
           cellSize: miningGridCellSize,
         )
