@@ -19,6 +19,7 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{
         'audio.musicEnabled': false,
         'audio.musicVolume': 1.5,
+        'audio.soundEnabled': false,
       });
       final manager = AudioManager(
         backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
@@ -28,7 +29,156 @@ void main() {
 
       expect(manager.musicEnabled, isFalse);
       expect(manager.musicVolume, 1.0);
+      expect(manager.soundEnabled, isFalse);
     });
+  });
+
+  group('AudioManager sound effects', () {
+    test(
+      'plays one-shot assets independently of music and persists mute',
+      () async {
+        final player = FakeBackgroundMusicPlayer();
+        final manager = AudioManager(soundEffectPlayer: player);
+        addTearDown(manager.dispose);
+        await manager.setMusicEnabled(false);
+        for (final sound in GameSound.values) {
+          await manager.playSound(sound);
+        }
+        expect(player.playedAssets, [
+          for (final sound in GameSound.values) 'audio/${sound.name}.wav',
+        ]);
+        expect(player.releaseMode, ReleaseMode.stop);
+        expect(player.volumeCalls.last, 0.7);
+        await manager.setSoundEnabled(false);
+        await manager.playSound(GameSound.merge);
+        expect(player.playedAssets, hasLength(GameSound.values.length));
+        await Future<void>.delayed(Duration.zero);
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getBool('audio.soundEnabled'), isFalse);
+        expect(prefs.getBool('audio.musicEnabled'), isFalse);
+      },
+    );
+
+    test('rapid input drops stale cues instead of queuing a burst', () async {
+      final player = FakeBackgroundMusicPlayer();
+      final manager = AudioManager(soundEffectPlayer: player);
+      addTearDown(manager.dispose);
+      final tap = manager.playSound(GameSound.tap);
+      final merge = manager.playSound(GameSound.merge);
+      await Future.wait([tap, merge]);
+      expect(player.playedAssets, ['audio/merge.wav']);
+    });
+
+    test(
+      'taps and mining cannot cancel pending or playing action cues',
+      () async {
+        final player = FakeBackgroundMusicPlayer(autoComplete: false);
+        final manager = AudioManager(soundEffectPlayer: player);
+        addTearDown(manager.dispose);
+        final upgrade = manager.playSound(GameSound.upgrade);
+        await manager.playSound(GameSound.tap);
+        await upgrade;
+        final stops = player.stopCalls;
+        await manager.playSound(GameSound.tap);
+        await manager.playSound(GameSound.mining);
+        expect(player.playedAssets, ['audio/upgrade.wav']);
+        expect(player.stopCalls, stops);
+
+        player.complete();
+        await manager.playSound(GameSound.mining);
+        await manager.playSound(GameSound.milestone);
+        await manager.playSound(GameSound.rig);
+        expect(player.playedAssets, [
+          'audio/upgrade.wav',
+          'audio/mining.wav',
+          'audio/milestone.wav',
+        ]);
+        await manager.setSoundEnabled(false);
+        await manager.setSoundEnabled(true);
+        await manager.playSound(GameSound.tap);
+        expect(player.playedAssets.last, 'audio/tap.wav');
+      },
+    );
+
+    test('lifecycle stops effects without replaying them on resume', () async {
+      final player = FakeBackgroundMusicPlayer();
+      final manager = AudioManager(soundEffectPlayer: player);
+      addTearDown(manager.dispose);
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.detached,
+      ]) {
+        await manager.playSound(GameSound.rig);
+        final count = player.playedAssets.length;
+        manager.handleLifecycleChange(state);
+        await manager.playSound(GameSound.sale);
+        await Future<void>.delayed(Duration.zero);
+        expect(player.playedAssets, hasLength(count));
+        manager.handleLifecycleChange(AppLifecycleState.resumed);
+        await Future<void>.delayed(Duration.zero);
+        expect(player.playedAssets, hasLength(count));
+      }
+      expect(player.resumeCalls, 0);
+      expect(player.stopCalls, 8);
+    });
+
+    test(
+      'mute during startup cancels queued cues and stops the late play',
+      () async {
+        final player = FakeBackgroundMusicPlayer(
+          playCompleter: Completer<void>(),
+        );
+        final manager = AudioManager(soundEffectPlayer: player);
+        addTearDown(manager.dispose);
+        final play = manager.playSound(GameSound.merge);
+        await Future<void>.delayed(Duration.zero);
+        final queued = manager.playSound(GameSound.sale);
+        final mute = manager.setSoundEnabled(false);
+        player.playCompleter!.complete();
+        await Future.wait([play, queued, mute]);
+        expect(player.playedAssets, ['audio/merge.wav']);
+        expect(player.stopCalls, 2);
+      },
+    );
+
+    test(
+      'dispose drains in-flight playback before releasing its player',
+      () async {
+        final player = FakeBackgroundMusicPlayer(
+          playCompleter: Completer<void>(),
+        );
+        final manager = AudioManager(soundEffectPlayer: player);
+        final play = manager.playSound(GameSound.merge);
+        await Future<void>.delayed(Duration.zero);
+        final disposal = manager.dispose();
+        await manager.playSound(GameSound.sale);
+        expect(player.disposeCalls, 0);
+        player.playCompleter!.complete();
+        await Future.wait([play, disposal]);
+        expect(player.playedAssets, ['audio/merge.wav']);
+        expect(player.stopCalls, 2);
+        expect(player.disposeCalls, 1);
+      },
+    );
+
+    test(
+      'player failures do not poison later effects or skip disposal',
+      () async {
+        final player = FakeBackgroundMusicPlayer(
+          setVolumeError: StateError('failed'),
+        );
+        final manager = AudioManager(soundEffectPlayer: player);
+        await manager.playSound(GameSound.milestone);
+        player.setVolumeError = null;
+        await manager.playSound(GameSound.tap);
+        expect(player.playedAssets, ['audio/tap.wav']);
+        player.stopError = StateError('failed');
+        await manager.dispose();
+        expect(player.disposeCalls, 1);
+      },
+    );
   });
 
   group('AudioManager.maybeStartBgm', () {
@@ -42,7 +192,7 @@ void main() {
       expect(manager.bgmStarted, isTrue);
       expect(player.releaseMode, ReleaseMode.loop);
       expect(player.volumeCalls, contains(0.8));
-      expect(player.playedAssets, <String>['audio/background.mp3']);
+      expect(player.playedAssets, <String>['audio/orbital_foundry.mp3']);
     });
 
     test('skips when music is disabled', () async {
@@ -67,7 +217,7 @@ void main() {
       playCompleter.complete();
       await firstStart;
 
-      expect(player.playedAssets, <String>['audio/background.mp3']);
+      expect(player.playedAssets, <String>['audio/orbital_foundry.mp3']);
       expect(manager.bgmStarted, isTrue);
     });
 
@@ -86,7 +236,7 @@ void main() {
 
         expect(manager.musicEnabled, isFalse);
         expect(manager.bgmStarted, isFalse);
-        expect(player.playedAssets, <String>['audio/background.mp3']);
+        expect(player.playedAssets, <String>['audio/orbital_foundry.mp3']);
         expect(player.stopCalls, 1);
       },
     );
@@ -98,7 +248,7 @@ void main() {
       await manager.maybeStartBgm();
       await manager.maybeStartBgm();
 
-      expect(player.playedAssets, <String>['audio/background.mp3']);
+      expect(player.playedAssets, <String>['audio/orbital_foundry.mp3']);
     });
 
     test(
@@ -174,7 +324,7 @@ void main() {
 
       expect(manager.musicEnabled, isTrue);
       expect(manager.bgmStarted, isTrue);
-      expect(player.playedAssets, <String>['audio/background.mp3']);
+      expect(player.playedAssets, <String>['audio/orbital_foundry.mp3']);
     });
 
     test('disabling music pauses active bgm and saves prefs', () async {

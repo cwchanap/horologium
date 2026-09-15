@@ -25,6 +25,7 @@ void main() {
     });
     final manager = AudioManager(
       backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: FakeBackgroundMusicPlayer(),
     );
     addTearDown(manager.dispose);
     await tester.pumpWidget(
@@ -73,6 +74,7 @@ void main() {
 
     final manager = AudioManager(
       backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: FakeBackgroundMusicPlayer(),
     );
     await manager.loadPrefs();
     await tester.pumpWidget(
@@ -116,6 +118,37 @@ void main() {
           .onChanged,
       isNotNull,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('sound effects mute independently and save the preference', (
+    tester,
+  ) async {
+    final effects = FakeBackgroundMusicPlayer();
+    final manager = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(manager.dispose);
+    await manager.loadPrefs();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: MiningSettingsSheet(audioManager: manager)),
+      ),
+    );
+    final toggle = find.byKey(const Key('mining-sound-switch'));
+    await tester.ensureVisible(toggle);
+    await tester.tap(toggle);
+    await tester.pump();
+    expect(manager.soundEnabled, isFalse);
+    expect(manager.musicEnabled, isFalse);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('audio.soundEnabled'), isFalse);
+    await tester.tap(toggle);
+    await tester.pump();
+    expect(manager.soundEnabled, isTrue);
+    expect(manager.musicEnabled, isFalse);
+    expect(effects.playedAssets, ['audio/tap.wav']);
     expect(tester.takeException(), isNull);
   });
 }

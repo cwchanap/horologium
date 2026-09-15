@@ -60,6 +60,7 @@ Future<void> _pumpLayer(
   bool withRig = true,
   double progress = 0,
   int impactSequence = 0,
+  VoidCallback? onMiningImpact,
   bool reducedMotion = false,
   List<(RigTier, MiningGridCell)> rigs = const [],
 }) async {
@@ -80,6 +81,7 @@ Future<void> _pumpLayer(
           rigs: rigs,
         ),
         impactSequence: impactSequence,
+        onMiningImpact: onMiningImpact,
         reducedMotion: reducedMotion,
         cellSize: 56,
       ),
@@ -171,6 +173,46 @@ void main() {
     imageCache.clear();
     imageCache.clearLiveImages();
   });
+
+  testWidgets(
+    'emits one sound at a visible strike, never on load or reduced motion',
+    (tester) async {
+      await warmGoldFrames(tester);
+      var impacts = 0;
+      void onImpact() => impacts++;
+      await _pumpLayer(tester, impactSequence: 8, onMiningImpact: onImpact);
+      await tester.pump(const Duration(seconds: 1));
+      expect(impacts, 0);
+      await _pumpLayer(tester, impactSequence: 9, onMiningImpact: onImpact);
+      await tester.pump(const Duration(milliseconds: 450));
+      expect(impacts, 0);
+      await tester.pump(const Duration(milliseconds: 20));
+      expect(impacts, 1);
+      await tester.pump(const Duration(seconds: 1));
+      expect(impacts, 1);
+      await _pumpLayer(
+        tester,
+        impactSequence: 10,
+        reducedMotion: true,
+        onMiningImpact: onImpact,
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(impacts, 1);
+      await _pumpLayer(tester, impactSequence: 11, onMiningImpact: onImpact);
+      await _pumpLayer(
+        tester,
+        impactSequence: 11,
+        withRig: false,
+        onMiningImpact: onImpact,
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(impacts, 1);
+      await _pumpLayer(tester, impactSequence: 12, onMiningImpact: onImpact);
+      await tester.pump(const Duration(seconds: 1));
+      expect(impacts, 1, reason: 'A missed strike must not play late.');
+    },
+    skip: kIsWeb,
+  );
 
   testWidgets('renders the staged plate and omits the rig without a rig', (
     tester,

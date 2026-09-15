@@ -93,7 +93,8 @@ class _MiningShellState extends State<MiningShell>
     final pendingReturnSummary = _controller.takePendingReturnSummary();
     if (!mounted) return;
     _initialized = true;
-    _refreshPresentation();
+    unawaited(_audioManager.playSound(GameSound.tap));
+    _refreshPresentation(announceCargo: false);
     _scheduleRecoverySnackBar();
     _startRefreshTimer();
     if (pendingReturnSummary != null) {
@@ -114,8 +115,7 @@ class _MiningShellState extends State<MiningShell>
   void _refreshForegroundProduction() {
     if (_controller.isBusy) return;
 
-    final before =
-        _controller.state.sites[MiningSiteId.landingBasin]!.storedAmount;
+    final before = _controller.state;
 
     _controller.refresh();
 
@@ -124,11 +124,38 @@ class _MiningShellState extends State<MiningShell>
 
     if (_openSiteId == MiningSiteId.landingBasin &&
         hasRig &&
-        landing.storedAmount > before) {
+        landing.storedAmount >
+            before.sites[MiningSiteId.landingBasin]!.storedAmount) {
       _landingBasinImpactSequence++;
     }
 
     _refreshPresentation();
+  }
+
+  void _announceFullCargo(MiningSave before) {
+    if (before.activePlanetId != _controller.state.activePlanetId) return;
+    for (final site in _content.planet(before.activePlanetId).sites) {
+      final progress = _controller.state.sites[site.id]!;
+      final capacity = _content.effectiveSiteCapacity(
+        site.id,
+        progress.rigPlacements.map((rig) => rig.tier),
+        _controller.state.technology.logistics,
+      );
+      if (capacity > 0 &&
+          before.sites[site.id]!.storedAmount < capacity &&
+          progress.storedAmount >= capacity) {
+        unawaited(_audioManager.playSound(GameSound.cargoFull));
+        break;
+      }
+    }
+  }
+
+  void _playMiningImpact() {
+    if (mounted &&
+        _openSiteId == MiningSiteId.landingBasin &&
+        (ModalRoute.of(context)?.isCurrent ?? false)) {
+      unawaited(_audioManager.playSound(GameSound.mining));
+    }
   }
 
   @override
@@ -140,8 +167,9 @@ class _MiningShellState extends State<MiningShell>
   @override
   bool get reducedMotion => _reducedMotion;
 
-  void _refreshPresentation() {
+  void _refreshPresentation({bool announceCargo = true}) {
     if (!_initialized) return;
+    if (announceCargo) _announceFullCargo(_displayState);
     _displayState = _controller.state;
     _displayNotifier.value = _controller.state;
     _reducedMotion =
@@ -174,8 +202,8 @@ class _MiningShellState extends State<MiningShell>
     );
   }
 
-  Future<void> _showMiningSheet(Widget sheet) {
-    return showModalBottomSheet<void>(
+  Future<void> _showMiningSheet(Widget sheet) async {
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -224,11 +252,13 @@ class _MiningShellState extends State<MiningShell>
         );
       },
     );
+    if (mounted) unawaited(_audioManager.playSound(GameSound.tap));
   }
 
   @override
   void openSettings() {
     if (!_initialized) return;
+    unawaited(_audioManager.playSound(GameSound.tap));
     unawaited(_audioManager.maybeStartBgm());
     unawaited(
       _showMiningSheet(MiningSettingsSheet(audioManager: _audioManager)),
@@ -238,6 +268,7 @@ class _MiningShellState extends State<MiningShell>
   @override
   void openTechnology() {
     if (!_initialized) return;
+    unawaited(_audioManager.playSound(GameSound.tap));
     unawaited(_audioManager.maybeStartBgm());
     unawaited(
       _showMiningSheet(
@@ -247,6 +278,8 @@ class _MiningShellState extends State<MiningShell>
             content: _content,
           ),
           onPurchase: _purchaseTechnology,
+          onSelectionChanged: () =>
+              unawaited(_audioManager.playSound(GameSound.tap)),
         ),
       ),
     );
@@ -256,6 +289,7 @@ class _MiningShellState extends State<MiningShell>
     _runSheetAction(
       () => _controller.purchaseTechnology(track),
       successMessage: 'Technology upgraded.',
+      sound: GameSound.upgrade,
     );
   }
 
@@ -263,6 +297,7 @@ class _MiningShellState extends State<MiningShell>
     _runSheetAction(
       () => _controller.unlockPlanet(id),
       successMessage: '${_content.planet(id).name} unlocked.',
+      sound: GameSound.milestone,
     );
   }
 
@@ -270,6 +305,7 @@ class _MiningShellState extends State<MiningShell>
     _runSheetAction(
       () => _controller.switchPlanet(id),
       successMessage: 'Traveled to ${_content.planet(id).name}.',
+      sound: GameSound.travel,
     );
   }
 
@@ -277,11 +313,16 @@ class _MiningShellState extends State<MiningShell>
     _runSheetAction(
       () => _controller.unlockSite(id),
       successMessage: 'Site unlocked.',
+      sound: GameSound.upgrade,
     );
   }
 
   void _spawnRig() {
-    _runSheetAction(_controller.spawnRig, successMessage: 'T1 rig spawned.');
+    _runSheetAction(
+      _controller.spawnRig,
+      successMessage: 'T1 rig spawned.',
+      sound: GameSound.rig,
+    );
   }
 
   void _handleDockBayTap(DockBayId bayId) {
@@ -295,12 +336,14 @@ class _MiningShellState extends State<MiningShell>
     final tappedBay = dockView.bay(bayId);
     if (tappedBay.rig == null) {
       setState(() => _selectedBayId = null);
+      unawaited(_audioManager.playSound(GameSound.reject));
       _showResult('Select an occupied rig bay.');
       return;
     }
 
     final selectedBayId = _selectedBayId;
     if (selectedBayId == null || selectedBayId == bayId) {
+      unawaited(_audioManager.playSound(GameSound.tap));
       setState(() => _selectedBayId = selectedBayId == bayId ? null : bayId);
       return;
     }
@@ -310,21 +353,25 @@ class _MiningShellState extends State<MiningShell>
       _runSheetAction(
         () => _controller.mergeDockRigs(selectedBayId, bayId),
         successMessage: 'Rigs merged.',
+        sound: GameSound.merge,
       );
       return;
     }
 
     setState(() => _selectedBayId = bayId);
+    unawaited(_audioManager.playSound(GameSound.tap));
   }
 
   void _enterSite(MiningSiteId id) {
     if (!_initialized || _controller.isBusy) return;
+    unawaited(_audioManager.playSound(GameSound.tap));
     unawaited(_audioManager.maybeStartBgm());
     setState(() => _openSiteId = id);
   }
 
   void _leaveSite() {
     if (!mounted) return;
+    unawaited(_audioManager.playSound(GameSound.tap));
     setState(() => _openSiteId = null);
   }
 
@@ -347,15 +394,18 @@ class _MiningShellState extends State<MiningShell>
         _runSheetAction(
           () => _controller.deployRig(bay, siteId, cell),
           successMessage: 'Rig deployed.',
+          sound: GameSound.rig,
         );
         break;
       case MineSiteGridTapAction.recall:
         _runSheetAction(
           () => _controller.recallRig(siteId, cell),
           successMessage: 'Rig recalled.',
+          sound: GameSound.rig,
         );
         break;
       case MineSiteGridTapAction.blocked:
+        unawaited(_audioManager.playSound(GameSound.reject));
         _showResult(outcome.message!);
         break;
     }
@@ -373,6 +423,9 @@ class _MiningShellState extends State<MiningShell>
             _refreshPresentation();
             if (result.isSuccess) {
               unawaited(HapticFeedback.lightImpact());
+              unawaited(_audioManager.playSound(GameSound.sale));
+            } else {
+              unawaited(_audioManager.playSound(GameSound.reject));
             }
             _showResult(
               result.isSuccess
@@ -383,6 +436,7 @@ class _MiningShellState extends State<MiningShell>
           .catchError((_) {
             if (!mounted) return;
             _refreshPresentation();
+            unawaited(_audioManager.playSound(GameSound.reject));
             _showResult('Sale failed.');
           }),
     );
@@ -416,6 +470,7 @@ class _MiningShellState extends State<MiningShell>
 
   void _showPrimarySurface(MiningNavigationDestination destination) {
     if (!_initialized) return;
+    unawaited(_audioManager.playSound(GameSound.tap));
     setState(() {
       _selectedDestination = destination;
       _openSiteId = null;
@@ -425,16 +480,17 @@ class _MiningShellState extends State<MiningShell>
   Future<void> _runSheetAction(
     Future<MiningActionResult> Function() operation, {
     required String successMessage,
+    required GameSound sound,
   }) async {
     if (!_initialized || _controller.isBusy) return;
-    final activePlanetBefore = _controller.state.activePlanetId;
+    final before = _controller.state;
     final pendingOperation = operation();
     _refreshPresentation();
     try {
       final result = await pendingOperation;
       if (!mounted) return;
       if (result.isSuccess &&
-          _controller.state.activePlanetId != activePlanetBefore) {
+          _controller.state.activePlanetId != before.activePlanetId) {
         _selectedBayId = null;
       } else {
         _preserveDockSelection();
@@ -442,6 +498,17 @@ class _MiningShellState extends State<MiningShell>
       _refreshPresentation();
       if (result.isSuccess) {
         unawaited(HapticFeedback.lightImpact());
+        // First commissioning also covers planet mastery and the Mars reward.
+        final commissioned = _controller.state.sites.entries.any(
+          (entry) =>
+              entry.value.commissioned &&
+              !before.sites[entry.key]!.commissioned,
+        );
+        unawaited(
+          _audioManager.playSound(commissioned ? GameSound.milestone : sound),
+        );
+      } else {
+        unawaited(_audioManager.playSound(GameSound.reject));
       }
       _showResult(
         result.isSuccess
@@ -451,6 +518,7 @@ class _MiningShellState extends State<MiningShell>
     } catch (_) {
       if (!mounted) return;
       _refreshPresentation();
+      unawaited(_audioManager.playSound(GameSound.reject));
       _showResult('Action failed.');
     }
   }
@@ -470,7 +538,7 @@ class _MiningShellState extends State<MiningShell>
     if (!_initialized) return;
     final summary = await _controller.resume();
     if (!mounted) return;
-    _refreshPresentation();
+    _refreshPresentation(announceCargo: false);
     _startRefreshTimer();
     if (summary != null) await _showOfflineReturn(summary);
   }
@@ -484,7 +552,7 @@ class _MiningShellState extends State<MiningShell>
         _refreshTimer = null;
         if (_initialized) {
           _checkpoint();
-          _refreshPresentation();
+          _refreshPresentation(announceCargo: false);
         }
         break;
       case AppLifecycleState.resumed:
@@ -590,6 +658,7 @@ class _MiningShellState extends State<MiningShell>
           cash: _displayState.cash,
           reducedMotion: _reducedMotion,
           impactSequence: _landingBasinImpactSequence,
+          onMiningImpact: _playMiningImpact,
           onGridCellTap: _handleSiteGridCellTap,
           onBayTap: _handleDockBayTap,
           onSpawnRig: _spawnRig,
