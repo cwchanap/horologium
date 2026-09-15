@@ -35,6 +35,7 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
   Object? resumeError;
   Object? stopError;
   ReleaseMode? releaseMode;
+  final List<AudioContext> audioContextCalls = <AudioContext>[];
   final List<double> volumeCalls = <double>[];
   final List<String> playedAssets = <String>[];
   int pauseCalls = 0;
@@ -71,6 +72,11 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
     if (resumeError != null) {
       throw resumeError!;
     }
+  }
+
+  @override
+  Future<void> setAudioContext(AudioContext context) async {
+    audioContextCalls.add(context);
   }
 
   @override
