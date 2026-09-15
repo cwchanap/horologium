@@ -257,4 +257,39 @@ void main() {
     expect(surveying.onPressed, isNull);
     expect(find.text('Max Level'), findsOneWidget);
   });
+
+  testWidgets('tapping a level node selects its track and reports the change', (
+    tester,
+  ) async {
+    var selectionCalls = 0;
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(402, 874);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TechnologySheet(
+            view: _view(),
+            onPurchase: (_) {},
+            onSelectionChanged: () => selectionCalls++,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('technology-node-logistics-1')));
+    await tester.pump();
+    expect(selectionCalls, 1);
+    expect(find.text('Commission Landing Basin'), findsOneWidget);
+
+    // Re-tapping a node on the already-selected track stays quiet.
+    await tester.tap(find.byKey(const Key('technology-node-logistics-2')));
+    await tester.pump();
+    expect(selectionCalls, 1);
+    expect(tester.takeException(), isNull);
+  });
 }

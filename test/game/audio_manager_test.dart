@@ -179,6 +179,39 @@ void main() {
         expect(player.disposeCalls, 1);
       },
     );
+
+    test('an errored completion stream releases the active cue', () async {
+      final player = FakeBackgroundMusicPlayer(autoComplete: false);
+      final manager = AudioManager(soundEffectPlayer: player);
+      addTearDown(manager.dispose);
+      await manager.playSound(GameSound.milestone);
+      player.completeWithError(StateError('decoder exploded'));
+      // The error clears the active sound, so a lower-priority cue plays.
+      await manager.playSound(GameSound.tap);
+      expect(player.playedAssets, ['audio/milestone.wav', 'audio/tap.wav']);
+    });
+
+    test(
+      'a failed completion unsubscribe is logged and playback continues',
+      () async {
+        final player = _CancelFailingCompletionPlayer();
+        final manager = AudioManager(soundEffectPlayer: player);
+        addTearDown(manager.dispose);
+        final prints = <String>[];
+        final previousPrint = debugPrint;
+        debugPrint = (message, {wrapWidth}) => prints.add(message ?? '');
+        addTearDown(() => debugPrint = previousPrint);
+
+        await manager.playSound(GameSound.tap);
+        await manager.setSoundEnabled(false);
+        await manager.setSoundEnabled(true);
+        await manager.playSound(GameSound.merge);
+
+        expect(player.playedAssets, ['audio/tap.wav', 'audio/merge.wav']);
+        expect(player.stopCalls, greaterThan(0));
+        expect(prints, contains(startsWith('Sound completion cleanup failed')));
+      },
+    );
   });
 
   group('AudioManager.maybeStartBgm', () {
@@ -496,4 +529,14 @@ void main() {
       expect(player.disposeCalls, 1);
     });
   });
+}
+
+// A completion stream whose subscription cancel fails. Each access returns a
+// fresh single-subscription controller so the manager can re-listen after the
+// failed cancel.
+class _CancelFailingCompletionPlayer extends FakeBackgroundMusicPlayer {
+  @override
+  Stream<void> get onComplete => StreamController<void>(
+    onCancel: () => Future<void>.error(StateError('cancel failed')),
+  ).stream;
 }

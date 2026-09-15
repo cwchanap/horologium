@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/audio_manager.dart';
@@ -16,6 +17,7 @@ import 'package:horologium/mining/presentation/mining_shell.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/fake_background_music_player.dart';
+import '../../support/mining_visual_frames.dart';
 
 class CountingMiningSaveRepository extends MiningSaveRepository {
   var saveCount = 0;
@@ -1274,5 +1276,198 @@ void main() {
       ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
       greaterThan(0),
     );
+  });
+
+  testWidgets('a visible Landing Basin strike plays the mining cue', (
+    tester,
+  ) async {
+    final clock = TestClock(_start);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingBasin(clock.now));
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await warmGoldFrames(tester);
+    await pumpShell(
+      tester,
+      repository: repository,
+      clock: clock,
+      audioManager: audio,
+    );
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+
+    await pumpMiningTick(tester, clock);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(effects.playedAssets, [
+      'audio/tap.wav',
+      'audio/tap.wav',
+      'audio/mining.wav',
+    ]);
+  }, skip: kIsWeb);
+
+  testWidgets('tapping an empty dock bay rejects with guidance', (
+    tester,
+  ) async {
+    final repository = CountingMiningSaveRepository();
+    await repository.save(MiningSave.initial(nowUtc: _start));
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await pumpShell(tester, repository: repository, audioManager: audio);
+
+    // The keyed Container is clipped inside the bay's MiningHex, so tap the
+    // InkWell ancestor that actually receives the gesture.
+    final emptyBay = find.ancestor(
+      of: find.byKey(const ValueKey<String>('b3')),
+      matching: find.byType(InkWell),
+    );
+    await tester.tap(emptyBay);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Select an occupied rig bay.'), findsOneWidget);
+    expect(effects.playedAssets, ['audio/tap.wav', 'audio/reject.wav']);
+  });
+
+  testWidgets('tapping a mismatched dock rig reselects it', (tester) async {
+    final initial = MiningSave.initial(nowUtc: _start);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(
+      initial.copyWith(
+        docks: {
+          ...initial.docks,
+          MiningPlanetId.homeworld: {
+            ...initial.docks[MiningPlanetId.homeworld]!,
+            DockBayId.b2: RigTier.t2,
+          },
+        },
+      ),
+    );
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await pumpShell(tester, repository: repository, audioManager: audio);
+
+    await tester.tap(find.byKey(const ValueKey<String>('b1')));
+    await tester.tap(find.byKey(const ValueKey<String>('b2')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      find.bySemanticsLabel('Dock bay B2: Selected T2 rig.'),
+      findsOneWidget,
+    );
+    expect(effects.playedAssets, [
+      'audio/tap.wav',
+      'audio/tap.wav',
+      'audio/tap.wav',
+    ]);
+  });
+
+  testWidgets('a second stale sale rejects once cargo is gone', (tester) async {
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingState(_start, cargo: 10));
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await pumpShell(tester, repository: repository, audioManager: audio);
+
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+    final sell = find.byKey(const Key('mine-site-sell'));
+    // tester.tap does not pump a frame, so the still-enabled button can be
+    // tapped again after the first sale settles and empties the cargo.
+    await tester.tap(sell);
+    await tester.binding.idle();
+    await tester.tap(sell);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final state = shellHandles(tester).controller.state;
+    expect(state.cash, 140);
+    expect(find.text('No cargo to sell.'), findsOneWidget);
+    expect(effects.playedAssets, [
+      'audio/tap.wav',
+      'audio/tap.wav',
+      'audio/sale.wav',
+      'audio/reject.wav',
+    ]);
+  });
+
+  testWidgets('a failed sale write reports and rejects', (tester) async {
+    final repository = DelayedMiningSaveRepository();
+    await repository.save(deployedLandingState(_start, cargo: 10));
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await pumpShell(tester, repository: repository, audioManager: audio);
+
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+    repository.delayNextSave = true;
+    await tester.tap(find.byKey(const Key('mine-site-sell')));
+    await repository.saveStarted.future;
+    repository.allowSave.completeError(StateError('save failed'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final state = shellHandles(tester).controller.state;
+    expect(state.cash, 100);
+    expect(state.sites[MiningSiteId.landingBasin]!.storedAmount, 10);
+    expect(find.text('Sale failed.'), findsOneWidget);
+    expect(effects.playedAssets, [
+      'audio/tap.wav',
+      'audio/tap.wav',
+      'audio/reject.wav',
+    ]);
+  });
+
+  testWidgets('a second stale spawn reports the failure politely', (
+    tester,
+  ) async {
+    final repository = CountingMiningSaveRepository();
+    await repository.save(
+      MiningSave.initial(nowUtc: _start).copyWith(cash: 25),
+    );
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await pumpShell(tester, repository: repository, audioManager: audio);
+
+    final spawn = find.byKey(const Key('fleet-dock-spawn'));
+    // The first spawn drains cash to zero; the still-enabled stale button
+    // then reaches the controller and returns a failure result.
+    await tester.tap(spawn);
+    await tester.binding.idle();
+    await tester.tap(spawn);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final state = shellHandles(tester).controller.state;
+    expect(state.cash, 0);
+    expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b3], RigTier.t1);
+    expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b4], isNull);
+    expect(find.text('Not enough cash.'), findsOneWidget);
+    expect(effects.playedAssets, [
+      'audio/tap.wav',
+      'audio/rig.wav',
+      'audio/reject.wav',
+    ]);
   });
 }

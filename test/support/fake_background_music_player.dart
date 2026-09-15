@@ -24,6 +24,10 @@ class FakeBackgroundMusicPlayer implements BackgroundMusicPlayer {
     if (!_completion.isClosed) _completion.add(null);
   }
 
+  void completeWithError(Object error) {
+    if (!_completion.isClosed) _completion.addError(error);
+  }
+
   Completer<void>? playCompleter;
   Completer<void>? stopCompleter;
   Object? setVolumeError;
