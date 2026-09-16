@@ -42,6 +42,7 @@ class AudioManager {
   StreamSubscription<void>? _sfxCompletion;
   bool _soundEnabled = true;
   bool _bgmStarted = false;
+  bool _bgmStartRequested = false;
   bool _bgmInitializing = false;
   bool _musicEnabled = true;
   double _musicVolume = 0.5;
@@ -103,6 +104,10 @@ class AudioManager {
   }
 
   Future<void> maybeStartBgm() async {
+    // Record the request even when startup is currently blocked so a later
+    // resumed lifecycle event can distinguish a user-driven start attempt
+    // from the pre-initialization default state.
+    _bgmStartRequested = true;
     if (_bgmStarted ||
         !_musicEnabled ||
         _bgmInitializing ||
@@ -288,7 +293,7 @@ class AudioManager {
                   }),
             );
           }
-        } else if (_musicEnabled) {
+        } else if (_bgmStartRequested && _musicEnabled) {
           unawaited(maybeStartBgm());
         }
         break;
@@ -340,6 +345,7 @@ class AudioManager {
     } finally {
       _bgm = null;
       _bgmStarted = false;
+      _bgmStartRequested = false;
       _bgmInitializing = false;
       _lifecycleState = null;
       _disposed = true;
