@@ -128,7 +128,13 @@ void main() {
 
     test('lifecycle stops effects without replaying them on resume', () async {
       final player = FakeBackgroundMusicPlayer();
-      final manager = AudioManager(soundEffectPlayer: player);
+      // Resumed retries BGM startup when music is enabled, so inject a fake
+      // music player as well; a real AudioPlayer's asset load never settles
+      // in the headless web test environment.
+      final manager = AudioManager(
+        backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+        soundEffectPlayer: player,
+      );
       addTearDown(manager.dispose);
       for (final state in [
         AppLifecycleState.inactive,
