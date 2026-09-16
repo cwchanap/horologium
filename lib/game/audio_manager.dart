@@ -288,6 +288,8 @@ class AudioManager {
                   }),
             );
           }
+        } else if (_musicEnabled) {
+          unawaited(maybeStartBgm());
         }
         break;
       case AppLifecycleState.detached:
