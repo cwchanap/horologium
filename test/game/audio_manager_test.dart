@@ -476,6 +476,41 @@ void main() {
       },
     );
 
+    test('resumed during pending prefs load does not start bgm for a '
+        'muted save', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'audio.musicEnabled': false,
+      });
+      final player = FakeBackgroundMusicPlayer();
+      final manager = AudioManager(backgroundMusicPlayer: player);
+      addTearDown(manager.dispose);
+
+      // A quick background/resume while loadPrefs is still in flight must
+      // not start BGM off the default _musicEnabled = true.
+      final prefs = manager.loadPrefs();
+      manager.handleLifecycleChange(AppLifecycleState.paused);
+      manager.handleLifecycleChange(AppLifecycleState.resumed);
+      await Future<void>.delayed(Duration.zero);
+      await prefs;
+
+      expect(player.playedAssets, isEmpty);
+      expect(manager.bgmStarted, isFalse);
+      expect(manager.musicEnabled, isFalse);
+    });
+
+    test('resumed does not start bgm without a prior start request', () async {
+      final player = FakeBackgroundMusicPlayer();
+      final manager = AudioManager(backgroundMusicPlayer: player);
+      addTearDown(manager.dispose);
+
+      manager.handleLifecycleChange(AppLifecycleState.paused);
+      manager.handleLifecycleChange(AppLifecycleState.resumed);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(player.playedAssets, isEmpty);
+      expect(manager.bgmStarted, isFalse);
+    });
+
     test(
       'retries bgm startup on resume after a blocked start attempt',
       () async {
