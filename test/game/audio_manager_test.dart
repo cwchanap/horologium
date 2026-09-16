@@ -471,6 +471,25 @@ void main() {
     );
 
     test(
+      'retries bgm startup on resume after a blocked start attempt',
+      () async {
+        final player = FakeBackgroundMusicPlayer();
+        final manager = AudioManager(backgroundMusicPlayer: player);
+        addTearDown(manager.dispose);
+
+        manager.handleLifecycleChange(AppLifecycleState.paused);
+        await manager.maybeStartBgm();
+        expect(player.playedAssets, isEmpty);
+
+        manager.handleLifecycleChange(AppLifecycleState.resumed);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(manager.bgmStarted, isTrue);
+        expect(player.playedAssets, <String>['audio/orbital_foundry.mp3']);
+      },
+    );
+
+    test(
       'handleLifecycleChange catches async player command failures',
       () async {
         final player = FakeBackgroundMusicPlayer();
