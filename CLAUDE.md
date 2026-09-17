@@ -35,7 +35,17 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
 - Landing Basin robot/deposit animation never calls the controller or persists animation/variant state. Cold-load/resume production is never replayed as historical strikes.
 - Add another site-specific visual path only when a concrete second animated site needs it; do not pre-build a generic resource visual registry.
 
-Mine Site is a Flutter InteractiveViewer over an authored 24x18 grid. Each site owns four static deposits; rigs occupy one cell and mine the unique orthogonally adjacent deposit. Placement legality is centralized in mining_grid.dart, state persists immutable rigPlacements, and production remains aggregate/deterministic in MiningSimulation. Sites remain capped at four rigs. Landing Basin owns the only site-specific animated grid layer; its shell impact sequence is presentation-only.
+Mine Site is a Flutter InteractiveViewer over a deterministic 50×50 grid.
+Each site derives 100 1×1/2×2/3×3 resource bodies from its site ID; resources
+are not persisted. Rigs occupy one cell and mine their unique orthogonally
+adjacent resource. Free unique perimeter cells are the only resource-level
+placement capacity, sites remain capped at four rigs, static perimeter geometry
+is cached with content, placement legality stays centralized in mining_grid.dart,
+and production remains aggregate/deterministic in MiningSimulation. Landing
+Basin remains the only site-specific animated visual layer and only mined
+resources participate in its per-frame animation builder. An invalid persisted
+placement resets the complete mining save through the existing recovery
+boundary; there is no migration.
 
 - old rigByNode saves intentionally recover fresh through the invalid-save boundary
 - `_displayNotifier` remains a shell rebuild channel for live modal HUDs, not state ownership

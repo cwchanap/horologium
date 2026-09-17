@@ -2,9 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_controller.dart';
-import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../support/mining_grid_fixtures.dart';
 
 class TestClock {
   TestClock(this.now);
@@ -62,17 +63,18 @@ Future<void> earnUntil(
   );
 }
 
-const journeyCell = <MiningSiteId, MiningGridCell>{
-  MiningSiteId.landingBasin: MiningGridCell(3, 2),
-  MiningSiteId.carbonRidge: MiningGridCell(5, 1),
-  MiningSiteId.graniteCrater: MiningGridCell(2, 4),
-  MiningSiteId.frozenBasin: MiningGridCell(4, 2),
-  MiningSiteId.titaniumHighlands: MiningGridCell(2, 1),
-  MiningSiteId.heliumMare: MiningGridCell(6, 1),
-  MiningSiteId.ochreBasin: MiningGridCell(2, 3),
-  MiningSiteId.silicaDunes: MiningGridCell(5, 2),
-  MiningSiteId.cobaltChasm: MiningGridCell(3, 1),
-};
+/// First row-major legal deploy cell per site at its first playable
+/// Surveying level (the journey only ever deploys at or above it).
+final journeyCell = () {
+  final content = MiningContentRegistry.stellarMining();
+  return {
+    for (final id in MiningSiteId.values)
+      id: deployableMiningCells(
+        content.site(id),
+        surveyingLevel: content.site(id).deposits.first.requiredSurveyingLevel,
+      ).first,
+  };
+}();
 
 void main() {
   test(
