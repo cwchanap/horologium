@@ -115,7 +115,12 @@ class MiningGridMap extends StatelessWidget {
               // not tile widgets; empty cells render nothing.
               for (final deposit in view.deposits)
                 Positioned(
-                  key: Key('mining-deposit-${deposit.definition.id.name}'),
+                  key: Key(
+                    'mining-deposit-'
+                    '${deposit.definition.x}-'
+                    '${deposit.definition.y}-'
+                    '${deposit.definition.size}',
+                  ),
                   left: deposit.definition.x * miningGridCellSize,
                   top: deposit.definition.y * miningGridCellSize,
                   width: deposit.definition.size * miningGridCellSize,
@@ -179,16 +184,16 @@ class MiningGridMap extends StatelessWidget {
     final locked = deposit.isSurveyed
         ? ''
         : ' Requires Surveying ${definition.requiredSurveyingLevel}.';
-    return '$resource deposit ${definition.id.name.toUpperCase()}: '
+    return '$resource deposit (${definition.x},${definition.y}): '
         '${definition.size}x${definition.size}, '
-        '${deposit.minerCount} of ${definition.maxMiners} miners.$locked';
+        '${deposit.minerCount} of ${deposit.slotCount} miners.$locked';
   }
 
   String _rigLabel(MineSiteRigView rig) {
     final reason = rig.disabledReason;
     return '${rig.placement.tier.name.toUpperCase()} rig at '
         '(${rig.placement.cell.x},${rig.placement.cell.y}) mining '
-        '${rig.target.id.name.toUpperCase()}.'
+        'deposit (${rig.target.x},${rig.target.y}).'
         '${reason == null ? '' : ' $reason'}';
   }
 }

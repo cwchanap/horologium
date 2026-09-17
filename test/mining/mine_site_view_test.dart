@@ -4,6 +4,8 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
 
+import '../support/mining_grid_fixtures.dart';
+
 SiteProgress progress({
   bool unlocked = true,
   bool commissioned = false,
@@ -49,6 +51,7 @@ void main() {
   );
 
   test('projects grid deployable cells and blocked tap outcomes', () {
+    final site = content.site(MiningSiteId.landingBasin);
     final view = viewFor(
       stateWith(landing: progress()),
       selectedBayId: DockBayId.b1,
@@ -56,16 +59,21 @@ void main() {
 
     expect(view.isUnlocked, isTrue);
     expect(view.surveyingLevel, 0);
-    expect(view.deployableCells, contains(const MiningGridCell(3, 2)));
-    expect(view.deployableCells, contains(const MiningGridCell(16, 2)));
-    expect(view.deployableCells, isNot(contains(const MiningGridCell(5, 10))));
+    expect(view.deployableCells, deployableMiningCells(site).toSet());
 
+    // Inside the fourth progression resource (Surveying 2).
+    final lockedDeposit = site.deposits[3];
     expect(
-      view.gridTapOutcome(const MiningGridCell(5, 11)).message,
-      'Requires Surveying 1.',
+      view
+          .gridTapOutcome(MiningGridCell(lockedDeposit.x, lockedDeposit.y))
+          .message,
+      'Requires Surveying 2.',
     );
+    // Adjacent to the third progression resource (Surveying 1).
+    final lockedCell = site.perimeterCellsByDeposit[site.deposits[2]]!.first;
+    expect(view.gridTapOutcome(lockedCell).message, 'Requires Surveying 1.');
     expect(
-      view.gridTapOutcome(const MiningGridCell(10, 8)).message,
+      view.gridTapOutcome(const MiningGridCell(0, 0)).message,
       'Place the rig next to a resource.',
     );
   });
@@ -196,10 +204,13 @@ void main() {
       selectedBayId: DockBayId.b1,
     );
 
-    // D4 on Frozen Basin requires Surveying 5; the cell inside the deposit
-    // surfaces the requirement before any other outcome.
+    // The fourth progression resource on Frozen Basin requires Surveying 5;
+    // a cell inside it surfaces the requirement before any other outcome.
+    final lockedDeposit = content.site(MiningSiteId.frozenBasin).deposits[3];
     expect(
-      view.gridTapOutcome(const MiningGridCell(17, 11)).message,
+      view
+          .gridTapOutcome(MiningGridCell(lockedDeposit.x, lockedDeposit.y))
+          .message,
       'Requires Surveying 5.',
     );
   });
@@ -207,9 +218,12 @@ void main() {
   test(
     'recalls an occupied cell and blocks on cargo above post-recall capacity',
     () {
-      final rigs = const [
-        MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
-        MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(16, 2)),
+      final cells = deployableMiningCells(
+        content.site(MiningSiteId.landingBasin),
+      );
+      final rigs = [
+        MiningRigPlacement(tier: RigTier.t1, cell: cells[0]),
+        MiningRigPlacement(tier: RigTier.t1, cell: cells[1]),
       ];
       final view = viewFor(
         stateWith(
@@ -217,11 +231,11 @@ void main() {
         ),
       );
 
-      final rig = view.rigAt(const MiningGridCell(3, 2))!;
+      final rig = view.rigAt(cells[0])!;
       expect(rig.canRecall, isFalse);
       expect(rig.disabledReason, 'Sell cargo before recalling this rig.');
       expect(
-        view.gridTapOutcome(const MiningGridCell(3, 2)).message,
+        view.gridTapOutcome(cells[0]).message,
         'Sell cargo before recalling this rig.',
       );
 
@@ -232,7 +246,7 @@ void main() {
       );
 
       expect(
-        soldView.gridTapOutcome(const MiningGridCell(3, 2)).action,
+        soldView.gridTapOutcome(cells[0]).action,
         MineSiteGridTapAction.recall,
       );
     },
@@ -268,34 +282,41 @@ void main() {
     );
   });
 
-  test('rig semantics resolve their target deposit and miner counts', () {
+  test('two rigs on one resource share its target and miner count', () {
+    final site = content.site(MiningSiteId.landingBasin);
+    final target = site.deposits.first;
+    final cells = site.perimeterCellsByDeposit[target]!.toList();
+    expect(cells.length, greaterThanOrEqualTo(2));
+
     final view = viewFor(
       stateWith(
         landing: progress(
           commissioned: true,
-          rigs: const [
-            MiningRigPlacement(tier: RigTier.t2, cell: MiningGridCell(3, 2)),
+          rigs: [
+            MiningRigPlacement(tier: RigTier.t2, cell: cells[0]),
+            MiningRigPlacement(tier: RigTier.t1, cell: cells[1]),
           ],
         ),
       ),
     );
 
-    expect(view.rigs.single.target.id, MiningDepositId.d1);
-    expect(
-      view.deposits
-          .singleWhere((d) => d.definition.id == MiningDepositId.d1)
-          .minerCount,
-      1,
+    expect(view.rigs[0].target, target);
+    expect(view.rigs[1].target, target);
+    final depositView = view.deposits.singleWhere(
+      (deposit) => deposit.definition == target,
     );
-    expect(
-      view.deposits
-          .singleWhere((d) => d.definition.id == MiningDepositId.d2)
-          .minerCount,
-      0,
+    expect(depositView.minerCount, 2);
+    expect(depositView.slotCount, cells.length);
+    final locked = view.deposits.singleWhere(
+      (deposit) => deposit.definition == site.deposits[2],
     );
+    expect(locked.minerCount, 0);
+    expect(locked.slotCount, greaterThan(0));
+    expect(locked.isSurveyed, isFalse);
   });
 
   test('occupied and deposit cells block deployment with grid copy', () {
+    final site = content.site(MiningSiteId.landingBasin);
     final view = viewFor(
       stateWith(
         landing: progress(
@@ -310,6 +331,14 @@ void main() {
 
     expect(
       view.gridTapOutcome(const MiningGridCell(3, 3)).message,
+      'Place the rig next to a resource.',
+    );
+    final depositOrigin = MiningGridCell(
+      site.deposits.first.x,
+      site.deposits.first.y,
+    );
+    expect(
+      view.gridTapOutcome(depositOrigin).message,
       'Resources occupy this cell.',
     );
   });

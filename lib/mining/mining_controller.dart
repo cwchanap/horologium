@@ -259,8 +259,6 @@ class MiningController {
           'Place the rig next to a resource.',
         MiningPlacementRejection.surveyingLocked =>
           'Requires Surveying ${result.target!.requiredSurveyingLevel}.',
-        MiningPlacementRejection.depositAtCapacity =>
-          'This resource already has its maximum miners.',
         MiningPlacementRejection.ambiguousAdjacentDeposit => throw StateError(
           'Authored mining grid has ambiguous adjacency.',
         ),

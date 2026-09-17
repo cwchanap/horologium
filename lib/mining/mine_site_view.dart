@@ -7,10 +7,12 @@ class MineSiteDepositView {
   const MineSiteDepositView({
     required this.definition,
     required this.minerCount,
+    required this.slotCount,
     required this.isSurveyed,
   });
   final MiningDepositDefinition definition;
   final int minerCount;
+  final int slotCount;
   final bool isSurveyed;
 }
 
@@ -168,10 +170,6 @@ class MineSiteView {
         MineSiteGridTapOutcome.blocked(
           'Requires Surveying ${placement.target!.requiredSurveyingLevel}.',
         ),
-      MiningPlacementRejection.depositAtCapacity =>
-        const MineSiteGridTapOutcome.blocked(
-          'This resource already has its maximum miners.',
-        ),
       MiningPlacementRejection.ambiguousAdjacentDeposit => throw StateError(
         'Authored mining grid has ambiguous adjacency.',
       ),
@@ -216,20 +214,28 @@ class MineSiteView {
       technology: state.technology,
     );
 
+    final targetByRigCell = <MiningGridCell, MiningDepositDefinition>{};
+    final minerCountByDeposit = <MiningDepositDefinition, int>{};
+    for (final placement in progress.rigPlacements) {
+      final target = uniqueAdjacentDeposit(
+        deposits: definition.deposits,
+        cell: placement.cell,
+      );
+      if (target == null) {
+        throw StateError(
+          'Saved rig placement without a unique adjacent resource.',
+        );
+      }
+      targetByRigCell[placement.cell] = target;
+      minerCountByDeposit[target] = (minerCountByDeposit[target] ?? 0) + 1;
+    }
+
     final deposits = List<MineSiteDepositView>.unmodifiable([
       for (final deposit in definition.deposits)
         MineSiteDepositView(
           definition: deposit,
-          minerCount: progress.rigPlacements
-              .where(
-                (placement) =>
-                    uniqueAdjacentDeposit(
-                      deposits: definition.deposits,
-                      cell: placement.cell,
-                    )?.id ==
-                    deposit.id,
-              )
-              .length,
+          minerCount: minerCountByDeposit[deposit] ?? 0,
+          slotCount: definition.perimeterCellsByDeposit[deposit]!.length,
           isSurveyed: surveyingLevel >= deposit.requiredSurveyingLevel,
         ),
     ]);
@@ -237,15 +243,6 @@ class MineSiteView {
     final rigViews = List<MineSiteRigView>.unmodifiable([
       for (final placement in progress.rigPlacements)
         () {
-          final target = uniqueAdjacentDeposit(
-            deposits: definition.deposits,
-            cell: placement.cell,
-          );
-          if (target == null) {
-            throw StateError(
-              'Saved rig placement without a unique adjacent deposit.',
-            );
-          }
           final recallCapacity = content.effectiveSiteCapacity(
             siteId,
             progress.rigPlacements
@@ -267,7 +264,7 @@ class MineSiteView {
               : null;
           return MineSiteRigView(
             placement: placement,
-            target: target,
+            target: targetByRigCell[placement.cell]!,
             canRecall: canRecall,
             disabledReason: disabledReason,
           );
@@ -276,20 +273,24 @@ class MineSiteView {
 
     final canDeployAnywhere =
         !isBusy && progress.unlocked && active && selectedRig != null;
+    final candidateCells = <MiningGridCell>{
+      for (final deposit in definition.deposits)
+        if (surveyingLevel >= deposit.requiredSurveyingLevel)
+          ...definition.perimeterCellsByDeposit[deposit]!,
+    };
     final deployableCells = <MiningGridCell>{
       if (canDeployAnywhere)
-        for (var x = 0; x < definition.gridWidth; x++)
-          for (var y = 0; y < definition.gridHeight; y++)
-            if (evaluateMiningPlacement(
-              gridWidth: definition.gridWidth,
-              gridHeight: definition.gridHeight,
-              deposits: definition.deposits,
-              occupiedRigCells: rigViews.map((rig) => rig.placement.cell),
-              candidate: MiningGridCell(x, y),
-              surveyingLevel: surveyingLevel,
-              maxRigCount: MiningContentRegistry.maxDeployedRigsPerSite,
-            ).isAllowed)
-              MiningGridCell(x, y),
+        for (final candidate in candidateCells)
+          if (evaluateMiningPlacement(
+            gridWidth: definition.gridWidth,
+            gridHeight: definition.gridHeight,
+            deposits: definition.deposits,
+            occupiedRigCells: rigViews.map((rig) => rig.placement.cell),
+            candidate: candidate,
+            surveyingLevel: surveyingLevel,
+            maxRigCount: MiningContentRegistry.maxDeployedRigsPerSite,
+          ).isAllowed)
+            candidate,
     };
 
     return MineSiteView(

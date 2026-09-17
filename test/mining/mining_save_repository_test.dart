@@ -7,6 +7,16 @@ import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../support/mining_grid_fixtures.dart';
+
+final _content = MiningContentRegistry.stellarMining();
+final _landingSite = _content.site(MiningSiteId.landingBasin);
+final _firstResourceCells = _landingSite
+    .perimeterCellsByDeposit[_landingSite.deposits.first]!
+    .toList();
+final _surveyLockedCell =
+    _landingSite.perimeterCellsByDeposit[_landingSite.deposits[2]]!.first;
+
 MiningSave _progressedState(DateTime now) {
   final initial = MiningSave.initial(nowUtc: now);
   final docks = <MiningPlanetId, Map<DockBayId, RigTier?>>{
@@ -286,22 +296,11 @@ void main() {
                 commissioned: true,
                 storedAmount: 359,
                 rigPlacements: [
-                  const MiningRigPlacement(
-                    tier: RigTier.t1,
-                    cell: MiningGridCell(3, 2),
-                  ),
-                  MiningRigPlacement(
-                    tier: RigTier.t1,
-                    cell: const MiningGridCell(16, 2),
-                  ),
-                  MiningRigPlacement(
-                    tier: RigTier.t1,
-                    cell: const MiningGridCell(5, 10),
-                  ),
-                  MiningRigPlacement(
-                    tier: RigTier.t1,
-                    cell: const MiningGridCell(16, 9),
-                  ),
+                  for (final cell in deployableMiningCells(
+                    _landingSite,
+                    surveyingLevel: 3,
+                  ).take(4))
+                    MiningRigPlacement(tier: RigTier.t1, cell: cell),
                 ],
               ),
         },
@@ -582,29 +581,24 @@ void main() {
     test(
       'invalid rig placements recover through the strict boundary',
       () async {
+        final surveyedCells = deployableMiningCells(
+          _landingSite,
+          surveyingLevel: 2,
+        );
         final invalid = <Map<String, Object?>>[
           rawWithLandingPlacements([
             {'tier': 't1', 'x': 3, 'y': 2},
             {'tier': 't2', 'x': 3, 'y': 2},
           ]),
           rawWithLandingPlacements([
-            {'tier': 't1', 'x': 3, 'y': 3},
+            {'tier': 't1', 'x': 0, 'y': 0},
           ]),
           rawWithLandingPlacements([
-            {'tier': 't1', 'x': 5, 'y': 10},
+            {'tier': 't1', 'x': _surveyLockedCell.x, 'y': _surveyLockedCell.y},
           ], surveying: 0),
           rawWithLandingPlacements([
-            {'tier': 't1', 'x': 16, 'y': 9},
-            {'tier': 't1', 'x': 17, 'y': 9},
-            {'tier': 't1', 'x': 18, 'y': 9},
-            {'tier': 't1', 'x': 15, 'y': 10},
-          ], surveying: 2),
-          rawWithLandingPlacements([
-            {'tier': 't1', 'x': 3, 'y': 2},
-            {'tier': 't1', 'x': 16, 'y': 2},
-            {'tier': 't1', 'x': 5, 'y': 10},
-            {'tier': 't1', 'x': 16, 'y': 9},
-            {'tier': 't1', 'x': 17, 'y': 9},
+            for (final cell in surveyedCells.take(5))
+              {'tier': 't1', 'x': cell.x, 'y': cell.y},
           ], surveying: 2),
           rawWithLandingPlacements([
             {'tier': 't9', 'x': 3, 'y': 2},
@@ -637,10 +631,48 @@ void main() {
       await expectRecovered(raw);
     });
 
+    test(
+      'round-trips two rigs sharing one resource and rebuilds the target',
+      () async {
+        final site = _content.site(MiningSiteId.landingBasin);
+        final target = site.deposits.first;
+        final cells = site.perimeterCellsByDeposit[target]!.toList();
+        expect(cells.length, greaterThanOrEqualTo(2));
+        final initial = MiningSave.initial(nowUtc: now);
+        final state = initial.copyWith(
+          sites: {
+            ...initial.sites,
+            MiningSiteId.landingBasin: initial.sites[MiningSiteId.landingBasin]!
+                .copyWith(
+                  commissioned: true,
+                  rigPlacements: [
+                    MiningRigPlacement(tier: RigTier.t1, cell: cells[0]),
+                    MiningRigPlacement(tier: RigTier.t2, cell: cells[1]),
+                  ],
+                ),
+          },
+        );
+        final repository = MiningSaveRepository();
+
+        await repository.save(state);
+        final loaded = await repository.load(nowUtc: now);
+
+        expect(loaded.state, state);
+        expect(loaded.recoveredFromInvalidSave, isFalse);
+        final placement =
+            loaded.state.sites[MiningSiteId.landingBasin]!.rigPlacements.first;
+        expect(
+          uniqueAdjacentDeposit(deposits: site.deposits, cell: placement.cell),
+          target,
+        );
+      },
+    );
+
     test('valid placements decode in order into an immutable list', () async {
+      final cells = _firstResourceCells;
       final raw = rawWithLandingPlacements([
-        {'tier': 't1', 'x': 3, 'y': 2},
-        {'tier': 't2', 'x': 16, 'y': 2},
+        {'tier': 't1', 'x': cells[0].x, 'y': cells[0].y},
+        {'tier': 't2', 'x': cells[1].x, 'y': cells[1].y},
       ]);
       SharedPreferences.setMockInitialValues({
         MiningSaveRepository.saveKey: jsonEncode(raw),
@@ -651,8 +683,8 @@ void main() {
       expect(result.recoveredFromInvalidSave, isFalse);
       final landing = result.state.sites[MiningSiteId.landingBasin]!;
       expect(landing.rigPlacements, [
-        MiningRigPlacement(tier: RigTier.t1, cell: const MiningGridCell(3, 2)),
-        MiningRigPlacement(tier: RigTier.t2, cell: const MiningGridCell(16, 2)),
+        MiningRigPlacement(tier: RigTier.t1, cell: cells[0]),
+        MiningRigPlacement(tier: RigTier.t2, cell: cells[1]),
       ]);
       expect(
         () => landing.rigPlacements.add(
@@ -663,6 +695,35 @@ void main() {
         ),
         throwsUnsupportedError,
       );
+    });
+
+    test('obsolete Landing Basin placement inside a generated resource '
+        'resets the whole document', () async {
+      // The pre-cutover valid placement (16,2) now sits inside the fourth
+      // progression resource of the generated dense field.
+      final obsolete = _progressedState(now).copyWith(
+        sites: {
+          ..._progressedState(now).sites,
+          MiningSiteId.landingBasin: _progressedState(now)
+              .sites[MiningSiteId.landingBasin]!
+              .copyWith(
+                rigPlacements: const [
+                  MiningRigPlacement(
+                    tier: RigTier.t1,
+                    cell: MiningGridCell(16, 2),
+                  ),
+                ],
+              ),
+        },
+      );
+      SharedPreferences.setMockInitialValues({
+        MiningSaveRepository.saveKey: jsonEncode(obsolete.toJson()),
+      });
+
+      final result = await MiningSaveRepository().load(nowUtc: now);
+
+      expect(result.recoveredFromInvalidSave, isTrue);
+      expect(result.state, MiningSave.initial(nowUtc: now));
     });
   });
 
