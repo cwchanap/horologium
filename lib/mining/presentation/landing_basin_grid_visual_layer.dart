@@ -244,9 +244,12 @@ class _LandingBasinGridVisualLayerState
             height: depositVisualSize(deposit.definition.size),
             fit: BoxFit.contain,
             gaplessPlayback: true,
+            // Mined art stays full; surveyed-but-unmined dims; unsurveyed
+            // dims further so locked resources read differently from
+            // surveyed peers without floating lock badges.
             opacity: deposit.minerCount > 0
                 ? null
-                : const AlwaysStoppedAnimation(.62),
+                : AlwaysStoppedAnimation(deposit.isSurveyed ? .62 : .35),
           ),
         ),
       );

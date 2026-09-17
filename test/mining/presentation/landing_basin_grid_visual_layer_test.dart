@@ -275,6 +275,26 @@ void main() {
     expect(dimmed!.value, .62);
   });
 
+  testWidgets('renders the three survey tiers on the deposit art', (
+    tester,
+  ) async {
+    // Landing Basin progression levels are 0,0,1,2: at Surveying 0 the
+    // default target and its surveyed unmined peer are visible while the
+    // rest of the field is locked.
+    final unsurveyed = _landing.deposits.firstWhere(
+      (deposit) => deposit.requiredSurveyingLevel > 0,
+    );
+    await _pumpLayer(tester, reducedMotion: true);
+
+    expect(_depositOpacity(tester, _minedDeposit), isNull);
+    final surveyed = _depositOpacity(tester, _unminedDeposit);
+    expect(surveyed, isA<AlwaysStoppedAnimation<double>>());
+    expect(surveyed!.value, .62);
+    final locked = _depositOpacity(tester, unsurveyed);
+    expect(locked, isA<AlwaysStoppedAnimation<double>>());
+    expect(locked!.value, .35);
+  });
+
   testWidgets('keeps gapless playback on the changing deposit image', (
     tester,
   ) async {

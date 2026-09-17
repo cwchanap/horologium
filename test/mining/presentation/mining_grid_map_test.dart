@@ -118,6 +118,40 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('dims unsurveyed resources, keeps surveyed art full', (
+    tester,
+  ) async {
+    final view = _view(MiningSiteId.carbonRidge);
+    await _pumpMap(tester, view, (_) {});
+
+    // Carbon Ridge progression levels are 0,1,2,3: at Surveying 0 the level-0
+    // resource is surveyed and the rest of the field is locked.
+    Key depositNodeKey(MineSiteDepositView deposit) => Key(
+      'static-deposit-${deposit.definition.x}-'
+      '${deposit.definition.y}-${deposit.definition.size}',
+    );
+    final surveyed = view.deposits.firstWhere((deposit) => deposit.isSurveyed);
+    final locked = view.deposits.firstWhere((deposit) => !deposit.isSurveyed);
+
+    final surveyedImage = tester.widget<Image>(
+      find.descendant(
+        of: find.byKey(depositNodeKey(surveyed)),
+        matching: find.byType(Image),
+      ),
+    );
+    expect(surveyedImage.opacity, isNull);
+
+    final lockedImage = tester.widget<Image>(
+      find.descendant(
+        of: find.byKey(depositNodeKey(locked)),
+        matching: find.byType(Image),
+      ),
+    );
+    expect(lockedImage.opacity, isA<AlwaysStoppedAnimation<double>>());
+    expect(lockedImage.opacity!.value, .62);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('hosts the static object layer for non-Landing sites', (
     tester,
   ) async {

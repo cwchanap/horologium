@@ -196,6 +196,7 @@ class _StaticMiningGridVisualLayer extends StatelessWidget {
     children: [
       for (final deposit in view.deposits)
         Positioned(
+          key: Key('static-deposit-${_depositKey(deposit.definition)}'),
           left: deposit.definition.x * cellSize,
           top: deposit.definition.y * cellSize,
           width: deposit.definition.size * cellSize,
@@ -210,6 +211,11 @@ class _StaticMiningGridVisualLayer extends StatelessWidget {
               height: depositVisualSize(deposit.definition.size),
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => const SizedBox(),
+              // Unsurveyed art dims so locked resources read differently
+              // from surveyed peers without floating lock badges.
+              opacity: deposit.isSurveyed
+                  ? null
+                  : const AlwaysStoppedAnimation(.62),
             ),
           ),
         ),
