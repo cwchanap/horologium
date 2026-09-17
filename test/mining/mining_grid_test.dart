@@ -2,23 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_grid.dart';
 
 void main() {
-  const d1 = MiningDepositDefinition(
-    id: MiningDepositId.d1,
+  const target = MiningDepositDefinition(
     x: 3,
     y: 3,
     size: 1,
-    maxMiners: 1,
     requiredSurveyingLevel: 0,
   );
-  const d3 = MiningDepositDefinition(
-    id: MiningDepositId.d3,
-    x: 5,
-    y: 11,
-    size: 2,
-    maxMiners: 1,
-    requiredSurveyingLevel: 1,
-  );
-  const deposits = [d1, d3];
+  const deposits = [target];
 
   MiningPlacementResult placement(
     MiningGridCell candidate, {
@@ -26,8 +16,8 @@ void main() {
     int surveying = 5,
     List<MiningDepositDefinition> authored = deposits,
   }) => evaluateMiningPlacement(
-    gridWidth: 24,
-    gridHeight: 18,
+    gridWidth: 8,
+    gridHeight: 8,
     deposits: authored,
     occupiedRigCells: occupied,
     candidate: candidate,
@@ -36,17 +26,44 @@ void main() {
   );
 
   test('deposit footprints and orthogonal adjacency are exact', () {
-    expect(d1.contains(const MiningGridCell(3, 3)), isTrue);
-    expect(d1.isOrthogonallyAdjacent(const MiningGridCell(3, 2)), isTrue);
-    expect(d1.isOrthogonallyAdjacent(const MiningGridCell(2, 2)), isFalse);
-    expect(d3.contains(const MiningGridCell(6, 12)), isTrue);
-    expect(d3.isOrthogonallyAdjacent(const MiningGridCell(5, 10)), isTrue);
+    expect(target.contains(const MiningGridCell(3, 3)), isTrue);
+    expect(target.isOrthogonallyAdjacent(const MiningGridCell(3, 2)), isTrue);
+    expect(target.isOrthogonallyAdjacent(const MiningGridCell(2, 2)), isFalse);
+  });
+
+  test('same resource hosts multiple robots on sibling perimeter cells', () {
+    expect(
+      miningPerimeterCells(
+        gridWidth: 8,
+        gridHeight: 8,
+        deposits: deposits,
+        target: target,
+      ),
+      {
+        const MiningGridCell(3, 2),
+        const MiningGridCell(2, 3),
+        const MiningGridCell(4, 3),
+        const MiningGridCell(3, 4),
+      },
+    );
+
+    final second = evaluateMiningPlacement(
+      gridWidth: 8,
+      gridHeight: 8,
+      deposits: deposits,
+      occupiedRigCells: const [MiningGridCell(3, 2)],
+      candidate: const MiningGridCell(2, 3),
+      surveyingLevel: 0,
+      maxRigCount: 4,
+    );
+    expect(second.isAllowed, isTrue);
+    expect(second.target, target);
   });
 
   test('placement returns the unique target', () {
     final result = placement(const MiningGridCell(3, 2), surveying: 0);
     expect(result.isAllowed, isTrue);
-    expect(result.target, d1);
+    expect(result.target, target);
   });
 
   test('placement rejection matrix is exact', () {
@@ -66,9 +83,9 @@ void main() {
       placement(const MiningGridCell(-1, 0)).rejection,
       MiningPlacementRejection.outsideGrid,
     );
-    final depositCell = placement(const MiningGridCell(5, 11), surveying: 0);
+    final depositCell = placement(const MiningGridCell(3, 3), surveying: 0);
     expect(depositCell.rejection, MiningPlacementRejection.depositCell);
-    expect(depositCell.target, d3);
+    expect(depositCell.target, target);
     expect(
       placement(
         const MiningGridCell(3, 2),
@@ -77,42 +94,30 @@ void main() {
       MiningPlacementRejection.rigOccupied,
     );
     expect(
-      placement(const MiningGridCell(10, 8)).rejection,
+      placement(const MiningGridCell(0, 0)).rejection,
       MiningPlacementRejection.noAdjacentDeposit,
     );
     const ambiguous = [
-      MiningDepositDefinition(
-        id: MiningDepositId.d1,
-        x: 3,
-        y: 3,
-        size: 1,
-        maxMiners: 1,
-        requiredSurveyingLevel: 0,
-      ),
-      MiningDepositDefinition(
-        id: MiningDepositId.d2,
-        x: 3,
-        y: 1,
-        size: 1,
-        maxMiners: 1,
-        requiredSurveyingLevel: 0,
-      ),
+      MiningDepositDefinition(x: 3, y: 3, size: 1, requiredSurveyingLevel: 0),
+      MiningDepositDefinition(x: 3, y: 1, size: 1, requiredSurveyingLevel: 0),
     ];
     expect(
       placement(const MiningGridCell(3, 2), authored: ambiguous).rejection,
       MiningPlacementRejection.ambiguousAdjacentDeposit,
     );
-    expect(
-      placement(const MiningGridCell(5, 10), surveying: 0).rejection,
-      MiningPlacementRejection.surveyingLocked,
+    const locked = MiningDepositDefinition(
+      x: 3,
+      y: 3,
+      size: 1,
+      requiredSurveyingLevel: 3,
     );
     expect(
       placement(
-        const MiningGridCell(3, 4),
-        occupied: const [MiningGridCell(3, 2)],
+        const MiningGridCell(3, 2),
         surveying: 0,
+        authored: [locked],
       ).rejection,
-      MiningPlacementRejection.depositAtCapacity,
+      MiningPlacementRejection.surveyingLocked,
     );
   });
 }

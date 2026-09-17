@@ -1,5 +1,3 @@
-enum MiningDepositId { d1, d2, d3, d4 }
-
 enum MiningPlacementRejection {
   siteAtCapacity,
   outsideGrid,
@@ -8,7 +6,6 @@ enum MiningPlacementRejection {
   noAdjacentDeposit,
   ambiguousAdjacentDeposit,
   surveyingLocked,
-  depositAtCapacity,
 }
 
 class MiningGridCell {
@@ -29,18 +26,15 @@ class MiningGridCell {
 
 class MiningDepositDefinition {
   const MiningDepositDefinition({
-    required this.id,
     required this.x,
     required this.y,
     required this.size,
-    required this.maxMiners,
     required this.requiredSurveyingLevel,
   });
-  final MiningDepositId id;
+
   final int x;
   final int y;
   final int size;
-  final int maxMiners;
   final int requiredSurveyingLevel;
 
   bool contains(MiningGridCell cell) =>
@@ -52,6 +46,17 @@ class MiningDepositDefinition {
     return (inColumns && (cell.y == y - 1 || cell.y == y + size)) ||
         (inRows && (cell.x == x - 1 || cell.x == x + size));
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is MiningDepositDefinition &&
+      other.x == x &&
+      other.y == y &&
+      other.size == size &&
+      other.requiredSurveyingLevel == requiredSurveyingLevel;
+
+  @override
+  int get hashCode => Object.hash(x, y, size, requiredSurveyingLevel);
 }
 
 class MiningPlacementResult {
@@ -70,6 +75,32 @@ MiningDepositDefinition? uniqueAdjacentDeposit({
       .where((deposit) => deposit.isOrthogonallyAdjacent(cell))
       .toList(growable: false);
   return adjacent.length == 1 ? adjacent.single : null;
+}
+
+Set<MiningGridCell> miningPerimeterCells({
+  required int gridWidth,
+  required int gridHeight,
+  required List<MiningDepositDefinition> deposits,
+  required MiningDepositDefinition target,
+}) {
+  final candidates = <MiningGridCell>{};
+  for (var i = 0; i < target.size; i++) {
+    candidates
+      ..add(MiningGridCell(target.x + i, target.y - 1))
+      ..add(MiningGridCell(target.x + i, target.y + target.size))
+      ..add(MiningGridCell(target.x - 1, target.y + i))
+      ..add(MiningGridCell(target.x + target.size, target.y + i));
+  }
+  bool inBounds(MiningGridCell cell) =>
+      cell.x >= 0 && cell.x < gridWidth && cell.y >= 0 && cell.y < gridHeight;
+  return candidates
+      .where(
+        (cell) =>
+            inBounds(cell) &&
+            !deposits.any((deposit) => deposit.contains(cell)) &&
+            uniqueAdjacentDeposit(deposits: deposits, cell: cell) == target,
+      )
+      .toSet();
 }
 
 MiningPlacementResult evaluateMiningPlacement({
@@ -129,16 +160,6 @@ MiningPlacementResult evaluateMiningPlacement({
   if (surveyingLevel < target.requiredSurveyingLevel) {
     return MiningPlacementResult.rejected(
       MiningPlacementRejection.surveyingLocked,
-      target: target,
-    );
-  }
-  final miners = occupied.where((cell) {
-    return uniqueAdjacentDeposit(deposits: deposits, cell: cell)?.id ==
-        target.id;
-  }).length;
-  if (miners >= target.maxMiners) {
-    return MiningPlacementResult.rejected(
-      MiningPlacementRejection.depositAtCapacity,
       target: target,
     );
   }
