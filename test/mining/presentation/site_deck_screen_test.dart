@@ -2,15 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mining_content.dart';
-import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/site_deck_screen.dart';
 import 'package:horologium/mining/site_deck_view.dart';
 
+import '../../support/mining_grid_fixtures.dart';
+
 final _start = DateTime.utc(2026, 8, 26, 12);
 final _content = MiningContentRegistry.stellarMining();
+final _landingCells = deployableMiningCells(
+  _content.site(MiningSiteId.landingBasin),
+);
+final _graniteCell = deployableMiningCells(
+  _content.site(MiningSiteId.graniteCrater),
+).first;
 
 MiningSave _stateWith({int? cash, Map<MiningSiteId, SiteProgress>? sites}) {
   final initial = MiningSave.initial(nowUtc: _start);
@@ -85,14 +92,8 @@ void main() {
           unlocked: true,
           commissioned: true,
           rigs: [
-            const MiningRigPlacement(
-              tier: RigTier.t1,
-              cell: MiningGridCell(3, 2),
-            ),
-            const MiningRigPlacement(
-              tier: RigTier.t3,
-              cell: MiningGridCell(16, 2),
-            ),
+            MiningRigPlacement(tier: RigTier.t1, cell: _landingCells[0]),
+            MiningRigPlacement(tier: RigTier.t3, cell: _landingCells[1]),
           ],
         ),
       },
@@ -203,10 +204,7 @@ void main() {
                   unlocked: true,
                   commissioned: true,
                   rigs: [
-                    MiningRigPlacement(
-                      tier: RigTier.t1,
-                      cell: const MiningGridCell(3, 2),
-                    ),
+                    MiningRigPlacement(tier: RigTier.t1, cell: _graniteCell),
                   ],
                 ),
               },
@@ -252,12 +250,7 @@ void main() {
         MiningSiteId.landingBasin: _progress(
           unlocked: true,
           commissioned: true,
-          rigs: [
-            MiningRigPlacement(
-              tier: RigTier.t2,
-              cell: const MiningGridCell(3, 2),
-            ),
-          ],
+          rigs: [MiningRigPlacement(tier: RigTier.t2, cell: _landingCells[0])],
         ),
       },
     );
@@ -419,12 +412,7 @@ void main() {
         MiningSiteId.landingBasin: _progress(
           unlocked: true,
           commissioned: true,
-          rigs: [
-            MiningRigPlacement(
-              tier: RigTier.t1,
-              cell: const MiningGridCell(3, 2),
-            ),
-          ],
+          rigs: [MiningRigPlacement(tier: RigTier.t1, cell: _landingCells[0])],
         ),
         MiningSiteId.carbonRidge: _progress(unlocked: true, commissioned: true),
       },
@@ -592,12 +580,7 @@ void main() {
         MiningSiteId.landingBasin: _progress(
           unlocked: true,
           commissioned: true,
-          rigs: [
-            MiningRigPlacement(
-              tier: RigTier.t1,
-              cell: const MiningGridCell(3, 2),
-            ),
-          ],
+          rigs: [MiningRigPlacement(tier: RigTier.t1, cell: _landingCells[0])],
         ),
       },
     );

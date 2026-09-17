@@ -5,6 +5,8 @@ import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_state.dart';
 
+import '../support/mining_grid_fixtures.dart';
+
 List<MiningRigPlacement> placements(List<(MiningGridCell, RigTier)> rigs) => [
   for (final (cell, tier) in rigs) MiningRigPlacement(tier: tier, cell: cell),
 ];
@@ -41,21 +43,24 @@ MiningSave stateWithLandingRigs({
   );
 }
 
+final _content = MiningContentRegistry.stellarMining();
+
+/// First row-major legal deploy cell for [id] at its first playable
+/// Surveying level.
+MiningGridCell _firstCell(MiningSiteId id) {
+  final site = _content.site(id);
+  return deployableMiningCells(
+    site,
+    surveyingLevel: site.deposits.first.requiredSurveyingLevel,
+  ).first;
+}
+
 MiningSave threePlanetState(
   DateTime now, {
   TechnologyLevels technology = const TechnologyLevels(),
   double homeworldStored = 0,
   double lunarStored = 0,
   double marsStored = 0,
-  List<MiningRigPlacement> homeworldRigs = const [
-    MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
-  ],
-  List<MiningRigPlacement> lunarRigs = const [
-    MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(4, 2)),
-  ],
-  List<MiningRigPlacement> marsRigs = const [
-    MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(2, 3)),
-  ],
   MiningPlanetId activePlanet = MiningPlanetId.marsFrontier,
 }) {
   final base = MiningSave.initial(nowUtc: now);
@@ -71,15 +76,30 @@ MiningSave threePlanetState(
       ...base.sites,
       MiningSiteId.landingBasin: progress(
         storedAmount: homeworldStored,
-        rigs: homeworldRigs,
+        rigs: [
+          MiningRigPlacement(
+            tier: RigTier.t1,
+            cell: _firstCell(MiningSiteId.landingBasin),
+          ),
+        ],
       ),
       MiningSiteId.frozenBasin: progress(
         storedAmount: lunarStored,
-        rigs: lunarRigs,
+        rigs: [
+          MiningRigPlacement(
+            tier: RigTier.t1,
+            cell: _firstCell(MiningSiteId.frozenBasin),
+          ),
+        ],
       ),
       MiningSiteId.ochreBasin: progress(
         storedAmount: marsStored,
-        rigs: marsRigs,
+        rigs: [
+          MiningRigPlacement(
+            tier: RigTier.t1,
+            cell: _firstCell(MiningSiteId.ochreBasin),
+          ),
+        ],
       ),
     },
   );
@@ -89,11 +109,15 @@ void main() {
   final content = MiningContentRegistry.stellarMining();
   final simulation = MiningSimulation(content);
   final start = DateTime.utc(2026, 8, 26, 12);
+  final landingCells = deployableMiningCells(
+    content.site(MiningSiteId.landingBasin),
+  );
+  final carbonRidgeCell = _firstCell(MiningSiteId.carbonRidge);
 
   test('one T1 keeps Landing Basin roughly 180 seconds to full', () {
     final state = stateWithLandingRigs(
       now: start,
-      rigs: placements(const [(MiningGridCell(3, 2), RigTier.t1)]),
+      rigs: placements([(landingCells[0], RigTier.t1)]),
     );
     final result = simulation.accrue(
       state,
@@ -107,11 +131,8 @@ void main() {
   test('four max rigs preserve the old max-tier fill curve', () {
     final state = stateWithLandingRigs(
       now: start,
-      rigs: placements(const [
-        (MiningGridCell(3, 2), RigTier.t5),
-        (MiningGridCell(16, 2), RigTier.t5),
-        (MiningGridCell(5, 10), RigTier.t5),
-        (MiningGridCell(16, 9), RigTier.t5),
+      rigs: placements([
+        for (final cell in landingCells.take(4)) (cell, RigTier.t5),
       ]),
       extraction: 5,
       logistics: 5,
@@ -128,9 +149,9 @@ void main() {
   test('mixed rig tiers sum rate and capacity shares', () {
     final state = stateWithLandingRigs(
       now: start,
-      rigs: placements(const [
-        (MiningGridCell(3, 2), RigTier.t1),
-        (MiningGridCell(16, 2), RigTier.t2),
+      rigs: placements([
+        (landingCells[0], RigTier.t1),
+        (landingCells[1], RigTier.t2),
       ]),
     );
     final result = simulation.accrue(
@@ -195,7 +216,7 @@ void main() {
   test('locked and empty sites do not accrue', () {
     final base = stateWithLandingRigs(
       now: start,
-      rigs: placements(const [(MiningGridCell(3, 2), RigTier.t1)]),
+      rigs: placements([(landingCells[0], RigTier.t1)]),
     );
     final state = base.copyWith(
       sites: {
@@ -203,7 +224,7 @@ void main() {
         MiningSiteId.carbonRidge: progress(
           unlocked: false,
           storedAmount: 4,
-          rigs: placements(const [(MiningGridCell(5, 1), RigTier.t5)]),
+          rigs: placements([(carbonRidgeCell, RigTier.t5)]),
         ),
         MiningSiteId.graniteCrater: progress(storedAmount: 8),
       },
@@ -223,7 +244,7 @@ void main() {
   test('zero elapsed returns the same state and empty summary', () {
     final state = stateWithLandingRigs(
       now: start,
-      rigs: placements(const [(MiningGridCell(3, 2), RigTier.t1)]),
+      rigs: placements([(landingCells[0], RigTier.t1)]),
       storedAmount: 10,
     );
     final result = simulation.accrue(state, start);
@@ -239,7 +260,7 @@ void main() {
   test('negative elapsed does not move time backward or accrue', () {
     final state = stateWithLandingRigs(
       now: start,
-      rigs: placements(const [(MiningGridCell(3, 2), RigTier.t1)]),
+      rigs: placements([(landingCells[0], RigTier.t1)]),
       storedAmount: 10,
     );
     final result = simulation.accrue(
@@ -256,7 +277,7 @@ void main() {
     final result = simulation.accrue(
       stateWithLandingRigs(
         now: start,
-        rigs: placements(const [(MiningGridCell(3, 2), RigTier.t1)]),
+        rigs: placements([(landingCells[0], RigTier.t1)]),
         storedAmount: 90,
       ),
       start.add(const Duration(seconds: 10)),
@@ -271,7 +292,7 @@ void main() {
     final result = simulation.accrue(
       stateWithLandingRigs(
         now: start,
-        rigs: placements(const [(MiningGridCell(3, 2), RigTier.t1)]),
+        rigs: placements([(landingCells[0], RigTier.t1)]),
         logistics: 2,
       ),
       start.add(const Duration(hours: 13)),
@@ -294,9 +315,9 @@ void main() {
   test('identical inputs and clock produce identical immutable results', () {
     final state = stateWithLandingRigs(
       now: start,
-      rigs: placements(const [
-        (MiningGridCell(3, 2), RigTier.t1),
-        (MiningGridCell(16, 2), RigTier.t3),
+      rigs: placements([
+        (landingCells[0], RigTier.t1),
+        (landingCells[1], RigTier.t3),
       ]),
       storedAmount: 10,
     );
