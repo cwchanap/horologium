@@ -10,6 +10,19 @@ import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+final _content = MiningContentRegistry.stellarMining();
+final _landingSite = _content.site(MiningSiteId.landingBasin);
+
+/// Cached perimeter cells of the first Landing Basin progression resource
+/// (Surveying 0). Multi-robot: several rigs may share one resource.
+final _firstResourceCells = _landingSite
+    .perimeterCellsByDeposit[_landingSite.deposits.first]!
+    .toList();
+
+/// A cell adjacent to the third progression resource (Surveying 1).
+final _lockedCell =
+    _landingSite.perimeterCellsByDeposit[_landingSite.deposits[2]]!.first;
+
 class TestClock {
   TestClock(this.now);
   DateTime now;
@@ -76,31 +89,26 @@ Map<DockBayId, RigTier?> dock({
   RigTier? b4,
 }) => {DockBayId.b1: b1, DockBayId.b2: b2, DockBayId.b3: b3, DockBayId.b4: b4};
 
-const n1Cell = MiningGridCell(3, 2);
-const n2Cell = MiningGridCell(16, 2);
-const n3Cell = MiningGridCell(5, 10);
-const n4Cell = MiningGridCell(16, 9);
-// First-deposit deploy cells for sites outside Homeworld, each adjacent to
-// that site's d1 under its authored Surveying gate.
-const frozenCell = MiningGridCell(4, 2);
-const carbonCell = MiningGridCell(5, 1);
-const graniteCell = MiningGridCell(2, 4);
-const cobaltCell = MiningGridCell(3, 1);
+final n1Cell = _firstResourceCells[0];
+final n2Cell = _firstResourceCells[1];
+// First-deposit deploy cells for sites outside Homeworld, derived from each
+// site's cached first-resource perimeter.
+MiningGridCell firstPerimeterCell(MiningSiteId id) => _content
+    .site(id)
+    .perimeterCellsByDeposit[_content.site(id).deposits.first]!
+    .first;
+final frozenCell = firstPerimeterCell(MiningSiteId.frozenBasin);
+final carbonCell = firstPerimeterCell(MiningSiteId.carbonRidge);
+final graniteCell = firstPerimeterCell(MiningSiteId.graniteCrater);
+final cobaltCell = firstPerimeterCell(MiningSiteId.cobaltChasm);
 
 List<MiningRigPlacement> siteRig(MiningGridCell cell, RigTier tier) => [
   MiningRigPlacement(tier: tier, cell: cell),
 ];
 
-List<MiningRigPlacement> placements({
-  RigTier? n1,
-  RigTier? n2,
-  RigTier? n3,
-  RigTier? n4,
-}) => [
+List<MiningRigPlacement> placements({RigTier? n1, RigTier? n2}) => [
   if (n1 != null) MiningRigPlacement(tier: n1, cell: n1Cell),
   if (n2 != null) MiningRigPlacement(tier: n2, cell: n2Cell),
-  if (n3 != null) MiningRigPlacement(tier: n3, cell: n3Cell),
-  if (n4 != null) MiningRigPlacement(tier: n4, cell: n4Cell),
 ];
 
 SiteProgress site({
@@ -566,10 +574,61 @@ void main() {
         final landing = controller.state.sites[MiningSiteId.landingBasin]!;
         expect(landing.commissioned, isTrue);
         expect(landing.rigPlacements, [
-          const MiningRigPlacement(tier: RigTier.t1, cell: n1Cell),
+          MiningRigPlacement(tier: RigTier.t1, cell: n1Cell),
         ]);
       },
     );
+
+    test('two dock rigs deploy onto one resource and persist', () async {
+      final landingDefinition = _content.site(MiningSiteId.landingBasin);
+      final target = landingDefinition.deposits.first;
+      final cells = landingDefinition.perimeterCellsByDeposit[target]!.toList();
+      expect(cells.length, greaterThanOrEqualTo(2));
+
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          docks: docksFor(
+            homeworld: dock(b1: RigTier.t1, b2: RigTier.t1),
+          ),
+          sites: sitesFor(landing: site(unlocked: true)),
+        ),
+      );
+
+      final first = await controller.deployRig(
+        DockBayId.b1,
+        MiningSiteId.landingBasin,
+        cells[0],
+      );
+      final second = await controller.deployRig(
+        DockBayId.b2,
+        MiningSiteId.landingBasin,
+        cells[1],
+      );
+
+      expect(first.isSuccess, isTrue);
+      expect(second.isSuccess, isTrue);
+      final expectedPlacements = [
+        MiningRigPlacement(tier: RigTier.t1, cell: cells[0]),
+        MiningRigPlacement(tier: RigTier.t1, cell: cells[1]),
+      ];
+      expect(
+        controller.state.sites[MiningSiteId.landingBasin]!.rigPlacements,
+        expectedPlacements,
+      );
+
+      final reloaded = MiningController(
+        content: _content,
+        repository: MiningSaveRepository(),
+        nowUtc: clock.call,
+      );
+      await reloaded.initialize();
+      expect(
+        reloaded.state.sites[MiningSiteId.landingBasin]!.rigPlacements,
+        expectedPlacements,
+      );
+    });
 
     test(
       'deploy rejects inactive sites, occupied nodes, and unavailable nodes',
@@ -617,9 +676,9 @@ void main() {
         );
         expect(
           (await controller.deployRig(
-            DockBayId.b1,
+            DockBayId.b2,
             MiningSiteId.landingBasin,
-            n3Cell,
+            _lockedCell,
           )).message,
           'Requires Surveying 1.',
         );

@@ -232,7 +232,12 @@ class _LandingBasinGridVisualLayerState
         children: [
           for (final deposit in widget.view.deposits)
             Positioned(
-              key: Key('landing-basin-deposit-${deposit.definition.id.name}'),
+              key: Key(
+                'landing-basin-deposit-'
+                '${deposit.definition.x}-'
+                '${deposit.definition.y}-'
+                '${deposit.definition.size}',
+              ),
               left: deposit.definition.x * cell,
               top: deposit.definition.y * cell,
               width: deposit.definition.size * cell,
