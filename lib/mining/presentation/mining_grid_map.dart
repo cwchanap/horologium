@@ -4,7 +4,6 @@ import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/presentation/landing_basin_grid_visual_layer.dart';
-import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 const double miningGridCellSize = 56;
@@ -18,6 +17,11 @@ double depositVisualSize(int footprint) => switch (footprint) {
   3 => 168,
   _ => throw ArgumentError.value(footprint),
 };
+
+/// Stable overlay/visual key derived from the deposit's authored geometry:
+/// dense-field resources key by footprint, not by list position.
+String _depositKey(MiningDepositDefinition definition) =>
+    '${definition.x}-${definition.y}-${definition.size}';
 
 class MiningGridMap extends StatelessWidget {
   const MiningGridMap({
@@ -78,7 +82,9 @@ class MiningGridMap extends StatelessWidget {
               Positioned.fill(
                 child: Image.asset(
                   view.definition.cavernAsset,
-                  fit: BoxFit.cover,
+                  fit: BoxFit.none,
+                  alignment: Alignment.topLeft,
+                  repeat: ImageRepeat.repeat,
                   errorBuilder: (context, error, stackTrace) =>
                       const DecoratedBox(
                         decoration: BoxDecoration(
@@ -110,45 +116,20 @@ class MiningGridMap extends StatelessWidget {
                   ),
                 ),
               ),
-              // Object overlays: exactly one semantics/lock overlay per
-              // authored deposit and at most one per deployed rig. These are
-              // not tile widgets; empty cells render nothing.
+              // Object overlays: exactly one semantics overlay per authored
+              // deposit and at most one per deployed rig. These are not tile
+              // widgets; empty cells render nothing.
               for (final deposit in view.deposits)
                 Positioned(
-                  key: Key(
-                    'mining-deposit-'
-                    '${deposit.definition.x}-'
-                    '${deposit.definition.y}-'
-                    '${deposit.definition.size}',
-                  ),
+                  key: Key('mining-deposit-${_depositKey(deposit.definition)}'),
                   left: deposit.definition.x * miningGridCellSize,
                   top: deposit.definition.y * miningGridCellSize,
                   width: deposit.definition.size * miningGridCellSize,
                   height: deposit.definition.size * miningGridCellSize,
                   child: IgnorePointer(
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: Semantics(
-                            label: _depositLabel(deposit),
-                            child: const SizedBox.expand(),
-                          ),
-                        ),
-                        if (!deposit.isSurveyed)
-                          Align(
-                            alignment: Alignment.topCenter,
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: _DepositLockBadge(
-                                  requiredSurveyingLevel:
-                                      deposit.definition.requiredSurveyingLevel,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
+                    child: Semantics(
+                      label: _depositLabel(deposit),
+                      child: const SizedBox.expand(),
                     ),
                   ),
                 ),
@@ -184,9 +165,10 @@ class MiningGridMap extends StatelessWidget {
     final locked = deposit.isSurveyed
         ? ''
         : ' Requires Surveying ${definition.requiredSurveyingLevel}.';
-    return '$resource deposit (${definition.x},${definition.y}): '
-        '${definition.size}x${definition.size}, '
-        '${deposit.minerCount} of ${deposit.slotCount} miners.$locked';
+    final freeSlots = deposit.slotCount - deposit.minerCount;
+    return '$resource resource ${definition.size}x${definition.size}, '
+        '${deposit.minerCount} miners, '
+        '$freeSlots of ${deposit.slotCount} perimeter slots free.$locked';
   }
 
   String _rigLabel(MineSiteRigView rig) {
@@ -196,36 +178,6 @@ class MiningGridMap extends StatelessWidget {
         'deposit (${rig.target.x},${rig.target.y}).'
         '${reason == null ? '' : ' $reason'}';
   }
-}
-
-class _DepositLockBadge extends StatelessWidget {
-  const _DepositLockBadge({required this.requiredSurveyingLevel});
-
-  final int requiredSurveyingLevel;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-    decoration: const BoxDecoration(
-      color: Color.fromRGBO(6, 10, 16, .72),
-      borderRadius: BorderRadius.all(Radius.circular(9)),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.biotech_rounded, size: 12, color: MiningTheme.accent),
-        const SizedBox(width: 4),
-        Text(
-          'Surveying $requiredSurveyingLevel',
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 class _StaticMiningGridVisualLayer extends StatelessWidget {

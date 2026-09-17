@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/mine_site_view.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/presentation/mining_grid_map.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
@@ -33,6 +34,10 @@ class LandingBasinGridVisualLayer extends StatefulWidget {
 class _LandingBasinGridVisualLayerState
     extends State<LandingBasinGridVisualLayer>
     with TickerProviderStateMixin {
+  /// Stable deposit key derived from authored geometry, matching the grid
+  /// map's `x-y-size` contract for dense-field resources.
+  String _depositKey(MiningDepositDefinition definition) =>
+      '${definition.x}-${definition.y}-${definition.size}';
   late final AnimationController _impactController = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 1),
@@ -220,44 +225,55 @@ class _LandingBasinGridVisualLayerState
     _syncIdleController();
   }
 
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: Listenable.merge([_impactController, _idleController]),
-    builder: (context, child) {
-      final t = _impactController.value.clamp(0.0, 1.0).toDouble();
-      final cell = widget.cellSize;
+  /// One positioned deposit body. Unmined deposits render the current stage
+  /// plate dimmed; mined deposits render the animated frame for tick [t].
+  Positioned _depositNode(MineSiteDepositView deposit, double cell, double t) =>
+      Positioned(
+        key: Key('landing-basin-deposit-${_depositKey(deposit.definition)}'),
+        left: deposit.definition.x * cell,
+        top: deposit.definition.y * cell,
+        width: deposit.definition.size * cell,
+        height: deposit.definition.size * cell,
+        child: OverflowBox(
+          maxWidth: depositVisualSize(deposit.definition.size),
+          maxHeight: depositVisualSize(deposit.definition.size),
+          alignment: Alignment.center,
+          child: Image.asset(
+            _depositAsset(deposit, t),
+            width: depositVisualSize(deposit.definition.size),
+            height: depositVisualSize(deposit.definition.size),
+            fit: BoxFit.contain,
+            gaplessPlayback: true,
+            opacity: deposit.minerCount > 0
+                ? null
+                : const AlwaysStoppedAnimation(.62),
+          ),
+        ),
+      );
 
-      return Stack(
+  @override
+  Widget build(BuildContext context) {
+    final cell = widget.cellSize;
+    // Unmined resources never depend on the animation tick: they live in
+    // AnimatedBuilder.child so a per-frame rebuild recomposes only the at
+    // most four mined resources and the rigs. Parent rebuilds caused by
+    // gameplay state naturally reconstruct static vs animated membership.
+    final staticResources = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        for (final deposit in widget.view.deposits)
+          if (deposit.minerCount == 0) _depositNode(deposit, cell, 1),
+      ],
+    );
+    return AnimatedBuilder(
+      animation: Listenable.merge([_impactController, _idleController]),
+      child: staticResources,
+      builder: (context, staticLayer) => Stack(
         clipBehavior: Clip.none,
         children: [
+          if (staticLayer != null) staticLayer,
           for (final deposit in widget.view.deposits)
-            Positioned(
-              key: Key(
-                'landing-basin-deposit-'
-                '${deposit.definition.x}-'
-                '${deposit.definition.y}-'
-                '${deposit.definition.size}',
-              ),
-              left: deposit.definition.x * cell,
-              top: deposit.definition.y * cell,
-              width: deposit.definition.size * cell,
-              height: deposit.definition.size * cell,
-              child: OverflowBox(
-                maxWidth: depositVisualSize(deposit.definition.size),
-                maxHeight: depositVisualSize(deposit.definition.size),
-                alignment: Alignment.center,
-                child: Image.asset(
-                  _depositAsset(deposit, t),
-                  width: depositVisualSize(deposit.definition.size),
-                  height: depositVisualSize(deposit.definition.size),
-                  fit: BoxFit.contain,
-                  gaplessPlayback: true,
-                  opacity: deposit.minerCount > 0
-                      ? null
-                      : const AlwaysStoppedAnimation(.62),
-                ),
-              ),
-            ),
+            if (deposit.minerCount > 0) _depositNode(deposit, cell, _t),
           for (final rig in widget.view.rigs)
             Positioned(
               left: rig.placement.cell.x * cell,
@@ -268,13 +284,15 @@ class _LandingBasinGridVisualLayerState
                 maxWidth: cell + 12,
                 maxHeight: cell + 12,
                 alignment: Alignment.center,
-                child: _rigRobot(rig, t, cell),
+                child: _rigRobot(rig, _t, cell),
               ),
             ),
         ],
-      );
-    },
-  );
+      ),
+    );
+  }
+
+  double get _t => _impactController.value.clamp(0.0, 1.0).toDouble();
 
   /// The robot mirrors horizontally only when its deposit sits to its right,
   /// so the articulated arm always strikes toward the resource. The chassis is

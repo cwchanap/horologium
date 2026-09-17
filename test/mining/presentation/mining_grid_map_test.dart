@@ -74,13 +74,15 @@ void main() {
         find.byKey(const Key('static-mining-grid-visual-layer')),
         findsNothing,
       );
-      expect(find.byKey(const Key('mining-deposit-d1')), findsOneWidget);
+      expect(find.byKey(const Key('mining-deposit-1-1-2')), findsOneWidget);
 
       final viewport = tester.getRect(
         find.byKey(const Key('mining-grid-interactive')),
       );
-      final d1 = tester.getRect(find.byKey(const Key('mining-deposit-d1')));
-      expect(viewport.overlaps(d1), isTrue);
+      final deposit = tester.getRect(
+        find.byKey(const Key('mining-deposit-1-1-2')),
+      );
+      expect(viewport.overlaps(deposit), isTrue);
 
       await tester.drag(
         find.byKey(const Key('mining-grid-interactive')),
@@ -89,13 +91,32 @@ void main() {
       await tester.pumpAndSettle();
       expect(taps, isEmpty);
 
-      final d2 = tester.getRect(find.byKey(const Key('mining-deposit-d2')));
-      await tester.tapAt(Offset(d2.center.dx, d2.top - 28));
+      final far = tester.getRect(
+        find.byKey(const Key('mining-deposit-16-1-3')),
+      );
+      await tester.tapAt(Offset(far.center.dx, far.top - 28));
       await tester.pump();
-      expect(taps.single, const MiningGridCell(16, 2));
+      expect(taps.single, const MiningGridCell(17, 0));
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('renders exactly 100 resource images on a static site', (
+    tester,
+  ) async {
+    final view = _view(MiningSiteId.carbonRidge);
+    await _pumpMap(tester, view, (_) {});
+
+    expect(view.deposits.length, 100);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('static-mining-grid-visual-layer')),
+        matching: find.byType(Image),
+      ),
+      findsNWidgets(100),
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('hosts the static object layer for non-Landing sites', (
     tester,
@@ -111,8 +132,46 @@ void main() {
       find.byKey(const Key('landing-basin-grid-visual-layer')),
       findsNothing,
     );
-    expect(find.byKey(const Key('mining-deposit-d1')), findsOneWidget);
+    expect(find.byKey(const Key('mining-deposit-1-1-2')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('keys resource overlays by x-y-size geometry', (tester) async {
+    await _pumpMap(tester, _view(MiningSiteId.landingBasin), (_) {});
+
+    // Authored dense-field deposits: (1,1) size 2 and (16,1) size 3.
+    expect(find.byKey(const Key('mining-deposit-1-1-2')), findsOneWidget);
+    expect(find.byKey(const Key('mining-deposit-16-1-3')), findsOneWidget);
+    expect(find.byKey(const Key('mining-deposit-d1')), findsNothing);
+  });
+
+  testWidgets('tiles the cavern background instead of stretching it', (
+    tester,
+  ) async {
+    final view = _view(MiningSiteId.carbonRidge);
+    await _pumpMap(tester, view, (_) {});
+
+    final background = tester.widget<Image>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName ==
+                view.definition.cavernAsset,
+      ),
+    );
+    expect(background.fit, BoxFit.none);
+    expect(background.alignment, Alignment.topLeft);
+    expect(background.repeat, ImageRepeat.repeat);
+  });
+
+  testWidgets('does not repeat a floating lock badge across the field', (
+    tester,
+  ) async {
+    await _pumpMap(tester, _view(MiningSiteId.landingBasin), (_) {});
+
+    expect(find.text('Surveying 1'), findsNothing);
+    expect(find.text('Surveying 2'), findsNothing);
   });
 
   testWidgets('tap outside any interaction still resolves a grid cell', (
@@ -144,23 +203,56 @@ void main() {
     // this both asserts the action survives the overlay IgnorePointer and
     // proves it forwards the rig's saved cell through onCellTap.
     tester.semantics.performAction(
-      find.semantics.byLabel(RegExp(r'T1 rig at \(3,2\) mining D1')),
+      find.semantics.byLabel(
+        RegExp(r'T1 rig at \(3,2\) mining deposit \(1,1\)'),
+      ),
       SemanticsAction.tap,
     );
     expect(taps.single, const MiningGridCell(3, 2));
     handle.dispose();
   });
 
-  testWidgets('labels deposits with resource and surveying identity', (
+  testWidgets('labels deposits with footprint, miners, and free slots', (
     tester,
   ) async {
     final handle = tester.ensureSemantics();
-    await _pumpMap(tester, _view(MiningSiteId.landingBasin), (_) {});
+    await _pumpMap(
+      tester,
+      _view(
+        MiningSiteId.landingBasin,
+        rigs: const [
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(2, 3)),
+        ],
+      ),
+      (_) {},
+    );
 
-    expect(find.bySemanticsLabel(RegExp('Gold deposit D1:')), findsOneWidget);
+    // The rig at (2,3) mines the 2x2 resource at (1,1): one miner, seven of
+    // eight perimeter slots free.
     expect(
-      find.bySemanticsLabel(RegExp(r'deposit D3.*Requires Surveying 1')),
+      find.bySemanticsLabel(
+        RegExp(r'Gold resource 2x2, 1 miners, 7 of 8 perimeter slots free\.'),
+      ),
       findsOneWidget,
+    );
+    // Locked resources keep their Surveying requirement in semantics.
+    expect(
+      find.bySemanticsLabel(
+        RegExp(
+          r'Gold resource \d+x\d+, 0 miners, \d+ of \d+ perimeter slots '
+          r'free\. Requires Surveying 1\.',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(
+        RegExp(
+          r'Gold resource \d+x\d+, 0 miners, \d+ of \d+ perimeter slots '
+          r'free\. Requires Surveying 2\.',
+        ),
+      ),
+      findsWidgets,
     );
     handle.dispose();
   });
