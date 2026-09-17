@@ -6,32 +6,50 @@ Implement [HPA-454](https://linear.app/cwchanap/issue/HPA-454/mining-polish-add-
 
 - make every Mine Site read as a dense field with roughly 100 resources;
 - support 1×1, 2×2, and 3×3 resource footprints;
-- allow multiple robots to mine one resource whenever different valid perimeter cells are free;
+- make multi-robot mining visible as soon as a site is playable;
 - remove authored `maxMiners` as a second capacity rule;
-- preserve the existing four-rig site cap, Surveying progression, deterministic/offline economy, and current save ownership boundaries.
+- preserve the four-rig site cap, existing Surveying requirements, deterministic/offline economy formulas, and current save ownership boundaries.
 
 This is a content/placement cutover, not a new resource simulation. Resources remain effectively infinite and `MiningSimulation` remains authoritative for production.
 
+## Review resolution
+
+The first draft over-constrained HPA-454 by reproducing the old `maxMiners`-driven effective-slot table exactly. Doing that required blocker resources whose only purpose was to recreate the capacity concept being deleted, and it delayed same-resource multi-robot placement until max Surveying on most later sites.
+
+The revised design removes that constraint:
+
+- keep the existing four per-site Surveying levels as content;
+- place those four progression resources in the same dense lattice as every other resource;
+- let their normal geometry expose multiple perimeter cells;
+- re-baseline placement availability to the new geometry instead of emulating the old one-slot anchors;
+- keep the global four-rig cap and every production/capacity formula unchanged.
+
+This intentionally changes **when four placement slots become available**, not how deployed rigs produce. The ticket is gameplay polish; making its headline interaction usable at the site's first playable Surveying level is more valuable than preserving an untuned pre-1.0 slot curve.
+
+The review also exposed three avoidable hot paths in the first draft. The revised design therefore:
+
+- caches the generated `MiningContentRegistry` instead of rebuilding ~900 resources per call;
+- precomputes static resource perimeter cells once with the site definition;
+- buckets the at-most-four rig targets once per `MineSiteView` build;
+- derives deployable highlights from the surveyed perimeter candidate set instead of scanning all 2,500 grid cells;
+- keeps static Landing Basin resources outside the animation-frame builder.
+
 ## Current baseline
 
-The design is based on `main` at `de23a3693497fc9d1ef6f24211b5f580957bd4ab`.
-
-Today:
+The design is based on the HPA-454 draft PR's `main` baseline. Today:
 
 - every `MiningSiteDefinition` owns a 24×18 grid with four authored `MiningDepositDefinition`s;
 - every deposit carries `MiningDepositId`, `size`, `maxMiners`, and `requiredSurveyingLevel`;
 - `evaluateMiningPlacement(...)` is the shared legality predicate used by controller deployment, save decoding, and Mine Site highlights;
 - rig persistence stores only tier plus grid cell, and the target deposit is reconstructed from geometry;
-- the site economy already uses only deployed rig tiers, not deposit identity;
-- Landing Basin owns a presentation-only animated layer on top of the same grid contract.
+- the site economy uses deployed rig tiers, not deposit identity;
+- Landing Basin owns a presentation-only animated layer over the same grid contract.
 
-Those seams are already the right ownership model. HPA-454 should replace the four-deposit content contract without creating another placement, persistence, or economy subsystem.
+Those ownership seams remain correct. HPA-454 replaces content and derived geometry without adding another state owner, simulation, slot subsystem, or save model.
 
-## Decision
+## Resource identity and placement model
 
-Use one small deterministic resource-field generator inside the existing mining content module. Keep the current `MiningDepositDefinition` type name to avoid unrelated rename churn, but remove persistent/authored identity and capacity from it.
-
-The new definition is geometry plus Surveying only:
+Keep the current `MiningDepositDefinition` name to avoid unrelated rename churn, but reduce it to geometry + Surveying:
 
 ```dart
 class MiningDepositDefinition {
@@ -46,117 +64,157 @@ class MiningDepositDefinition {
   final int y;
   final int size;
   final int requiredSurveyingLevel;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MiningDepositDefinition &&
+      other.x == x &&
+      other.y == y &&
+      other.size == size &&
+      other.requiredSurveyingLevel == requiredSurveyingLevel;
+
+  @override
+  int get hashCode => Object.hash(x, y, size, requiredSurveyingLevel);
 }
 ```
 
-Do not replace `MiningDepositId` with another stored/string/UUID identity. When presentation needs a widget key, derive it from deterministic geometry (`x`, `y`, and `size`). HPA-455 may use the same transient geometry identity for local HP state later; it must not become save data.
+Delete:
+
+- `MiningDepositId`;
+- `MiningDepositDefinition.maxMiners`;
+- `MiningPlacementRejection.depositAtCapacity`.
+
+Do not replace them with another ID, slot entity, reservation table, UUID, string key, or persisted target.
+
+When widgets or transient presentation state need identity, use deterministic geometry (`x`, `y`, `size`, `requiredSurveyingLevel`). HPA-455 may use the same transient geometry key for local HP state later; it must not become save data.
 
 ## Field layout
 
-### Fixed dimensions
+### Fixed dimensions and count
 
-Every site moves to a **50×50 logical grid**.
+Every site moves to a **50×50 logical grid** containing exactly **100 resources**.
 
-Keep the existing `miningGridCellSize = 56` and `InteractiveViewer`. The field remains pan/zoom content rather than trying to fit all 50×50 cells on screen.
+Use one 10×10 lattice of 5×5 tiles. Every tile owns exactly one resource. This is simpler than the first draft's separate 12-resource anchor strip + 90-resource filler path, remains inside HPA-454's accepted 80–120 range, and keeps geometry/performance predictable.
 
-### Resource count
+Keep `miningGridCellSize = 56` and the current `InteractiveViewer`; the field remains pannable/zoomable rather than fitting 50×50 cells on screen.
 
-Each site contains exactly **102 resources**:
+### Existing Surveying content
 
-- 12 resources in four Surveying progression anchor groups;
-- 90 deterministic filler resources in a 10×9 lattice.
+Keep the existing four Surveying levels for each site:
 
-102 is intentionally fixed rather than random. It is inside HPA-454's accepted 80–120 range, is close to the desired ~100, and makes performance and tests predictable.
+| Site | Progression resource levels |
+| --- | --- |
+| Landing Basin | `0, 0, 1, 2` |
+| Carbon Ridge | `0, 1, 2, 3` |
+| Granite Crater | `0, 1, 2, 3` |
+| Frozen Basin | `3, 3, 4, 5` |
+| Titanium Highlands | `4, 4, 5, 5` |
+| Helium Mare | `5, 5, 5, 5` |
+| Ochre Basin | `5, 5, 5, 5` |
+| Silica Dunes | `5, 5, 5, 5` |
+| Cobalt Chasm | `5, 5, 5, 5` |
 
-### Surveying progression anchors
+The first four row-major lattice resources use those four levels. All remaining resources use the site's maximum level. Surveying still visibly reveals additional resource bodies; it no longer exists to emulate the deleted per-resource miner cap.
 
-The existing four authored deposits also encode the number of simultaneous mining opportunities unlocked by Surveying. Preserve that player-facing pacing without preserving `maxMiners`.
+### One generator path
 
-Use four one-slot anchor groups on the top boundary. Anchor X coordinates are:
-
-```text
-5, 17, 29, 41
-```
-
-For each anchor at `(x, 0)` generate three adjacent 1×1 resources:
-
-```text
-(x - 1, 0)  blocker
-(x,     0)  progression anchor
-(x + 1, 0)  blocker
-```
-
-Because the anchor is on the top boundary and its left/right cells are occupied by resources, its only valid perimeter slot is `(x, 1)`.
-
-The four anchor Surveying levels preserve the current site progression exactly:
-
-| Site | Anchor levels | Existing effective slots by Surveying 0→5 |
-| --- | --- | --- |
-| Landing Basin | `0, 0, 1, 2` | `2, 3, 4, 4, 4, 4` |
-| Carbon Ridge | `0, 1, 2, 3` | `1, 2, 3, 4, 4, 4` |
-| Granite Crater | `0, 1, 2, 3` | `1, 2, 3, 4, 4, 4` |
-| Frozen Basin | `3, 3, 4, 5` | `0, 0, 0, 2, 3, 4` |
-| Titanium Highlands | `4, 4, 5, 5` | `0, 0, 0, 0, 2, 4` |
-| Helium Mare | `5, 5, 5, 5` | `0, 0, 0, 0, 0, 4` |
-| Ochre Basin | `5, 5, 5, 5` | `0, 0, 0, 0, 0, 4` |
-| Silica Dunes | `5, 5, 5, 5` | `0, 0, 0, 0, 0, 4` |
-| Cobalt Chasm | `5, 5, 5, 5` | `0, 0, 0, 0, 0, 4` |
-
-The two blockers in each group use the maximum anchor level for that site. They are therefore unavailable before the site's final current Surveying gate. At that final gate the site already has four anchor slots, so the global four-rig cap keeps the economy envelope unchanged even though many more perimeter cells become legal.
-
-This is deliberately geometry-driven: the anchor contributes one slot because of where resources are placed, not because a `maxMiners = 1` property says so.
-
-### Dense filler field
-
-Below the anchor strip, generate a 10×9 set of 5×5 tiles beginning at logical Y=5. Each tile contains one resource with a one-cell minimum margin from tile edges.
-
-For row-major filler index `i` and `siteId.index`, compute:
+For row-major index `i` (`0..99`) and `siteId.index`:
 
 ```dart
 final value = (siteId.index * 31 + i * 17 + i * i * 7) % 97;
-final size = 1 + value % 3;
-final movableSpan = 4 - size; // 3 for 1×1, 2 for 2×2, 1 for 3×3
+final isProgressionResource = i < 4;
+final size = isProgressionResource ? 2 + i % 2 : 1 + value % 3;
+final requiredSurveyingLevel = isProgressionResource
+    ? progressionLevels[i]
+    : maxSurveyingLevel;
+final movableSpan = 4 - size;
 final offsetX = 1 + (value ~/ 3) % movableSpan;
 final offsetY = 1 + (value ~/ 11) % movableSpan;
+
+final x = column * 5 + offsetX;
+final y = row * 5 + offsetY;
 ```
 
-Then:
+The four progression bodies therefore alternate 2×2 / 3×3 and expose multiple perimeter cells naturally. They use the same lattice placement rule as filler resources; there are no blocker bodies or separate top-edge strip.
+
+The 5×5 envelope keeps at least two logical cells between neighboring maximum-size footprints. That is enough to keep resource footprints non-overlapping and prevent one empty cell from being orthogonally adjacent to two resources.
+
+This formula is intentionally boring and contains no RNG, seed object, generator registry, strategy interface, or procgen framework.
+
+### Re-baselined placement availability
+
+With normal 2×2/3×3 progression resources, a site's first surveyed progression body already exposes more than one perimeter cell. After the global four-rig cap, the effective placement-slot table becomes:
+
+| Site | Effective slots by Surveying 0→5 |
+| --- | --- |
+| Landing Basin | `4, 4, 4, 4, 4, 4` |
+| Carbon Ridge | `4, 4, 4, 4, 4, 4` |
+| Granite Crater | `4, 4, 4, 4, 4, 4` |
+| Frozen Basin | `0, 0, 0, 4, 4, 4` |
+| Titanium Highlands | `0, 0, 0, 0, 4, 4` |
+| Helium Mare | `0, 0, 0, 0, 0, 4` |
+| Ochre Basin | `0, 0, 0, 0, 0, 4` |
+| Silica Dunes | `0, 0, 0, 0, 0, 4` |
+| Cobalt Chasm | `0, 0, 0, 0, 0, 4` |
+
+This is an intentional HPA-454 gameplay change. Tests should pin the table and monotonicity, but must not attempt to reconstruct the old one-slot capacity rule.
+
+For every site, at `site.requiredSurveyingLevel`, at least one surveyed resource must expose two or more valid perimeter cells. This is the direct acceptance condition that keeps multi-robot mining reachable rather than technically present but hidden behind later tech.
+
+## Static geometry cache
+
+A 100-resource field makes repeated geometry scans unnecessary work. Keep the cache as derived immutable content, not runtime state.
+
+`MiningSiteDefinition` stores:
 
 ```dart
-x = column * 5 + offsetX;
-y = 5 + row * 5 + offsetY;
+final List<MiningDepositDefinition> deposits;
+final Map<MiningDepositDefinition, Set<MiningGridCell>> perimeterCellsByDeposit;
 ```
 
-Every filler resource uses the site's maximum anchor Surveying level.
+Build `perimeterCellsByDeposit` once when constructing the site using the same production `miningPerimeterCells(...)` helper. Sets/maps are unmodifiable.
 
-This formula is intentionally boring. It is deterministic across platforms, varies all three resource sizes and placement offsets by site, and does not justify a random-number abstraction, seed object, generator registry, or procgen framework.
+This is not another capacity rule. The cache is only the materialized result of deterministic geometry; controller/save legality still goes through `evaluateMiningPlacement(...)`.
 
-The 5×5 tile envelope guarantees that even two neighboring 3×3 resources retain two empty columns/rows between footprints. That prevents a single empty cell from becoming orthogonally adjacent to two filler resources. The top anchor strip is separated from filler by several rows, so it also cannot create ambiguous adjacency.
+## Cached registry construction
+
+The old registry is effectively free because it is const. The generated field must not turn `MiningContentRegistry.stellarMining()` into repeated construction.
+
+Use one cached instance:
+
+```dart
+static final MiningContentRegistry _stellar = _buildStellarMining();
+
+factory MiningContentRegistry.stellarMining() => _stellar;
+```
+
+`_buildStellarMining()` generates all nine site fields once. Existing call sites such as `MiningSaveRepository`, `MiningShell`, and `TechnologySheet` remain unchanged and cheap.
+
+Tests should explicitly prove the factory returns the identical cached instance. Do not use two factory calls as a generator-determinism test; that would only test the cache. Generator correctness is pinned by exact progression-resource geometry plus exhaustive count/size/bounds/overlap/ambiguity/uniqueness invariants.
 
 ## Placement contract
 
-Keep `evaluateMiningPlacement(...)` as the one legality predicate consumed by:
+Keep `evaluateMiningPlacement(...)` as the sole legality predicate consumed by:
 
 - `MiningController.deployRig(...)`;
 - `MiningSaveRepository` rig-placement decoding;
-- `MineSiteView.placementAt(...)` and deployable-cell highlights.
+- `MineSiteView.placementAt(...)`;
+- deployable-cell highlight filtering.
 
-The evaluation order remains:
+Evaluation remains:
 
-1. reject when the site already has four rigs;
-2. reject outside-grid cells;
-3. reject cells occupied by a resource footprint;
-4. reject cells occupied by another rig;
-5. find the unique orthogonally adjacent resource;
-6. reject no-resource or ambiguous-resource cells;
-7. reject when that resource's Surveying requirement is not met;
-8. otherwise allow placement.
+1. site four-rig capacity;
+2. bounds;
+3. resource footprint;
+4. occupied rig cell;
+5. unique orthogonally adjacent resource;
+6. no/ambiguous adjacency;
+7. Surveying requirement;
+8. allow.
 
-Remove `MiningPlacementRejection.depositAtCapacity` entirely. There is no resource-level count check after Surveying.
+There is no resource miner-count check after Surveying.
 
-A resource's capacity is now exactly the number of its valid perimeter cells. Multiple rigs target the same resource naturally because each rig occupies a different grid cell and `rigOccupied` only rejects the candidate cell itself.
-
-Add one geometry helper for production code and tests:
+Add/keep one geometry helper:
 
 ```dart
 Set<MiningGridCell> miningPerimeterCells({
@@ -167,23 +225,52 @@ Set<MiningGridCell> miningPerimeterCells({
 });
 ```
 
-It returns in-bounds, non-resource cells for which `uniqueAdjacentDeposit(...)` resolves to `target`. Do not create a `MiningSlot`, assignment table, reservation object, or second placement evaluator.
+It returns in-bounds, non-resource cells whose unique adjacent resource equals `target`.
 
-## View model and presentation
+## MineSiteView projection without repeated static work
 
-`MineSiteView` continues deriving rig targets from geometry. For each resource expose:
+`MineSiteView.from(...)` runs during foreground refresh, so it must not recompute static geometry for all 100 resources each time.
 
-- `minerCount`: rigs whose unique adjacent target is this resource;
-- `slotCount`: geometry-derived perimeter slot count;
-- `isSurveyed`.
+### Rig target/miner-count projection
 
-No resource runtime model or controller mutation is added.
+Resolve each of the at-most-four rig placements once:
 
-### Dense rendering
+```dart
+final targetByRigCell = <MiningGridCell, MiningDepositDefinition>{};
+final minerCountByDeposit = <MiningDepositDefinition, int>{};
 
-Keep the current `Stack`/`CustomPaint` architecture:
+for (final placement in progress.rigPlacements) {
+  final target = uniqueAdjacentDeposit(
+    deposits: definition.deposits,
+    cell: placement.cell,
+  );
+  if (target == null) {
+    throw StateError('Saved rig placement without a unique adjacent resource.');
+  }
+  targetByRigCell[placement.cell] = target;
+  minerCountByDeposit[target] = (minerCountByDeposit[target] ?? 0) + 1;
+}
+```
 
-- one background image;
+Then each `MineSiteDepositView` reads:
+
+- `minerCount` from `minerCountByDeposit[deposit] ?? 0`;
+- `slotCount` from `definition.perimeterCellsByDeposit[deposit]!.length`;
+- `isSurveyed` from current Surveying.
+
+Each `MineSiteRigView` reuses `targetByRigCell[placement.cell]!` rather than resolving the target again.
+
+### Deployable highlights
+
+Do not scan every 50×50 grid cell.
+
+Build the candidate set from the cached perimeter sets of surveyed resources, remove obviously occupied cells, then filter candidates through `evaluateMiningPlacement(...)`. The shared evaluator remains authoritative while the view stops asking it about cells that can never be legal.
+
+## Dense rendering
+
+Keep the existing `Stack`/`CustomPaint` architecture:
+
+- one repeated cavern background;
 - one image per resource;
 - one image per rig;
 - one semantics region per resource;
@@ -198,93 +285,166 @@ mining-deposit-<x>-<y>-<size>
 landing-basin-deposit-<x>-<y>-<size>
 ```
 
-Update semantics copy from `N of maxMiners miners` to geometry, for example:
+Semantics use geometry-derived slot counts, for example:
 
 ```text
-Gold resource 1x1, 2 miners, 2 of 4 perimeter slots free.
+Gold resource 2x2, 2 miners, 6 of 8 perimeter slots free.
 ```
 
-For unsurveyed resources, dim the resource art and keep the Surveying requirement in semantics/tap feedback. Remove the per-resource floating lock badge: a badge repeated across ~100 objects creates visual clutter and unnecessary widget work. This is presentation simplification, not a new interaction.
+For unsurveyed resources, dim the art and preserve the Surveying requirement in semantics/tap feedback. Do not render ~100 floating lock badges.
 
-### Landing Basin animation
+## Background treatment
 
-Preserve the HPA-451 ownership contract:
+A 50×50 surface is 2800×2800 logical pixels at the current cell size. Do not stretch one existing cavern frame across that full square.
 
-- `impactSequence` remains shell-owned/presentation-only;
-- animation never owns production or persistence;
-- only resources with `minerCount > 0` use the active idle/hit sequence;
-- robot strike direction still derives from the target resource geometry;
-- cold-load/resume production is not replayed as historical strikes.
+Reuse the existing cavern art as a repeated background:
 
-HPA-454 does not add per-resource HP, damage, depletion, break, or respawn state. Those remain HPA-455.
+```dart
+Image.asset(
+  view.definition.cavernAsset,
+  fit: BoxFit.none,
+  alignment: Alignment.topLeft,
+  repeat: ImageRepeat.repeat,
+)
+```
 
-## Save and economy cutover
+This keeps HPA-454 code-only and avoids forced upscale/crop. A manual visual gate must check for obvious seams/repetition. If the existing cavern frames cannot tile acceptably, do **not** add generated art to this coding ticket: create a separate image-generation task and keep that asset decision isolated, per project workflow.
 
-The JSON save shape does **not** change. `rigPlacements` still persist only:
+## Landing Basin animation cost
+
+The current Landing Basin `AnimatedBuilder` rebuilds every resource on every animation tick. That is acceptable at four resources but not at 100.
+
+Split the visual layer:
+
+- pass all resources with `minerCount == 0` as the `AnimatedBuilder.child` static layer;
+- rebuild only resources with `minerCount > 0` (maximum four) and rigs inside the animation builder;
+- preserve current impact, idle, exhaust, reduced-motion, and strike-direction timing.
+
+When rig placement changes, the parent rebuild naturally reconstructs which deposits belong to static vs animated layers. No resource animation registry is needed.
+
+## Save cutover
+
+The save JSON remains unchanged:
 
 ```json
 {"tier":"t2","x":5,"y":1}
 ```
 
-Save decoding already revalidates rig cells against current content through `evaluateMiningPlacement(...)`. Keep that boundary.
+There is no migration, schema version, legacy decoder, target ID, or coordinate converter.
 
-Because the resource layout intentionally changes, old rig coordinates may fail validation and clean-reset through the existing invalid-save recovery path. Add no migration, schema version, legacy four-deposit decoder, target ID, or coordinate converter. A coincidentally still-valid old placement may remain valid; no compatibility work is required either way.
+The recovery consequence must be explicit: `MiningSaveRepository` validates every persisted rig coordinate through `evaluateMiningPlacement(...)`. If **any** persisted placement is invalid under the new generated geometry, `_decode(...)` throws and `load(...)` returns an entirely fresh `MiningSave.initial(...)`. That resets cash, technology, unlocked planets, docks, cargo, and site progress — not only rig positions.
 
-`MiningSimulation`, rate multipliers, capacity multipliers, cargo math, offline caps, selling, site commissioning, planet mastery, and technology costs remain unchanged. At a given Surveying level the number of usable slots up to the four-rig cap stays identical to the current contract.
+Some legacy coordinates may happen to remain valid under the new lattice; that survival is incidental and unsupported. Tests should use one known old valid Landing Basin coordinate that becomes invalid under the new geometry (for example the old `(16,2)` placement, which falls inside a new progression resource) and prove the whole invalid-save recovery boundary activates.
+
+This is acceptable for the current pre-1.0 project; it simply must not be described as a partial rig reset.
+
+## Economy boundary
+
+Keep unchanged:
+
+- `MiningSimulation` and elapsed-time accrual;
+- rig tier/extraction rate formulas;
+- logistics capacity formulas and offline caps;
+- cargo/selling;
+- site commissioning;
+- planet mastery/reward logic;
+- technology costs and site/planet requirements.
+
+HPA-454 intentionally permits filling the existing four-rig site cap earlier than the old resource-cap geometry. That placement-pacing change is part of this feature; once rigs are deployed, production math is unchanged.
 
 ## Test fixture strategy
 
-Many tests currently hard-code the old authored cells (`(3,2)`, `(16,2)`, etc.). Do not replace those with a second set of copied magic coordinates in every file.
+Many tests hard-code the old authored cells. Do not replace those with another copied coordinate table in every file.
 
-Add a small test-only helper under `test/support/` that asks the real content and placement predicate for deterministic legal cells. Domain tests still freeze the generator geometry separately, so higher-level controller/simulation/presentation tests can focus on their own behavior instead of duplicating layout knowledge.
+Add a test-only helper under `test/support/` that:
 
-Tests that specifically verify geometry or Landing Basin robot direction may assert exact anchor cells. General economy/save/journey tests should use the helper.
+1. reads the real site definition;
+2. unions cached perimeter cells for resources available at the requested Surveying level;
+3. filters candidates through `evaluateMiningPlacement(...)`;
+4. returns deterministic row-major legal cells.
+
+Geometry/content tests independently freeze the generator, so higher-level controller/simulation/presentation tests can focus on behavior without hiding a geometry regression.
+
+Exact coordinates remain appropriate only where geometry itself is under test (for example one Landing Basin strike-direction case).
 
 ## Alternatives rejected
 
+### Preserve the old effective-slot table with blocker resources
+
+Rejected. It rebuilds the deleted one-miner capacity rule through geometry, adds fake visual bodies, and hides same-resource multi-robot play until late Surveying on most sites.
+
 ### Hand-author ~100 resources per site
 
-This would produce nearly 900 coordinates to maintain, review, and adjust. It buys no gameplay value because resource identity is not persisted and sites already share the same placement rules.
+Rejected. Nearly 900 coordinates add maintenance without gameplay value.
 
-### Persist generated resource IDs / slot assignments
+### Persist resource IDs / slot assignments
 
-This would require a resource entity model, save schema changes, migration logic, and a second ownership layer for data that can be reproduced from site ID and geometry. HPA-454 explicitly does not need that.
+Rejected. Generated geometry is deterministic and persistence only needs rig tier/cell.
 
 ### Generic procgen strategies / registries
 
-There is one field shape and nine fixed site seeds. A strategy interface, pluggable generator, PRNG abstraction, or content DSL would be speculative infrastructure. Keep one pure helper until a second genuinely different generation rule exists.
+Rejected. There is one field rule and nine fixed site IDs. One pure helper is enough.
 
-## Non-goals
+## Risks and gates
 
-Do not include:
+### Placement pacing intentionally changes
 
-- HPA-455 HP bars, damage text, break/refresh state, or presentation damage values;
-- finite reserves, resource depletion, respawn, or economy changes;
-- more than four deployed rigs per site;
-- drag-and-drop or a new input system;
-- new resource or robot artwork;
-- new persistence fields or migrations;
-- a second mining simulation, placement subsystem, resource registry, or generic procgen framework;
-- Fleet Dock interaction changes from HPA-452;
-- cargo/selling polish from HPA-286.
+Earlier access to four legal cells can accelerate when a player is able to deploy four rigs. This is intentional HPA-454 behavior; numeric production per deployed rig remains unchanged. Tests pin the new table so it cannot drift accidentally.
+
+### Dense-field CPU/widget cost
+
+100 resources magnify work that was trivial at four. Cache registry/static perimeters, bucket rig targets, avoid the 2,500-cell scan, and keep static Landing Basin deposits out of the animation-frame builder. Do not add a general spatial index unless profiling after these cuts proves it necessary.
+
+### Visual readability/background scaling
+
+A deterministic field can still look noisy. Before completion, manually inspect Landing Basin and one max-Surveying site on a portrait viewport. Verify resource density, background tiling, initial deployability, pan/zoom readability, and that dimmed locks are understandable without 100 badges. If existing background art cannot be reused acceptably, split new art into a separate image-generation task.
+
+### Breaking save recovery
+
+Any incompatible rig coordinate invalidates the complete save document and resets all mining progress. No migration is added; document and test this boundary explicitly.
+
+### Intermediate commits
+
+Removing `MiningDepositId` / `maxMiners` creates temporary compile fallout in dependent files. The first two focused commits may only have their targeted tests green; the whole repository is required to compile again in the integration cutover commit and must remain green at the PR tip. Do not represent intermediate commits as independently releasable.
 
 ## Validation
 
-Focused tests must prove:
+Focused automated validation must prove:
 
-- each site generates exactly 102 resources on a 50×50 grid;
-- layouts are identical across repeated registry construction;
-- every site contains 1×1, 2×2, and 3×3 resources;
-- no resource footprints overlap;
+- every site has exactly 100 resources on a 50×50 grid;
+- every site's resource definitions are unique (`site.deposits.toSet().length == 100`);
+- all three sizes exist at every site;
+- all footprints are in bounds and non-overlapping;
 - no empty cell is ambiguously adjacent to two resources;
-- the Surveying effective-slot arrays remain exactly the table above after clamping to four rigs;
-- two or more rigs can target one resource through different perimeter cells;
-- occupying one perimeter cell does not block another valid perimeter cell;
-- save reload reconstructs the same targets from geometry;
-- incompatible old coordinates recover through the existing invalid-save boundary;
-- aggregate production/offline tests retain the same numeric results;
-- dense Mine Site rendering remains image/semantics based, with no per-cell widget grid;
-- Landing Basin visual feedback still follows the visible impact sequence.
+- the cached `stellarMining()` factory returns the identical instance;
+- progression resource levels remain the existing four-level lists;
+- computed effective slots match the revised table and are monotonic;
+- at each site's first playable Surveying level, at least one resource exposes ≥2 valid perimeter cells;
+- two or more rigs can target the same resource through distinct perimeter cells;
+- occupying one perimeter cell does not block another valid cell;
+- static perimeter counts are read from the site cache;
+- miner counts come from one rig-target bucketing pass;
+- deployable-cell candidates come from surveyed perimeter sets and still pass the shared placement predicate;
+- a known incompatible legacy placement triggers full invalid-save recovery;
+- aggregate production/offline numeric tests retain their formulas/results for the same deployed rig set;
+- dense rendering stays image/semantics based with no per-cell widget grid;
+- Landing Basin animation rebuilds only mined resources/rigs per animation tick;
+- existing cavern art is tiled rather than stretched across the 2800×2800 field.
+
+Manual visual validation must open:
+
+1. Landing Basin at its initial Surveying level with a rig selected;
+2. one Surveying-5 site (prefer Ochre Basin).
+
+Verify:
+
+- at least one deployable perimeter cell is reachable from the initial top-left viewport;
+- two rigs can visibly target the same resource;
+- ~100 bodies read as a field rather than noise;
+- pan/zoom remains usable;
+- resource sprites do not visibly collide;
+- tiled cavern art is not distractingly repetitive/seamed;
+- locked resources remain understandable without floating lock badges.
 
 Then run the repository gate from `CLAUDE.md`:
 
@@ -301,4 +461,17 @@ flutter build ios --simulator --debug
 
 ## Acceptance criteria
 
-HPA-454 is complete when every Mine Site shows the deterministic 102-resource field, the existing Surveying-to-four-rig progression is unchanged, multiple robots can occupy distinct perimeter slots around one resource, `maxMiners`/`depositAtCapacity`/`MiningDepositId` are gone, saves still persist only rig placements, the deterministic/offline economy is unchanged, and HPA-455 can build transient per-resource hit feedback on top without another data model.
+HPA-454 is complete when:
+
+- every Mine Site shows the deterministic 100-resource field;
+- multi-robot placement on one resource is reachable at the site's first playable Surveying level;
+- the four existing progression Surveying levels remain authored content;
+- the revised effective-slot table is pinned and monotonic;
+- `MiningDepositId`, `maxMiners`, and `depositAtCapacity` are gone with no replacement capacity/identity subsystem;
+- `evaluateMiningPlacement(...)` remains the sole legality predicate;
+- generated registry/static perimeter geometry is cached rather than rebuilt on refresh/render paths;
+- Landing Basin does not rebuild all 100 static resources per animation frame;
+- strict save JSON remains rig tier + cell only, with full invalid-save reset documented/tested;
+- production/offline formulas remain unchanged;
+- existing art is reused via tiling, with any required new art split into a separate image-generation task;
+- the automated repository gate and manual visual gate both pass.
