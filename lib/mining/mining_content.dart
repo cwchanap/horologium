@@ -23,7 +23,7 @@ enum RigTier { t1, t2, t3, t4, t5 }
 enum TechnologyTrack { extraction, logistics, surveying }
 
 class MiningSiteDefinition {
-  const MiningSiteDefinition({
+  MiningSiteDefinition({
     required this.id,
     required this.name,
     required this.resource,
@@ -41,7 +41,11 @@ class MiningSiteDefinition {
     required this.cardAsset,
     this.facilityName,
     this.discoveryText,
-  });
+  }) : perimeterCellsByDeposit = _perimeterCellsByDeposit(
+         gridWidth: gridWidth,
+         gridHeight: gridHeight,
+         deposits: deposits,
+       );
 
   final MiningSiteId id;
   final String name;
@@ -55,11 +59,76 @@ class MiningSiteDefinition {
   final int gridWidth;
   final int gridHeight;
   final List<MiningDepositDefinition> deposits;
+  final Map<MiningDepositDefinition, Set<MiningGridCell>>
+  perimeterCellsByDeposit;
   final String cavernAsset;
   final String depositAsset;
   final String cardAsset;
   final String? facilityName;
   final String? discoveryText;
+}
+
+const _denseGridWidth = 50;
+const _denseGridHeight = 50;
+
+const _surveyingProgressionLevels = <MiningSiteId, List<int>>{
+  MiningSiteId.landingBasin: [0, 0, 1, 2],
+  MiningSiteId.carbonRidge: [0, 1, 2, 3],
+  MiningSiteId.graniteCrater: [0, 1, 2, 3],
+  MiningSiteId.frozenBasin: [3, 3, 4, 5],
+  MiningSiteId.titaniumHighlands: [4, 4, 5, 5],
+  MiningSiteId.heliumMare: [5, 5, 5, 5],
+  MiningSiteId.ochreBasin: [5, 5, 5, 5],
+  MiningSiteId.silicaDunes: [5, 5, 5, 5],
+  MiningSiteId.cobaltChasm: [5, 5, 5, 5],
+};
+
+Map<MiningDepositDefinition, Set<MiningGridCell>> _perimeterCellsByDeposit({
+  required int gridWidth,
+  required int gridHeight,
+  required List<MiningDepositDefinition> deposits,
+}) => Map.unmodifiable({
+  for (final deposit in deposits)
+    deposit: Set.unmodifiable(
+      miningPerimeterCells(
+        gridWidth: gridWidth,
+        gridHeight: gridHeight,
+        deposits: deposits,
+        target: deposit,
+      ),
+    ),
+});
+
+List<MiningDepositDefinition> _denseResourceField(MiningSiteId siteId) {
+  final progressionLevels = _surveyingProgressionLevels[siteId]!;
+  final maxLevel = progressionLevels.reduce((a, b) => a > b ? a : b);
+  final deposits = <MiningDepositDefinition>[];
+
+  for (var row = 0; row < 10; row++) {
+    for (var column = 0; column < 10; column++) {
+      final index = row * 10 + column;
+      final value = (siteId.index * 31 + index * 17 + index * index * 7) % 97;
+      final isProgressionResource = index < 4;
+      final size = isProgressionResource ? 2 + index % 2 : 1 + value % 3;
+      final requiredSurveyingLevel = isProgressionResource
+          ? progressionLevels[index]
+          : maxLevel;
+      final movableSpan = 4 - size;
+      final offsetX = 1 + (value ~/ 3) % movableSpan;
+      final offsetY = 1 + (value ~/ 11) % movableSpan;
+
+      deposits.add(
+        MiningDepositDefinition(
+          x: column * 5 + offsetX,
+          y: row * 5 + offsetY,
+          size: size,
+          requiredSurveyingLevel: requiredSurveyingLevel,
+        ),
+      );
+    }
+  }
+
+  return List.unmodifiable(deposits);
 }
 
 /// Built-in Material-icon silhouette for a resource: distinct icon, display
@@ -190,7 +259,12 @@ class MiningContentRegistry {
     ),
   };
 
-  factory MiningContentRegistry.stellarMining() => const MiningContentRegistry._({
+  static final MiningContentRegistry _stellar = _buildStellarMining();
+
+  factory MiningContentRegistry.stellarMining() => _stellar;
+
+  static MiningContentRegistry
+  _buildStellarMining() => MiningContentRegistry._({
     MiningPlanetId.homeworld: MiningPlanetDefinition(
       id: MiningPlanetId.homeworld,
       name: 'Homeworld',
@@ -211,42 +285,9 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.50,
           baseCapacity: 90,
           saleValuePerUnit: 4,
-          gridWidth: 24,
-          gridHeight: 18,
-          deposits: [
-            MiningDepositDefinition(
-              id: MiningDepositId.d1,
-              x: 3,
-              y: 3,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 0,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d2,
-              x: 16,
-              y: 3,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 0,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d3,
-              x: 5,
-              y: 11,
-              size: 2,
-              maxMiners: 1,
-              requiredSurveyingLevel: 1,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d4,
-              x: 16,
-              y: 10,
-              size: 3,
-              maxMiners: 3,
-              requiredSurveyingLevel: 2,
-            ),
-          ],
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.landingBasin),
           cavernAsset: 'assets/images/mining/caverns/gold.png',
           depositAsset: 'assets/images/mining/nodes/gold.png',
           cardAsset: 'assets/images/mining/sites/landing_basin.png',
@@ -261,42 +302,9 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.75,
           baseCapacity: 120,
           saleValuePerUnit: 3,
-          gridWidth: 24,
-          gridHeight: 18,
-          deposits: [
-            MiningDepositDefinition(
-              id: MiningDepositId.d1,
-              x: 5,
-              y: 2,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 0,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d2,
-              x: 17,
-              y: 5,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 1,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d3,
-              x: 13,
-              y: 12,
-              size: 2,
-              maxMiners: 1,
-              requiredSurveyingLevel: 2,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d4,
-              x: 2,
-              y: 11,
-              size: 3,
-              maxMiners: 3,
-              requiredSurveyingLevel: 3,
-            ),
-          ],
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.carbonRidge),
           cavernAsset: 'assets/images/mining/caverns/coal.png',
           depositAsset: 'assets/images/mining/nodes/coal.png',
           cardAsset: 'assets/images/mining/sites/carbon_ridge.png',
@@ -311,42 +319,9 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.60,
           baseCapacity: 120,
           saleValuePerUnit: 5,
-          gridWidth: 24,
-          gridHeight: 18,
-          deposits: [
-            MiningDepositDefinition(
-              id: MiningDepositId.d1,
-              x: 2,
-              y: 5,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 0,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d2,
-              x: 18,
-              y: 2,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 1,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d3,
-              x: 5,
-              y: 12,
-              size: 2,
-              maxMiners: 1,
-              requiredSurveyingLevel: 2,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d4,
-              x: 15,
-              y: 10,
-              size: 3,
-              maxMiners: 3,
-              requiredSurveyingLevel: 3,
-            ),
-          ],
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.graniteCrater),
           cavernAsset: 'assets/images/mining/caverns/stone.png',
           depositAsset: 'assets/images/mining/nodes/stone.png',
           cardAsset: 'assets/images/mining/sites/granite_crater.png',
@@ -373,42 +348,9 @@ class MiningContentRegistry {
           baseRatePerSecond: 1.00,
           baseCapacity: 150,
           saleValuePerUnit: 6,
-          gridWidth: 24,
-          gridHeight: 18,
-          deposits: [
-            MiningDepositDefinition(
-              id: MiningDepositId.d1,
-              x: 4,
-              y: 3,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 3,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d2,
-              x: 15,
-              y: 2,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 3,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d3,
-              x: 3,
-              y: 12,
-              size: 2,
-              maxMiners: 1,
-              requiredSurveyingLevel: 4,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d4,
-              x: 16,
-              y: 10,
-              size: 3,
-              maxMiners: 3,
-              requiredSurveyingLevel: 5,
-            ),
-          ],
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.frozenBasin),
           cavernAsset: 'assets/images/mining/caverns/water_ice.png',
           depositAsset: 'assets/images/mining/nodes/water_ice.png',
           cardAsset: 'assets/images/mining/caverns/water_ice.png',
@@ -423,42 +365,9 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.80,
           baseCapacity: 140,
           saleValuePerUnit: 12,
-          gridWidth: 24,
-          gridHeight: 18,
-          deposits: [
-            MiningDepositDefinition(
-              id: MiningDepositId.d1,
-              x: 2,
-              y: 2,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 4,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d2,
-              x: 19,
-              y: 6,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 4,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d3,
-              x: 12,
-              y: 3,
-              size: 2,
-              maxMiners: 1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d4,
-              x: 5,
-              y: 11,
-              size: 3,
-              maxMiners: 3,
-              requiredSurveyingLevel: 5,
-            ),
-          ],
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.titaniumHighlands),
           cavernAsset: 'assets/images/mining/caverns/titanium_ore.png',
           depositAsset: 'assets/images/mining/nodes/titanium_ore.png',
           cardAsset: 'assets/images/mining/caverns/titanium_ore.png',
@@ -473,42 +382,9 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.55,
           baseCapacity: 120,
           saleValuePerUnit: 30,
-          gridWidth: 24,
-          gridHeight: 18,
-          deposits: [
-            MiningDepositDefinition(
-              id: MiningDepositId.d1,
-              x: 6,
-              y: 2,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d2,
-              x: 18,
-              y: 3,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d3,
-              x: 3,
-              y: 10,
-              size: 2,
-              maxMiners: 1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d4,
-              x: 14,
-              y: 11,
-              size: 3,
-              maxMiners: 3,
-              requiredSurveyingLevel: 5,
-            ),
-          ],
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.heliumMare),
           cavernAsset: 'assets/images/mining/caverns/helium_3.png',
           depositAsset: 'assets/images/mining/nodes/helium_3.png',
           cardAsset: 'assets/images/mining/caverns/helium_3.png',
@@ -535,42 +411,9 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.75,
           baseCapacity: 180,
           saleValuePerUnit: 32,
-          gridWidth: 24,
-          gridHeight: 18,
-          deposits: [
-            MiningDepositDefinition(
-              id: MiningDepositId.d1,
-              x: 2,
-              y: 4,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d2,
-              x: 17,
-              y: 2,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d3,
-              x: 14,
-              y: 12,
-              size: 2,
-              maxMiners: 1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d4,
-              x: 4,
-              y: 11,
-              size: 3,
-              maxMiners: 3,
-              requiredSurveyingLevel: 5,
-            ),
-          ],
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.ochreBasin),
           cavernAsset: 'assets/images/mining/caverns/iron_ore.png',
           depositAsset: 'assets/images/mining/nodes/iron_ore.png',
           cardAsset: 'assets/images/mining/caverns/iron_ore.png',
@@ -588,42 +431,9 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.55,
           baseCapacity: 160,
           saleValuePerUnit: 55,
-          gridWidth: 24,
-          gridHeight: 18,
-          deposits: [
-            MiningDepositDefinition(
-              id: MiningDepositId.d1,
-              x: 5,
-              y: 3,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d2,
-              x: 19,
-              y: 4,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d3,
-              x: 3,
-              y: 12,
-              size: 2,
-              maxMiners: 1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d4,
-              x: 14,
-              y: 9,
-              size: 3,
-              maxMiners: 3,
-              requiredSurveyingLevel: 5,
-            ),
-          ],
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.silicaDunes),
           cavernAsset: 'assets/images/mining/caverns/silica.png',
           depositAsset: 'assets/images/mining/nodes/silica.png',
           cardAsset: 'assets/images/mining/caverns/silica.png',
@@ -641,42 +451,9 @@ class MiningContentRegistry {
           baseRatePerSecond: 0.35,
           baseCapacity: 130,
           saleValuePerUnit: 110,
-          gridWidth: 24,
-          gridHeight: 18,
-          deposits: [
-            MiningDepositDefinition(
-              id: MiningDepositId.d1,
-              x: 3,
-              y: 2,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d2,
-              x: 18,
-              y: 6,
-              size: 1,
-              maxMiners: 1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d3,
-              x: 7,
-              y: 12,
-              size: 2,
-              maxMiners: 1,
-              requiredSurveyingLevel: 5,
-            ),
-            MiningDepositDefinition(
-              id: MiningDepositId.d4,
-              x: 14,
-              y: 10,
-              size: 3,
-              maxMiners: 3,
-              requiredSurveyingLevel: 5,
-            ),
-          ],
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.cobaltChasm),
           cavernAsset: 'assets/images/mining/caverns/cobalt_ore.png',
           depositAsset: 'assets/images/mining/nodes/cobalt_ore.png',
           cardAsset: 'assets/images/mining/caverns/cobalt_ore.png',
