@@ -8,11 +8,25 @@ import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/landing_basin_grid_visual_layer.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
+import '../../support/mining_grid_fixtures.dart';
 import '../../support/mining_visual_frames.dart';
 
 final _content = MiningContentRegistry.stellarMining();
 final _start = DateTime.utc(2026, 8, 26, 12);
 const _defaultCell = MiningGridCell(2, 3);
+
+final _landing = _content.site(MiningSiteId.landingBasin);
+
+/// The default rig at (2,3) uniquely mines this authored 2x2 deposit at (1,1).
+final _minedDeposit = _landing.deposits.first;
+
+/// An authored deposit with no rig on it.
+final _unminedDeposit = _landing.deposits[1];
+
+final _deployableCells = deployableMiningCells(_landing);
+
+Key _depositKey(MiningDepositDefinition deposit) =>
+    Key('landing-basin-deposit-${deposit.x}-${deposit.y}-${deposit.size}');
 
 MineSiteView _view({
   RigTier rigTier = RigTier.t1,
@@ -92,21 +106,23 @@ Future<void> _pumpLayer(
   await tester.pump();
 }
 
-Animation<double>? _depositOpacity(WidgetTester tester, {String id = 'd1'}) =>
-    tester
-        .widget<Image>(
-          find.descendant(
-            of: find.byKey(Key('landing-basin-deposit-$id')),
-            matching: find.byType(Image),
-          ),
-        )
-        .opacity;
+Animation<double>? _depositOpacity(
+  WidgetTester tester, [
+  MiningDepositDefinition? deposit,
+]) => tester
+    .widget<Image>(
+      find.descendant(
+        of: find.byKey(_depositKey(deposit ?? _minedDeposit)),
+        matching: find.byType(Image),
+      ),
+    )
+    .opacity;
 
-String _depositAsset(WidgetTester tester, {String id = 'd1'}) {
+String _depositAsset(WidgetTester tester, [MiningDepositDefinition? deposit]) {
   final images = tester
       .widgetList<Image>(
         find.descendant(
-          of: find.byKey(Key('landing-basin-deposit-$id')),
+          of: find.byKey(_depositKey(deposit ?? _minedDeposit)),
           matching: find.byType(Image),
         ),
       )
@@ -195,7 +211,7 @@ void main() {
   ) async {
     await _pumpLayer(tester, withRig: false, reducedMotion: true);
 
-    expect(find.byKey(const Key('landing-basin-deposit-d1')), findsOneWidget);
+    expect(find.byKey(_depositKey(_minedDeposit)), findsOneWidget);
     expect(find.byKey(_robotKey(_defaultCell)), findsNothing);
     expect(_depositAsset(tester), MiningVisuals.goldNodeStageAsset(1));
   });
@@ -203,28 +219,58 @@ void main() {
   testWidgets('animates only the mined deposit and keeps others static', (
     tester,
   ) async {
-    // The default rig at (2,3) mines d1 only: d1 runs its idle loop while
-    // unmined d2 stays on its static stage plate.
+    // The default rig at (2,3) mines the (1,1) deposit only: it runs its idle
+    // loop while unmined deposits stay on their static stage plate.
     await _pumpLayer(tester, reducedMotion: false);
-    expect(_depositAsset(tester, id: 'd1'), MiningVisuals.goldNodeIdleAsset(1));
+    expect(_depositAsset(tester), MiningVisuals.goldNodeIdleAsset(1));
     expect(
-      _depositAsset(tester, id: 'd2'),
+      _depositAsset(tester, _unminedDeposit),
       MiningVisuals.goldNodeStageAsset(1),
     );
 
     await tester.pump(const Duration(milliseconds: 125));
-    expect(_depositAsset(tester, id: 'd1'), MiningVisuals.goldNodeIdleAsset(2));
+    expect(_depositAsset(tester), MiningVisuals.goldNodeIdleAsset(2));
     expect(
-      _depositAsset(tester, id: 'd2'),
+      _depositAsset(tester, _unminedDeposit),
       MiningVisuals.goldNodeStageAsset(1),
     );
+  });
+
+  testWidgets('renders two rigs targeting one resource without duplication', (
+    tester,
+  ) async {
+    // Two legal perimeter cells of the same authored deposit: two robots may
+    // mine one resource body, which renders exactly once and undimmed.
+    final sharedCells = _deployableCells
+        .where((cell) => _minedDeposit.isOrthogonallyAdjacent(cell))
+        .take(2)
+        .toList();
+    expect(sharedCells, hasLength(2));
+
+    await _pumpLayer(
+      tester,
+      rigs: [(RigTier.t1, sharedCells[0]), (RigTier.t2, sharedCells[1])],
+      reducedMotion: true,
+    );
+
+    expect(find.byKey(_robotKey(sharedCells[0])), findsOneWidget);
+    expect(find.byKey(_robotKey(sharedCells[1])), findsOneWidget);
+    expect(find.byKey(_depositKey(_minedDeposit)), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(_depositKey(_minedDeposit)),
+        matching: find.byType(Image),
+      ),
+      findsOneWidget,
+    );
+    expect(_depositOpacity(tester, _minedDeposit), isNull);
   });
 
   testWidgets('dims only deposits without a miner', (tester) async {
     await _pumpLayer(tester, reducedMotion: true);
 
-    expect(_depositOpacity(tester, id: 'd1'), isNull);
-    final dimmed = _depositOpacity(tester, id: 'd2');
+    expect(_depositOpacity(tester), isNull);
+    final dimmed = _depositOpacity(tester, _unminedDeposit);
     expect(dimmed, isA<AlwaysStoppedAnimation<double>>());
     expect(dimmed!.value, .62);
   });
@@ -236,7 +282,7 @@ void main() {
 
     final image = tester.widget<Image>(
       find.descendant(
-        of: find.byKey(const Key('landing-basin-deposit-d1')),
+        of: find.byKey(_depositKey(_minedDeposit)),
         matching: find.byType(Image),
       ),
     );
@@ -306,9 +352,9 @@ void main() {
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 240));
       expect(_depositAsset(tester), MiningVisuals.goldNodeHitAsset(1));
-      // The impact one-shot animates the mined d1, never unmined d2.
+      // The impact one-shot animates the mined deposit, never unmined ones.
       expect(
-        _depositAsset(tester, id: 'd2'),
+        _depositAsset(tester, _unminedDeposit),
         MiningVisuals.goldNodeStageAsset(1),
       );
       expect(
@@ -512,16 +558,19 @@ void main() {
   testWidgets('mirrors the robot only when the deposit sits to its right', (
     tester,
   ) async {
-    // d1 occupies (3,3) with size 1, so its center-X is 3.5. Rig cells to the
-    // left/right of the deposit make the target center-X sit right/left of the
-    // rig; above/below cells keep the center-X equal. Expected mirrors:
-    // right-of-deposit -> false, left-of-deposit -> true, above -> false,
-    // below -> false.
+    // The default target occupies (1,1) with size 2, so its center-X is 2.0.
+    // The robot mirrors whenever that center sits right of the rig cell so
+    // the arm strikes toward the resource; the chassis never rotates
+    // vertically for deposits above or below.
     final cases = <(MiningGridCell, bool)>[
-      (const MiningGridCell(4, 3), false),
-      (const MiningGridCell(2, 3), true),
-      (const MiningGridCell(3, 2), false),
-      (const MiningGridCell(3, 4), false),
+      // Right of the deposit: target center is left of the rig.
+      (const MiningGridCell(3, 1), false),
+      // Left of the deposit: target center is right of the rig.
+      (const MiningGridCell(0, 2), true),
+      // Above, rig center-X right of the deposit center.
+      (const MiningGridCell(2, 0), false),
+      // Below, rig center-X left of the deposit center.
+      (const MiningGridCell(1, 3), true),
     ];
 
     for (final (cell, expectedMirror) in cases) {

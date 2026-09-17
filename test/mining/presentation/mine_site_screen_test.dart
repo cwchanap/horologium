@@ -11,8 +11,12 @@ import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
+import '../../support/mining_grid_fixtures.dart';
+
 final _start = DateTime.utc(2026, 8, 26, 12);
 final _content = MiningContentRegistry.stellarMining();
+final _landingDefinition = _content.site(MiningSiteId.landingBasin);
+final _landingRigCells = deployableMiningCells(_landingDefinition);
 
 SiteProgress _progress({
   bool unlocked = true,
@@ -189,7 +193,10 @@ void main() {
         find.byKey(const Key('landing-basin-grid-visual-layer')),
         findsOneWidget,
       );
-      expect(find.byKey(const Key('landing-basin-deposit-d1')), findsOneWidget);
+      expect(
+        find.byKey(const Key('landing-basin-deposit-1-1-2')),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('landing-basin-robot-3-2')), findsOneWidget);
 
       await _pumpMineSite(
@@ -205,7 +212,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(
         find.descendant(
-          of: find.byKey(const Key('landing-basin-deposit-d1')),
+          of: find.byKey(const Key('landing-basin-deposit-1-1-2')),
           matching: find.byWidgetPredicate(
             (widget) =>
                 widget is Image &&
@@ -228,9 +235,9 @@ void main() {
       final state = _stateWith(
         landing: _progress(
           commissioned: true,
-          rigs: const [
-            MiningRigPlacement(tier: RigTier.t4, cell: MiningGridCell(3, 2)),
-            MiningRigPlacement(tier: RigTier.t3, cell: MiningGridCell(16, 2)),
+          rigs: [
+            MiningRigPlacement(tier: RigTier.t4, cell: _landingRigCells[0]),
+            MiningRigPlacement(tier: RigTier.t3, cell: _landingRigCells[1]),
           ],
         ),
       );
@@ -242,8 +249,8 @@ void main() {
       );
 
       for (final entry in {
-        const MiningGridCell(3, 2): RigTier.t4,
-        const MiningGridCell(16, 2): RigTier.t3,
+        _landingRigCells[0]: RigTier.t4,
+        _landingRigCells[1]: RigTier.t3,
       }.entries) {
         final cell = entry.key;
         final tier = entry.value;
@@ -363,15 +370,15 @@ void main() {
       const Rect.fromLTWH(14, 146, 44, 48),
     );
     // The fixed-node rects are replaced by the grid viewport/object contract:
-    // the pan/zoom viewport starts at the cavern origin and d1's overlay sits
-    // on its logical footprint.
+    // the pan/zoom viewport starts at the cavern origin and the (1,1) 2x2
+    // resource overlay sits on its logical footprint.
     expect(
       tester.getRect(find.byKey(const Key('mining-grid-interactive'))).topLeft,
       Offset.zero,
     );
     expect(
-      tester.getRect(find.byKey(const Key('mining-deposit-d1'))).topLeft,
-      const Offset(3 * miningGridCellSize, 3 * miningGridCellSize),
+      tester.getRect(find.byKey(const Key('mining-deposit-1-1-2'))).topLeft,
+      Offset(miningGridCellSize, miningGridCellSize),
     );
     final sell = tester.getRect(find.byKey(const Key('mine-site-sell')));
     expect(sell.top, 506);
@@ -385,8 +392,8 @@ void main() {
         landing: _progress(
           commissioned: true,
           storedAmount: 10,
-          rigs: const [
-            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(16, 2)),
+          rigs: [
+            MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCells[1]),
           ],
         ),
       );
@@ -446,11 +453,18 @@ void main() {
     );
 
     expect(find.bySemanticsLabel(RegExp(r'Dock bay B1')), findsOneWidget);
-    expect(find.bySemanticsLabel(RegExp(r'Gold deposit D1')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        RegExp(r'Gold resource 2x2, 1 miners, 7 of 8 perimeter slots free'),
+      ),
+      findsOneWidget,
+    );
     expect(find.bySemanticsLabel(RegExp(r'T1 rig at \(3,2\)')), findsOneWidget);
-    final d1 = tester.getRect(find.byKey(const Key('mining-deposit-d1')));
-    expect(d1.width, miningGridCellSize);
-    expect(d1.height, miningGridCellSize);
+    final deposit = tester.getRect(
+      find.byKey(const Key('mining-deposit-1-1-2')),
+    );
+    expect(deposit.width, 2 * miningGridCellSize);
+    expect(deposit.height, 2 * miningGridCellSize);
   });
 
   testWidgets('anchors the cash chip and cargo gauge over portrait art', (
@@ -579,9 +593,9 @@ void main() {
         landing: _progress(
           commissioned: true,
           storedAmount: 150,
-          rigs: const [
+          rigs: [
             MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
-            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(16, 2)),
+            MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCells[1]),
           ],
         ),
       );
@@ -732,20 +746,34 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('locked deposits render their authored Surveying requirement', (
+  testWidgets('locked resources stay legible without repeated lock badges', (
     tester,
   ) async {
-    // Landing Basin d3 requires Surveying 1 and d4 requires Surveying 2; with
-    // default Surveying 0 both show their authored Surveying badges, not a
-    // hard-coded 'Surveying 1' for every locked deposit.
+    // At Surveying 0 most of Landing Basin's dense field is locked. The field
+    // must not repeat a floating badge per locked resource; the dimmed
+    // resources keep their Surveying requirement in semantics instead.
     final state = _stateWith(landing: _progress(commissioned: true));
     await _pumpMineSite(tester, view: _siteView(state), dock: _dockView(state));
 
-    expect(find.text('Surveying 1'), findsOneWidget);
-    expect(find.text('Surveying 2'), findsOneWidget);
+    expect(find.text('Surveying 1'), findsNothing);
+    expect(find.text('Surveying 2'), findsNothing);
     expect(
-      find.bySemanticsLabel(RegExp(r'deposit D3.*Surveying 1')),
+      find.bySemanticsLabel(
+        RegExp(
+          r'resource \d+x\d+, 0 miners, \d+ of \d+ perimeter slots '
+          r'free\. Requires Surveying 1\.',
+        ),
+      ),
       findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(
+        RegExp(
+          r'resource \d+x\d+, 0 miners, \d+ of \d+ perimeter slots '
+          r'free\. Requires Surveying 2\.',
+        ),
+      ),
+      findsWidgets,
     );
   });
 
