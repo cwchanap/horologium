@@ -47,13 +47,8 @@ final _content = MiningContentRegistry.stellarMining();
 
 /// First row-major legal deploy cell for [id] at its first playable
 /// Surveying level.
-MiningGridCell _firstCell(MiningSiteId id) {
-  final site = _content.site(id);
-  return deployableMiningCells(
-    site,
-    surveyingLevel: site.deposits.first.requiredSurveyingLevel,
-  ).first;
-}
+MiningGridCell _firstCell(MiningSiteId id) =>
+    firstPlayableCell(_content.site(id));
 
 MiningSave threePlanetState(
   DateTime now, {

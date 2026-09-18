@@ -17,8 +17,11 @@ const _defaultCell = MiningGridCell(2, 3);
 
 final _landing = _content.site(MiningSiteId.landingBasin);
 
-/// The default rig at (2,3) uniquely mines this authored 2x2 deposit at (1,1).
-final _minedDeposit = _landing.deposits.first;
+/// The default rig at (2,3) uniquely mines the pinned first progression
+/// resource (1,1,2,0) from the content contract: an authored 2x2 at (1,1).
+final _minedDeposit = _landing.deposits.singleWhere(
+  (d) => d.x == 1 && d.y == 1 && d.size == 2,
+);
 
 /// An authored deposit with no rig on it.
 final _unminedDeposit = _landing.deposits[1];

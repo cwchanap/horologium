@@ -83,7 +83,7 @@ Set<MiningGridCell> miningPerimeterCells({
   required List<MiningDepositDefinition> deposits,
   required MiningDepositDefinition target,
 }) {
-  final candidates = <MiningGridCell>{};
+  final candidates = <MiningGridCell>[];
   for (var i = 0; i < target.size; i++) {
     candidates
       ..add(MiningGridCell(target.x + i, target.y - 1))

@@ -701,10 +701,11 @@ void main() {
         'resets the whole document', () async {
       // The pre-cutover valid placement (16,2) now sits inside the fourth
       // progression resource of the generated dense field.
-      final obsolete = _progressedState(now).copyWith(
+      final progressed = _progressedState(now);
+      final obsolete = progressed.copyWith(
         sites: {
-          ..._progressedState(now).sites,
-          MiningSiteId.landingBasin: _progressedState(now)
+          ...progressed.sites,
+          MiningSiteId.landingBasin: progressed
               .sites[MiningSiteId.landingBasin]!
               .copyWith(
                 rigPlacements: const [
