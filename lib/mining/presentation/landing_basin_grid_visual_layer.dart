@@ -260,14 +260,19 @@ class _LandingBasinGridVisualLayerState
     final cell = widget.cellSize;
     // Unmined resources never depend on the animation tick: they live in
     // AnimatedBuilder.child so a per-frame rebuild recomposes only the at
-    // most four mined resources and the rigs. Parent rebuilds caused by
-    // gameplay state naturally reconstruct static vs animated membership.
-    final staticResources = Stack(
-      clipBehavior: Clip.none,
-      children: [
-        for (final deposit in widget.view.deposits)
-          if (deposit.minerCount == 0) _depositNode(deposit, cell, 1),
-      ],
+    // most four mined resources and the rigs. The RepaintBoundary moves the
+    // static subtree into its own composited layer, so per-frame repaints of
+    // the parent Stack composite the retained layer instead of re-painting
+    // every unmined resource. Parent rebuilds caused by gameplay state
+    // naturally reconstruct static vs animated membership.
+    final staticResources = RepaintBoundary(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (final deposit in widget.view.deposits)
+            if (deposit.minerCount == 0) _depositNode(deposit, cell, 1),
+        ],
+      ),
     );
     return AnimatedBuilder(
       animation: Listenable.merge([_impactController, _idleController]),
