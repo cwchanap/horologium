@@ -7,64 +7,55 @@ Baseline: `main` at `844e4a77243ad915a347c14e4c6bbfe696870c1c` after HPA-454 / P
 
 ## Problem
 
-Fleet management currently appears on both the Site Deck and the Mine Site. That splits one interaction loop across two surfaces:
+Fleet management currently appears on both the Site Deck and the Mine Site. That splits one interaction loop across two surfaces and makes successful spawn/merge actions drop the player's immediate intent:
 
-1. spawn/select/merge rigs on the Site Deck or Mine Site;
-2. enter a Mine Site;
-3. select a dock rig again when needed;
-4. deploy it onto the grid.
+- a spawned T1 is not selected;
+- a successful merge clears selection instead of leaving the upgraded target ready to place.
 
-The duplicated Fleet Dock also consumes a meaningful amount of Site Deck space. More importantly, successful spawn and merge actions currently drop the interaction thread:
-
-- spawning a T1 rig leaves the newly created bay unselected;
-- merging clears the current selection before persistence finishes, and the upgraded target bay is not selected afterward.
-
-HPA-452 should make fleet manipulation feel local to mining gameplay without creating a second fleet model or changing the economy.
+HPA-452 should make fleet manipulation local to Mine Site gameplay, remove duplicate Site Deck chrome, and keep spawn/merge → deploy continuous without creating another fleet subsystem.
 
 ## Goals
 
-- Remove Fleet Dock spawn/select/merge controls from the Site Deck.
-- Keep spawn, select, merge, deploy, and recall entirely on the Mine Site.
-- Automatically select the newly spawned T1 rig after a successful spawn.
-- Keep the upgraded target rig selected after a successful merge.
-- Make compatible merge targets visually obvious while a rig is selected.
-- Show a compact merge outcome preview such as `T1 + T1 → T2`.
-- Explain merge value as stronger output per occupied deployment slot, not as a guaranteed increase over the combined output of the two consumed rigs.
-- Preserve the existing controller mutation boundary, save format, economy, deployment rules, audio/haptics, reduced-motion behavior, and four-bay dock.
+- Remove Fleet Dock spawn/select/merge controls from Site Deck in portrait and landscape.
+- Keep spawn, select, merge, deploy, and recall inside Mine Site.
+- Automatically select the bay actually filled by a successful T1 spawn.
+- Keep the upgraded target bay selected after a successful merge.
+- Reuse the existing merge-compatibility projection to emphasize valid target bays.
+- Show a compact `Tn + Tn → T(n+1) · STRONGER PER SLOT` preview in the existing horizontal Fleet Dock hint line.
+- Preserve controller ownership, save format, economy, deploy/recall legality, audio/haptics, reduced motion, and the four-bay dock.
 
 ## Non-goals
 
 This PR does not:
 
-- change `MiningController` spawn/merge/deploy/recall rules;
+- add a second fleet owner, inventory, deployment subsystem, or state-management layer;
+- change spawn/merge/deploy/recall rules;
 - add or change save fields;
-- change rig prices, rates, capacity, technology multipliers, or merge balance;
-- add drag-and-drop or confirmation dialogs;
-- add a second dock, inventory, deployment model, or generic action framework;
+- change rig prices, rate/capacity multipliers, technology multipliers, or balance;
+- add drag-and-drop, confirmation dialogs, tutorial state, or another input framework;
+- add another Fleet Dock chrome row or generic footer/layout abstraction;
 - change HPA-454 resource geometry;
 - add HPA-455 HP/damage feedback;
 - add HPA-286 Site Deck selling/cargo-full polish;
 - generate new image art.
 
-## Current ownership to preserve
+One narrow controller result change is allowed: successful spawn reports the bay it already chose. That exposes an existing mutation fact; it does not move selection into the controller or change gameplay rules.
 
-The repository guidance remains authoritative:
+## Current ownership to preserve
 
 ```text
 MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepository
                          -> Flutter Site Deck / Mine Site / Stellar Map
 ```
 
-For HPA-452:
-
-- `MiningController` remains the sole mutation boundary.
-- `MiningSave.docks` remains the authoritative four-bay fleet state per planet.
+- `MiningController` remains the sole mutation/persistence boundary.
+- `MiningSave.docks` remains authoritative fleet state.
 - `MiningShell._selectedBayId` remains transient presentation selection.
-- `FleetDockView` remains a pure projection of save state plus transient selection/busy state.
-- `MineSiteView` remains responsible for deploy/recall legality and grid tap outcomes.
+- `FleetDockView` remains a pure projection.
+- `MineSiteView` remains the deploy/recall legality projection.
 - Widgets never mutate save state directly.
 
-No new state owner is needed.
+No second fleet state owner is needed.
 
 ## Design decisions
 
@@ -72,222 +63,262 @@ No new state owner is needed.
 
 Remove Fleet Dock from `SiteDeckScreen` in both orientations.
 
-The Site Deck constructor no longer accepts:
+Delete these Site Deck inputs:
 
 - `FleetDockView fleetDock`;
 - `onBayTap`;
 - `onSpawnRig`.
 
-The Site Deck should continue to own only:
+The Site Deck retains site cards/status, unlock/entry, cash/cargo/progression display, and bottom navigation only.
 
-- site status/cards;
-- site unlock/entry;
-- cash/cargo/progression display;
-- bottom navigation.
+Because Site Deck is the only `FleetDock.inline` caller, delete `inline` and `_inlineChildren()` rather than preserving dead presentation code.
 
-This also removes the only caller of `FleetDock.inline`. Delete the inline rendering mode instead of keeping dead presentation code.
+#### Portrait
 
-#### Portrait layout
+Reclaim the bottom space currently reserved for Fleet Dock + navigation. Reserve only the existing 88px navigation height plus safe-area padding. Do not introduce a footer helper.
 
-The Site Deck currently reserves bottom space for both the inline Fleet Dock and the 88px navigation bar. After removing the Fleet Dock, reclaim that space and reserve only enough room for the existing navigation bar plus safe-area padding.
+#### Landscape
 
-Do not create a generic footer/layout abstraction. Adjust the existing portrait stack directly and cover it with the current layout tests.
+Remove the fixed 320px Fleet Dock column and let the site list use the available width. Do not replace the rail with another panel.
 
-#### Landscape layout
+#### Shell cut must be atomic with the constructor cut
 
-Remove the fixed 320px Fleet Dock column. Let the existing site list use the available content width.
+The same production step that removes Site Deck fleet fields must also stop `MiningShell.build` from constructing/passing fleet data and callbacks to that surface. This keeps the repository compiling after the step instead of deferring shell wiring to a later task.
 
-No replacement sidebar is required in this ticket.
+Build `FleetDockView` only when a Mine Site is open.
 
 ### 2. Keep selection transient in MiningShell
 
-Do not put selected bay state into `MiningController`, `MiningSave`, or `FleetDockView`.
+Do not persist or move selected bay state into `MiningController`, `MiningSave`, or `FleetDockView`.
 
-`MiningShell._selectedBayId` already has the correct lifetime:
+`MiningShell._selectedBayId` already has the correct lifetime. Existing `_preserveDockSelection()` remains the final guard that clears selection when the selected bay is no longer occupied.
 
-- it is UI-only;
-- it follows the active planet;
-- existing `_preserveDockSelection()` clears it when the selected bay becomes empty;
-- active-planet changes already clear it.
+Active-planet changes continue to clear selection.
 
-HPA-452 only changes what selection becomes after successful spawn and merge actions.
+### 3. Successful spawn reports the filled bay; the shell does not reconstruct it
 
-### 3. Successful spawn selects the actual newly filled bay
+`MiningController.spawnRig()` already:
 
-`MiningController.spawnRig()` intentionally owns which empty bay is filled. The shell should not duplicate the controller's "first empty bay" policy.
+1. chooses the first empty active-planet bay;
+2. writes the T1 there;
+3. persists;
+4. returns `MiningActionResult.success()`.
 
-Before starting the spawn action, capture the active planet's dock map. After a successful persisted action, compare the before/after dock maps and select the bay that changed from `null` to non-null.
-
-This keeps selection behavior coupled to the actual controller result rather than to duplicated UI assumptions.
-
-If the spawn fails, keep the previous selection unchanged.
-
-### 4. Successful merge selects the upgraded target bay
-
-`MiningController.mergeDockRigs(sourceBay, targetBay)` clears the source bay and upgrades the target bay.
-
-Current shell behavior clears selection before the async mutation starts. Remove that eager clear.
-
-During the mutation, keep the source bay as the transient selection. After successful persistence:
-
-- set `_selectedBayId = targetBay`;
-- let `_preserveDockSelection()` validate it against the authoritative state.
-
-If persistence or validation fails, leave the original source selection in place so the player can retry or choose another target.
-
-This preserves the user's interaction thread and avoids false optimistic state.
-
-### 5. Add one small success hook to the existing action runner
-
-Reuse `_runSheetAction` instead of duplicating its persistence/audio/haptic/snackbar orchestration for spawn and merge.
-
-Add one optional success callback, invoked only after the controller action has successfully persisted and before the final selection-preservation pass.
-
-This callback is intentionally narrow:
-
-- spawn uses it to select the newly filled bay;
-- merge uses it to select the upgraded target bay;
-- all other actions omit it.
-
-Do not turn this into a generalized action pipeline, reducer, event bus, or command framework.
-
-### 6. Reuse FleetDockView's existing merge compatibility signal
-
-`FleetDockBayView.canMergeWithSelection` already identifies a valid same-tier non-T5 merge target. Keep that as the only compatibility signal.
-
-Enhance presentation in two places:
-
-1. compatible target bays get a stronger border/fill or small merge indicator;
-2. the dock shows a compact merge preview for the currently selected non-T5 rig.
-
-Add a small pure view property such as:
+Expose the chosen bay directly on the existing action result:
 
 ```dart
-String? mergePreview; // e.g. "T1 + T1 → T2"
+class MiningActionResult {
+  const MiningActionResult.success({
+    this.message,
+    this.dockBayId,
+  }) : isSuccess = true;
+
+  const MiningActionResult.failure(this.message)
+    : isSuccess = false,
+      dockBayId = null;
+
+  final bool isSuccess;
+  final String? message;
+  final DockBayId? dockBayId;
+}
 ```
 
-The exact property name may vary, but the value should be derived entirely inside `FleetDockView.from(...)` from the selected rig tier.
+`spawnRig()` returns `MiningActionResult.success(dockBayId: emptyBay)`.
 
-For a selected T5 rig, no merge preview is required because it cannot merge.
+Do not add a third result type and do not diff dock maps in the shell. `MiningSaleResult` already establishes that mutation results can carry success payloads when the presentation needs a fact produced by the mutation.
 
-### 7. Merge copy describes slot efficiency, not combined DPS
+On spawn success, the shell sets `_selectedBayId = result.dockBayId`. On failure, prior selection remains unchanged.
 
-The compact preview should pair the tier result with short explanatory copy such as:
+### 4. Successful merge selects the known target bay
 
-> Stronger per deployment slot
+`_handleDockBayTap(source -> target)` already knows the target `bayId`; no result payload or state diff is needed.
 
-Avoid claims such as "double output", "more total output", or "upgrade for higher combined production" because HPA-452 is not changing or re-balancing the rate formula.
+Remove the eager `_selectedBayId = null` before `mergeDockRigs(...)`.
 
-The Mine Site already has limited chrome, especially in landscape. Keep this explanation compact and local to the Fleet Dock; do not add a tutorial modal or persistent hint system.
+While persistence is in flight, keep the source selection. After success:
 
-### 8. Deploy and recall behavior stay unchanged
+- set `_selectedBayId = targetBay`;
+- run `_preserveDockSelection()` against authoritative controller state.
 
-After spawn/merge selects a dock rig, the existing Mine Site flow should work unchanged:
+On failure, leave the source selection intact so the player can retry or choose another target.
 
-- selected rig projects deployable cells through `MineSiteView`;
-- tapping a legal grid cell calls `MiningController.deployRig(...)`;
-- deployment empties the selected bay;
-- existing `_preserveDockSelection()` clears the now-empty selection.
+### 5. Reuse the existing action runner with one narrow success hook
 
-Recall behavior remains exactly as today:
+Extend `_runSheetAction(...)` with one optional callback receiving the successful `MiningActionResult`.
 
-- tapping an occupied rig cell recalls through the controller;
-- the controller chooses an empty dock bay;
-- the recalled bay is not auto-selected in this ticket.
+Invoke it only after persistence has succeeded and before the existing selection-preservation pass.
 
-That keeps HPA-452 focused on the two explicitly requested continuity improvements.
+Uses:
+
+- spawn reads `result.dockBayId` and selects it;
+- merge closes over its already-known target bay and selects it;
+- every other call site omits the callback.
+
+Do not turn this into an event bus, reducer, command object, or generic action pipeline.
+
+### 6. Reuse FleetDockView's existing compatibility signal
+
+`FleetDockBayView.canMergeWithSelection` is already the only merge-target compatibility signal. Do not add another compatibility model.
+
+Extend `FleetDockView.from(...)` with one optional pure projection such as:
+
+```dart
+String? mergePreview; // "T1 + T1 → T2 · STRONGER PER SLOT"
+```
+
+Derive it from the selected non-T5 tier. T5 and no-selection keep the current deploy instruction.
+
+`_BayButton` should use `canMergeWithSelection` for stronger fill/border emphasis. The flag currently exists but is not used by the button's selected/empty/occupied color branches.
+
+### 7. Put merge copy in the existing hint line, not new chrome
+
+The horizontal Fleet Dock already has one one-line instruction beside the FLEET label:
+
+- `TAP A RIG, THEN A NODE`;
+- `TAP A NODE TO DEPLOY`.
+
+When a non-T5 rig is selected, reuse that Text for:
+
+`T1 + T1 → T2 · STRONGER PER SLOT`
+
+It already uses one line plus ellipsis, so no dock height change or second chrome strip is required.
+
+The 104px landscape rail keeps its existing compact vertical composition. Do not add another row there; compatible-target emphasis/semantics remain visible without changing rail geometry.
+
+### 8. “Stronger per slot” is the truthful benefit
+
+Authored rig rate multipliers are:
+
+`[1.0, 1.5, 2.25, 3.25, 4.5]`.
+
+Two T1 rigs produce more combined rate than one T2, so do not claim that merging always increases total/combined output. The correct player-facing statement is stronger output per occupied deployment slot.
+
+No balance change belongs in HPA-452.
+
+### 9. Deploy and recall remain unchanged
+
+After spawn/merge selects a dock rig:
+
+- `MineSiteView` projects deployable cells as today;
+- a legal cell calls `MiningController.deployRig(...)`;
+- deploy empties the selected bay;
+- `_preserveDockSelection()` clears that now-empty selection.
+
+Recall remains unchanged and does **not** auto-select the returned rig.
 
 ## File-level changes
 
 ### `lib/mining/presentation/site_deck_screen.dart`
 
-- remove Fleet Dock imports and constructor fields;
+- remove Fleet Dock imports/fields/callbacks;
 - remove portrait inline Fleet Dock;
 - remove landscape Fleet Dock column;
-- reclaim the vacated layout space;
-- retain Site Deck navigation and site-card callbacks.
-
-### `lib/mining/presentation/fleet_dock.dart`
-
-- remove the unused `inline` mode;
-- retain horizontal and vertical Mine Site layouts;
-- visually distinguish `canMergeWithSelection` bays;
-- render the compact merge preview and slot-efficiency copy.
-
-### `lib/mining/fleet_dock_view.dart`
-
-- keep existing bay compatibility projection;
-- add the small selected-tier merge preview projection;
-- do not add mutation behavior.
+- reclaim space while preserving existing navigation.
 
 ### `lib/mining/presentation/mining_shell.dart`
 
-- only build/pass `FleetDockView` for Mine Site;
-- stop wiring fleet callbacks into Site Deck;
-- add the narrow post-success callback to `_runSheetAction`;
-- derive/select the actual newly spawned bay after success;
-- retain source selection while merge is in flight;
-- select the merge target after success.
+- cut Site Deck fleet wiring in the same step as its constructor change;
+- create/pass `FleetDockView` only for Mine Site;
+- add the narrow `MiningActionResult` success callback to `_runSheetAction`;
+- spawn selects `result.dockBayId`;
+- merge keeps source selection during persistence and selects target on success.
 
-No production changes are expected in `mining_controller.dart`, `mining_state.dart`, `mining_simulation.dart`, or `mining_save_repository.dart`.
+### `lib/mining/mining_controller.dart`
+
+- add optional `DockBayId? dockBayId` success metadata to `MiningActionResult`;
+- return `emptyBay` from successful `spawnRig()`;
+- change no mutation rule, persistence ordering, or economy behavior.
+
+### `lib/mining/fleet_dock_view.dart`
+
+- keep `canMergeWithSelection`;
+- add optional selected-tier `mergePreview`.
+
+### `lib/mining/presentation/fleet_dock.dart`
+
+- delete `inline`;
+- use `canMergeWithSelection` for target emphasis;
+- reuse the existing horizontal hint Text for merge preview/copy;
+- do not add a second row.
+
+No changes are expected in `mining_state.dart`, `mining_simulation.dart`, or `mining_save_repository.dart`.
 
 ## Verification strategy
 
-### Pure projection coverage
+### Controller result payload
 
-Extend `test/mining/fleet_dock_view_test.dart` to cover:
+Extend `test/mining/mining_controller_test.dart`:
 
-- selected T1 projects `T1 + T1 → T2`;
-- compatible same-tier bays remain marked as merge targets;
-- T5 has no merge preview;
-- busy state still disables merge targets.
+- successful spawn reports the actual filled `DockBayId`;
+- failed spawn reports no `dockBayId`;
+- existing spawn state/persistence assertions stay authoritative.
 
-### Site Deck coverage
+### Site Deck and shell ownership cut
 
-Update `test/mining/presentation/site_deck_screen_test.dart` and constructor users to prove:
+Update `test/mining/presentation/site_deck_screen_test.dart`:
 
-- portrait Site Deck contains no `fleet-dock`;
-- landscape Site Deck contains no `fleet-dock`;
-- site entry/unlock and navigation callbacks still work;
-- reclaimed portrait/landscape space does not overlap the navigation bar.
+- portrait and landscape contain no `fleet-dock`;
+- site entry/unlock/navigation callbacks still work;
+- reclaimed content does not overlap the 88px navigation bar;
+- interaction-size checks cover only Site Deck-owned controls.
 
-Update `visual_parity_golden_test.dart` fixtures for the slimmer constructor and Site Deck ownership change.
+Update `test/mining/presentation/mining_shell_test.dart` in the same task:
 
-### Mine Site / shell behavior
+- Site Deck HUD now expects Fleet Dock absence;
+- any fleet interaction test enters a Mine Site before touching bays/spawn;
+- travel/unlock selection-clear tests select the rig in Mine Site first;
+- delayed-save spawn, empty-bay reject, mismatched-tier reselect, and stale second spawn are moved to Mine Site;
+- the old “Site Deck wires bay selection, merge, spawn…” test is replaced by Mine Site continuity coverage.
 
-Update `test/mining/presentation/mining_shell_test.dart` so fleet operations are performed after entering a Mine Site.
+Update skipped `visual_parity_golden_test.dart` only so constructors compile; it is not a layout gate.
 
-Add explicit flows:
+### Fleet projection/presentation
 
-1. **spawn continuity**
+Extend `test/mining/fleet_dock_view_test.dart`:
+
+- T1/T4 previews project the expected next tier;
+- T5/no-selection use no preview;
+- busy state still suppresses compatible targets.
+
+Extend `test/mining/presentation/mine_site_screen_test.dart`:
+
+- four bays and spawn remain in portrait/landscape;
+- compatible bays expose merge-target emphasis/semantics;
+- preview uses the existing hint row;
+- existing dock-vs-navigation non-overlap and 104px landscape rail geometry remain green.
+
+### Continuity behavior
+
+In `mining_shell_test.dart` prove behavior rather than private selection:
+
+1. **spawn → deploy**
    - enter Mine Site;
-   - spawn a T1;
-   - without tapping its bay, tap a legal resource perimeter cell;
-   - verify that the newly spawned rig deploys.
+   - spawn;
+   - do not tap the new bay;
+   - tap a legal perimeter cell;
+   - assert T1 deploys.
 
-2. **merge continuity**
+2. **merge → deploy**
    - enter Mine Site;
-   - select one T1 and tap a compatible T1 target;
-   - verify the target becomes T2;
-   - without reselecting the target bay, tap a legal placement cell;
-   - verify T2 deploys.
+   - select source T1;
+   - tap compatible T1 target;
+   - do not reselect target;
+   - tap a legal perimeter cell;
+   - assert T2 deploys.
 
 3. **failure preservation**
-   - failed spawn/merge persistence does not invent a new selection;
-   - existing reject audio/message behavior remains.
-
-Keep the existing controller tests for mutation legality unchanged unless a regression requires only fixture updates.
+   - spawn persistence failure does not select a phantom bay;
+   - merge/reject paths retain existing authoritative messages/audio.
 
 ## Acceptance mapping
 
-- **Site Deck no longer exposes fleet controls**: constructor/layout removal plus portrait/landscape widget tests.
-- **Spawn then place with no extra bay tap**: shell spawn-continuity test.
-- **Merge leaves upgraded rig selected and deployable**: shell merge-continuity test.
-- **Invalid placement/blocked actions remain authoritative**: no controller/view legality changes; existing Mine Site tests retained.
-- **No save/economy changes**: no changes to save/controller/simulation contracts.
+- **Site Deck no fleet controls**: constructor/shell ownership cut plus portrait/landscape tests.
+- **Spawn immediately placeable**: controller result payload plus spawn→deploy shell test.
+- **Merged rig remains ready**: merge→deploy shell test.
+- **Merge affordance**: pure preview + existing compatibility flag + existing hint line + target emphasis.
+- **Invalid placement/messages unchanged**: no legality/controller-rule changes.
+- **No save/economy changes**: save/simulation contracts untouched.
 
 ## Assets
 
-No image generation is required.
-
-Reuse the existing rig art, merge icon, Flutter typography, borders, and color emphasis. If a later visual review concludes that a dedicated merge-effect asset is needed, that should be a separate art task rather than added to HPA-452.
+No image generation is required. Reuse the current rig art, merge icon, text, and `MiningHex` styling. If dedicated art is later justified, scope it as a separate task.
