@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mining_content.dart';
-import 'package:horologium/mining/presentation/fleet_dock.dart';
 import 'package:horologium/mining/presentation/mining_dashed_border.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_hud.dart';
@@ -14,22 +12,16 @@ class SiteDeckScreen extends StatelessWidget {
   const SiteDeckScreen({
     super.key,
     required this.view,
-    required this.fleetDock,
     required this.onEnterSite,
     required this.onUnlockSite,
-    required this.onBayTap,
-    required this.onSpawnRig,
     required this.onDestinationSelected,
     this.cash = 0,
     this.selectedDestination = MiningNavigationDestination.siteDeck,
   });
 
   final SiteDeckView view;
-  final FleetDockView fleetDock;
   final ValueChanged<MiningSiteId> onEnterSite;
   final ValueChanged<MiningSiteId> onUnlockSite;
-  final ValueChanged<DockBayId> onBayTap;
-  final VoidCallback onSpawnRig;
   final ValueChanged<MiningNavigationDestination> onDestinationSelected;
   final int cash;
   final MiningNavigationDestination selectedDestination;
@@ -41,13 +33,10 @@ class SiteDeckScreen extends StatelessWidget {
     if (!landscape) {
       return _PortraitSiteDeck(
         view: view,
-        fleetDock: fleetDock,
         cash: cash,
         selectedDestination: selectedDestination,
         onEnterSite: onEnterSite,
         onUnlockSite: onUnlockSite,
-        onBayTap: onBayTap,
-        onSpawnRig: onSpawnRig,
         onDestinationSelected: onDestinationSelected,
       );
     }
@@ -71,30 +60,16 @@ class SiteDeckScreen extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ListView.separated(
-                      key: const Key('site-deck-scroll'),
-                      padding: const EdgeInsets.all(12),
-                      itemCount: view.sites.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 9),
-                      itemBuilder: (context, index) => _SiteCard(
-                        card: view.sites[index],
-                        onEnter: () => onEnterSite(view.sites[index].id),
-                        onUnlock: () => onUnlockSite(view.sites[index].id),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 320,
-                    child: FleetDock(
-                      view: fleetDock,
-                      onBayTap: onBayTap,
-                      onSpawnRig: onSpawnRig,
-                    ),
-                  ),
-                ],
+              child: ListView.separated(
+                key: const Key('site-deck-scroll'),
+                padding: const EdgeInsets.all(12),
+                itemCount: view.sites.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 9),
+                itemBuilder: (context, index) => _SiteCard(
+                  card: view.sites[index],
+                  onEnter: () => onEnterSite(view.sites[index].id),
+                  onUnlock: () => onUnlockSite(view.sites[index].id),
+                ),
               ),
             ),
             MiningNavigationBar(
@@ -111,24 +86,18 @@ class SiteDeckScreen extends StatelessWidget {
 class _PortraitSiteDeck extends StatelessWidget {
   const _PortraitSiteDeck({
     required this.view,
-    required this.fleetDock,
     required this.cash,
     required this.selectedDestination,
     required this.onEnterSite,
     required this.onUnlockSite,
-    required this.onBayTap,
-    required this.onSpawnRig,
     required this.onDestinationSelected,
   });
 
   final SiteDeckView view;
-  final FleetDockView fleetDock;
   final int cash;
   final MiningNavigationDestination selectedDestination;
   final ValueChanged<MiningSiteId> onEnterSite;
   final ValueChanged<MiningSiteId> onUnlockSite;
-  final ValueChanged<DockBayId> onBayTap;
-  final VoidCallback onSpawnRig;
   final ValueChanged<MiningNavigationDestination> onDestinationSelected;
 
   @override
@@ -193,7 +162,7 @@ class _PortraitSiteDeck extends StatelessWidget {
             left: 14,
             right: 14,
             top: 164 + pad.top,
-            bottom: 198 + pad.bottom,
+            bottom: 96 + pad.bottom,
             child: SingleChildScrollView(
               key: const Key('site-deck-scroll'),
               child: Column(
@@ -214,18 +183,6 @@ class _PortraitSiteDeck extends StatelessWidget {
                   ],
                 ],
               ),
-            ),
-          ),
-          Positioned(
-            left: 14,
-            right: 14,
-            bottom: 96 + pad.bottom,
-            height: 64,
-            child: FleetDock(
-              view: fleetDock,
-              inline: true,
-              onBayTap: onBayTap,
-              onSpawnRig: onSpawnRig,
             ),
           ),
           Positioned(

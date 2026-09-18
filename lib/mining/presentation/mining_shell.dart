@@ -372,7 +372,10 @@ class _MiningShellState extends State<MiningShell>
   void _leaveSite() {
     if (!mounted) return;
     unawaited(_audioManager.playSound(GameSound.tap));
-    setState(() => _openSiteId = null);
+    setState(() {
+      _openSiteId = null;
+      _selectedBayId = null;
+    });
   }
 
   void _handleSiteGridCellTap(MiningGridCell cell) {
@@ -474,6 +477,7 @@ class _MiningShellState extends State<MiningShell>
     setState(() {
       _selectedDestination = destination;
       _openSiteId = null;
+      _selectedBayId = null;
     });
   }
 
@@ -610,12 +614,6 @@ class _MiningShellState extends State<MiningShell>
         content: _content,
         isBusy: _controller.isBusy,
       );
-      final fleetDock = FleetDockView.from(
-        state: _displayState,
-        content: _content,
-        selectedBayId: _selectedBayId,
-        isBusy: _controller.isBusy,
-      );
       final siteId = _openSiteId;
       if (_selectedDestination == MiningNavigationDestination.stellarMap) {
         surface = StellarMapScreen(
@@ -636,15 +634,18 @@ class _MiningShellState extends State<MiningShell>
       } else if (siteId == null) {
         surface = SiteDeckScreen(
           view: siteDeck,
-          fleetDock: fleetDock,
           cash: _displayState.cash,
           onEnterSite: _enterSite,
           onUnlockSite: _unlockSite,
-          onBayTap: _handleDockBayTap,
-          onSpawnRig: _spawnRig,
           onDestinationSelected: _handleNavigation,
         );
       } else {
+        final fleetDock = FleetDockView.from(
+          state: _displayState,
+          content: _content,
+          selectedBayId: _selectedBayId,
+          isBusy: _controller.isBusy,
+        );
         final mineSite = MineSiteView.from(
           state: _displayState,
           content: _content,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
@@ -41,21 +40,11 @@ SiteProgress _progress({
 SiteDeckView _deckView(MiningSave state) =>
     SiteDeckView.from(state: state, content: _content, isBusy: false);
 
-FleetDockView _dockView(MiningSave state) => FleetDockView.from(
-  state: state,
-  content: _content,
-  selectedBayId: null,
-  isBusy: false,
-);
-
 Future<void> _pumpDeck(
   WidgetTester tester, {
   required SiteDeckView view,
-  required FleetDockView dock,
   ValueChanged<MiningSiteId>? onEnterSite,
   ValueChanged<MiningSiteId>? onUnlockSite,
-  ValueChanged<DockBayId>? onBayTap,
-  VoidCallback? onSpawnRig,
   ValueChanged<MiningNavigationDestination>? onDestinationSelected,
 }) async {
   tester.view.devicePixelRatio = 1;
@@ -69,11 +58,8 @@ Future<void> _pumpDeck(
       theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
       home: SiteDeckScreen(
         view: view,
-        fleetDock: dock,
         onEnterSite: onEnterSite ?? (_) {},
         onUnlockSite: onUnlockSite ?? (_) {},
-        onBayTap: onBayTap ?? (_) {},
-        onSpawnRig: onSpawnRig ?? () {},
         onDestinationSelected: onDestinationSelected ?? (_) {},
       ),
     ),
@@ -98,9 +84,17 @@ void main() {
         ),
       },
     );
-    await _pumpDeck(tester, view: _deckView(state), dock: _dockView(state));
+    await _pumpDeck(tester, view: _deckView(state));
     tester.view.physicalSize = const Size(402, 874);
     await tester.pump();
+
+    final scroll = tester.getRect(find.byKey(const Key('site-deck-scroll')));
+    expect(scroll.bottom, 778);
+    expect(
+      find.byKey(const Key('fleet-dock')),
+      findsNothing,
+      reason: 'Fleet management is Mine-Site-only.',
+    );
 
     final first = tester.getRect(
       find.byKey(const Key('site-card-landingBasin')),
@@ -143,7 +137,7 @@ void main() {
     tester,
   ) async {
     final state = _stateWith();
-    await _pumpDeck(tester, view: _deckView(state), dock: _dockView(state));
+    await _pumpDeck(tester, view: _deckView(state));
 
     final selected = tester.widget<MiningHex>(
       find.ancestor(
@@ -169,7 +163,7 @@ void main() {
     final fresh = _deckView(
       _stateWith(sites: {MiningSiteId.landingBasin: _progress(unlocked: true)}),
     );
-    await _pumpDeck(tester, view: fresh, dock: _dockView(_stateWith()));
+    await _pumpDeck(tester, view: fresh);
     expect(
       find.byKey(const Key('site-card-landingBasin-node-dots')),
       findsNothing,
@@ -210,11 +204,8 @@ void main() {
               },
             ),
           ),
-          fleetDock: _dockView(_stateWith()),
           onEnterSite: (_) {},
           onUnlockSite: (_) {},
-          onBayTap: (_) {},
-          onSpawnRig: () {},
           onDestinationSelected: (_) {},
         ),
       ),
@@ -254,7 +245,7 @@ void main() {
         ),
       },
     );
-    await _pumpDeck(tester, view: _deckView(state), dock: _dockView(state));
+    await _pumpDeck(tester, view: _deckView(state));
     tester.view.physicalSize = const Size(430, 932);
     await tester.pump();
 
@@ -290,7 +281,7 @@ void main() {
     expect(find.text('250'), findsOneWidget);
   });
 
-  testWidgets('emits site, dock, spawn, and bottom navigation callbacks', (
+  testWidgets('emits site entry, unlock, and bottom navigation callbacks', (
     tester,
   ) async {
     final state = _stateWith(
@@ -299,17 +290,12 @@ void main() {
     );
     final entered = <MiningSiteId>[];
     final unlocked = <MiningSiteId>[];
-    final bays = <DockBayId>[];
     final destinations = <MiningNavigationDestination>[];
-    var spawned = false;
     await _pumpDeck(
       tester,
       view: _deckView(state),
-      dock: _dockView(state),
       onEnterSite: entered.add,
       onUnlockSite: unlocked.add,
-      onBayTap: bays.add,
-      onSpawnRig: () => spawned = true,
       onDestinationSelected: destinations.add,
     );
 
@@ -320,23 +306,16 @@ void main() {
     );
     await tester.pump();
     await tester.tap(find.byKey(const Key('site-card-carbonRidge-unlock')));
-    await tester.tap(find.byKey(const ValueKey<String>('b1')));
-    await tester.tap(find.byKey(const ValueKey<String>('b2')));
-    await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
     await tester.tap(find.byKey(const Key('mining-nav-technology')));
 
     expect(entered, <MiningSiteId>[MiningSiteId.landingBasin]);
     expect(unlocked, <MiningSiteId>[MiningSiteId.carbonRidge]);
-    expect(bays, <DockBayId>[DockBayId.b1, DockBayId.b2]);
-    expect(spawned, isTrue);
     expect(destinations, <MiningNavigationDestination>[
       MiningNavigationDestination.technology,
     ]);
   });
 
-  testWidgets('keeps four bay controls and interactive targets accessible', (
-    tester,
-  ) async {
+  testWidgets('keeps interactive targets accessible', (tester) async {
     final initial = MiningSave.initial(nowUtc: _start);
     final state = initial.copyWith(
       cash: 2_000,
@@ -345,31 +324,7 @@ void main() {
           entry.key: entry.value.copyWith(unlocked: true),
       },
     );
-    await _pumpDeck(tester, view: _deckView(state), dock: _dockView(state));
-
-    expect(DockBayId.values, hasLength(4));
-    for (final bay in DockBayId.values) {
-      final control = find.byKey(ValueKey<String>(bay.name));
-      expect(control, findsOneWidget);
-      final size = tester.getSize(control);
-      expect(size.width, greaterThanOrEqualTo(48));
-      expect(size.height, greaterThanOrEqualTo(48));
-      expect(
-        find.bySemanticsLabel(RegExp('Dock bay ${bay.name.toUpperCase()}')),
-        findsOneWidget,
-      );
-    }
-
-    final spawn = find.byKey(const Key('fleet-dock-spawn'));
-    expect(
-      tester.getRect(spawn).left,
-      greaterThan(
-        tester.getRect(find.byKey(const ValueKey<String>('b4'))).right,
-      ),
-    );
-    final spawnSize = tester.getSize(spawn);
-    expect(spawnSize.width, greaterThanOrEqualTo(48));
-    expect(spawnSize.height, greaterThanOrEqualTo(48));
+    await _pumpDeck(tester, view: _deckView(state));
 
     final scroll = find.byKey(const Key('site-deck-scroll'));
     for (final card in _deckView(state).sites) {
@@ -421,11 +376,8 @@ void main() {
       MaterialApp(
         home: SiteDeckScreen(
           view: _deckView(state),
-          fleetDock: _dockView(state),
           onEnterSite: (_) {},
           onUnlockSite: (_) {},
-          onBayTap: (_) {},
-          onSpawnRig: () {},
           onDestinationSelected: (_) {},
         ),
         builder: (context, child) => MediaQuery(
@@ -445,19 +397,21 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull);
       expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
-      expect(find.byKey(const Key('fleet-dock')), findsOneWidget);
+      expect(
+        find.byKey(const Key('fleet-dock')),
+        findsNothing,
+        reason: 'Fleet management is Mine-Site-only.',
+      );
       expect(find.byKey(const Key('mining-bottom-navigation')), findsOneWidget);
       final navRect = tester.getRect(
         find.byKey(const Key('mining-bottom-navigation')),
       );
-      final dockRect = tester.getRect(find.byKey(const Key('fleet-dock')));
-      expect(navRect.overlaps(dockRect), isFalse);
       expect(navRect.bottom, lessThanOrEqualTo(size.height));
     }
   });
 
   testWidgets(
-    'keeps the landscape site action reachable above the fixed dock',
+    'keeps the landscape site action reachable above the navigation',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(874, 402);
@@ -473,11 +427,8 @@ void main() {
         MaterialApp(
           home: SiteDeckScreen(
             view: _deckView(state),
-            fleetDock: _dockView(state),
             onEnterSite: (_) {},
             onUnlockSite: (_) {},
-            onBayTap: (_) {},
-            onSpawnRig: () {},
             onDestinationSelected: (_) {},
           ),
           builder: (context, child) => MediaQuery(
@@ -492,24 +443,17 @@ void main() {
 
       final action = find.byKey(const Key('site-card-landingBasin-enter'));
       final initialActionRect = tester.getRect(action);
-      final dockRect = tester.getRect(find.byKey(const Key('fleet-dock')));
       final navRect = tester.getRect(
         find.byKey(const Key('mining-bottom-navigation')),
       );
       expect(initialActionRect.top, greaterThanOrEqualTo(0));
       expect(initialActionRect.bottom, lessThanOrEqualTo(navRect.top));
-      expect(initialActionRect.overlaps(dockRect), isFalse);
       expect(initialActionRect.overlaps(navRect), isFalse);
-      final spawn = find.byKey(const Key('fleet-dock-spawn'));
-      final spawnSize = tester.getSize(spawn);
-      expect(spawnSize.width, greaterThanOrEqualTo(48));
-      expect(spawnSize.height, greaterThanOrEqualTo(48));
-      for (final bay in DockBayId.values) {
-        final control = find.byKey(ValueKey<String>(bay.name));
-        final size = tester.getSize(control);
-        expect(size.width, greaterThanOrEqualTo(48));
-        expect(size.height, greaterThanOrEqualTo(48));
-      }
+      expect(
+        find.byKey(const Key('fleet-dock')),
+        findsNothing,
+        reason: 'Fleet management is Mine-Site-only.',
+      );
       for (final destination in MiningNavigationDestination.values) {
         final control = find.byKey(Key('mining-nav-${destination.name}'));
         final size = tester.getSize(control);
@@ -521,7 +465,6 @@ void main() {
       final actionRect = tester.getRect(action);
       expect(actionRect.top, greaterThanOrEqualTo(0));
       expect(actionRect.bottom, lessThanOrEqualTo(navRect.top));
-      expect(actionRect.overlaps(dockRect), isFalse);
       expect(actionRect.overlaps(navRect), isFalse);
       expect(actionRect.height, greaterThanOrEqualTo(48));
     },
@@ -537,7 +480,7 @@ void main() {
     final state = _stateWith(
       sites: {MiningSiteId.landingBasin: _progress(unlocked: true)},
     );
-    await _pumpDeck(tester, view: _deckView(state), dock: _dockView(state));
+    await _pumpDeck(tester, view: _deckView(state));
 
     final granite = find.byKey(const Key('site-card-graniteCrater'));
     expect(granite, findsOneWidget);
@@ -589,11 +532,8 @@ void main() {
         theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
         home: SiteDeckScreen(
           view: _deckView(state),
-          fleetDock: _dockView(state),
           onEnterSite: (_) {},
           onUnlockSite: (_) {},
-          onBayTap: (_) {},
-          onSpawnRig: () {},
           onDestinationSelected: (_) {},
         ),
       ),

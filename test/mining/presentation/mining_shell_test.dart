@@ -17,6 +17,7 @@ import 'package:horologium/mining/presentation/mining_shell.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/fake_background_music_player.dart';
+import '../../support/mining_grid_fixtures.dart';
 import '../../support/mining_visual_frames.dart';
 
 class CountingMiningSaveRepository extends MiningSaveRepository {
@@ -122,6 +123,12 @@ Future<void> tapGridCell(WidgetTester tester, MiningGridCell cell) async {
 }
 
 const frozenRigCell = MiningGridCell(4, 2);
+
+/// Surveying-0 legal deploy cell for Carbon Ridge, used to prove dock
+/// selection does not leak across sites.
+final _carbonRidgeCell = deployableMiningCells(
+  MiningContentRegistry.stellarMining().site(MiningSiteId.carbonRidge),
+).first;
 
 Future<void> pumpShell(
   WidgetTester tester, {
@@ -289,7 +296,11 @@ void main() {
     await pumpShell(tester);
 
     expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
-    expect(find.byKey(const Key('fleet-dock')), findsOneWidget);
+    expect(
+      find.byKey(const Key('fleet-dock')),
+      findsNothing,
+      reason: 'Fleet management is Mine-Site-only.',
+    );
     expect(find.byKey(const Key('mining-bottom-navigation')), findsOneWidget);
     expect(find.byKey(const Key('mining-cash-chip')), findsOneWidget);
     expect(find.byKey(const Key('mining-cargo-gauge')), findsOneWidget);
@@ -397,7 +408,10 @@ void main() {
       );
       await pumpShell(tester, repository: repository);
 
+      await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey<String>('b1')));
+      await tester.pump();
       await tester.tap(find.byKey(const Key('mining-nav-stellarMap')));
       await tester.pump();
       final travel = find.byKey(
@@ -443,7 +457,10 @@ void main() {
     );
     await pumpShell(tester, repository: repository);
 
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey<String>('b1')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('mining-nav-stellarMap')));
     await tester.pump();
     final unlock = find.byKey(
@@ -523,12 +540,18 @@ void main() {
     );
     addTearDown(audio.dispose);
     await pumpShell(tester, repository: repository, audioManager: audio);
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
     repository.delayNextSave = true;
     await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
     await tester.pump();
     repository.allowSave.completeError(StateError('save failed'));
     await tester.pump();
-    expect(effects.playedAssets, ['audio/tap.wav', 'audio/reject.wav']);
+    expect(effects.playedAssets, [
+      'audio/tap.wav',
+      'audio/tap.wav',
+      'audio/reject.wav',
+    ]);
     expect(shellHandles(tester).controller.state.cash, 100);
   });
 
@@ -563,7 +586,7 @@ void main() {
     },
   );
 
-  testWidgets('Site Deck wires bay selection, merge, spawn, and site entry', (
+  testWidgets('Mine Site wires bay selection, merge, spawn, and site exit', (
     tester,
   ) async {
     final repository = CountingMiningSaveRepository();
@@ -576,6 +599,8 @@ void main() {
     addTearDown(audio.dispose);
     await pumpShell(tester, repository: repository, audioManager: audio);
 
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey<String>('b1')));
     await tester.tap(find.byKey(const ValueKey<String>('b2')));
     await tester.pump(const Duration(milliseconds: 300));
@@ -599,20 +624,63 @@ void main() {
     );
     expect(controller.state.cash, 75);
 
-    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
-    await tester.pump();
-    expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
     await tester.tap(find.byKey(const Key('mine-site-back')));
     await tester.pump();
     expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+    expect(
+      find.byKey(const Key('fleet-dock')),
+      findsNothing,
+      reason: 'Fleet management is Mine-Site-only.',
+    );
     expect(effects.playedAssets, [
+      'audio/tap.wav',
       'audio/tap.wav',
       'audio/tap.wav',
       'audio/merge.wav',
       'audio/rig.wav',
       'audio/tap.wav',
-      'audio/tap.wav',
     ]);
+  });
+
+  testWidgets('dock selection clears when leaving Mine Site', (tester) async {
+    // Arrange two unlocked sites so a selection can be exercised across a
+    // site boundary.
+    final initial = MiningSave.initial(nowUtc: _start);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(
+      initial.copyWith(
+        sites: {
+          ...initial.sites,
+          MiningSiteId.carbonRidge: initial.sites[MiningSiteId.carbonRidge]!
+              .copyWith(unlocked: true),
+        },
+      ),
+    );
+    await pumpShell(tester, repository: repository);
+
+    // Enter site A and select a dock rig.
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey<String>('b1')));
+    await tester.pump();
+
+    // Back to Site Deck, then enter site B and tap a legal cell without
+    // selecting again.
+    await tester.tap(find.byKey(const Key('mine-site-back')));
+    await tester.pump();
+    final enterCarbonRidge = find.byKey(
+      const Key('site-card-carbonRidge-enter'),
+    );
+    await tester.ensureVisible(enterCarbonRidge);
+    await tester.pump();
+    await tester.tap(enterCarbonRidge);
+    await tester.pump();
+    await tapGridCell(tester, _carbonRidgeCell);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final state = shellHandles(tester).controller.state;
+    expect(state.sites[MiningSiteId.carbonRidge]!.rigPlacements, isEmpty);
+    expect(find.text('Select a rig from the dock.'), findsOneWidget);
   });
 
   testWidgets('Mine Site deploys and recalls through the controller', (
@@ -1323,6 +1391,8 @@ void main() {
     );
     addTearDown(audio.dispose);
     await pumpShell(tester, repository: repository, audioManager: audio);
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
 
     // The keyed Container is clipped inside the bay's MiningHex, so tap the
     // InkWell ancestor that actually receives the gesture.
@@ -1334,7 +1404,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Select an occupied rig bay.'), findsOneWidget);
-    expect(effects.playedAssets, ['audio/tap.wav', 'audio/reject.wav']);
+    expect(effects.playedAssets, [
+      'audio/tap.wav',
+      'audio/tap.wav',
+      'audio/reject.wav',
+    ]);
   });
 
   testWidgets('tapping a mismatched dock rig reselects it', (tester) async {
@@ -1358,6 +1432,8 @@ void main() {
     );
     addTearDown(audio.dispose);
     await pumpShell(tester, repository: repository, audioManager: audio);
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
 
     await tester.tap(find.byKey(const ValueKey<String>('b1')));
     await tester.tap(find.byKey(const ValueKey<String>('b2')));
@@ -1368,6 +1444,7 @@ void main() {
       findsOneWidget,
     );
     expect(effects.playedAssets, [
+      'audio/tap.wav',
       'audio/tap.wav',
       'audio/tap.wav',
       'audio/tap.wav',
@@ -1450,6 +1527,8 @@ void main() {
     );
     addTearDown(audio.dispose);
     await pumpShell(tester, repository: repository, audioManager: audio);
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
 
     final spawn = find.byKey(const Key('fleet-dock-spawn'));
     // The first spawn drains cash to zero; the still-enabled stale button
@@ -1465,6 +1544,7 @@ void main() {
     expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b4], isNull);
     expect(find.text('Not enough cash.'), findsOneWidget);
     expect(effects.playedAssets, [
+      'audio/tap.wav',
       'audio/tap.wav',
       'audio/rig.wav',
       'audio/reject.wav',

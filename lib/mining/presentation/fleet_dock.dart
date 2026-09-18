@@ -14,14 +14,12 @@ class FleetDock extends StatelessWidget {
     required this.onBayTap,
     required this.onSpawnRig,
     this.axis = FleetDockAxis.horizontal,
-    this.inline = false,
   });
 
   final FleetDockView view;
   final ValueChanged<DockBayId> onBayTap;
   final VoidCallback onSpawnRig;
   final FleetDockAxis axis;
-  final bool inline;
 
   @override
   Widget build(BuildContext context) {
@@ -29,9 +27,7 @@ class FleetDock extends StatelessWidget {
       key: const Key('fleet-dock'),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       color: Colors.transparent,
-      child: inline
-          ? Row(children: _inlineChildren())
-          : axis == FleetDockAxis.vertical
+      child: axis == FleetDockAxis.vertical
           ? SizedBox.expand(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -44,28 +40,6 @@ class FleetDock extends StatelessWidget {
             ),
     );
   }
-
-  List<Widget> _inlineChildren() => [
-    const SizedBox(width: 54, child: _FleetLabel()),
-    for (final bayId in DockBayId.values) ...[
-      Expanded(
-        child: SizedBox(
-          height: 58,
-          child: _BayButton(
-            view: view.bay(bayId),
-            onTap: () => onBayTap(bayId),
-          ),
-        ),
-      ),
-      if (bayId != DockBayId.values.last) const SizedBox(width: 4),
-    ],
-    const SizedBox(width: 4),
-    SizedBox(
-      width: 48,
-      height: 54,
-      child: _SpawnHex(view: view, onSpawnRig: onSpawnRig),
-    ),
-  ];
 
   List<Widget> _horizontalChildren() => [
     Row(

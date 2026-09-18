@@ -11,9 +11,7 @@ import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
-import 'package:horologium/mining/presentation/site_deck_screen.dart';
 import 'package:horologium/mining/presentation/stellar_map_screen.dart';
-import 'package:horologium/mining/site_deck_view.dart';
 
 final _content = MiningContentRegistry.stellarMining();
 final _now = DateTime.utc(2026, 8, 29, 12);
@@ -76,45 +74,6 @@ void main() {
       await loader.load();
     }
   });
-
-  testWidgets(
-    'Site Deck portrait visual contract',
-    (tester) async {
-      final state = _operationalState();
-      await _pumpSurface(
-        tester,
-        size: const Size(430, 932),
-        child: SiteDeckScreen(
-          cash: state.cash,
-          view: SiteDeckView.from(
-            state: state,
-            content: _content,
-            isBusy: false,
-          ),
-          fleetDock: FleetDockView.from(
-            state: state,
-            content: _content,
-            selectedBayId: null,
-            isBusy: false,
-          ),
-          onEnterSite: (_) {},
-          onUnlockSite: (_) {},
-          onBayTap: (_) {},
-          onSpawnRig: () {},
-          onDestinationSelected: (_) {},
-        ),
-      );
-
-      await expectLater(
-        find.byType(SiteDeckScreen),
-        matchesGoldenFile('goldens/site_deck_430x932.png'),
-      );
-    },
-    // HPA-285: golden stale after 815d17c added the portrait _LockedSite
-    // prerequisite-gate copy; regenerate on Linux (FreeType). Structural
-    // coverage lives in site_deck_screen_test.dart.
-    skip: true,
-  );
 
   for (final size in [const Size(430, 932), const Size(874, 402)]) {
     testWidgets(
