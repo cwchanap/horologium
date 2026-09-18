@@ -82,7 +82,53 @@ void main() {
     );
 
     expect(view.bays[DockBayId.b1]!.hint, contains('Selected'));
-    expect(view.bays[DockBayId.b2]!.hint, contains('Merge'));
+    expect(view.bays[DockBayId.b2]!.hint, 'Merge with selected bay.');
     expect(view.bays[DockBayId.b3]!.hint, contains('Empty'));
+  });
+
+  test('resolves dockHint for every dock instruction state', () {
+    FleetDockView viewFor({
+      Map<DockBayId, RigTier?>? bays,
+      DockBayId? selectedBayId,
+    }) => FleetDockView.from(
+      state: stateWith(bays: bays),
+      content: content,
+      selectedBayId: selectedBayId,
+      isBusy: false,
+    );
+
+    expect(viewFor().dockHint, 'TAP A RIG, THEN A NODE');
+
+    // The initial homeworld dock holds T1 rigs in b1 and b2.
+    expect(
+      viewFor(selectedBayId: DockBayId.b1).dockHint,
+      'T1 + T1 = T2 • STRONGER PER SLOT',
+    );
+    expect(
+      viewFor(
+        bays: {DockBayId.b1: RigTier.t4},
+        selectedBayId: DockBayId.b1,
+      ).dockHint,
+      'T4 + T4 = T5 • STRONGER PER SLOT',
+    );
+    expect(
+      viewFor(
+        bays: {DockBayId.b1: RigTier.t5},
+        selectedBayId: DockBayId.b1,
+      ).dockHint,
+      'TAP A NODE TO DEPLOY',
+    );
+  });
+
+  test('busy state keeps the merge flag off without a merge hint', () {
+    final busy = FleetDockView.from(
+      state: stateWith(),
+      content: content,
+      selectedBayId: DockBayId.b1,
+      isBusy: true,
+    );
+
+    expect(busy.bays[DockBayId.b2]!.canMergeWithSelection, isFalse);
+    expect(busy.bays[DockBayId.b2]!.hint, isNot(contains('Merge')));
   });
 }

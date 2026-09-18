@@ -32,6 +32,7 @@ class FleetDockView {
     required this.canSpawn,
     required this.spawnDisabledReason,
     required this.spawnHint,
+    required this.dockHint,
     required this.isBusy,
   });
 
@@ -41,6 +42,10 @@ class FleetDockView {
   final bool canSpawn;
   final String? spawnDisabledReason;
   final String spawnHint;
+
+  /// Resolved instruction copy for the dock hint row.
+  final String dockHint;
+
   final bool isBusy;
 
   FleetDockBayView bay(DockBayId id) => bays[id]!;
@@ -57,6 +62,17 @@ class FleetDockView {
   }) {
     final dock = state.docks[state.activePlanetId]!;
     final spawnCost = content.planet(state.activePlanetId).rigSpawnCost;
+    final selectedRig = selectedBayId == null ? null : dock[selectedBayId];
+    final String dockHint;
+    if (selectedRig == null) {
+      dockHint = 'TAP A RIG, THEN A NODE';
+    } else if (selectedRig == RigTier.t5) {
+      dockHint = 'TAP A NODE TO DEPLOY';
+    } else {
+      final tier = selectedRig.name.toUpperCase();
+      final next = RigTier.values[selectedRig.index + 1].name.toUpperCase();
+      dockHint = '$tier + $tier = $next • STRONGER PER SLOT';
+    }
     final hasEmptyBay = DockBayId.values.any((id) => dock[id] == null);
     final spawnDisabledReason = isBusy
         ? 'Finishing previous action…'
@@ -70,7 +86,6 @@ class FleetDockView {
     for (final id in DockBayId.values) {
       final rig = dock[id];
       final isSelected = selectedBayId == id;
-      final selectedRig = selectedBayId == null ? null : dock[selectedBayId];
       final canMergeWithSelection =
           !isBusy &&
           !isSelected &&
@@ -108,6 +123,7 @@ class FleetDockView {
       spawnHint: canSpawn
           ? 'Spawn a T1 rig for $spawnCost cash.'
           : spawnDisabledReason,
+      dockHint: dockHint,
       isBusy: isBusy,
     );
   }
