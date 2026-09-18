@@ -591,7 +591,7 @@ void main() {
             {'tier': 't2', 'x': 3, 'y': 2},
           ]),
           rawWithLandingPlacements([
-            {'tier': 't1', 'x': 0, 'y': 0},
+            {'tier': 't1', 'x': -1, 'y': 0},
           ]),
           rawWithLandingPlacements([
             {'tier': 't1', 'x': _surveyLockedCell.x, 'y': _surveyLockedCell.y},

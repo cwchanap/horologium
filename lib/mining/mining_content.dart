@@ -35,13 +35,14 @@ class MiningSiteDefinition {
     required this.saleValuePerUnit,
     required this.gridWidth,
     required this.gridHeight,
-    required this.deposits,
+    required List<MiningDepositDefinition> deposits,
     required this.cavernAsset,
     required this.depositAsset,
     required this.cardAsset,
     this.facilityName,
     this.discoveryText,
-  }) : perimeterCellsByDeposit = _perimeterCellsByDeposit(
+  }) : deposits = List.unmodifiable(deposits),
+       perimeterCellsByDeposit = _perimeterCellsByDeposit(
          gridWidth: gridWidth,
          gridHeight: gridHeight,
          deposits: deposits,
@@ -146,17 +147,17 @@ class ResourceSilhouette {
 }
 
 class MiningPlanetDefinition {
-  const MiningPlanetDefinition({
+  MiningPlanetDefinition({
     required this.id,
     required this.name,
-    required this.sites,
+    required List<MiningSiteDefinition> sites,
     required this.unlockRequiredMasteryPlanetId,
     required this.unlockRequiredSurveyingLevel,
     required this.unlockCashCost,
     required this.masteryRewardCash,
     required this.rigSpawnCost,
     required this.planetAsset,
-  });
+  }) : sites = List.unmodifiable(sites);
 
   final MiningPlanetId id;
   final String name;
@@ -170,7 +171,8 @@ class MiningPlanetDefinition {
 }
 
 class MiningContentRegistry {
-  const MiningContentRegistry._(this.planets);
+  MiningContentRegistry._(Map<MiningPlanetId, MiningPlanetDefinition> planets)
+    : planets = Map.unmodifiable(planets);
 
   static const int maxTechnologyLevel = 5;
   static const int maxDeployedRigsPerSite = 4;
