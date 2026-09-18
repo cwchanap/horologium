@@ -48,17 +48,20 @@ class FleetDock extends StatelessWidget {
         const _FleetLabel(),
         const SizedBox(width: 7),
         Expanded(
-          child: Text(
-            view.selectedBayId == null
-                ? 'TAP A RIG, THEN A NODE'
-                : 'TAP A NODE TO DEPLOY',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white54,
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              letterSpacing: .8,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              view.dockHint,
+              key: const Key('fleet-dock-hint'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white54,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                letterSpacing: .8,
+              ),
             ),
           ),
         ),
@@ -198,6 +201,7 @@ class _BayButton extends StatelessWidget {
     final tierColor = rig != null && rig.index >= RigTier.t3.index
         ? const Color(0xFFC4AFFF)
         : MiningTheme.accent;
+    final isMergeTarget = view.canMergeWithSelection;
     return Semantics(
       button: true,
       enabled: !view.isBusy,
@@ -205,11 +209,15 @@ class _BayButton extends StatelessWidget {
       child: MiningHex(
         fill: view.isSelected
             ? const Color.fromRGBO(24, 255, 255, .16)
+            : isMergeTarget
+            ? tierColor.withValues(alpha: .28)
             : rig == null
             ? const Color.fromRGBO(255, 255, 255, .05)
             : tierColor.withValues(alpha: .14),
         border: view.isSelected
             ? MiningTheme.highlight
+            : isMergeTarget
+            ? tierColor.withValues(alpha: .9)
             : rig == null
             ? const Color.fromRGBO(255, 255, 255, .16)
             : tierColor.withValues(alpha: .6),

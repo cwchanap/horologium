@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mine_site_view.dart';
@@ -7,6 +8,7 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_grid_map.dart';
+import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
@@ -917,4 +919,91 @@ void main() {
       expect(lastBay.bottom, lessThanOrEqualTo(402 - padBottom));
     },
   );
+
+  testWidgets(
+    'keeps four bays plus Spawn with one hint row in both orientations',
+    (tester) async {
+      final state = _stateWith();
+      for (final size in const [Size(360, 640), Size(874, 402)]) {
+        await _pumpMineSite(
+          tester,
+          size: size,
+          view: _siteView(state),
+          dock: _dockView(state),
+        );
+        for (final bay in DockBayId.values) {
+          expect(find.byKey(ValueKey<String>(bay.name)), findsOneWidget);
+        }
+        expect(find.byKey(const Key('fleet-dock-spawn')), findsOneWidget);
+      }
+      // The landscape vertical rail carries no hint row at all.
+      expect(find.byKey(const Key('fleet-dock-hint')), findsNothing);
+    },
+  );
+
+  testWidgets('renders the resolved dock hint without a selection branch', (
+    tester,
+  ) async {
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(tester, view: _siteView(state), dock: _dockView(state));
+    expect(find.text('TAP A RIG, THEN A NODE'), findsOneWidget);
+
+    await _pumpMineSite(
+      tester,
+      view: _siteView(state, selectedBayId: DockBayId.b1),
+      dock: _dockView(state, selectedBayId: DockBayId.b1),
+    );
+    expect(find.text('T1 + T1 = T2 • STRONGER PER SLOT'), findsOneWidget);
+  });
+
+  testWidgets(
+    'strengthens compatible merge-target chrome over normal occupied bays',
+    (tester) async {
+      final initial = _stateWith(landing: _progress(commissioned: true));
+      // b3 gains a T2 rig: occupied, but not a merge target for the selected
+      // T1 in b1 (the other T1 sits in b2).
+      final state = initial.copyWith(
+        docks: {
+          ...initial.docks,
+          MiningPlanetId.homeworld: {
+            ...initial.docks[MiningPlanetId.homeworld]!,
+            DockBayId.b3: RigTier.t2,
+          },
+        },
+      );
+      await _pumpMineSite(
+        tester,
+        view: _siteView(state, selectedBayId: DockBayId.b1),
+        dock: _dockView(state, selectedBayId: DockBayId.b1),
+      );
+
+      MiningHex hexOf(DockBayId id) => tester.widget<MiningHex>(
+        find.ancestor(
+          of: find.byKey(ValueKey<String>(id.name)),
+          matching: find.byType(MiningHex),
+        ),
+      );
+      final target = hexOf(DockBayId.b2);
+      final normal = hexOf(DockBayId.b3);
+      expect(target.fill.a, greaterThan(normal.fill.a));
+      expect(target.border.a, greaterThan(normal.border.a));
+    },
+  );
+
+  testWidgets('keeps the dock hint inside max lines at 360x640', (
+    tester,
+  ) async {
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(360, 640),
+      view: _siteView(state, selectedBayId: DockBayId.b1),
+      dock: _dockView(state, selectedBayId: DockBayId.b1),
+    );
+
+    final hint = find.byKey(const Key('fleet-dock-hint'));
+    expect(tester.widget<Text>(hint).maxLines, 1);
+    final paragraph = tester.renderObject<RenderParagraph>(hint);
+    expect(paragraph.didExceedMaxLines, isFalse);
+  });
 }
