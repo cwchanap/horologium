@@ -14,11 +14,19 @@ String _formatCash(int amount) => amount.toString().replaceAllMapped(
 );
 
 class MiningActionResult {
-  const MiningActionResult.success({this.message}) : isSuccess = true;
-  const MiningActionResult.failure(this.message) : isSuccess = false;
+  const MiningActionResult.success({this.message, this.dockBayId})
+    : isSuccess = true;
+
+  const MiningActionResult.failure(this.message)
+    : isSuccess = false,
+      dockBayId = null;
 
   final bool isSuccess;
   final String? message;
+
+  /// The dock bay a successful [spawnRig] filled; null for every other
+  /// action and for failures.
+  final DockBayId? dockBayId;
 }
 
 class MiningSaleResult {
@@ -205,7 +213,7 @@ class MiningController {
     );
     await repository.save(next);
     _state = next;
-    return const MiningActionResult.success();
+    return MiningActionResult.success(dockBayId: emptyBay);
   });
 
   Future<MiningActionResult> mergeDockRigs(

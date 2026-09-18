@@ -122,6 +122,13 @@ Future<void> tapGridCell(WidgetTester tester, MiningGridCell cell) async {
   );
 }
 
+/// A free Surveying-0 perimeter cell of Landing Basin, distinct from
+/// [landingRigCell], used to deploy a freshly spawned rig without re-tapping
+/// the dock.
+final _freeLandingDeployCell = deployableMiningCells(
+  MiningContentRegistry.stellarMining().site(MiningSiteId.landingBasin),
+).firstWhere((cell) => cell != landingRigCell);
+
 const frozenRigCell = MiningGridCell(4, 2);
 
 /// Surveying-0 legal deploy cell for Carbon Ridge, used to prove dock
@@ -553,6 +560,17 @@ void main() {
       'audio/reject.wav',
     ]);
     expect(shellHandles(tester).controller.state.cash, 100);
+
+    // The failed spawn leaves no phantom selected bay behind.
+    await tapGridCell(tester, landingRigCell);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Select a rig from the dock.'), findsOneWidget);
+    expect(
+      shellHandles(
+        tester,
+      ).controller.state.sites[MiningSiteId.landingBasin]!.rigPlacements,
+      isEmpty,
+    );
   });
 
   testWidgets(
@@ -640,6 +658,104 @@ void main() {
       'audio/rig.wav',
       'audio/tap.wav',
     ]);
+  });
+
+  testWidgets('spawn selects its filled bay so the new rig deploys directly', (
+    tester,
+  ) async {
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingState(_start));
+    await pumpShell(tester, repository: repository);
+
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
+    await tester.binding.idle();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final state = shellHandles(tester).controller.state;
+    expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b1], RigTier.t1);
+
+    // The new bay is not tapped again; the spawned T1 deploys straight away.
+    await tapGridCell(tester, _freeLandingDeployCell);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final deployed = shellHandles(tester).controller.state;
+    expect(deployed.docks[MiningPlanetId.homeworld]![DockBayId.b1], isNull);
+    expect(
+      deployed.sites[MiningSiteId.landingBasin]!.rigPlacements,
+      contains(
+        MiningRigPlacement(tier: RigTier.t1, cell: _freeLandingDeployCell),
+      ),
+    );
+    expect(find.text('Rig deployed.'), findsOneWidget);
+  });
+
+  testWidgets('merge keeps the combined rig selected so it deploys directly', (
+    tester,
+  ) async {
+    final repository = CountingMiningSaveRepository();
+    await repository.save(MiningSave.initial(nowUtc: _start));
+    await pumpShell(tester, repository: repository);
+
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey<String>('b1')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey<String>('b2')));
+    await tester.binding.idle();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    var state = shellHandles(tester).controller.state;
+    expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b1], isNull);
+    expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b2], RigTier.t2);
+    expect(find.text('Rigs merged.'), findsOneWidget);
+
+    // The target bay is not tapped again; the merged T2 deploys straight away.
+    await tapGridCell(tester, landingRigCell);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    state = shellHandles(tester).controller.state;
+    expect(state.sites[MiningSiteId.landingBasin]!.rigPlacements, [
+      MiningRigPlacement(tier: RigTier.t2, cell: landingRigCell),
+    ]);
+    expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b2], isNull);
+    expect(find.text('Rig deployed.'), findsOneWidget);
+  });
+
+  testWidgets('a failed merge keeps the source rig selected', (tester) async {
+    final repository = DelayedMiningSaveRepository();
+    await repository.save(MiningSave.initial(nowUtc: _start));
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await pumpShell(tester, repository: repository, audioManager: audio);
+
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey<String>('b1')));
+    await tester.pump();
+    repository.delayNextSave = true;
+    await tester.tap(find.byKey(const ValueKey<String>('b2')));
+    await repository.saveStarted.future;
+    repository.allowSave.completeError(StateError('save failed'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Action failed.'), findsOneWidget);
+    expect(
+      shellHandles(
+        tester,
+      ).controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b2],
+      RigTier.t1,
+      reason: 'merge did not persist',
+    );
+    expect(
+      find.bySemanticsLabel('Dock bay B1: Selected T1 rig.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('dock selection clears when leaving Mine Site', (tester) async {

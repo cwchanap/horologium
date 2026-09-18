@@ -367,6 +367,7 @@ void main() {
         final result = await controller.spawnRig();
 
         expect(result.isSuccess, isTrue);
+        expect(result.dockBayId, DockBayId.b3);
         expect(controller.state.cash, 5);
         expect(controller.state.docks[MiningPlanetId.homeworld], {
           DockBayId.b1: RigTier.t1,
@@ -374,6 +375,10 @@ void main() {
           DockBayId.b3: RigTier.t1,
           DockBayId.b4: null,
         });
+        expect(
+          controller.state.docks[MiningPlanetId.homeworld]![result.dockBayId!],
+          RigTier.t1,
+        );
       },
     );
 
@@ -401,6 +406,7 @@ void main() {
 
       expect(result.isSuccess, isFalse);
       expect(result.message, 'Not enough cash.');
+      expect(result.dockBayId, isNull);
       expect(controller.state.toJson(), before);
     });
 
@@ -425,6 +431,7 @@ void main() {
 
       expect(result.isSuccess, isFalse);
       expect(result.message, 'Dock is full.');
+      expect(result.dockBayId, isNull);
     });
 
     test(

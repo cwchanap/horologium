@@ -322,6 +322,7 @@ class _MiningShellState extends State<MiningShell>
       _controller.spawnRig,
       successMessage: 'T1 rig spawned.',
       sound: GameSound.rig,
+      onSuccess: (result) => _selectedBayId = result.dockBayId,
     );
   }
 
@@ -349,11 +350,13 @@ class _MiningShellState extends State<MiningShell>
     }
 
     if (tappedBay.canMergeWithSelection) {
-      setState(() => _selectedBayId = null);
+      // The source stays selected while saving; the merged rig takes the
+      // selection on success, and on failure the source keeps it.
       _runSheetAction(
         () => _controller.mergeDockRigs(selectedBayId, bayId),
         successMessage: 'Rigs merged.',
         sound: GameSound.merge,
+        onSuccess: (_) => _selectedBayId = bayId,
       );
       return;
     }
@@ -485,6 +488,7 @@ class _MiningShellState extends State<MiningShell>
     Future<MiningActionResult> Function() operation, {
     required String successMessage,
     required GameSound sound,
+    void Function(MiningActionResult result)? onSuccess,
   }) async {
     if (!_initialized || _controller.isBusy) return;
     final before = _controller.state;
@@ -493,6 +497,7 @@ class _MiningShellState extends State<MiningShell>
     try {
       final result = await pendingOperation;
       if (!mounted) return;
+      if (result.isSuccess) onSuccess?.call(result);
       if (result.isSuccess &&
           _controller.state.activePlanetId != before.activePlanetId) {
         _selectedBayId = null;
