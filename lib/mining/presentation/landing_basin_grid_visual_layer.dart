@@ -6,6 +6,11 @@ import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/presentation/mining_grid_map.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
+/// Stable deposit key derived from authored geometry, matching the grid
+/// map's `x-y-size` contract for dense-field resources.
+String _depositKey(MiningDepositDefinition definition) =>
+    '${definition.x}-${definition.y}-${definition.size}';
+
 /// HPA-451 authored art/animation for the Landing Basin mine site grid.
 /// Owns only visuals: one impact controller, one S1 idle controller, finite
 /// frame precache, and the stalled-first-impact drop. The grid map renders no
@@ -34,10 +39,6 @@ class LandingBasinGridVisualLayer extends StatefulWidget {
 class _LandingBasinGridVisualLayerState
     extends State<LandingBasinGridVisualLayer>
     with TickerProviderStateMixin {
-  /// Stable deposit key derived from authored geometry, matching the grid
-  /// map's `x-y-size` contract for dense-field resources.
-  String _depositKey(MiningDepositDefinition definition) =>
-      '${definition.x}-${definition.y}-${definition.size}';
   late final AnimationController _impactController = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 1),
@@ -274,7 +275,7 @@ class _LandingBasinGridVisualLayerState
       builder: (context, staticLayer) => Stack(
         clipBehavior: Clip.none,
         children: [
-          if (staticLayer != null) staticLayer,
+          staticLayer!,
           for (final deposit in widget.view.deposits)
             if (deposit.minerCount > 0) _depositNode(deposit, cell, _t),
           for (final rig in widget.view.rigs)

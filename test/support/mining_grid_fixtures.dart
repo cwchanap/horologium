@@ -32,3 +32,11 @@ List<MiningGridCell> deployableMiningCells(
   });
   return legal;
 }
+
+/// First row-major legal deploy cell for [site] at its first playable
+/// Surveying level (its first progression resource's requirement).
+MiningGridCell firstPlayableCell(MiningSiteDefinition site) =>
+    deployableMiningCells(
+      site,
+      surveyingLevel: site.deposits.first.requiredSurveyingLevel,
+    ).first;

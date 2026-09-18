@@ -89,10 +89,12 @@ Map<DockBayId, RigTier?> dock({
   RigTier? b4,
 }) => {DockBayId.b1: b1, DockBayId.b2: b2, DockBayId.b3: b3, DockBayId.b4: b4};
 
+// Homeworld first-resource perimeter cells (n1/n2), derived from the cached
+// first-resource perimeter, not literals — the dense field owns geometry.
 final n1Cell = _firstResourceCells[0];
 final n2Cell = _firstResourceCells[1];
-// First-deposit deploy cells for sites outside Homeworld, derived from each
-// site's cached first-resource perimeter.
+// First-deposit deploy cells for sites outside Homeworld, likewise derived
+// from each site's cached first-resource perimeter.
 MiningGridCell firstPerimeterCell(MiningSiteId id) => _content
     .site(id)
     .perimeterCellsByDeposit[_content.site(id).deposits.first]!

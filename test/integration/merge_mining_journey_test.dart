@@ -69,10 +69,7 @@ final journeyCell = () {
   final content = MiningContentRegistry.stellarMining();
   return {
     for (final id in MiningSiteId.values)
-      id: deployableMiningCells(
-        content.site(id),
-        surveyingLevel: content.site(id).deposits.first.requiredSurveyingLevel,
-      ).first,
+      id: firstPlayableCell(content.site(id)),
   };
 }();
 

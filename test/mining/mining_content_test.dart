@@ -360,7 +360,11 @@ void main() {
       expect(site.gridHeight, 50, reason: site.name);
       expect(site.deposits, hasLength(100), reason: site.name);
       expect(site.deposits.toSet(), hasLength(100), reason: site.name);
-      expect(site.deposits.map((d) => d.size).toSet(), {1, 2, 3});
+      expect(site.deposits.map((d) => d.size).toSet(), {
+        1,
+        2,
+        3,
+      }, reason: site.name);
       expect(
         site.perimeterCellsByDeposit.keys.toSet(),
         site.deposits.toSet(),

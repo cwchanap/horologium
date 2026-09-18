@@ -273,11 +273,13 @@ class MineSiteView {
 
     final canDeployAnywhere =
         !isBusy && progress.unlocked && active && selectedRig != null;
-    final candidateCells = <MiningGridCell>{
-      for (final deposit in definition.deposits)
-        if (surveyingLevel >= deposit.requiredSurveyingLevel)
-          ...definition.perimeterCellsByDeposit[deposit]!,
-    };
+    final candidateCells = canDeployAnywhere
+        ? <MiningGridCell>{
+            for (final deposit in definition.deposits)
+              if (surveyingLevel >= deposit.requiredSurveyingLevel)
+                ...definition.perimeterCellsByDeposit[deposit]!,
+          }
+        : const <MiningGridCell>{};
     final deployableCells = <MiningGridCell>{
       if (canDeployAnywhere)
         for (final candidate in candidateCells)

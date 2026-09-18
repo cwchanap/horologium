@@ -15,9 +15,9 @@ final _content = MiningContentRegistry.stellarMining();
 final _landingCells = deployableMiningCells(
   _content.site(MiningSiteId.landingBasin),
 );
-final _graniteCell = deployableMiningCells(
+final _graniteCell = firstPlayableCell(
   _content.site(MiningSiteId.graniteCrater),
-).first;
+);
 
 MiningSave _stateWith({int? cash, Map<MiningSiteId, SiteProgress>? sites}) {
   final initial = MiningSave.initial(nowUtc: _start);
