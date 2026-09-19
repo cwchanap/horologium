@@ -343,6 +343,51 @@ class _LandingBasinGridVisualLayerState
     return backing;
   }
 
+  /// One damage label per rig for a valid contact's post-contact tail
+  /// (0.46 <= t < 1.0), anchored at the rig→target midpoint. Normal motion
+  /// drifts upward and fades toward timeline end; reduced motion fades in
+  /// place. Gated on the contact latch, so cold-drop and late-miss paths
+  /// render nothing and no label history is kept.
+  Widget? _damageLabel(MineSiteRigView rig, double cell) {
+    if (!_impactContactHandled) return null;
+    final t = _t;
+    if (t < .46 || t >= 1.0) return null;
+    final tail = (t - .46) / .54;
+    final anchor = Offset(
+      (rig.placement.cell.x + .5 + rig.target.x + rig.target.size / 2) /
+          2 *
+          cell,
+      (rig.placement.cell.y + .5 + rig.target.y + rig.target.size / 2) /
+          2 *
+          cell,
+    );
+    final drift = widget.reducedMotion ? 0.0 : tail * 18;
+    return Positioned(
+      key: Key(
+        'landing-basin-damage-'
+        '${rig.placement.cell.x}-${rig.placement.cell.y}',
+      ),
+      left: anchor.dx - 24,
+      top: anchor.dy - drift,
+      width: 48,
+      child: ExcludeSemantics(
+        child: Opacity(
+          opacity: (1 - tail).clamp(0.0, 1.0),
+          child: Text(
+            '-${landingBasinStrikeDamage(rig.placement.tier)}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: MiningTheme.primaryText,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              shadows: [Shadow(color: Colors.black, blurRadius: 3)],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Transient HP chrome above a mined resource's oversized art, centered on
   /// its visual bounds. A sibling of the deposit node, so frame tests still
   /// find exactly one Image below each deposit key.
@@ -351,6 +396,13 @@ class _LandingBasinGridVisualLayerState
     final visual = depositVisualSize(definition.size);
     final max = landingBasinMaxHp(definition.size);
     final remaining = _displayedHp(definition);
+    // [_displayedHp] reads zero only while the resource is broken by the
+    // current contact and the impact timeline has not yet completed.
+    final brokeNow = remaining == 0;
+    final tail = ((_t - .46) / .54).clamp(0.0, 1.0);
+    final emphasis = brokeNow && !widget.reducedMotion
+        ? 1 + .2 * (1 - tail)
+        : 1.0;
     return Positioned(
       key: Key('landing-basin-hp-${_depositKey(definition)}'),
       left: (definition.x + definition.size / 2) * cell - visual / 2,
@@ -369,12 +421,17 @@ class _LandingBasinGridVisualLayerState
                 backgroundColor: Colors.black54,
               ),
             ),
-            Text(
-              '$remaining/$max',
-              style: const TextStyle(
-                color: MiningTheme.primaryText,
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
+            Transform.scale(
+              scale: emphasis,
+              child: Text(
+                '$remaining/$max',
+                style: TextStyle(
+                  color: brokeNow
+                      ? MiningTheme.warning
+                      : MiningTheme.primaryText,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
@@ -426,6 +483,8 @@ class _LandingBasinGridVisualLayerState
                 child: _rigRobot(rig, _t, cell),
               ),
             ),
+          for (final rig in widget.view.rigs)
+            if (_damageLabel(rig, cell) case final label?) label,
         ],
       ),
     );
