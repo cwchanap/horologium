@@ -44,6 +44,42 @@ String _hpText(WidgetTester tester, [MiningDepositDefinition? deposit]) =>
         )
         .data!;
 
+Key _damageKey(MiningGridCell cell) =>
+    Key('landing-basin-damage-${cell.x}-${cell.y}');
+
+String _damageText(WidgetTester tester, MiningGridCell cell) => tester
+    .widget<Text>(
+      find.descendant(
+        of: find.byKey(_damageKey(cell)),
+        matching: find.byType(Text),
+      ),
+    )
+    .data!;
+
+double _damageOpacity(WidgetTester tester, MiningGridCell cell) => tester
+    .widget<Opacity>(
+      find.descendant(
+        of: find.byKey(_damageKey(cell)),
+        matching: find.byType(Opacity),
+      ),
+    )
+    .opacity;
+
+Offset _damageTopLeft(WidgetTester tester, MiningGridCell cell) =>
+    tester.getTopLeft(
+      find.descendant(
+        of: find.byKey(_damageKey(cell)),
+        matching: find.byType(Text),
+      ),
+    );
+
+/// Two legal perimeter cells of the default mined deposit, so two rigs can
+/// share one resource body (a break needs more damage than one T5 strike).
+final _sharedAdjacentCells = _deployableCells
+    .where((cell) => _minedDeposit.isOrthogonallyAdjacent(cell))
+    .take(2)
+    .toList();
+
 MineSiteView _view({
   RigTier rigTier = RigTier.t1,
   MiningGridCell cell = _defaultCell,
@@ -747,6 +783,126 @@ void main() {
 
       await tester.pumpWidget(const SizedBox.shrink());
       await _pumpLayer(tester, impactSequence: 1);
+      expect(_hpText(tester), '80/80');
+    }, skip: kIsWeb);
+  });
+
+  group('damage labels and break beat', () {
+    testWidgets('one valid multi-rig impact renders one label per rig', (
+      tester,
+    ) async {
+      final rigs = [
+        (RigTier.t1, _sharedAdjacentCells[0]),
+        (RigTier.t2, _sharedAdjacentCells[1]),
+      ];
+      await warmGoldFrames(tester);
+      await _pumpLayer(tester, rigs: rigs, impactSequence: 0);
+      await _pumpLayer(tester, rigs: rigs, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 450));
+      expect(find.byKey(_damageKey(_sharedAdjacentCells[0])), findsNothing);
+      expect(find.byKey(_damageKey(_sharedAdjacentCells[1])), findsNothing);
+
+      await tester.pump(const Duration(milliseconds: 20));
+      expect(find.byKey(_damageKey(_sharedAdjacentCells[0])), findsOneWidget);
+      expect(find.byKey(_damageKey(_sharedAdjacentCells[1])), findsOneWidget);
+      expect(_damageText(tester, _sharedAdjacentCells[0]), '-10');
+      expect(_damageText(tester, _sharedAdjacentCells[1]), '-20');
+      expect(
+        find.descendant(
+          of: find.byKey(_damageKey(_sharedAdjacentCells[0])),
+          matching: find.byType(ExcludeSemantics),
+        ),
+        findsOneWidget,
+      );
+    }, skip: kIsWeb);
+
+    testWidgets(
+      'reduced motion still applies HP and fades the value in place',
+      (tester) async {
+        await warmGoldFrames(tester);
+        await _pumpLayer(tester, impactSequence: 0, reducedMotion: true);
+        await _pumpLayer(tester, impactSequence: 1, reducedMotion: true);
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(_hpText(tester), '80/80');
+        expect(find.byKey(_damageKey(_defaultCell)), findsNothing);
+
+        await tester.pump(const Duration(milliseconds: 30));
+        expect(_hpText(tester), '70/80');
+        expect(find.byKey(_damageKey(_defaultCell)), findsOneWidget);
+        expect(_damageText(tester, _defaultCell), '-10');
+        final restTopLeft = _damageTopLeft(tester, _defaultCell);
+        final firstOpacity = _damageOpacity(tester, _defaultCell);
+
+        await tester.pump(const Duration(milliseconds: 300));
+        // No translated label: the fade happens exactly in place through the
+        // post-contact tail.
+        expect(_damageTopLeft(tester, _defaultCell), restTopLeft);
+        expect(_damageOpacity(tester, _defaultCell), lessThan(firstOpacity));
+      },
+      skip: kIsWeb,
+    );
+
+    testWidgets('a breaking hit shows visible zero then the fresh max at end', (
+      tester,
+    ) async {
+      final rigs = [
+        (RigTier.t5, _sharedAdjacentCells[0]),
+        (RigTier.t5, _sharedAdjacentCells[1]),
+      ];
+      await warmGoldFrames(tester);
+      await _pumpLayer(
+        tester,
+        rigs: rigs,
+        impactSequence: 0,
+        reducedMotion: true,
+      );
+      await _pumpLayer(
+        tester,
+        rigs: rigs,
+        impactSequence: 1,
+        reducedMotion: true,
+      );
+      await tester.pump(const Duration(milliseconds: 470));
+      expect(_hpText(tester), '0/80');
+
+      await tester.pump(const Duration(seconds: 1));
+      expect(_hpText(tester), '80/80');
+    }, skip: kIsWeb);
+
+    testWidgets('damage labels are gone at timeline end', (tester) async {
+      await warmGoldFrames(tester);
+      await _pumpLayer(tester, impactSequence: 0);
+      await _pumpLayer(tester, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 470));
+      expect(find.byKey(_damageKey(_defaultCell)), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.byKey(_damageKey(_defaultCell)), findsNothing);
+    }, skip: kIsWeb);
+
+    // Cold on purpose and cross-platform: a dropped impact renders no labels,
+    // mirroring the kept-full-HP drop test above.
+    testWidgets('a cold-cache dropped impact renders no damage labels', (
+      tester,
+    ) async {
+      await _pumpLayer(tester, impactSequence: 0);
+      await _pumpLayer(tester, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byKey(_damageKey(_defaultCell)), findsNothing);
+      expect(_hpText(tester), '80/80');
+    });
+
+    testWidgets('a warmed late miss at or past 0.62 renders no damage labels', (
+      tester,
+    ) async {
+      await warmGoldFrames(tester);
+      await _pumpLayer(tester, impactSequence: 0);
+      await _pumpLayer(tester, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 450));
+      expect(find.byKey(_damageKey(_defaultCell)), findsNothing);
+
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byKey(_damageKey(_defaultCell)), findsNothing);
       expect(_hpText(tester), '80/80');
     }, skip: kIsWeb);
   });
