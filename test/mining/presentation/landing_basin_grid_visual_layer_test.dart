@@ -141,6 +141,22 @@ String _robotCellKey(MiningGridCell cell) =>
 
 Key _robotKey(MiningGridCell cell) => Key(_robotCellKey(cell));
 
+MineSiteRigView _rig(
+  RigTier tier,
+  MiningGridCell cell,
+  MiningDepositDefinition target,
+) => MineSiteRigView(
+  placement: MiningRigPlacement(tier: tier, cell: cell),
+  target: target,
+  canRecall: true,
+  disabledReason: null,
+);
+
+MiningGridCell _firstAdjacentCell(MiningDepositDefinition deposit) =>
+    _deployableCells
+        .where((cell) => deposit.isOrthogonallyAdjacent(cell))
+        .first;
+
 Transform _robotFlipTransform(WidgetTester tester, MiningGridCell cell) =>
     tester.widget<Transform>(
       find.byKey(Key('landing-basin-robot-flip-${cell.x}-${cell.y}')),
@@ -157,6 +173,46 @@ Transform _robotArmTransform(WidgetTester tester, MiningGridCell cell) =>
     );
 
 void main() {
+  group('feedback math', () {
+    test('scales resource max HP by body size', () {
+      expect(landingBasinMaxHp(1), 40);
+      expect(landingBasinMaxHp(2), 80);
+      expect(landingBasinMaxHp(3), 120);
+    });
+
+    test('scales strike damage by rig tier', () {
+      expect(
+        [for (final tier in RigTier.values) landingBasinStrikeDamage(tier)],
+        [10, 20, 30, 40, 50],
+      );
+    });
+
+    test('groups strike damage of rigs targeting one resource', () {
+      final cell = _firstAdjacentCell(_minedDeposit);
+      final groups = landingBasinGroupedDamage([
+        _rig(RigTier.t1, cell, _minedDeposit),
+        _rig(RigTier.t5, _defaultCell, _minedDeposit),
+      ]);
+      expect(groups, {_minedDeposit: 60});
+    });
+
+    test('keeps rigs targeting different resources in separate groups', () {
+      expect(_unminedDeposit, isNot(equals(_minedDeposit)));
+      final groups = landingBasinGroupedDamage([
+        _rig(RigTier.t1, _firstAdjacentCell(_minedDeposit), _minedDeposit),
+        _rig(RigTier.t2, _firstAdjacentCell(_unminedDeposit), _unminedDeposit),
+      ]);
+      expect(groups, {_minedDeposit: 10, _unminedDeposit: 20});
+    });
+
+    test('clamps remaining HP at zero and discards overkill', () {
+      expect(landingBasinRemainingHpAfterStrike(40, 10), 30);
+      expect(landingBasinRemainingHpAfterStrike(30, 50), 0);
+      expect(landingBasinRemainingHpAfterStrike(10, 50), 0);
+      expect(landingBasinRemainingHpAfterStrike(0, 10), 0);
+    });
+  });
+
   // The layer defers its first one-shot impact until the finite gold frames
   // finish precaching, and readiness is tied only to actual Future.wait
   // completion (the deferral budget drops a stalled impact, it does not fire
