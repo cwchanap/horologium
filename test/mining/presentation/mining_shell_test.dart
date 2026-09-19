@@ -799,6 +799,124 @@ void main() {
     expect(find.text('Select a rig from the dock.'), findsOneWidget);
   });
 
+  testWidgets(
+    'spawn finishing after leaving Mine Site keeps the selection cleared',
+    (tester) async {
+      final initial = MiningSave.initial(nowUtc: _start);
+      final repository = DelayedMiningSaveRepository();
+      await repository.save(
+        initial.copyWith(
+          sites: {
+            ...initial.sites,
+            MiningSiteId.carbonRidge: initial.sites[MiningSiteId.carbonRidge]!
+                .copyWith(unlocked: true),
+          },
+        ),
+      );
+      await pumpShell(tester, repository: repository);
+
+      await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+      await tester.pump();
+      repository.delayNextSave = true;
+      await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
+      await repository.saveStarted.future;
+
+      // Leaving while persistence is in flight must not let the pending
+      // success callback restore a hidden selection on the Site Deck.
+      await tester.tap(find.byKey(const Key('mine-site-back')));
+      await tester.pump();
+      expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+      repository.allowSave.complete();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        shellHandles(
+          tester,
+        ).controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b3],
+        RigTier.t1,
+        reason: 'spawn persisted after the exit',
+      );
+
+      final enterCarbonRidge = find.byKey(
+        const Key('site-card-carbonRidge-enter'),
+      );
+      await tester.ensureVisible(enterCarbonRidge);
+      await tester.pump();
+      await tester.tap(enterCarbonRidge);
+      await tester.pump();
+      await tapGridCell(tester, _carbonRidgeCell);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        shellHandles(
+          tester,
+        ).controller.state.sites[MiningSiteId.carbonRidge]!.rigPlacements,
+        isEmpty,
+      );
+      expect(find.text('Select a rig from the dock.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'merge finishing after leaving Mine Site keeps the selection cleared',
+    (tester) async {
+      final initial = MiningSave.initial(nowUtc: _start);
+      final repository = DelayedMiningSaveRepository();
+      await repository.save(
+        initial.copyWith(
+          sites: {
+            ...initial.sites,
+            MiningSiteId.carbonRidge: initial.sites[MiningSiteId.carbonRidge]!
+                .copyWith(unlocked: true),
+          },
+        ),
+      );
+      await pumpShell(tester, repository: repository);
+
+      await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey<String>('b1')));
+      await tester.pump();
+      repository.delayNextSave = true;
+      await tester.tap(find.byKey(const ValueKey<String>('b2')));
+      await repository.saveStarted.future;
+
+      // Leaving while persistence is in flight must not let the pending
+      // success callback restore a hidden selection on the Site Deck.
+      await tester.tap(find.byKey(const Key('mine-site-back')));
+      await tester.pump();
+      expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+      repository.allowSave.complete();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        shellHandles(
+          tester,
+        ).controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b2],
+        RigTier.t2,
+        reason: 'merge persisted after the exit',
+      );
+
+      final enterCarbonRidge = find.byKey(
+        const Key('site-card-carbonRidge-enter'),
+      );
+      await tester.ensureVisible(enterCarbonRidge);
+      await tester.pump();
+      await tester.tap(enterCarbonRidge);
+      await tester.pump();
+      await tapGridCell(tester, _carbonRidgeCell);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        shellHandles(
+          tester,
+        ).controller.state.sites[MiningSiteId.carbonRidge]!.rigPlacements,
+        isEmpty,
+      );
+      expect(find.text('Select a rig from the dock.'), findsOneWidget);
+    },
+  );
+
   testWidgets('Mine Site deploys and recalls through the controller', (
     tester,
   ) async {

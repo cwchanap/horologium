@@ -1,8 +1,8 @@
 # HPA-452 — Gameplay-only Fleet Management Implementation Plan
 
-Date: 2026-09-17  
-Linear: HPA-452  
-Design: `docs/superpowers/specs/2026-09-17-hpa-452-gameplay-only-fleet-management-design.md`
+- Date: 2026-09-17
+- Linear: HPA-452
+- Design: `docs/superpowers/specs/2026-09-17-hpa-452-gameplay-only-fleet-management-design.md`
 
 ## Delivery rule
 

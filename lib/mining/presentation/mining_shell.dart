@@ -492,12 +492,20 @@ class _MiningShellState extends State<MiningShell>
   }) async {
     if (!_initialized || _controller.isBusy) return;
     final before = _controller.state;
+    // Selection callbacks are Mine-Site-local: if the surface changed while
+    // persistence was in flight, a late success must not recreate a hidden
+    // selection that could deploy in another site.
+    final actionSiteId = _openSiteId;
     final pendingOperation = operation();
     _refreshPresentation();
     try {
       final result = await pendingOperation;
       if (!mounted) return;
-      if (result.isSuccess) onSuccess?.call(result);
+      if (result.isSuccess &&
+          actionSiteId != null &&
+          _openSiteId == actionSiteId) {
+        onSuccess?.call(result);
+      }
       if (result.isSuccess &&
           _controller.state.activePlanetId != before.activePlanetId) {
         _selectedBayId = null;

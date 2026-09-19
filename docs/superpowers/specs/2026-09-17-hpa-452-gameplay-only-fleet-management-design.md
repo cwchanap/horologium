@@ -1,9 +1,9 @@
 # HPA-452 — Gameplay-only Fleet Management Design
 
-Date: 2026-09-17  
-Status: Draft implementation design  
-Linear: HPA-452 — [Mining Polish] Make fleet management gameplay-only and streamline merge/deploy  
-Baseline: `main` at `844e4a77243ad915a347c14e4c6bbfe696870c1c` after HPA-454 / PR #30
+- Date: 2026-09-17
+- Status: Draft implementation design
+- Linear: HPA-452 — [Mining Polish] Make fleet management gameplay-only and streamline merge/deploy
+- Baseline: `main` at `844e4a77243ad915a347c14e4c6bbfe696870c1c` after HPA-454 / PR #30
 
 ## Problem
 
