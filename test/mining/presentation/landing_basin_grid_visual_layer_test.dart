@@ -31,6 +31,19 @@ final _deployableCells = deployableMiningCells(_landing);
 Key _depositKey(MiningDepositDefinition deposit) =>
     Key('landing-basin-deposit-${deposit.x}-${deposit.y}-${deposit.size}');
 
+Key _hpKey(MiningDepositDefinition deposit) =>
+    Key('landing-basin-hp-${deposit.x}-${deposit.y}-${deposit.size}');
+
+String _hpText(WidgetTester tester, [MiningDepositDefinition? deposit]) =>
+    tester
+        .widget<Text>(
+          find.descendant(
+            of: find.byKey(_hpKey(deposit ?? _minedDeposit)),
+            matching: find.byType(Text),
+          ),
+        )
+        .data!;
+
 MineSiteView _view({
   RigTier rigTier = RigTier.t1,
   MiningGridCell cell = _defaultCell,
@@ -657,5 +670,84 @@ void main() {
       final flip = _robotFlipTransform(tester, cell).transform.storage[0];
       expect(flip, expectedMirror ? -1 : 1, reason: '$cell');
     }
+  });
+
+  group('resource HP chrome', () {
+    testWidgets('renders HP chrome for mined resources only', (tester) async {
+      await _pumpLayer(tester, reducedMotion: true);
+
+      expect(find.byKey(_hpKey(_minedDeposit)), findsOneWidget);
+      expect(find.byKey(_hpKey(_unminedDeposit)), findsNothing);
+    });
+
+    testWidgets('a warmed valid T1 contact drops visible HP exactly once', (
+      tester,
+    ) async {
+      await warmGoldFrames(tester);
+      await _pumpLayer(tester, impactSequence: 0);
+      expect(_hpText(tester), '80/80');
+
+      await _pumpLayer(tester, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 450));
+      expect(_hpText(tester), '80/80');
+      await tester.pump(const Duration(milliseconds: 20));
+      expect(_hpText(tester), '70/80');
+
+      await tester.pump(const Duration(seconds: 1));
+      expect(_hpText(tester), '70/80');
+    }, skip: kIsWeb);
+
+    testWidgets('a cargo update without a new impact keeps the struck HP', (
+      tester,
+    ) async {
+      await warmGoldFrames(tester);
+      await _pumpLayer(tester, impactSequence: 0);
+      await _pumpLayer(tester, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 470));
+      expect(_hpText(tester), '70/80');
+
+      await _pumpLayer(tester, impactSequence: 1, progress: .5);
+      expect(_hpText(tester), '70/80');
+      await tester.pump(const Duration(seconds: 1));
+      expect(_hpText(tester), '70/80');
+    }, skip: kIsWeb);
+
+    // Cold on purpose and cross-platform: a dropped impact must never mutate
+    // HP, mirroring the stalled-first-impact drop above.
+    testWidgets('a cold-cache dropped impact keeps full HP', (tester) async {
+      await _pumpLayer(tester, impactSequence: 0);
+      expect(_hpText(tester), '80/80');
+
+      await _pumpLayer(tester, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(_hpText(tester), '80/80');
+    });
+
+    testWidgets('a warmed late miss at or past 0.62 keeps full HP', (
+      tester,
+    ) async {
+      await warmGoldFrames(tester);
+      await _pumpLayer(tester, impactSequence: 0);
+      await _pumpLayer(tester, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 450));
+      expect(_hpText(tester), '80/80');
+
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(_hpText(tester), '80/80');
+      await tester.pump(const Duration(seconds: 1));
+      expect(_hpText(tester), '80/80');
+    }, skip: kIsWeb);
+
+    testWidgets('remounting the layer resets visible HP', (tester) async {
+      await warmGoldFrames(tester);
+      await _pumpLayer(tester, impactSequence: 0);
+      await _pumpLayer(tester, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 470));
+      expect(_hpText(tester), '70/80');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _pumpLayer(tester, impactSequence: 1);
+      expect(_hpText(tester), '80/80');
+    }, skip: kIsWeb);
   });
 }
