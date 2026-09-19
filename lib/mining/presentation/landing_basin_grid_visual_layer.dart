@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/mine_site_view.dart';
+import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/presentation/mining_grid_map.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
@@ -10,6 +11,30 @@ import 'package:horologium/mining/presentation/mining_visuals.dart';
 /// map's `x-y-size` contract for dense-field resources.
 String _depositKey(MiningDepositDefinition definition) =>
     '${definition.x}-${definition.y}-${definition.size}';
+
+/// Maximum HP of a Landing Basin resource body of [size] cells per side:
+/// 40 HP per cell row (40 / 80 / 120 for 1x1 / 2x2 / 3x3).
+int landingBasinMaxHp(int size) => size * 40;
+
+/// Damage one robot strike deals to its resource, by rig tier: 10 per tier.
+int landingBasinStrikeDamage(RigTier tier) => (tier.index + 1) * 10;
+
+/// Strike damage summed per distinct target resource, keyed by the authored
+/// deposit geometry (which has value equality).
+Map<MiningDepositDefinition, int> landingBasinGroupedDamage(
+  Iterable<MineSiteRigView> rigs,
+) {
+  final groups = <MiningDepositDefinition, int>{};
+  for (final rig in rigs) {
+    final damage = landingBasinStrikeDamage(rig.placement.tier);
+    groups[rig.target] = (groups[rig.target] ?? 0) + damage;
+  }
+  return groups;
+}
+
+/// HP remaining after one strike, clamped at zero: overkill is discarded.
+int landingBasinRemainingHpAfterStrike(int remainingHp, int damage) =>
+    remainingHp > damage ? remainingHp - damage : 0;
 
 /// HPA-451 authored art/animation for the Landing Basin mine site grid.
 /// Owns only visuals: one impact controller, one S1 idle controller, finite
