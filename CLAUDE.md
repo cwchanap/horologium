@@ -33,6 +33,7 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
 - Landing Basin is the first authored animated mining site. Its transient shell-owned `impactSequence` presents passive one-second deterministic production; animation is not an economy clock.
 - `MiningController`, `MiningSimulation`, `MineSiteView`, and `_displayState` remain authoritative. User-initiated mutations may publish their accrued state immediately and do not fabricate mining impacts.
 - Landing Basin robot/deposit animation never calls the controller or persists animation/variant state. Cold-load/resume production is never replayed as historical strikes.
+- Landing Basin resource HP and strike-damage labels are transient visual-layer state driven by the existing valid-contact latch; they never feed persistence or production.
 - Add another site-specific visual path only when a concrete second animated site needs it; do not pre-build a generic resource visual registry.
 
 Mine Site is a Flutter InteractiveViewer over a deterministic 50×50 grid.
