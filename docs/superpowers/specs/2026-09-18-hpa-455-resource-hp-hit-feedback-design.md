@@ -8,13 +8,15 @@ This slice builds directly on HPA-451's Landing Basin visible strike timeline an
 
 ## Current seams to keep
 
-- MiningShell owns the one-second foreground refresh and the transient Landing Basin impactSequence.
-- MineSiteView already projects each deployed rig's tier and concrete target resource.
-- LandingBasinGridVisualLayer already owns the visible robot arm/contact timeline and the one mining SFX callback.
-- Static unmined resources stay behind the retained RepaintBoundary; only mined resources and rigs participate in per-frame animation.
-- Resource geometry is deterministic and MiningDepositDefinition equality is sufficient as transient presentation identity.
+- `MiningShell` owns the one-second foreground refresh and the transient Landing Basin `impactSequence`.
+- `MineSiteView` already projects each deployed rig's tier and concrete target resource.
+- `LandingBasinGridVisualLayer` already owns the visible robot arm/contact timeline and the one mining SFX callback.
+- The existing impact listener already has the authoritative visible-contact latch and late-frame window: contact begins at `0.46`, a frame at or beyond `0.62` is too late, deferred cold-cache impacts can be dropped without ever becoming visible.
+- Static unmined resources stay behind the retained `RepaintBoundary`; only mined resources and rigs participate in per-frame animation.
+- Resource geometry is deterministic and `MiningDepositDefinition` equality is sufficient as transient presentation identity.
+- `MiningGridMap` already owns the single semantics region for each resource.
 
-Do not add a second timer, controller field, save field, resource entity ID, event bus, or HP subsystem.
+Do not add a second timer, second contact/sequence latch, controller field, save field, resource entity ID, event bus, HP subsystem, or second deposit semantics owner.
 
 ## Scope boundary
 
@@ -36,6 +38,8 @@ Keep the numbers deliberately simple and independent from the economy.
 | 2x2 | 80 |
 | 3x3 | 120 |
 
+The implementation can remain arithmetic: `maxHp(size) = size * 40`.
+
 ### Rig presentation damage
 
 | Tier | Damage per visible strike |
@@ -46,135 +50,196 @@ Keep the numbers deliberately simple and independent from the economy.
 | T4 | 40 |
 | T5 | 50 |
 
+`RigTier` is ordered T1 through T5, so the implementation can remain arithmetic: `damage(tier) = (tier.index + 1) * 10`.
+
 These values are presentation-only. Extraction, site rate, cargo, technology, offline caps, and sale value never read them.
 
-Keep the lookup as private pure helpers beside LandingBasinGridVisualLayer. A generic combat/stat registry would be unnecessary.
+Keep these and the grouping/clamp logic as private pure helpers beside `LandingBasinGridVisualLayer`. A generic combat/stat registry or public feedback model would be unnecessary.
 
 ## Transient HP ownership
 
-LandingBasinGridVisualLayer owns one private map:
+`LandingBasinGridVisualLayer` owns one private map:
 
-- key: MiningDepositDefinition
+- key: `MiningDepositDefinition`
 - value: remaining presentation HP
 
-Only currently mined deposits need entries. When a resource becomes mined, initialize it to its footprint max HP. When it no longer has miners, remove its entry. Destroying the Mine Site naturally drops all HP history.
+Only currently mined deposits need entries.
+
+Use one private sync helper:
+
+- call it from `initState` to seed currently mined resources at max HP;
+- call it from `didUpdateWidget` to add newly mined resources at max HP and prune resources whose `minerCount` returned to zero;
+- never initialize or prune HP from `build()`.
+
+Destroying/remounting the Mine Site naturally drops all HP history.
 
 This state is intentionally lost on:
 
 - leaving/re-entering the site;
 - app restart;
-- lifecycle recreation;
+- widget/lifecycle recreation;
 - save reload.
 
 That is the desired contract: HP is visual rhythm, not depletion.
 
-## Hit synchronization
+## Hit synchronization: reuse the existing contact latch
 
-Do not react merely because impactSequence changed. HPA-451 can defer or drop the first impact while art frames decode, so HP feedback must follow the actual visible strike timeline.
+Do not react merely because `impactSequence` changed. HPA-451 can defer or drop the first impact while art frames decode, and it intentionally suppresses a frame that arrives after the visible strike window.
 
-Use the existing impact AnimationController:
+The existing `_notifyMiningImpact` listener is the authoritative contact seam. Reuse its current once-per-visible-impact latch (currently `_impactSoundFired`; it may be renamed locally for clarity, but do not add another latch).
 
-1. impactSequence changes and the existing layer starts or defers the impact exactly as today;
-2. once the running impact reaches the current contact point (about 0.46), apply feedback exactly once for that sequence;
-3. keep the existing onMiningImpact callback firing once for the visible impact, not once per rig;
-4. if the impact is dropped before it visibly runs, do not decrement HP or show damage.
+The listener contract is:
 
-Track one transient applied-feedback sequence so repeated animation-listener callbacks cannot double-apply damage.
+1. before `t = 0.46`, do nothing;
+2. when the existing latch first trips, mark the contact handled;
+3. if `t >= 0.62`, treat it as a missed/late strike and do **not** change HP, show damage, or play SFX;
+4. otherwise apply grouped presentation damage exactly once;
+5. reduced motion still performs step 4; only the existing `onMiningImpact` SFX callback remains suppressed for reduced motion;
+6. a deferred first impact that exceeds the existing 200 ms decode budget stays dropped and cannot change HP because the visible-contact latch never runs through the valid window.
+
+Do not add `_appliedFeedbackSequence`, another animation listener, a damage queue, or `setState` at contact. The existing `AnimationController` notification drives the `AnimatedBuilder` on the same frame.
+
+## Grouped damage
+
+At a valid visible contact:
+
+- compute each rig's fixed tier damage from `rig.placement.tier`;
+- group damage by each rig's concrete `rig.target` `MiningDepositDefinition`;
+- subtract the grouped amount from that target's shared remaining HP;
+- clamp at zero;
+- ignore overkill instead of carrying it into the next HP cycle.
+
+Do not derive damage from `minerCount`: two miners can have different tiers.
+
+Keep the logic private and explicit, in the same style as `_stageForProgress` / `_armAngle`:
+
+- max HP by footprint;
+- damage by tier;
+- grouped damage by target;
+- remaining-after-strike clamp.
+
+Tests still exercise this through the widget boundary; no `@visibleForTesting` model is required.
 
 ## Multiple rigs on one resource
 
-All rigs animate from the same one-second foreground impact, so treat one impactSequence as one presentation batch.
+All rigs animate from the same one-second foreground impact, so one valid contact is one presentation batch.
 
-At contact:
+For one shared target:
 
-- derive each rig's fixed tier damage;
-- group rigs by their target MiningDepositDefinition;
-- sum grouped damage when updating the target's shared HP;
-- render one floating damage label per rig, so two T1 rigs still show two -10 labels;
-- clamp the shared resource HP at zero;
-- do not carry excess damage into the next cycle.
+- grouped tier damage changes the shared HP once;
+- each rig still renders its own `-N` label;
+- mixed tiers remain correct (for example T1 + T5 shows `-10` and `-50`, subtracting 60 total);
+- overkill is discarded.
 
 This makes multiple robots visibly contribute to the same HP cycle without inventing per-rig clocks.
 
 ## HP bar
 
-Render one compact bar only for deposits with minerCount greater than zero.
+Render one compact bar only for deposits with `minerCount > 0`.
 
 The bar:
 
 - is positioned just above the resource footprint;
 - uses the existing mining palette;
-- shows remaining/max HP in semantics;
+- displays visible text such as `70/80`;
+- has a deterministic key such as `landing-basin-hp-<x>-<y>-<size>`;
+- is wrapped in `ExcludeSemantics` so `MiningGridMap` remains the single resource semantics owner;
 - does not intercept taps;
 - stays inside the animated/mined-resource subtree, so the ~100-resource field does not gain ~100 HUD widgets.
 
 Unmined resources have no HP bar.
 
+Do not change `MineSiteView` or `MiningGridMap._depositLabel` to pipe transient HP into semantics in this ticket.
+
 ## Floating damage feedback
 
-During a short window after contact, render one -N label per active rig.
+Damage labels exist only during the existing contact-to-recoil window:
 
-Position the label between that rig cell and its target resource center, with a small deterministic offset when multiple rigs hit the same target so labels remain legible.
+`0.46 <= t < 0.62`
+
+Render one label per active rig using a deterministic key such as:
+
+`landing-basin-damage-<rig-x>-<rig-y>`
+
+The value is derived directly from the rig tier; there is no damage-history list or label queue.
+
+Position each label between its rig cell and target resource center, with a small deterministic offset when multiple rigs share a target so the labels remain legible.
 
 Normal motion:
 
-- short upward drift;
-- quick fade.
+- short upward drift across the `0.46..0.62` window;
+- fade toward zero opacity at `0.62`.
 
 Reduced motion:
 
 - no positional travel or shake;
-- keep the value visible briefly and fade it in place.
+- fade in place across the same `0.46..0.62` window.
 
-No damage-history list, timer queue, or overlay manager is needed. The current impactSequence, rig list, fixed damage helper, and animation progress can derive the visible labels for the current strike.
+Wrap damage chrome in `ExcludeSemantics`; tests pin keys and visible text rather than creating a second a11y node.
 
 ## Break / refresh beat
 
 When grouped damage takes a resource to zero:
 
-- keep the HP bar at zero for a brief contact-to-recovery window;
-- give the resource a small scale/opacity emphasis when reduced motion is off;
-- reduced motion keeps only the non-positional visual emphasis;
-- at roughly 0.70 on the same impact timeline, reset that resource to its footprint max HP.
+- keep the HP bar at zero through the same contact-to-recoil window;
+- give the resource a small scale/opacity emphasis while `0.46 <= t < 0.62` when reduced motion is off;
+- reduced motion keeps only non-positional emphasis;
+- reset any zero-HP mined resource to its footprint max HP when the existing listener reaches `t >= 0.62`.
+
+`0.62` is intentionally reused as the recovery knot because it is already the authored end of the valid contact/SFX window and the start of recoil. Do not introduce a separate `0.70` timeline constant.
+
+Reset is idempotent: only entries at zero are restored. It needs no timer and no impact-sequence ID.
 
 The resource never disappears and production never pauses. No respawn timer or depletion state is introduced.
 
 ## SFX
 
-Keep the existing Landing Basin onMiningImpact callback and AudioManager path unchanged.
+Keep the existing Landing Basin `onMiningImpact` callback and `AudioManager` path unchanged.
 
-One visible foreground impact still produces one mining SFX even when several rigs strike. HPA-455 does not add a player, new sound asset, per-rig sound spam, or audio state.
+One valid visible foreground impact still produces one mining SFX even when several rigs strike. Reduced motion continues to suppress that motion/SFX cue while HP and damage-value feedback still update.
+
+HPA-455 does not add a player, new sound asset, per-rig sound spam, or audio state.
 
 ## Files
 
 Expected production changes stay narrow:
 
-- lib/mining/presentation/landing_basin_grid_visual_layer.dart
-- CLAUDE.md
+- `lib/mining/presentation/landing_basin_grid_visual_layer.dart`
+- `CLAUDE.md`
 
 Expected test work:
 
-- test/mining/presentation/landing_basin_grid_visual_layer_test.dart
-- existing mining_shell lifecycle/no-replay tests remain regression coverage unless a concrete gap is found.
+- `test/mining/presentation/landing_basin_grid_visual_layer_test.dart`
+- `test/mining/presentation/mining_shell_test.dart` only if implementation uncovers an integration gap that cannot be pinned by remounting the layer.
 
-MineSiteView, MiningShell, MiningController, MiningSimulation, MiningSaveRepository, mining_content.dart, and save JSON should not need production changes.
+`MineSiteView`, `MiningShell`, `MiningController`, `MiningSimulation`, `MiningSaveRepository`, `mining_content.dart`, and save JSON should not need production changes.
 
 ## Tests
 
-Focused widget tests should pin:
+Focused widget tests must pin:
 
-- mined resources show HP bars; unmined resources do not;
+- mined resources show keyed HP bars; unmined resources do not;
 - 1x1 / 2x2 / 3x3 max-HP values;
-- T1 through T5 produce increasing fixed -N values;
-- one impact applies feedback once even across multiple pumped animation frames;
+- T1 through T5 produce increasing fixed `-N` values;
+- one valid contact applies feedback once even across multiple pumped animation frames;
 - two rigs targeting one resource show two labels and subtract their combined damage from one shared HP value;
-- reaching zero shows the completion state, then resets to max within the same impact timeline;
+- mixed-tier same-resource damage sums tier values rather than miner count;
+- reaching zero is observable during `0.46..0.62`, then resets to max at `0.62`;
 - reduced motion still updates HP and shows damage with no translated damage label;
-- changing cargo/view state without a new visible impact does not mutate presentation HP;
-- initial mount / resume do not replay historical HP changes or damage labels;
+- a cold-cache impact dropped by the existing 200 ms budget leaves HP at max and shows no damage;
+- a warmed impact advanced directly beyond `0.62` is treated as a late miss and leaves HP at max;
+- strike once (for example 80 -> 70), then change cargo/progress without a new impact and HP remains 70;
+- unmount/remount returns transient HP to max and does not replay the prior strike;
 - static unmined resources remain outside the per-frame rebuild path.
 
-The existing HPA-451 tests continue to pin finite-frame precache, dropped first impact, strike timing, sound timing, and lifecycle no-replay behavior.
+Any test that asserts a **visible** strike, including reduced-motion HP feedback, must follow the existing frame-test pattern:
+
+- call `warmGoldFrames(tester)`;
+- use `skip: kIsWeb`.
+
+The cold-cache drop test intentionally stays cold and can run on both VM and web.
+
+The existing HPA-451 tests continue to pin finite-frame precache, frame selection, sound timing, and lifecycle no-replay behavior, but HPA-455 adds explicit HP assertions to the drop/late/remount paths because those are the correctness boundary for the new state.
 
 ## Manual visual gate
 
@@ -183,7 +248,7 @@ On a 430x932 portrait viewport:
 1. deploy one T1 rig to a Landing Basin resource and verify the bar is readable without obscuring the field;
 2. deploy a second rig to the same resource and verify shared HP plus two damage labels remain legible;
 3. use a higher-tier rig and verify the larger number reads clearly;
-4. observe one zero-HP completion/reset beat;
+4. observe zero HP through contact and reset at recoil;
 5. enable reduced motion and confirm values remain readable with no travel/shake;
 6. pan/zoom the dense field and confirm only actively mined resources carry HUD chrome.
 
@@ -196,10 +261,11 @@ On a 430x932 portrait viewport:
 - per-rig independent attack timers;
 - generic animation/event/combat frameworks;
 - resource focus/selection state;
+- a second deposit semantics owner;
 - new audio system or SFX asset;
 - new image art in this coding PR;
 - animating the other eight sites before they have a concrete visible strike path.
 
 ## Acceptance
 
-HPA-455 is complete when each real foreground Landing Basin strike produces synchronized fixed-tier damage feedback and shared transient resource HP, multi-rig hits combine correctly, zero HP visibly refreshes, reduced motion remains readable, and no controller/simulation/save/economy behavior changes.
+HPA-455 is complete when each real foreground Landing Basin contact in the existing `0.46..0.62` window produces synchronized fixed-tier damage feedback and shared transient resource HP, multi-rig hits combine correctly, cold/dropped/late/remounted paths do not fabricate history, zero HP refreshes at the existing recoil knot, reduced motion remains readable, and no controller/simulation/save/economy behavior changes.
