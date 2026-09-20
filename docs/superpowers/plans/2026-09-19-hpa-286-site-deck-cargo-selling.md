@@ -12,15 +12,15 @@ Keep planning and implementation on this draft PR. Do not open a second implemen
 
 No image-generation or SFX task is included.
 
-## Task 1 — Add derived full/sale projection without widening shared state
+## Task 1 — Add derived full/sale projection and centralize sale copy
 
-This task is projection-only and must stay green before widget wiring changes.
+This task stays pure/read-model plus one semantic helper. It must remain green before widget wiring changes.
 
 ### Tests first
 
 Extend `test/mining/site_deck_view_test.dart`.
 
-Add a helper/fixture that can set stored cargo on a site with a deployed rig, then cover:
+Add a fixture that can set stored cargo on a site with a deployed rig, then cover:
 
 1. **exactly full**
    - commissioned + one rig;
@@ -45,9 +45,15 @@ Add a helper/fixture that can set stored cargo on a site with a deployed rig, th
    - zero cargo -> `canSell == false` / no unsellable cargo;
    - positive cargo whose aggregate floored value is 0 -> `canSell == false` and `hasUnsellableCargo == true`.
 
+5. **shared sale semantics**
+   - busy -> `Finishing previous action…`;
+   - sellable -> `Sell all cargo for N cash.`;
+   - unsellable positive cargo -> `Keep mining until cargo is worth at least 1 cash.`;
+   - empty -> `No cargo to sell.`.
+
 ### Production change
 
-Edit `lib/mining/site_deck_view.dart` only.
+Edit `lib/mining/site_deck_view.dart`.
 
 Add:
 
@@ -67,12 +73,26 @@ bool get hasUnsellableCargo =>
     !isBusy && totalCargo > 0 && projectedValue == 0;
 ```
 
+Add one copy-only helper next to those getters:
+
+```dart
+String miningSaleActionLabel({
+  required bool isBusy,
+  required bool canSell,
+  required bool hasUnsellableCargo,
+  required int projectedValue,
+});
+```
+
+It returns the existing Mine Site strings exactly. It must not calculate cargo or mutate state.
+
 Do not:
 
 - add `MiningSiteCardState.full`;
 - add constructor fields for these booleans;
 - change `SiteMetrics.of(...)`;
 - add epsilon/full thresholds;
+- add a sale-affordance class/type;
 - touch controller/simulation/save code.
 
 ### Focused gate
@@ -84,11 +104,23 @@ dart format --output=none --set-exit-if-changed \
 flutter test test/mining/site_deck_view_test.dart
 ```
 
-## Task 2 — Add Site Deck full-state chrome and one planet-wide Sell action
+## Task 2 — Reuse sale semantics, add full-state chrome, and fit one honest Site Deck Sell action
 
-`SiteDeckScreen` and its `MiningShell` constructor call must change atomically so the repository continues compiling.
+This is the risky task. The primary failure mode is portrait geometry, not sale/controller ownership.
 
-### Widget tests first
+`SiteDeckScreen`, the Mine Site semantic delegate, and the `MiningShell` Site Deck constructor call change atomically so the repository continues compiling.
+
+### Tests first — Mine Site semantic reuse
+
+Keep the existing `mine_site_screen_test.dart` sale-label tests as the behavioral contract. They already pin:
+
+- `Sell all cargo for N cash.`;
+- tiny-sale keep-mining feedback;
+- enabled/disabled sale behavior.
+
+No new Mine Site widget test is required unless the helper delegation breaks an existing case.
+
+### Tests first — Site Deck
 
 Update the `_progress(...)`, `_deckView(...)`, and `_pumpDeck(...)` helpers in `test/mining/presentation/site_deck_screen_test.dart` so tests can:
 
@@ -98,30 +130,49 @@ Update the `_progress(...)`, `_deckView(...)`, and `_pumpDeck(...)` helpers in `
 
 Add portrait coverage:
 
-- a full Landing Basin card shows a visible `FULL` cue;
-- its cargo row shows `SELL TO RESUME` instead of the ordinary percent label;
+- a full Landing Basin card shows `FULL · SELL TO RESUME` in the cargo/progress row;
 - semantics identify the site as full and tell the player to sell;
-- the full card uses warning-state treatment while an under-capacity operational card keeps normal operational treatment;
-- `site-deck-sell` exists and shows the projected active-planet value;
+- the existing rig-occupancy dots remain present while full;
+- the full card may use warning border/shadow treatment;
+- an under-capacity operational card retains normal operational treatment;
+- `site-deck-sell` exists, shows projected active-planet value, and uses the shared sale semantics;
 - tapping enabled Sell emits exactly one callback;
 - zero cargo disables the action;
-- positive cargo with floored aggregate value 0 disables the action with the tiny-sale guidance;
-- busy view disables the action with pending-action guidance.
+- positive cargo with floored aggregate value 0 disables the action with the shared tiny-sale guidance;
+- busy view disables the action with the shared pending-action guidance.
 
-Add/extend layout assertions at 402x874:
+Pin the authored 402×874 geometry:
 
-- cargo gauge keeps its current rect;
-- Sell sits below the gauge and above `site-deck-scroll`;
-- Sell does not overlap `_PlanetProgress` or the first site card;
-- existing Site Deck card and navigation placement remains green.
+- cargo gauge remains `Rect.fromLTWH(310, 50, 80, 80)`;
+- `site-deck-scroll` still starts at y = 164;
+- `site-deck-sell` is `Rect.fromLTWH(218, 108, 80, 48)`;
+- Sell does not overlap cash, cargo gauge, `_PlanetProgress`, first site card, or bottom navigation.
 
-Add landscape coverage at 874x402:
+Add landscape coverage at 874×402:
 
 - `site-deck-sell` is visible/reachable beside the HUD;
-- a full card state chip/status reads `FULL` / `FULL — SELL TO RESUME`;
+- a full card state chip reads `FULL`;
+- status reads `FULL — SELL TO RESUME`;
+- border/chip remain operational accent, not available-warning;
 - no Fleet Dock appears.
 
-Keep the existing 360x640, 430x932, 874x402 text-scale test and update only what the new control requires.
+Extend the existing accessibility coverage:
+
+- `site-deck-sell` is at least 48×48 in portrait;
+- `site-deck-sell` is at least 48×48 in landscape;
+- existing card and navigation target-size checks stay green.
+
+Keep the existing 360×640, 430×932, 874×402 text-scale test. The new Sell action must fit without overlap/truncation there too.
+
+### Production change — shared semantic reuse
+
+Edit `lib/mining/presentation/mine_site_screen.dart`:
+
+- import/reuse `miningSaleActionLabel(...)`;
+- replace the body of private `_saleLabel(MineSiteView view)` with delegation to that helper;
+- do not change `_SellControl`, `MiningCargoGauge`, geometry, keys, value text, or callbacks.
+
+Do not extract a shared Sell widget.
 
 ### Production change — Site Deck
 
@@ -141,27 +192,41 @@ Add one private `_SiteDeckSellAction` used by both orientations:
 - current cargo icon;
 - `SELL` + `view.projectedValue`;
 - `onPressed: view.canSell ? onSellCargo : null`;
-- stable semantic label derived from busy/sellable/unsellable/empty state;
-- no mutation logic.
+- semantic label from `miningSaleActionLabel(...)`;
+- minimum 48×48 target;
+- no mutation logic;
+- do not use `MiningCargoGauge.onPressed`.
 
-Portrait:
+Portrait placement is explicit:
 
-- place the action below the 80px cargo gauge in the existing 196px header;
-- keep `site-deck-scroll` top at the current 164px + safe-area inset.
+```text
+right: 104
+top: 108 + pad.top
+width: 80
+height: 48
+```
+
+At 402×874 with zero safe-area inset this must equal `Rect.fromLTWH(218, 108, 80, 48)`.
+
+Keep:
+
+- cargo gauge at its existing position;
+- `site-deck-scroll top: 164 + pad.top`;
+- existing 196px header.
+
+Do not put Sell below the gauge. Do not shrink it below 48px. If the chosen rect fails the compact/text-scale overlap checks, stop and revise the composition explicitly rather than silently moving the list.
 
 Landscape:
 
 - wrap the current top `MiningHud` in a row;
-- keep the HUD expanded;
+- keep the HUD `Expanded`;
 - place the compact Sell action beside it;
-- do not add another toolbar or footer.
+- do not change `MiningHud` or create another toolbar/footer.
 
-Add full-state card presentation without changing `MiningSiteCardState`:
+Full-card behavior without enum changes:
 
-- helper labels take the whole `MiningSiteCardView` when full-state knowledge is needed;
-- portrait full card: warning border/shadow, `FULL` badge in the operational-status area, progress label `SELL TO RESUME`;
-- landscape full card: warning border/state chip and status `FULL — SELL TO RESUME`;
-- card semantics include full/sell guidance;
+- portrait: keep node dots; keep 100% bar; trailing cargo-row copy becomes `FULL · SELL TO RESUME`; semantics become full/stalled; warning border/shadow is allowed;
+- landscape: state label becomes `FULL`, status becomes `FULL — SELL TO RESUME`, but `_StateChip` and border still receive `MiningSiteCardState.operational` so accent chrome remains;
 - idle/available/locked and under-capacity operational visuals remain unchanged.
 
 ### Production change — shell wiring
@@ -183,11 +248,13 @@ Do not change `_sellCargo()` itself.
 dart format --output=none --set-exit-if-changed \
   lib/mining/site_deck_view.dart \
   lib/mining/presentation/site_deck_screen.dart \
+  lib/mining/presentation/mine_site_screen.dart \
   lib/mining/presentation/mining_shell.dart \
   test/mining/site_deck_view_test.dart \
   test/mining/presentation/site_deck_screen_test.dart
 flutter test test/mining/site_deck_view_test.dart
 flutter test test/mining/presentation/site_deck_screen_test.dart
+flutter test test/mining/presentation/mine_site_screen_test.dart
 flutter analyze --fatal-infos
 ```
 
@@ -201,25 +268,32 @@ Extend `test/mining/presentation/mining_shell_test.dart` with public-behavior co
 
 #### Site Deck sell success
 
-1. initialize a save with a commissioned, rigged active-planet site;
-2. advance/refresh so active-planet cargo is sellable;
-3. remain on Site Deck;
-4. tap `site-deck-sell`;
-5. wait for persistence;
-6. assert active-planet cargo is 0;
-7. assert cash increased by the controller-reported sale value;
-8. assert Site Deck remains the active primary surface;
-9. assert existing `Sold N cash.` feedback and sale sound are emitted.
+Seed saleable state directly; do not wait on the one-second foreground timer:
+
+```dart
+await repository.save(deployedLandingState(_start, cargo: 10));
+```
+
+Then:
+
+1. pump the shell and remain on Site Deck;
+2. tap `site-deck-sell`;
+3. wait for persistence;
+4. assert active-planet cargo is 0;
+5. assert cash increased by the existing controller sale value;
+6. assert Site Deck remains the active primary surface;
+7. assert existing `Sold N cash.` feedback and sale sound/haptic behavior.
 
 #### Busy double-tap guard
 
-Use the existing delayed/failing repository fixture pattern:
+Use the existing delayed repository fixture pattern with seeded cargo:
 
 1. start a Site Deck sale whose save is pending;
-2. assert the Site Deck Sell action disables immediately after the shell busy refresh;
-3. attempt another tap;
-4. release persistence;
-5. assert only one sale mutation/result occurred.
+2. pump the immediate shell busy refresh;
+3. assert `site-deck-sell` is disabled;
+4. attempt another tap;
+5. release persistence;
+6. assert only one sale mutation/result occurred.
 
 Do not inspect private shell fields.
 
@@ -242,15 +316,16 @@ flutter test test/mining/presentation/mining_shell_test.dart
 Search the intended cut surface:
 
 ```sh
-rg "site-deck-sell|isCargoFull|canSell|hasUnsellableCargo|onSellCargo" \
+rg "site-deck-sell|isCargoFull|canSell|hasUnsellableCargo|onSellCargo|miningSaleActionLabel" \
   lib/mining \
   test/mining
 ```
 
 Expected ownership:
 
-- `isCargoFull`, Site Deck sale getters: `site_deck_view.dart`;
+- `isCargoFull`, Site Deck sale getters, shared sale-copy helper: `site_deck_view.dart`;
 - Site Deck sell/full presentation: `site_deck_screen.dart`;
+- Mine Site semantic delegation only: `mine_site_screen.dart`;
 - Site Deck -> `_sellCargo` wiring: `mining_shell.dart`;
 - existing Mine Site `onSellCargo` remains;
 - `MiningController.sellAllCargo()` is unchanged.
@@ -262,9 +337,13 @@ Confirm there is no:
 - save/schema field;
 - auto-sell;
 - per-card sale mutation;
+- `MiningCargoGauge.onPressed` sale wiring;
+- shared/extracted Sell-control widget;
 - Fleet Dock on Site Deck;
 - new tutorial/alert framework;
-- new image or audio asset.
+- new image or audio asset;
+- portrait removal of rig-occupancy dots;
+- landscape warning chrome used for a full operational card.
 
 Run full gates:
 
@@ -284,6 +363,7 @@ Production:
 
 - `lib/mining/site_deck_view.dart`
 - `lib/mining/presentation/site_deck_screen.dart`
+- `lib/mining/presentation/mine_site_screen.dart` — sale semantic helper delegation only
 - `lib/mining/presentation/mining_shell.dart`
 
 Tests:
@@ -292,19 +372,26 @@ Tests:
 - `test/mining/presentation/site_deck_screen_test.dart`
 - `test/mining/presentation/mining_shell_test.dart`
 
+Existing `test/mining/presentation/mine_site_screen_test.dart` should remain green without edits unless implementation exposes a concrete missing assertion.
+
 Planning:
 
 - `docs/superpowers/specs/2026-09-19-hpa-286-site-deck-cargo-selling-design.md`
 - `docs/superpowers/plans/2026-09-19-hpa-286-site-deck-cargo-selling.md`
 
-No controller, simulation, persistence, state-schema, asset, or platform file is expected.
+No controller, simulation, persistence, state-schema, content, Stellar Map, asset, or platform file is expected.
 
 ## Completion criteria
 
 - Full sites are unmistakable from Site Deck in portrait and landscape.
-- Full-site guidance explicitly says `SELL TO RESUME`.
+- Full-site guidance explicitly says `FULL · SELL TO RESUME` / `FULL — SELL TO RESUME`.
+- Portrait rig-occupancy dots remain visible while full.
+- Landscape full cards retain operational accent chrome.
 - Under-capacity operational sites still look operational, not stalled.
 - Site Deck has one active-planet Sell action in portrait and landscape.
+- Portrait Sell is an honest 80×48 target at the pinned authored rect and does not overlap existing header/list controls.
+- Sell is at least 48×48 in both orientations.
+- Site Deck and Mine Site reuse one sale semantic-label helper.
 - Sell eligibility/value matches the existing aggregate projection.
 - Site Deck sale routes through the existing `_sellCargo()` / `sellAllCargo()` path.
 - Sale disables while a mutation is pending and cannot queue a duplicate tap.
@@ -316,9 +403,13 @@ No controller, simulation, persistence, state-schema, asset, or platform file is
 
 Stop and re-evaluate if implementation starts requiring:
 
+- a portrait Sell target smaller than 48×48 or overlapping current header/list controls;
+- an undeclared shift of the `site-deck-scroll` top away from 164;
 - `MiningSiteCardState.full` across Stellar Map;
 - controller/simulation/persistence changes;
 - a second sale orchestration path;
+- duplicated sale semantic strings;
+- a shared/extracted Sell-control widget;
 - per-site or global selling;
 - auto-sell;
 - another state-management/tutorial/alert subsystem;
