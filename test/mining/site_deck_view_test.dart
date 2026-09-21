@@ -105,4 +105,210 @@ void main() {
     );
     expect(() => view.sites.add(view.sites.first), throwsUnsupportedError);
   });
+
+  group('cargo-full projection', () {
+    test('flags an operational site at effective capacity as full', () {
+      final view = SiteDeckView.from(
+        state: stateWith(
+          sites: {
+            MiningSiteId.landingBasin: progress(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 90,
+              rigs: const [
+                MiningRigPlacement(
+                  tier: RigTier.t1,
+                  cell: MiningGridCell(3, 2),
+                ),
+              ],
+            ),
+          },
+        ),
+        content: content,
+        isBusy: false,
+      );
+
+      final card = view.cards[MiningSiteId.landingBasin]!;
+      expect(card.state, MiningSiteCardState.operational);
+      expect(card.capacity, 90);
+      expect(card.cargo, 90);
+      expect(card.isCargoFull, isTrue);
+    });
+
+    test('keeps an otherwise-identical under-capacity site not full', () {
+      final view = SiteDeckView.from(
+        state: stateWith(
+          sites: {
+            MiningSiteId.landingBasin: progress(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 89,
+              rigs: const [
+                MiningRigPlacement(
+                  tier: RigTier.t1,
+                  cell: MiningGridCell(3, 2),
+                ),
+              ],
+            ),
+          },
+        ),
+        content: content,
+        isBusy: false,
+      );
+
+      final card = view.cards[MiningSiteId.landingBasin]!;
+      expect(card.state, MiningSiteCardState.operational);
+      expect(card.isCargoFull, isFalse);
+    });
+
+    test('keeps a commissioned idle site with zero capacity not full', () {
+      final view = SiteDeckView.from(
+        state: stateWith(
+          sites: {
+            MiningSiteId.landingBasin: progress(
+              unlocked: true,
+              commissioned: true,
+            ),
+          },
+        ),
+        content: content,
+        isBusy: false,
+      );
+
+      final card = view.cards[MiningSiteId.landingBasin]!;
+      expect(card.state, MiningSiteCardState.idle);
+      expect(card.capacity, 0);
+      expect(card.isCargoFull, isFalse);
+    });
+  });
+
+  group('MiningSaleAffordance', () {
+    test('disables sale with busy copy while an action is in flight', () {
+      final sale = MiningSaleAffordance.from(
+        isBusy: true,
+        cargo: 10,
+        projectedValue: 40,
+      );
+
+      expect(sale.canSell, isFalse);
+      expect(sale.hasUnsellableCargo, isFalse);
+      expect(sale.label, 'Finishing previous action…');
+    });
+
+    test('enables sale with the projected cash copy', () {
+      final sale = MiningSaleAffordance.from(
+        isBusy: false,
+        cargo: 10,
+        projectedValue: 40,
+      );
+
+      expect(sale.canSell, isTrue);
+      expect(sale.hasUnsellableCargo, isFalse);
+      expect(sale.label, 'Sell all cargo for 40 cash.');
+    });
+
+    test('disables sale with tiny-sale copy when cargo floors to zero', () {
+      final sale = MiningSaleAffordance.from(
+        isBusy: false,
+        cargo: 0.1,
+        projectedValue: 0,
+      );
+
+      expect(sale.canSell, isFalse);
+      expect(sale.hasUnsellableCargo, isTrue);
+      expect(sale.label, 'Keep mining until cargo is worth at least 1 cash.');
+    });
+
+    test('disables sale with empty copy when there is no cargo', () {
+      final sale = MiningSaleAffordance.from(
+        isBusy: false,
+        cargo: 0,
+        projectedValue: 0,
+      );
+
+      expect(sale.canSell, isFalse);
+      expect(sale.hasUnsellableCargo, isFalse);
+      expect(sale.label, 'No cargo to sell.');
+    });
+  });
+
+  group('SiteDeckView.sale', () {
+    test('projects a sellable aggregate across active-planet cargo', () {
+      final view = SiteDeckView.from(
+        state: stateWith(
+          sites: {
+            MiningSiteId.landingBasin: progress(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 10,
+            ),
+            MiningSiteId.carbonRidge: progress(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 5,
+            ),
+          },
+        ),
+        content: content,
+        isBusy: false,
+      );
+
+      expect(view.totalCargo, 15);
+      // 10 Gold at 4 cash/unit + 5 Coal at 3 cash/unit.
+      expect(view.projectedValue, 55);
+      expect(view.sale.canSell, isTrue);
+      expect(view.sale.hasUnsellableCargo, isFalse);
+      expect(view.sale.label, 'Sell all cargo for 55 cash.');
+    });
+
+    test('projects a tiny-sale aggregate that floors to zero cash', () {
+      // 0.1 Gold (0.4 gross) + 0.1 Coal (0.3 gross) floor to 0 together.
+      final view = SiteDeckView.from(
+        state: stateWith(
+          sites: {
+            MiningSiteId.landingBasin: progress(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 0.1,
+            ),
+            MiningSiteId.carbonRidge: progress(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 0.1,
+            ),
+          },
+        ),
+        content: content,
+        isBusy: false,
+      );
+
+      expect(view.projectedValue, 0);
+      expect(view.sale.canSell, isFalse);
+      expect(view.sale.hasUnsellableCargo, isTrue);
+      expect(
+        view.sale.label,
+        'Keep mining until cargo is worth at least 1 cash.',
+      );
+    });
+
+    test('disables the sale while the shell is busy', () {
+      final view = SiteDeckView.from(
+        state: stateWith(
+          sites: {
+            MiningSiteId.landingBasin: progress(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 10,
+            ),
+          },
+        ),
+        content: content,
+        isBusy: true,
+      );
+
+      expect(view.sale.canSell, isFalse);
+      expect(view.sale.hasUnsellableCargo, isFalse);
+      expect(view.sale.label, 'Finishing previous action…');
+    });
+  });
 }
