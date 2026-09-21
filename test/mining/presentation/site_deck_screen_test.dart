@@ -4,6 +4,7 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
+import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/site_deck_screen.dart';
 import 'package:horologium/mining/site_deck_view.dart';
 
@@ -18,10 +19,17 @@ final _graniteCell = firstPlayableCell(
   _content.site(MiningSiteId.graniteCrater),
 );
 
-MiningSave _stateWith({int? cash, Map<MiningSiteId, SiteProgress>? sites}) {
+MiningSave _stateWith({
+  int? cash,
+  Map<MiningSiteId, SiteProgress>? sites,
+  Set<MiningPlanetId>? unlockedPlanetIds,
+  MiningPlanetId? activePlanetId,
+}) {
   final initial = MiningSave.initial(nowUtc: _start);
   return initial.copyWith(
     cash: cash,
+    unlockedPlanetIds: unlockedPlanetIds,
+    activePlanetId: activePlanetId,
     sites: sites == null ? null : {...initial.sites, ...sites},
   );
 }
@@ -29,29 +37,63 @@ MiningSave _stateWith({int? cash, Map<MiningSiteId, SiteProgress>? sites}) {
 SiteProgress _progress({
   bool unlocked = false,
   bool commissioned = false,
+  double storedAmount = 0,
   List<MiningRigPlacement> rigs = const [],
 }) => SiteProgress(
   unlocked: unlocked,
   commissioned: commissioned,
-  storedAmount: 0,
+  storedAmount: storedAmount,
   rigPlacements: rigs,
 );
 
-SiteDeckView _deckView(MiningSave state) =>
-    SiteDeckView.from(state: state, content: _content, isBusy: false);
+SiteDeckView _deckView(MiningSave state, {bool isBusy = false}) =>
+    SiteDeckView.from(state: state, content: _content, isBusy: isBusy);
+
+/// A commissioned Lunar Frontier state so portrait header tests can exercise a
+/// long non-Homeworld planet name (`LUNAR FRONTIER`).
+MiningSave _lunarState() => _stateWith(
+  cash: 2_000,
+  unlockedPlanetIds: const {
+    MiningPlanetId.homeworld,
+    MiningPlanetId.lunarFrontier,
+  },
+  activePlanetId: MiningPlanetId.lunarFrontier,
+  sites: {
+    MiningSiteId.frozenBasin: _progress(
+      unlocked: true,
+      commissioned: true,
+      storedAmount: 10,
+    ),
+  },
+);
+
+/// Landing Basin with one T1 rig: rate 0.50/s, capacity 90. Stored at
+/// capacity makes the card cargo-full.
+SiteProgress _fullLandingBasin() => _progress(
+  unlocked: true,
+  commissioned: true,
+  storedAmount: 90,
+  rigs: [MiningRigPlacement(tier: RigTier.t1, cell: _landingCells[0])],
+);
 
 Future<void> _pumpDeck(
   WidgetTester tester, {
   required SiteDeckView view,
+  Size size = const Size(360, 640),
+  double textScale = 1,
+  double paddingTop = 0,
+  VoidCallback? onSellCargo,
   ValueChanged<MiningSiteId>? onEnterSite,
   ValueChanged<MiningSiteId>? onUnlockSite,
   ValueChanged<MiningNavigationDestination>? onDestinationSelected,
 }) async {
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = const Size(360, 640);
+  tester.view.physicalSize = size;
+  tester.view.padding = FakeViewPadding(top: paddingTop);
   addTearDown(() {
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
+    tester.view.resetPadding();
   });
   await tester.pumpWidget(
     MaterialApp(
@@ -60,7 +102,14 @@ Future<void> _pumpDeck(
         view: view,
         onEnterSite: onEnterSite ?? (_) {},
         onUnlockSite: onUnlockSite ?? (_) {},
+        onSellCargo: onSellCargo ?? () {},
         onDestinationSelected: onDestinationSelected ?? (_) {},
+      ),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
       ),
     ),
   );
@@ -206,6 +255,7 @@ void main() {
           ),
           onEnterSite: (_) {},
           onUnlockSite: (_) {},
+          onSellCargo: () {},
           onDestinationSelected: (_) {},
         ),
       ),
@@ -353,60 +403,257 @@ void main() {
     }
   });
 
-  testWidgets('fits compact and large portrait viewports at text scale 1.3', (
+  testWidgets('marks a full portrait card while keeping occupancy dots', (
     tester,
   ) async {
-    tester.view.devicePixelRatio = 1;
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
+    final state = _stateWith(
+      cash: 2_000,
+      sites: {
+        MiningSiteId.landingBasin: _fullLandingBasin(),
+        MiningSiteId.graniteCrater: _progress(
+          unlocked: true,
+          commissioned: true,
+          rigs: [MiningRigPlacement(tier: RigTier.t1, cell: _graniteCell)],
+        ),
+      },
+    );
+    await _pumpDeck(tester, view: _deckView(state));
+
+    expect(
+      find.bySemanticsLabel(RegExp(r'Landing Basin, FULL site')),
+      findsOneWidget,
+    );
+    expect(find.text('FULL · SELL TO RESUME'), findsOneWidget);
+    expect(
+      find.byKey(const Key('site-card-landingBasin-node-dots')),
+      findsOneWidget,
+    );
+
+    await tester.drag(
+      find.byKey(const Key('site-deck-scroll')),
+      const Offset(0, -500),
+    );
+    await tester.pump();
+    expect(
+      find.bySemanticsLabel(RegExp(r'Granite Crater, OPERATIONAL site')),
+      findsOneWidget,
+      reason: 'Under-capacity operational cards keep OPERATIONAL.',
+    );
+  });
+
+  testWidgets('marks a full landscape card FULL with operational accent', (
+    tester,
+  ) async {
+    final state = _stateWith(
+      cash: 2_000,
+      sites: {MiningSiteId.landingBasin: _fullLandingBasin()},
+    );
+    await _pumpDeck(tester, view: _deckView(state), size: const Size(874, 402));
+
+    expect(
+      find.bySemanticsLabel(RegExp(r'Landing Basin, FULL site')),
+      findsOneWidget,
+    );
+    final chip = tester.widget<Text>(find.text('FULL'));
+    expect(chip.style?.color, MiningTheme.accent);
+    final card = tester.widget<Container>(
+      find.byKey(const Key('site-card-landingBasin')),
+    );
+    final decoration = card.decoration! as BoxDecoration;
+    expect(
+      (decoration.border! as Border).top.color,
+      MiningTheme.accent.withAlpha(180),
+    );
+    expect(
+      find.text('FULL · 0.50/s · 90 / 90\nSELL TO RESUME'),
+      findsOneWidget,
+      reason: 'Full status keeps rate and cargo numbers plus recovery copy.',
+    );
+  });
+
+  testWidgets('emits one sale callback per site-deck-sell tap', (tester) async {
     final state = _stateWith(
       cash: 2_000,
       sites: {
         MiningSiteId.landingBasin: _progress(
           unlocked: true,
           commissioned: true,
-          rigs: [MiningRigPlacement(tier: RigTier.t1, cell: _landingCells[0])],
+          storedAmount: 10,
         ),
-        MiningSiteId.carbonRidge: _progress(unlocked: true, commissioned: true),
       },
     );
-    await tester.pumpWidget(
-      MaterialApp(
-        home: SiteDeckScreen(
-          view: _deckView(state),
-          onEnterSite: (_) {},
-          onUnlockSite: (_) {},
-          onDestinationSelected: (_) {},
-        ),
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: TextScaler.linear(1.3)),
-          child: child!,
-        ),
-      ),
+    var sales = 0;
+    await _pumpDeck(tester, view: _deckView(state), onSellCargo: () => sales++);
+
+    final sell = find.byKey(const Key('site-deck-sell'));
+    expect(sell, findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Sell all cargo for 40 cash.'),
+      findsOneWidget,
     );
-    for (final size in [
-      const Size(360, 640),
-      const Size(430, 932),
-      const Size(874, 402),
-    ]) {
-      tester.view.physicalSize = size;
-      await tester.pump();
-      expect(tester.takeException(), isNull);
-      expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+    expect(find.text('SELL'), findsOneWidget);
+    expect(find.text('+40'), findsOneWidget);
+    var size = tester.getSize(sell);
+    expect(size.width, greaterThanOrEqualTo(48));
+    expect(size.height, greaterThanOrEqualTo(48));
+    await tester.tap(sell);
+    await tester.pump();
+    expect(sales, 1);
+
+    await _pumpDeck(
+      tester,
+      view: _deckView(state),
+      size: const Size(874, 402),
+      textScale: 1.3,
+      onSellCargo: () => sales++,
+    );
+    expect(tester.takeException(), isNull);
+    expect(sell, findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Sell all cargo for 40 cash.'),
+      findsOneWidget,
+    );
+    size = tester.getSize(sell);
+    expect(size.width, greaterThanOrEqualTo(48));
+    expect(size.height, greaterThanOrEqualTo(48));
+    await tester.tap(sell);
+    await tester.pump();
+    expect(sales, 2);
+  });
+
+  testWidgets('disables site-deck-sell while busy, tiny-sale, or empty', (
+    tester,
+  ) async {
+    final sellable = _stateWith(
+      sites: {
+        MiningSiteId.landingBasin: _progress(
+          unlocked: true,
+          commissioned: true,
+          storedAmount: 10,
+        ),
+      },
+    );
+    final sell = find.byKey(const Key('site-deck-sell'));
+
+    await _pumpDeck(tester, view: _deckView(sellable, isBusy: true));
+    expect(tester.widget<OutlinedButton>(sell).onPressed, isNull);
+    expect(find.bySemanticsLabel('Finishing previous action…'), findsOneWidget);
+
+    final tinySale = _stateWith(
+      sites: {
+        MiningSiteId.landingBasin: _progress(
+          unlocked: true,
+          commissioned: true,
+          storedAmount: 0.1,
+        ),
+      },
+    );
+    await _pumpDeck(tester, view: _deckView(tinySale));
+    expect(tester.widget<OutlinedButton>(sell).onPressed, isNull);
+    expect(
+      find.bySemanticsLabel(
+        'Keep mining until cargo is worth at least 1 cash.',
+      ),
+      findsOneWidget,
+    );
+
+    await _pumpDeck(tester, view: _deckView(_stateWith()));
+    expect(tester.widget<OutlinedButton>(sell).onPressed, isNull);
+    expect(find.bySemanticsLabel('No cargo to sell.'), findsOneWidget);
+  });
+
+  testWidgets('keeps the portrait Sell band clear across the fit matrix', (
+    tester,
+  ) async {
+    final cases = <(Size, SiteDeckView, String?)>[
+      (const Size(360, 640), _deckView(_lunarState()), 'LUNAR FRONTIER'),
+      (
+        const Size(402, 874),
+        _deckView(
+          _stateWith(
+            cash: 2_000,
+            sites: {
+              MiningSiteId.landingBasin: _progress(
+                unlocked: true,
+                commissioned: true,
+                storedAmount: 10,
+                rigs: [
+                  MiningRigPlacement(tier: RigTier.t1, cell: _landingCells[0]),
+                ],
+              ),
+              MiningSiteId.carbonRidge: _progress(
+                unlocked: true,
+                commissioned: true,
+              ),
+            },
+          ),
+        ),
+        null,
+      ),
+      (const Size(430, 932), _deckView(_lunarState()), 'LUNAR FRONTIER'),
+    ];
+    for (final (size, view, planetName) in cases) {
+      await _pumpDeck(tester, view: view, size: size, textScale: 1.3);
+      expect(tester.takeException(), isNull, reason: '$size overflowed');
+
+      final scroll = tester.getRect(find.byKey(const Key('site-deck-scroll')));
+      expect(scroll.top, 164, reason: '$size moved the card list');
+
+      final sell = find.byKey(const Key('site-deck-sell'));
+      expect(sell, findsOneWidget);
+      final sellRect = tester.getRect(sell);
+      expect(sellRect.width, greaterThanOrEqualTo(48));
+      expect(sellRect.height, greaterThanOrEqualTo(48));
+
+      final gauge = tester.getRect(find.byKey(const Key('mining-cargo-gauge')));
+      expect(
+        sellRect.overlaps(gauge),
+        isFalse,
+        reason: '$size Sell overlaps the cargo gauge',
+      );
+
+      final planetProgress = tester.getRect(
+        find.byKey(const Key('site-deck-planet-progress')),
+      );
+      expect(
+        sellRect.overlaps(planetProgress),
+        isFalse,
+        reason: '$size Sell overlaps the planet progress region',
+      );
+
+      final firstCard = tester.getRect(
+        find.byKey(Key('site-card-${view.sites.first.id.name}')),
+      );
+      expect(
+        sellRect.overlaps(firstCard),
+        isFalse,
+        reason: '$size Sell overlaps the first site card',
+      );
+
+      final nav = tester.getRect(
+        find.byKey(const Key('mining-bottom-navigation')),
+      );
+      expect(
+        sellRect.bottom,
+        lessThanOrEqualTo(nav.top),
+        reason: '$size Sell dips into the bottom navigation',
+      );
+
+      if (planetName != null) {
+        expect(find.text(planetName), findsOneWidget);
+      }
+      if (size.width == 402 && size.height == 874) {
+        expect(
+          sellRect,
+          const Rect.fromLTWH(218, 108, 80, 48),
+          reason: 'Authored composition pins the Sell rect',
+        );
+      }
       expect(
         find.byKey(const Key('fleet-dock')),
         findsNothing,
         reason: 'Fleet management is Mine-Site-only.',
       );
-      expect(find.byKey(const Key('mining-bottom-navigation')), findsOneWidget);
-      final navRect = tester.getRect(
-        find.byKey(const Key('mining-bottom-navigation')),
-      );
-      expect(navRect.bottom, lessThanOrEqualTo(size.height));
     }
   });
 
@@ -429,6 +676,7 @@ void main() {
             view: _deckView(state),
             onEnterSite: (_) {},
             onUnlockSite: (_) {},
+            onSellCargo: () {},
             onDestinationSelected: (_) {},
           ),
           builder: (context, child) => MediaQuery(
@@ -534,6 +782,7 @@ void main() {
           view: _deckView(state),
           onEnterSite: (_) {},
           onUnlockSite: (_) {},
+          onSellCargo: () {},
           onDestinationSelected: (_) {},
         ),
       ),
