@@ -650,6 +650,7 @@ class _MiningShellState extends State<MiningShell>
           cash: _displayState.cash,
           onEnterSite: _enterSite,
           onUnlockSite: _unlockSite,
+          onSellCargo: _sellCargo,
           onDestinationSelected: _handleNavigation,
         );
       } else {

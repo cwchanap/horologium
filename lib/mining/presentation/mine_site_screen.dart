@@ -510,7 +510,7 @@ class _SellControl extends StatelessWidget {
     excludeSemantics: true,
     button: true,
     enabled: view.canSell,
-    label: _saleLabel(view),
+    label: view.sale.label,
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -589,11 +589,3 @@ class _MineChromeButton extends StatelessWidget {
     ),
   );
 }
-
-String _saleLabel(MineSiteView view) => view.isBusy
-    ? 'Finishing previous action…'
-    : view.canSell
-    ? 'Sell all cargo for ${view.activePlanetProjectedSale} cash.'
-    : view.hasUnsellableCargo
-    ? 'Keep mining until cargo is worth at least 1 cash.'
-    : 'No cargo to sell.';

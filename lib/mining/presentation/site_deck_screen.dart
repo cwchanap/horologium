@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/presentation/mining_dashed_border.dart';
@@ -14,6 +16,7 @@ class SiteDeckScreen extends StatelessWidget {
     required this.view,
     required this.onEnterSite,
     required this.onUnlockSite,
+    required this.onSellCargo,
     required this.onDestinationSelected,
     this.cash = 0,
     this.selectedDestination = MiningNavigationDestination.siteDeck,
@@ -22,6 +25,7 @@ class SiteDeckScreen extends StatelessWidget {
   final SiteDeckView view;
   final ValueChanged<MiningSiteId> onEnterSite;
   final ValueChanged<MiningSiteId> onUnlockSite;
+  final VoidCallback onSellCargo;
   final ValueChanged<MiningNavigationDestination> onDestinationSelected;
   final int cash;
   final MiningNavigationDestination selectedDestination;
@@ -37,6 +41,7 @@ class SiteDeckScreen extends StatelessWidget {
         selectedDestination: selectedDestination,
         onEnterSite: onEnterSite,
         onUnlockSite: onUnlockSite,
+        onSellCargo: onSellCargo,
         onDestinationSelected: onDestinationSelected,
       );
     }
@@ -48,15 +53,23 @@ class SiteDeckScreen extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-              child: MiningHud(
-                planetName: view.planetName,
-                cash: cash,
-                commissionedSites: view.commissionedCount,
-                totalSites: view.siteCount,
-                cargo: view.totalCargo,
-                capacity: view.totalCapacity,
-                cargoValue: view.projectedValue,
-                rate: view.totalRate,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: MiningHud(
+                      planetName: view.planetName,
+                      cash: cash,
+                      commissionedSites: view.commissionedCount,
+                      totalSites: view.siteCount,
+                      cargo: view.totalCargo,
+                      capacity: view.totalCapacity,
+                      cargoValue: view.projectedValue,
+                      rate: view.totalRate,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _SiteDeckSellAction(view: view, onSellCargo: onSellCargo),
+                ],
               ),
             ),
             Expanded(
@@ -90,6 +103,7 @@ class _PortraitSiteDeck extends StatelessWidget {
     required this.selectedDestination,
     required this.onEnterSite,
     required this.onUnlockSite,
+    required this.onSellCargo,
     required this.onDestinationSelected,
   });
 
@@ -98,6 +112,7 @@ class _PortraitSiteDeck extends StatelessWidget {
   final MiningNavigationDestination selectedDestination;
   final ValueChanged<MiningSiteId> onEnterSite;
   final ValueChanged<MiningSiteId> onUnlockSite;
+  final VoidCallback onSellCargo;
   final ValueChanged<MiningNavigationDestination> onDestinationSelected;
 
   @override
@@ -155,8 +170,28 @@ class _PortraitSiteDeck extends StatelessWidget {
           ),
           Positioned(
             left: 16,
-            top: 110 + pad.top,
-            child: _PlanetProgress(view: view),
+            right: 104,
+            top: 108 + pad.top,
+            height: 48,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _PlanetProgress(
+                    key: const Key('site-deck-planet-progress'),
+                    view: view,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 80,
+                  height: 48,
+                  child: _SiteDeckSellAction(
+                    view: view,
+                    onSellCargo: onSellCargo,
+                  ),
+                ),
+              ],
+            ),
           ),
           Positioned(
             left: 14,
@@ -201,7 +236,7 @@ class _PortraitSiteDeck extends StatelessWidget {
 }
 
 class _PlanetProgress extends StatelessWidget {
-  const _PlanetProgress({required this.view});
+  const _PlanetProgress({super.key, required this.view});
 
   final SiteDeckView view;
 
@@ -210,34 +245,39 @@ class _PlanetProgress extends StatelessWidget {
     children: [
       Image.asset(_planetAsset(view.activePlanetId), width: 34, height: 34),
       const SizedBox(width: 9),
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            view.planetName.toUpperCase(),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.1,
+      Expanded(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              view.planetName.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              for (var index = 0; index < view.siteCount; index++) ...[
-                Container(
-                  width: 26,
-                  height: 3,
-                  color: index < view.commissionedCount
-                      ? MiningTheme.accent
-                      : Colors.white24,
-                ),
-                if (index != view.siteCount - 1) const SizedBox(width: 4),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                for (var index = 0; index < view.siteCount; index++) ...[
+                  Container(
+                    width: 26,
+                    height: 3,
+                    color: index < view.commissionedCount
+                        ? MiningTheme.accent
+                        : Colors.white24,
+                  ),
+                  if (index != view.siteCount - 1) const SizedBox(width: 4),
+                ],
               ],
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     ],
   );
@@ -263,7 +303,7 @@ class _PrototypeSiteCard extends StatelessWidget {
     final locked = !card.isUnlocked && !card.canUnlock;
     return Semantics(
       container: true,
-      label: '${card.name}, ${_siteStateLabel(card.state)} site',
+      label: '${card.name}, ${_siteCardLabel(card)} site',
       child: Container(
         key: Key('site-card-${card.id.name}'),
         height: height,
@@ -646,29 +686,43 @@ class _SiteProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = card.capacity <= 0 ? 0.0 : card.cargo / card.capacity;
-    return Row(
-      children: [
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              minHeight: 8,
-              value: progress.clamp(0, 1),
-              color: MiningTheme.warning,
-              backgroundColor: Colors.black54,
+    // The bar keeps every pixel the trailing copy does not need; the copy is
+    // capped so `FULL · SELL TO RESUME` ellipsizes instead of overflowing the
+    // row at large text scales.
+    return LayoutBuilder(
+      builder: (context, constraints) => Row(
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                minHeight: 8,
+                value: progress.clamp(0, 1),
+                color: MiningTheme.warning,
+                backgroundColor: Colors.black54,
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          '${(progress * 100).clamp(0, 100).round()}%',
-          style: const TextStyle(
-            color: MiningTheme.warning,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
+          const SizedBox(width: 8),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: math.max(0, constraints.maxWidth - 48),
+            ),
+            child: Text(
+              card.isCargoFull
+                  ? 'FULL · SELL TO RESUME'
+                  : '${(progress * 100).clamp(0, 100).round()}%',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: MiningTheme.warning,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -700,12 +754,87 @@ String _planetAsset(MiningPlanetId id) => switch (id) {
     'assets/images/mining/planets/mars_frontier.png',
 };
 
-String _siteStateLabel(MiningSiteCardState state) => switch (state) {
-  MiningSiteCardState.locked => 'LOCKED',
-  MiningSiteCardState.available => 'AVAILABLE',
-  MiningSiteCardState.idle => 'IDLE',
-  MiningSiteCardState.operational => 'OPERATIONAL',
-};
+/// One card-label helper owns the `FULL` overlay: a cargo-full operational
+/// card reads FULL in portrait semantics, landscape semantics, and the
+/// landscape state chip, while chip/border color still comes from
+/// `card.state`.
+String _siteCardLabel(MiningSiteCardView card) => card.isCargoFull
+    ? 'FULL'
+    : switch (card.state) {
+        MiningSiteCardState.locked => 'LOCKED',
+        MiningSiteCardState.available => 'AVAILABLE',
+        MiningSiteCardState.idle => 'IDLE',
+        MiningSiteCardState.operational => 'OPERATIONAL',
+      };
+
+/// Planet-wide Sell action for Site Deck chrome. Enabled only by
+/// `view.sale.canSell`; carries `view.sale.label` for semantics and shows the
+/// projected cash value because the cargo gauge does not render it visibly.
+class _SiteDeckSellAction extends StatelessWidget {
+  const _SiteDeckSellAction({required this.view, required this.onSellCargo});
+
+  final SiteDeckView view;
+  final VoidCallback onSellCargo;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    excludeSemantics: true,
+    button: true,
+    enabled: view.sale.canSell,
+    label: view.sale.label,
+    child: OutlinedButton(
+      key: const Key('site-deck-sell'),
+      onPressed: view.sale.canSell ? onSellCargo : null,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        foregroundColor: MiningTheme.warning,
+        disabledForegroundColor: MiningTheme.mutedText,
+        side: BorderSide(color: MiningTheme.warning.withAlpha(160)),
+        shape: BeveledRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  MiningVisuals.cargoIcon,
+                  width: 16,
+                  height: 16,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.inventory_2_rounded,
+                    color: MiningTheme.warning,
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                const Text(
+                  'SELL',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: .6,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '+${view.projectedValue}',
+              maxLines: 1,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
 
 class _SiteCard extends StatelessWidget {
   const _SiteCard({
@@ -720,7 +849,7 @@ class _SiteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stateLabel = _stateLabel(card.state);
+    final stateLabel = _siteCardLabel(card);
     final artHeight = MediaQuery.sizeOf(context).height < 500
         ? 148.0
         : card.isUnlocked
@@ -733,6 +862,10 @@ class _SiteCard extends StatelessWidget {
               (card.requiredSite == null
                   ? 'Surveying ${card.requiredSurveyingLevel} required'
                   : 'Previous site required')
+        : card.isCargoFull
+        ? 'FULL · ${card.rate.toStringAsFixed(2)}/s · '
+              '${_amount(card.cargo)} / ${_amount(card.capacity)}\n'
+              'SELL TO RESUME'
         : card.rate <= 0
         ? 'IDLE'
         : '${card.rate.toStringAsFixed(2)}/s  ·  ${_amount(card.cargo)} / ${_amount(card.capacity)}';
@@ -941,19 +1074,6 @@ class _SiteCard extends StatelessWidget {
         return Colors.white38;
       case MiningSiteCardState.operational:
         return MiningTheme.accent.withAlpha(180);
-    }
-  }
-
-  static String _stateLabel(MiningSiteCardState state) {
-    switch (state) {
-      case MiningSiteCardState.locked:
-        return 'LOCKED';
-      case MiningSiteCardState.available:
-        return 'AVAILABLE';
-      case MiningSiteCardState.idle:
-        return 'IDLE';
-      case MiningSiteCardState.operational:
-        return 'OPERATIONAL';
     }
   }
 
