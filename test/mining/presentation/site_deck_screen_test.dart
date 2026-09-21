@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
@@ -499,6 +500,7 @@ void main() {
     );
     var sales = 0;
     await _pumpDeck(tester, view: _deckView(state), onSellCargo: () => sales++);
+    final semantics = tester.ensureSemantics();
 
     final sell = find.byKey(const Key('site-deck-sell'));
     expect(sell, findsOneWidget);
@@ -514,6 +516,15 @@ void main() {
     await tester.tap(sell);
     await tester.pump();
     expect(sales, 1);
+
+    // performAction throws unless the node exposes SemanticsAction.tap, so
+    // this proves the excludeSemantics wrapper forwards the sale to
+    // assistive-technology activations.
+    tester.semantics.performAction(
+      find.semantics.byLabel('Sell all cargo for 40 cash.'),
+      SemanticsAction.tap,
+    );
+    expect(sales, 2);
 
     await _pumpDeck(
       tester,
@@ -533,7 +544,8 @@ void main() {
     expect(size.height, greaterThanOrEqualTo(48));
     await tester.tap(sell);
     await tester.pump();
-    expect(sales, 2);
+    expect(sales, 3);
+    semantics.dispose();
   });
 
   testWidgets('disables site-deck-sell while busy, tiny-sale, or empty', (
@@ -549,9 +561,17 @@ void main() {
       },
     );
     final sell = find.byKey(const Key('site-deck-sell'));
+    final semantics = tester.ensureSemantics();
 
     await _pumpDeck(tester, view: _deckView(sellable, isBusy: true));
     expect(tester.widget<OutlinedButton>(sell).onPressed, isNull);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Finishing previous action…'))
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isFalse,
+    );
     expect(find.bySemanticsLabel('Finishing previous action…'), findsOneWidget);
 
     final tinySale = _stateWith(
@@ -575,6 +595,7 @@ void main() {
     await _pumpDeck(tester, view: _deckView(_stateWith()));
     expect(tester.widget<OutlinedButton>(sell).onPressed, isNull);
     expect(find.bySemanticsLabel('No cargo to sell.'), findsOneWidget);
+    semantics.dispose();
   });
 
   testWidgets('keeps the portrait Sell band clear across the fit matrix', (

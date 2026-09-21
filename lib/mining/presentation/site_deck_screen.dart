@@ -785,6 +785,7 @@ class _SiteDeckSellAction extends StatelessWidget {
     excludeSemantics: true,
     button: true,
     enabled: view.sale.canSell,
+    onTap: view.sale.canSell ? onSellCargo : null,
     label: view.sale.label,
     child: OutlinedButton(
       key: const Key('site-deck-sell'),
