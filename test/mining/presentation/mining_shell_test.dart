@@ -990,6 +990,82 @@ void main() {
     ]);
   });
 
+  testWidgets('Site Deck sells active-planet cargo and reports revenue', (
+    tester,
+  ) async {
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingState(_start, cargo: 10));
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await pumpShell(tester, repository: repository, audioManager: audio);
+
+    final sell = find.byKey(const Key('site-deck-sell'));
+    expect(sell, findsOneWidget);
+    expect(tester.widget<OutlinedButton>(sell).onPressed, isNotNull);
+    expect(
+      find.bySemanticsLabel('Sell all cargo for 40 cash.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(sell);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final state = shellHandles(tester).controller.state;
+    expect(state.cash, 140);
+    expect(state.sites[MiningSiteId.landingBasin]!.storedAmount, 0);
+    expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+    expect(find.byKey(const Key('mining-grid-surface')), findsNothing);
+    expect(find.text('Sold 40 cash.'), findsOneWidget);
+    expect(
+      effects.playedAssets.where((path) => path == 'audio/sale.wav'),
+      hasLength(1),
+    );
+    expect(effects.playedAssets, ['audio/tap.wav', 'audio/sale.wav']);
+  });
+
+  testWidgets('a busy Site Deck sell ignores a second tap and sells once', (
+    tester,
+  ) async {
+    final repository = DelayedMiningSaveRepository();
+    await repository.save(deployedLandingState(_start, cargo: 10));
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await pumpShell(tester, repository: repository, audioManager: audio);
+
+    final sell = find.byKey(const Key('site-deck-sell'));
+    repository.delayNextSave = true;
+    await tester.tap(sell);
+    await repository.saveStarted.future;
+    await tester.pump();
+
+    expect(tester.widget<OutlinedButton>(sell).onPressed, isNull);
+    expect(find.bySemanticsLabel('Finishing previous action…'), findsOneWidget);
+
+    await tester.tap(sell, warnIfMissed: false);
+    repository.allowSave.complete();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final state = shellHandles(tester).controller.state;
+    expect(state.cash, 140);
+    expect(state.sites[MiningSiteId.landingBasin]!.storedAmount, 0);
+    expect(find.text('Sold 40 cash.'), findsOneWidget);
+    expect(find.text('No cargo to sell.'), findsNothing);
+    expect(find.text('Sale failed.'), findsNothing);
+    expect(
+      effects.playedAssets.where((path) => path == 'audio/sale.wav'),
+      hasLength(1),
+    );
+    expect(effects.playedAssets, ['audio/tap.wav', 'audio/sale.wav']);
+  });
+
   testWidgets('blocked occupied cell tap shows its disabled reason', (
     tester,
   ) async {
