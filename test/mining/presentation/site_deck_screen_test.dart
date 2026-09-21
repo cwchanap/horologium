@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
@@ -403,7 +404,7 @@ void main() {
     }
   });
 
-  testWidgets('marks a full portrait card while keeping occupancy dots', (
+  testWidgets('marks a full portrait card and renders complete recovery copy', (
     tester,
   ) async {
     final state = _stateWith(
@@ -417,13 +418,27 @@ void main() {
         ),
       },
     );
-    await _pumpDeck(tester, view: _deckView(state));
+    await _pumpDeck(
+      tester,
+      view: _deckView(state),
+      size: const Size(360, 640),
+      textScale: 1.3,
+    );
+    expect(tester.takeException(), isNull);
 
     expect(
       find.bySemanticsLabel(RegExp(r'Landing Basin, FULL site')),
       findsOneWidget,
     );
-    expect(find.text('FULL · SELL TO RESUME'), findsOneWidget);
+    final fullCopy = find.text('FULL · SELL TO RESUME');
+    expect(fullCopy, findsOneWidget);
+    expect(
+      tester.renderObject<RenderParagraph>(fullCopy).didExceedMaxLines,
+      isFalse,
+      reason:
+          'the FULL · SELL TO RESUME copy must render completely '
+          'at 360px and text scale 1.3, not ellipsize',
+    );
     expect(
       find.byKey(const Key('site-card-landingBasin-node-dots')),
       findsOneWidget,
@@ -573,14 +588,9 @@ void main() {
           _stateWith(
             cash: 2_000,
             sites: {
-              MiningSiteId.landingBasin: _progress(
-                unlocked: true,
-                commissioned: true,
-                storedAmount: 10,
-                rigs: [
-                  MiningRigPlacement(tier: RigTier.t1, cell: _landingCells[0]),
-                ],
-              ),
+              // A full card inside the matrix keeps the wrapped
+              // `FULL · SELL TO RESUME` copy under structural checks at 1.3.
+              MiningSiteId.landingBasin: _fullLandingBasin(),
               MiningSiteId.carbonRidge: _progress(
                 unlocked: true,
                 commissioned: true,

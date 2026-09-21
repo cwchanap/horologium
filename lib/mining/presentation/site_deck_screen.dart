@@ -687,8 +687,9 @@ class _SiteProgress extends StatelessWidget {
   Widget build(BuildContext context) {
     final progress = card.capacity <= 0 ? 0.0 : card.cargo / card.capacity;
     // The bar keeps every pixel the trailing copy does not need; the copy is
-    // capped so `FULL · SELL TO RESUME` ellipsizes instead of overflowing the
-    // row at large text scales.
+    // capped so `FULL · SELL TO RESUME` scales down instead of overflowing or
+    // ellipsizing the row at large text scales. FittedBox lays the text out at
+    // its natural size first, so the complete string is always painted.
     return LayoutBuilder(
       builder: (context, constraints) => Row(
         children: [
@@ -708,16 +709,18 @@ class _SiteProgress extends StatelessWidget {
             constraints: BoxConstraints(
               maxWidth: math.max(0, constraints.maxWidth - 48),
             ),
-            child: Text(
-              card.isCargoFull
-                  ? 'FULL · SELL TO RESUME'
-                  : '${(progress * 100).clamp(0, 100).round()}%',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MiningTheme.warning,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                card.isCargoFull
+                    ? 'FULL · SELL TO RESUME'
+                    : '${(progress * 100).clamp(0, 100).round()}%',
+                maxLines: 1,
+                style: const TextStyle(
+                  color: MiningTheme.warning,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ),
