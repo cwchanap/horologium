@@ -41,6 +41,7 @@ class MiningSiteCardView {
   String get name => definition.name;
   String get cardAsset => definition.cardAsset;
   bool get isOperational => state == MiningSiteCardState.operational;
+  bool get isCargoFull => isOperational && capacity > 0 && cargo >= capacity;
   MiningSiteId? get requiredSite => definition.requiredSite;
   int get requiredSurveyingLevel => definition.requiredSurveyingLevel;
 }
@@ -104,6 +105,39 @@ class SiteMetrics {
   }
 }
 
+class MiningSaleAffordance {
+  const MiningSaleAffordance._({
+    required this.canSell,
+    required this.hasUnsellableCargo,
+    required this.label,
+  });
+
+  factory MiningSaleAffordance.from({
+    required bool isBusy,
+    required double cargo,
+    required int projectedValue,
+  }) {
+    final canSell = !isBusy && projectedValue > 0;
+    final hasUnsellableCargo = !isBusy && cargo > 0 && projectedValue == 0;
+    final label = isBusy
+        ? 'Finishing previous action…'
+        : canSell
+        ? 'Sell all cargo for $projectedValue cash.'
+        : hasUnsellableCargo
+        ? 'Keep mining until cargo is worth at least 1 cash.'
+        : 'No cargo to sell.';
+    return MiningSaleAffordance._(
+      canSell: canSell,
+      hasUnsellableCargo: hasUnsellableCargo,
+      label: label,
+    );
+  }
+
+  final bool canSell;
+  final bool hasUnsellableCargo;
+  final String label;
+}
+
 /// Presentation projection for the active planet's Site Deck.
 class SiteDeckView {
   const SiteDeckView({
@@ -139,6 +173,12 @@ class SiteDeckView {
   double get capacity => totalCapacity;
   double get rate => totalRate;
   int get projectedSale => projectedValue;
+
+  MiningSaleAffordance get sale => MiningSaleAffordance.from(
+    isBusy: isBusy,
+    cargo: totalCargo,
+    projectedValue: projectedValue,
+  );
 
   MiningSiteCardView card(MiningSiteId id) => cards[id]!;
 

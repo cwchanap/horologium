@@ -61,7 +61,6 @@ class MineSiteView {
     required this.projectedSale,
     required this.activePlanetCargo,
     required this.activePlanetProjectedSale,
-    required this.canSell,
     required this.isActivePlanet,
     required this.selectedBayId,
     required this.selectedRig,
@@ -84,7 +83,6 @@ class MineSiteView {
   final int projectedSale;
   final double activePlanetCargo;
   final int activePlanetProjectedSale;
-  final bool canSell;
   final bool isActivePlanet;
   final DockBayId? selectedBayId;
   final RigTier? selectedRig;
@@ -176,13 +174,19 @@ class MineSiteView {
     };
   }
 
+  /// Sale affordance for the active planet's aggregate cargo. A non-active
+  /// site contributes zeroed inputs, so it reports no sale and no cargo.
+  MiningSaleAffordance get sale => MiningSaleAffordance.from(
+    isBusy: isBusy,
+    cargo: isActivePlanet ? activePlanetCargo : 0,
+    projectedValue: isActivePlanet ? activePlanetProjectedSale : 0,
+  );
+
+  bool get canSell => sale.canSell;
+
   /// Active-planet cargo is present but its floored aggregate sale value is
   /// 0 cash, so selling would clear cargo without awarding any cash.
-  bool get hasUnsellableCargo =>
-      !isBusy &&
-      isActivePlanet &&
-      activePlanetCargo > 0 &&
-      activePlanetProjectedSale == 0;
+  bool get hasUnsellableCargo => sale.hasUnsellableCargo;
 
   static MineSiteView from({
     required MiningSave state,
@@ -313,7 +317,6 @@ class MineSiteView {
           : 0,
       activePlanetCargo: activePlanetCargo,
       activePlanetProjectedSale: activePlanetGrossSale.floor(),
-      canSell: !isBusy && active && activePlanetGrossSale.floor() > 0,
       isActivePlanet: active,
       selectedBayId: selectedBayId,
       selectedRig: selectedRig,
