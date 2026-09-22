@@ -54,6 +54,10 @@ boundary; there is no migration.
 
 Do not add a second state owner, direct widget/repository writes, a parallel
 mutation path, or a speculative processing/sink/currency layer.
+The city-era `docs/production_chains.md`,
+`docs/production_chain_recommendations.md`, and 2026-05-03 production-chain
+spec/plan are historical reference only; do not revive their
+`Building`/`Resources`/recipe/worker/city-tick architecture in mining.
 
 ## State and save contract
 
