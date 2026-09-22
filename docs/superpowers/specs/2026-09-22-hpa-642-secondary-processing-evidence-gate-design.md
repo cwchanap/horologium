@@ -1,309 +1,196 @@
-# HPA-642 — Secondary Processing Evidence Gate Design
+# HPA-642 — Secondary Processing Decision
 
 - Date: 2026-09-22
-- Status: Proposed
+- Status: Decision — Do not add processing
 - Linear: HPA-642 — Future decision: evaluate whether secondary processing is justified
-- Baseline: main at 035894ca8830aebf833411075dcc0eb2bad23942 after HPA-286 / PR #33
+- Baseline: `main` at `035894ca8830aebf833411075dcc0eb2bad23942` after HPA-286 / PR #33
 
-## Decision summary
-
-HPA-642 is the next remaining Horologium roadmap child, but its implementation gate is not currently met.
-
-HPA-641 has shipped the third planet and the current product now has three planets, nine raw-resource sites, cash-funded technology, planet mastery, deterministic offline production, active-planet selling, dense resource fields, gameplay-only fleet management, resource-hit feedback, and a Site Deck cargo-full recovery path.
-
-What is not currently documented is the other half of HPA-642's gate: a specific playtest-observed economy or progression problem that requires a new resource sink or a new wait-versus-sell choice.
-
-The current design therefore defaults to:
+## Decision
 
 **Do not add processing.**
 
-This PR is decision-first. It documents the evidence threshold and the smallest legal experiment if future evidence arrives. It must not introduce production code merely because the roadmap has reached this issue.
+HPA-641 completed the prerequisite multi-planet raw-resource game, but HPA-642 also requires a specific playtest-observed economy or progression problem that simpler existing levers cannot solve. Current repository evidence does not show that problem.
 
-## Problem
+This PR records that decision only. It does not authorize implementation work, and it must remain documentation-only.
 
-Secondary processing is expensive relative to the current game because it would add a new durable economic state and a second transformation step on top of an intentionally small raw-resource loop.
+After this PR merges, close HPA-642. If later playtesting produces new evidence, evaluate that evidence as new scoped work rather than growing this closed decision PR.
 
-The active product loop is currently:
+## Evidence gate
 
-Reveal or unlock -> deploy rigs -> accrue raw cargo -> sell for cash -> buy technology / unlock progression -> repeat
-
-The existing architecture is deliberately narrow:
-
-MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepository
-                         -> Site Deck / Mine Site / Stellar Map / Technology
-
-MiningSimulation currently only accrues raw site cargo. MiningSave stores cash, technology, unlocked planets, the active planet, docks, and per-site state. MiningController owns all mutations and sellAllCargo remains the only sale mutation.
-
-There is no refinery, recipe, processed-resource, routing, worker, power, or factory runtime in the active mining architecture.
-
-Old city-era production-chain documents still exist under docs, but the city economy was removed by the mining cutover. Those documents are historical reference only and are explicitly not an implementation seam for HPA-642.
-
-## Goals
-
-- Make the HPA-642 evidence gate executable and reviewable.
-- Prefer no feature over an unjustified processing subsystem.
-- Require one concrete player problem before any production change.
-- Reject simpler fixes explicitly before considering processing.
-- If processing becomes justified, constrain it to exactly one raw resource, one automatic refinery, and one processed output.
-- Preserve the existing single-controller, deterministic elapsed-time architecture.
-- Preserve raw selling and normal planet progression.
-- Keep one ticket = one PR.
-- Require no new image or SFX work inside HPA-642.
-
-## Non-goals
-
-This design does not authorize:
-
-- a generic recipe graph;
-- multiple refineries or recipes;
-- intermediate chains;
-- transport, routing, workers, power, maintenance, or vehicles;
-- dynamic markets;
-- a second spendable currency;
-- mandatory processing for progression;
-- another state-management layer;
-- revival of the deleted city production system;
-- speculative save abstractions for future factories;
-- new image generation or SFX work.
-
-If a future justified implementation cannot reuse existing visual/audio material, stop and scope the asset work separately instead of mixing asset generation into this coding PR.
-
-## Current evidence audit
-
-### What the game already provides
-
-Current main already has several ways to create spend and progression pressure without processing:
-
-- three technology tracks with five levels each;
-- technology costs of 300, 700, 1,500, 4,000, and 9,000 per level step;
-- rig spawn/merge/deploy progression;
-- per-site unlock costs and authored sale values;
-- Homeworld -> Lunar Frontier -> Mars Frontier mastery gates;
-- cash-funded planet unlocks;
-- a one-time Mars mastery reward;
-- per-site storage capacity and Logistics upgrades;
-- active-planet raw selling;
-- visible cargo-full recovery directly from Site Deck.
-
-The content registry already owns the balance values that control rates, capacities, sale values, site unlocks, technology costs, planet unlocks, and rewards.
-
-### What the recent polish work proved
-
-Recent Horologium work addressed:
-
-- dense resource fields and multi-rig placement;
-- fleet-management friction;
-- resource HP / hit readability;
-- cargo-full readability and selling access.
-
-Those are interaction and presentation improvements. They do not constitute evidence that the economy needs another resource transformation.
-
-### Missing evidence
-
-There is currently no HPA-642 comment, playtest note, test artifact, or roadmap decision that identifies a concrete problem such as:
-
-- excess cash with no meaningful spend decision;
-- raw-resource selling becoming strategically empty;
-- a long progression plateau that simpler cost/reward tuning cannot solve;
-- lack of an optional delayed-reward choice after Mars mastery.
-
-Without one of those concrete observations, processing is a solution looking for a problem.
-
-## Simpler alternatives that must be rejected first
-
-A processing implementation is allowed only after the recorded problem is checked against these cheaper options.
-
-### 1. Content or sale-value tuning
-
-If the problem is cash inflation or trivial progression, first test content-only tuning in MiningContentRegistry:
-
-- sale values;
-- site unlock costs;
-- rig spawn costs;
-- technology costs;
-- planet unlock cost;
-- mastery reward.
-
-This keeps simulation, persistence, UI ownership, and player mental model unchanged.
-
-### 2. Existing technology as the spend sink
-
-If players lack a useful cash decision, verify whether current technology pricing, visibility, or payoff is the actual issue before adding another system.
-
-A technology-cost or presentation change is materially cheaper than a new durable resource flow.
-
-### 3. Mastery / Stellar Map goal clarity
-
-If the issue is "I do not know what to work toward", improve the existing mastery and next-planet goal presentation rather than inventing processing.
-
-### 4. Another raw-resource/content beat
-
-If the issue is lack of variety or long-term motivation, another visually distinct raw-resource content beat is cheaper than teaching and persisting a second economy layer.
-
-Do not add another planet automatically; this alternative still requires evidence. The point is that content is a simpler lever than a new processing model.
-
-### 5. Better reward presentation
-
-If players do not feel a payoff after a progression milestone, improve the existing reward feedback before introducing another currency/resource transformation.
-
-## Gate contract
-
-Before production code can be added to this PR, HPA-642 must contain a concise evidence record with all of the following:
+Processing is not justified unless a future evaluation records all four items:
 
 1. **Observed problem**
-   - exact progression state;
+   - exact Homeworld -> Mars progression state;
    - what the player did;
-   - what felt empty, stalled, or confusing;
-   - why this matters to the mining loop.
+   - what felt empty, stalled, or strategically trivial;
+   - why it damages the existing mining loop.
 
 2. **Reproduction**
-   - fresh/progressed save state or deterministic fixture;
+   - a concrete fresh/progressed save state or deterministic fixture;
    - enough detail to reproduce the problem.
 
-3. **Rejected simpler alternatives**
-   - content/value tuning;
-   - existing technology;
-   - mastery/goal presentation;
-   - raw content;
-   - reward presentation.
+3. **Rejected cheaper alternatives**
+   - authored economy tuning;
+   - existing Technology payoff/presentation;
+   - mastery / Stellar Map goal presentation;
+   - reward presentation;
+   - another raw-resource/content beat when content variety is the actual problem.
 
 4. **Success criterion**
-   - one player-facing behavior that processing should improve;
-   - measurable enough to review after implementation.
+   - one player-facing behavior the experiment should improve;
+   - specific enough to review after implementation.
 
-If any of those are missing, the implementation gate remains closed.
+Statements such as "the game needs more depth", "idle games have refineries", "the roadmap reached this ticket", or "processing would be fun" are not evidence.
 
-## Current decision
+## Current evidence
 
-At the 2026-09-22 baseline, the required playtest evidence is absent.
+### HPA-285 playtest says keep the authored economy
 
-Therefore the current planned shipping outcome is:
+`docs/playtests/2026-08-26-hpa-285-three-planet-merge-mining.md` records a fresh-to-Mars live run using visible public actions.
 
-**Do not add processing.**
+Relevant late-game observations:
 
-The expected code diff after planning review is zero production files and zero test files.
+- Mars mastery ended at cash `33005` after the one-time `25000` mastery reward.
+- Late-game progression still used repeated five-minute sell cycles.
+- The playtest's explicit balance decision is **KEEP the authored numeric content** because all affordability gates and early/mid/late cadence passed.
+- It records **no evidence-required balance change**.
 
-Merging this decision documentation is enough to record why the roadmap deliberately stopped here. After merge, HPA-642 can be closed with the same conclusion unless new evidence is added before implementation begins.
+That is negative evidence for introducing a new sink: the accepted live run did not identify an economy defect that processing needs to repair.
 
-## Maximum experiment if the gate later becomes valid
+### The representative journey still leaves existing Technology spend
 
-If evidence is added and survives the simpler-alternative review before this PR merges, the same PR may be revised to implement exactly:
+`test/integration/merge_mining_journey_test.dart` progresses to Mars mastery by purchasing Surveying through level 5; it does not purchase Extraction or Logistics.
 
-One existing raw resource -> one automatic refinery -> one processed output
+`MiningContentRegistry.technologyCosts` is:
 
-The implementation must remain concrete and local.
+`300, 700, 1500, 4000, 9000`
 
-### Ownership constraints
+Each untouched track therefore still has `15500` of authored spend, or `31000` across Extraction and Logistics.
 
-- MiningController remains the only mutation/persistence boundary.
-- MiningSimulation remains the only elapsed-time economy calculator.
-- MiningSaveRepository remains the only save owner.
-- The refinery accrual must run in the same foreground/resume/cold-launch accrual pass as mining.
-- Raw selling remains available.
-- No widget writes state directly.
-- No second timer, scheduler, event bus, or processing service is introduced.
+`MiningContentRegistry.technologySiteGates` gates those levels on Landing Basin, Carbon Ridge, Granite Crater, Frozen Basin, and Titanium Highlands. Those sites are already commissioned by the time the representative journey reaches Mars mastery, so the remaining two tracks are still available progression rather than hypothetical locked sinks.
 
-### Data constraints
+The post-Mars cash snapshot is therefore not evidence that the game has no remaining authored spend decision.
 
-Do not pre-build a generic recipe model.
+### HPA-641 explicitly rejects a post-Mars sequel tier
 
-Only after the evidence identifies the actual resource/problem may the revised design freeze:
+`docs/superpowers/specs/2026-08-22-hpa-641-mars-frontier-content-pack-design.md` freezes the Mars mastery reward as:
 
-- one input resource;
-- one output resource;
-- one fixed refinery location;
-- one build/unlock cost;
-- one deterministic conversion rate;
-- one output capacity, and input capacity only if the chosen interaction truly needs it;
-- one processed sale premium.
+> a small completion flourish/rebate, not funding for another progression tier.
 
-Use the smallest concrete state needed for that single refinery. Do not generalize for a second consumer.
+It also says not to increase that reward merely to create a larger economy spike without play/balance evidence.
 
-### Choice contract
+HPA-642 must not reinterpret that flourish as a requirement for a new delayed-reward system after Mars mastery. A valid processing problem would need to emerge from the currently shipped Homeworld -> Lunar Frontier -> Mars Frontier loop, not from a desire to invent post-game progression.
 
-The experiment is only valid if it creates an understandable optional decision:
+## Cheaper levers already exist
 
-- sell raw now for immediate cash; or
-- leave raw available to the automatic refinery and receive more cash later.
+`MiningContentRegistry` already owns the primary economy/progression numbers:
 
-If the implementation cannot make that choice clear in one compact surface, reject processing rather than adding toggles, routes, recipe selection, or another management screen.
+- per-site sale values;
+- reveal/unlock/build values;
+- rig spawn costs;
+- production rates;
+- capacities;
+- Technology costs;
+- planet unlock costs;
+- mastery reward.
 
-## Save contract
+Existing Technology and Stellar Map presentation already own the visible long-term progression surfaces.
 
-Current mining saves are strict and unversioned.
+If later playtesting finds an actual economy/progression problem, these are the first levers to evaluate before adding durable processing state.
 
-The current root remains:
+## Why the current cargo model makes processing expensive
 
-cash, lastAccruedAtUtc, technology, unlockedPlanetIds, activePlanetId, docks, sites
+The current active model is intentionally simple:
 
-For the current no-processing outcome, that contract is unchanged.
+- `SiteProgress.storedAmount` is one scalar per site;
+- each `MiningSiteDefinition` has exactly one mined `ResourceType`;
+- `MiningSimulation.accrue()` fills that scalar up to site capacity;
+- full cargo stops further raw production until storage has headroom;
+- `MiningController.sellAllCargo()` sells and clears every active-planet site scalar using that site's `saleValuePerUnit`.
 
-If the gate later opens, the revised design must name the minimum new persisted refinery state explicitly and prove that cash, mines, technology, planets, cargo, and current progression remain intact. Do not add a versioning or migration framework just for speculative future factories.
+There is no reserved raw input, processed-output bucket, holdback policy, or per-resource inventory.
+
+A "sell raw now or wait for a premium" refinery is therefore not a small presentation feature. If conversion drains `storedAmount`, it also creates mining headroom; without careful economics, waiting can become strictly better than selling and silently replace the cargo-full/sell loop rather than add a meaningful choice.
+
+That interaction is another reason not to implement processing without concrete evidence.
 
 ## Historical production-chain guardrail
 
-The following old documents are not active architecture:
+These old city-era documents are historical only:
 
-- docs/production_chains.md
-- docs/production_chain_recommendations.md
-- docs/superpowers/specs/2026-05-03-production-chain-expansion-design.md
-- docs/superpowers/plans/2026-05-03-production-chain-expansion.md
+- `docs/production_chains.md`
+- `docs/production_chain_recommendations.md`
+- `docs/superpowers/specs/2026-05-03-production-chain-expansion-design.md`
+- `docs/superpowers/plans/2026-05-03-production-chain-expansion.md`
 
-Do not copy their Building, Resources, recipe, worker, city-tick, or recommendation architecture into mining.
+Do not revive their `Building`, `Resources`, recipe, worker, city-tick, recommendation, or graph architecture inside mining.
 
-The active source of truth is CLAUDE.md plus lib/mining.
+The active ownership remains:
 
-## Verification strategy
+```text
+MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepository
+                         -> Site Deck / Mine Site / Stellar Map / Technology
+```
 
-### Current no-processing outcome
+No second timer, processing service, recipe graph, currency, management screen, or parallel persistence path is justified.
 
-Review should verify:
+## Save contract
 
-- HPA-641 is complete;
-- HPA-642 has no current playtest evidence;
-- no active mining refinery/recipe code exists;
-- current cash/progression levers are owned by MiningContentRegistry;
-- current save contract has no processing state;
-- CLAUDE.md still forbids speculative processing/sink/currency layers;
-- this PR changes documentation only.
+For this decision, the save contract is unchanged.
 
-No Flutter test/build run is required for a documentation-only decision unless repository policy requires it.
+The strict root remains exactly:
+
+```text
+cash, lastAccruedAtUtc, technology, unlockedPlanetIds, activePlanetId, docks, sites
+```
+
+`MiningSaveRepository` uses exact-key decoding and recovers incompatible documents by creating a fresh save.
+
+Do not promise compatibility for a hypothetical future refinery. If future scoped work adds persisted processing state, that is a breaking pre-release save-contract change under the current policy unless that future ticket deliberately changes the policy. Do not add optional fallback keys, schema versions, or a migration framework speculatively.
+
+## Non-binding ceiling for any future evaluation
+
+This is a ceiling, not an implementation plan.
+
+If new evidence later justifies revisiting processing, do not exceed this shape without a separate roadmap decision:
+
+```text
+one existing raw site's stored cargo
+    -> one automatic refinery scalar
+    -> one processed scalar
+```
+
+Constraints:
+
+- run conversion inside the existing `MiningSimulation.accrue()` pass;
+- do not add a new `ResourceType` merely to represent processed output;
+- do not add a generic recipe type/registry;
+- do not add a second timer/service;
+- do not add a new management screen;
+- raw and processed selling must remain distinct actions if an experiment needs both;
+- reject the experiment if waiting becomes strictly dominant because the premium has no meaningful cash-now tradeoff or because conversion removes the cargo-full pressure that makes Sell relevant;
+- any persisted state must follow the strict-save/breaking-change policy above;
+- new art or SFX, if ever needed, must be scoped separately from implementation work.
+
+Those constraints are intentionally insufficient to implement a refinery. A future evidence-backed ticket must design the actual interaction from its observed problem rather than inherit speculative numbers or sequencing from HPA-642.
+
+## Verification
+
+This PR should change only:
+
+- `docs/superpowers/specs/2026-09-22-hpa-642-secondary-processing-evidence-gate-design.md`
+- `docs/superpowers/plans/2026-09-22-hpa-642-secondary-processing-evidence-gate.md`
+
+No production code, tests, save state, assets, dependencies, or platform files should change.
 
 Run:
 
-- git diff --check
+```sh
+git diff --check
+```
 
-### If the gate later opens
-
-Before implementation, revise this design with concrete resource/economy numbers and file-level ownership.
-
-Then require focused tests for:
-
-- deterministic conversion;
-- clamp to available raw input and output capacity;
-- foreground/resume/cold-launch parity;
-- atomic build/consume/produce/sell behavior;
-- raw selling remaining available;
-- persisted refinery state;
-- old player progression retained;
-- one compact presentation surface;
-- no generic recipe/routing abstractions.
-
-Finally run the normal repository gates from CLAUDE.md.
-
-## Acceptance mapping
-
-- Evidence precedes implementation: hard Task 0 gate.
-- Simpler alternatives are explicit: five cheaper levers are reviewed first.
-- Insufficient evidence has a successful outcome: Do not add processing.
-- Any future experiment remains one raw -> one refinery -> one output.
-- Raw selling remains part of the game.
-- Determinism and persistence stay under existing mining owners.
-- No generic production architecture is authorized.
-- No new art/SFX work is mixed into HPA-642.
+Then review the final branch diff and close HPA-642 after merge with **Do not add processing**.
 
 ## Assets
 
-No image generation or SFX work is required for the current decision-only outcome.
-
-Any later justified implementation must reuse existing assets unless a separate asset task is deliberately scoped first.
+No image generation or SFX work is required.
