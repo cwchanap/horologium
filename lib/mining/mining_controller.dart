@@ -8,11 +8,6 @@ import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_state.dart';
 
-String _formatCash(int amount) => amount.toString().replaceAllMapped(
-  RegExp(r'\B(?=(\d{3})+(?!\d))'),
-  (_) => ',',
-);
-
 class MiningActionResult {
   const MiningActionResult.success({this.message, this.dockBayId})
     : isSuccess = true;
@@ -347,7 +342,7 @@ class MiningController {
     return MiningActionResult.success(
       message: masteryReward
           ? '${planet.name.split(' ').first} mastered — '
-                '+${_formatCash(planet.masteryRewardCash)} cash.'
+                '+${formatMiningCash(planet.masteryRewardCash)} cash.'
           : null,
     );
   });

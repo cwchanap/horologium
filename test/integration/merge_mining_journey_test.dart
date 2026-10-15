@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_controller.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
+import 'package:horologium/mining/next_goal_view.dart';
+import 'package:horologium/mining/site_deck_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/mining_grid_fixtures.dart';
@@ -122,7 +124,27 @@ void main() {
         nowUtc: clock.call,
       );
 
+      MiningNextGoalView goal() => MiningNextGoalView.from(
+        state: controller.state,
+        content: content,
+        sellableValue: SiteDeckView.from(
+          state: controller.state,
+          content: content,
+          isBusy: false,
+        ).projectedValue,
+      );
+      void expectGoal(MiningGoalKind kind, String title, String point) {
+        final next = goal();
+        expect(next.kind, kind, reason: '$point goal kind');
+        expect(next.title, title, reason: '$point goal title');
+      }
+
       await controller.initialize();
+      expectGoal(
+        MiningGoalKind.commissionSite,
+        'Commission Landing Basin',
+        'fresh save',
+      );
       expect(controller.state.cash, 100);
       expect(controller.state.unlockedPlanetIds, {MiningPlanetId.homeworld});
       expect(controller.state.activePlanetId, MiningPlanetId.homeworld);
@@ -215,6 +237,11 @@ void main() {
         ),
         isTrue,
       );
+      expectGoal(
+        MiningGoalKind.researchSurveying,
+        'Research Surveying 1',
+        'Homeworld mastery',
+      );
 
       await earnUntil(
         controller,
@@ -235,6 +262,11 @@ void main() {
         controller.purchaseTechnology(TechnologyTrack.surveying),
       );
       expect(controller.state.technology.surveying, 3);
+      expectGoal(
+        MiningGoalKind.unlockPlanet,
+        'Unlock Lunar Frontier',
+        'Surveying 3',
+      );
 
       await expectAction(
         'unlock Lunar Frontier',
@@ -250,6 +282,11 @@ void main() {
       expect(
         controller.state.sites[MiningSiteId.frozenBasin]!.unlocked,
         isTrue,
+      );
+      expectGoal(
+        MiningGoalKind.commissionSite,
+        'Commission Frozen Basin',
+        'Lunar unlock',
       );
 
       final homeworldCargoBeforeLunarRefresh =
@@ -281,6 +318,11 @@ void main() {
         ),
       );
       debugPrint('SEQUENCE Lunar merge t1+t1->t2; deploy Frozen Basin');
+      expectGoal(
+        MiningGoalKind.researchSurveying,
+        'Research Surveying 4',
+        'Frozen Basin commissioned',
+      );
 
       await earnUntil(
         controller,
@@ -345,6 +387,11 @@ void main() {
         cashAtLeast: 25000,
         phase: 'Lunar mastery before Mars unlock',
       );
+      expectGoal(
+        MiningGoalKind.unlockPlanet,
+        'Unlock Mars Frontier',
+        'Lunar mastery',
+      );
       await expectAction(
         'unlock Mars Frontier',
         controller.unlockPlanet(MiningPlanetId.marsFrontier),
@@ -403,6 +450,12 @@ void main() {
         controller.unlockSite(MiningSiteId.cobaltChasm),
       );
       await expectAction('spawn Cobalt Chasm rig', controller.spawnRig());
+      expectGoal(
+        MiningGoalKind.commissionSite,
+        'Commission Cobalt Chasm',
+        'final Mars site',
+      );
+      expect(goal().detail, contains('+25,000'));
       final cashBeforeMarsMastery = controller.state.cash;
       final mastery = await controller.deployRig(
         DockBayId.b1,
@@ -412,6 +465,7 @@ void main() {
       expect(mastery.isSuccess, isTrue);
       expect(mastery.message, 'Mars mastered — +25,000 cash.');
       expect(controller.state.cash, cashBeforeMarsMastery + 25000);
+      expect(goal().kind, MiningGoalKind.frontiersMastered);
       debugPrint(
         'MASTERY reward=25000 cash=$cashBeforeMarsMastery->${controller.state.cash}',
       );

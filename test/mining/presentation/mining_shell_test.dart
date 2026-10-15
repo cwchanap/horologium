@@ -110,6 +110,35 @@ MiningSave deployedLandingState(DateTime now, {double cargo = 0}) {
   );
 }
 
+/// Every Homeworld site commissioned, as after Homeworld mastery.
+MiningSave homeworldMasteredState(
+  DateTime now, {
+  int surveying = 0,
+  int cash = 0,
+}) {
+  final base = MiningSave.initial(nowUtc: now);
+  return base.copyWith(
+    cash: cash,
+    technology: TechnologyLevels(surveying: surveying),
+    sites: {
+      ...base.sites,
+      for (final site
+          in MiningContentRegistry.stellarMining()
+              .planet(MiningPlanetId.homeworld)
+              .sites)
+        site.id: base.sites[site.id]!.copyWith(
+          unlocked: true,
+          commissioned: true,
+        ),
+    },
+  );
+}
+
+Finder _inGoalStrip(Finder matching) => find.descendant(
+  of: find.byKey(const Key('site-deck-next-goal')),
+  matching: matching,
+);
+
 /// Taps the center of a grid cell through the pannable mine-site transform.
 Future<void> tapGridCell(WidgetTester tester, MiningGridCell cell) async {
   final surface = tester.getRect(find.byKey(const Key('mining-grid-surface')));
@@ -1859,5 +1888,88 @@ void main() {
       'audio/rig.wav',
       'audio/reject.wav',
     ]);
+  });
+
+  group('next-goal strip', () {
+    testWidgets('fresh save commissions Landing Basin through its Mine Site', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+
+      expect(
+        _inGoalStrip(find.textContaining('Commission Landing Basin')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('site-deck-next-goal')));
+      await tester.pump();
+
+      expect(find.byType(MineSiteScreen), findsOneWidget);
+      expect(
+        tester.widget<MineSiteScreen>(find.byType(MineSiteScreen)).view.siteId,
+        MiningSiteId.landingBasin,
+      );
+    });
+
+    testWidgets('a Surveying goal opens the Technology sheet', (tester) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(homeworldMasteredState(_start, cash: 400));
+      await pumpShell(tester, repository: repository);
+
+      expect(
+        _inGoalStrip(find.textContaining('Research Surveying 1')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('site-deck-next-goal')));
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+    });
+
+    testWidgets('a planet goal opens the Stellar Map', (tester) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(
+        homeworldMasteredState(_start, surveying: 3, cash: 3_000),
+      );
+      await pumpShell(tester, repository: repository);
+
+      expect(
+        _inGoalStrip(find.textContaining('Unlock Lunar Frontier')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('site-deck-next-goal')));
+      await tester.pump();
+
+      expect(find.byKey(const Key('stellar-map-screen')), findsOneWidget);
+      expect(find.byKey(const Key('site-deck-next-goal')), findsNothing);
+    });
+
+    testWidgets('the goal follows foreground accrual and sales', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start).copyWith(cash: 200));
+      final clock = TestClock(_start);
+      await pumpShell(tester, repository: repository, clock: clock);
+
+      expect(
+        _inGoalStrip(find.text('Unlock it on its card below.')),
+        findsOneWidget,
+      );
+
+      // 30 s at 0.50/s is 15 gold, worth 60 cash: 200 + 60 covers 250.
+      await pumpMiningTick(tester, clock, elapsed: const Duration(seconds: 30));
+      expect(
+        _inGoalStrip(find.text('Sell cargo to afford it.')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('site-deck-sell')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(
+        _inGoalStrip(find.text('Ready: unlock it below.')),
+        findsOneWidget,
+      );
+      expect(shellHandles(tester).controller.state.cash, greaterThan(250));
+    });
   });
 }

@@ -2,10 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/next_goal_view.dart';
 import 'package:horologium/mining/presentation/mining_dashed_border.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
+import 'package:horologium/mining/presentation/mining_next_goal_strip.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:horologium/mining/site_deck_view.dart';
@@ -20,6 +22,8 @@ class SiteDeckScreen extends StatelessWidget {
     required this.onDestinationSelected,
     this.cash = 0,
     this.selectedDestination = MiningNavigationDestination.siteDeck,
+    this.nextGoal,
+    this.onGoalSelected,
   });
 
   final SiteDeckView view;
@@ -29,6 +33,10 @@ class SiteDeckScreen extends StatelessWidget {
   final ValueChanged<MiningNavigationDestination> onDestinationSelected;
   final int cash;
   final MiningNavigationDestination selectedDestination;
+
+  /// When non-null, the Site Deck shows the next-goal strip.
+  final MiningNextGoalView? nextGoal;
+  final ValueChanged<MiningGoalTarget>? onGoalSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -43,8 +51,11 @@ class SiteDeckScreen extends StatelessWidget {
         onUnlockSite: onUnlockSite,
         onSellCargo: onSellCargo,
         onDestinationSelected: onDestinationSelected,
+        nextGoal: nextGoal,
+        onGoalSelected: onGoalSelected,
       );
     }
+    final goal = nextGoal;
     return ColoredBox(
       key: const Key('mining-shell-placeholder'),
       color: const Color(0xFF07111E),
@@ -72,6 +83,16 @@ class SiteDeckScreen extends StatelessWidget {
                 ],
               ),
             ),
+            if (goal != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                child: MiningNextGoalStrip(
+                  key: const Key('site-deck-next-goal'),
+                  goal: goal,
+                  compact: true,
+                  onSelected: onGoalSelected ?? (_) {},
+                ),
+              ),
             Expanded(
               child: ListView.separated(
                 key: const Key('site-deck-scroll'),
@@ -105,6 +126,8 @@ class _PortraitSiteDeck extends StatelessWidget {
     required this.onUnlockSite,
     required this.onSellCargo,
     required this.onDestinationSelected,
+    required this.nextGoal,
+    required this.onGoalSelected,
   });
 
   final SiteDeckView view;
@@ -114,10 +137,21 @@ class _PortraitSiteDeck extends StatelessWidget {
   final ValueChanged<MiningSiteId> onUnlockSite;
   final VoidCallback onSellCargo;
   final ValueChanged<MiningNavigationDestination> onDestinationSelected;
+  final MiningNextGoalView? nextGoal;
+  final ValueChanged<MiningGoalTarget>? onGoalSelected;
+
+  /// Bottom navigation height reserved under the card list.
+  static const _navReserve = 96.0;
+  static const _goalHeight = 56.0;
+  static const _goalGap = 8.0;
 
   @override
   Widget build(BuildContext context) {
     final pad = MediaQuery.paddingOf(context);
+    final goal = nextGoal;
+    final scrollBottom = goal == null
+        ? _navReserve
+        : _navReserve + _goalGap + _goalHeight + _goalGap;
     return ColoredBox(
       key: const Key('mining-shell-placeholder'),
       color: const Color(0xFF060A10),
@@ -197,7 +231,7 @@ class _PortraitSiteDeck extends StatelessWidget {
             left: 14,
             right: 14,
             top: 164 + pad.top,
-            bottom: 96 + pad.bottom,
+            bottom: scrollBottom + pad.bottom,
             child: SingleChildScrollView(
               key: const Key('site-deck-scroll'),
               child: Column(
@@ -220,6 +254,18 @@ class _PortraitSiteDeck extends StatelessWidget {
               ),
             ),
           ),
+          if (goal != null)
+            Positioned(
+              left: 14,
+              right: 14,
+              bottom: _navReserve + _goalGap + pad.bottom,
+              height: _goalHeight,
+              child: MiningNextGoalStrip(
+                key: const Key('site-deck-next-goal'),
+                goal: goal,
+                onSelected: onGoalSelected ?? (_) {},
+              ),
+            ),
           Positioned(
             left: 0,
             right: 0,
