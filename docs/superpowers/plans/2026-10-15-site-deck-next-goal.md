@@ -36,6 +36,7 @@ Build states with `MiningSave.initial(nowUtc: ...)` plus `copyWith`, in the styl
 Content invariants, in the same file, against `MiningContentRegistry.stellarMining()`:
 
 - for every site and planet with Surveying requirement `N > 0`, each gate in `technologySiteGates.take(N)` appears earlier in the authored progression order (planets in `MiningPlanetId.values` order, sites in `planet.sites` order) than the site, or belongs to an earlier planet than the planet;
+- every site's `requiredSite`, when set, appears earlier in its planet's authored `sites` order (the unlock-site rung relies on this instead of re-checking `requiredSite`);
 - each planet's `unlockRequiredMasteryPlanetId` is the immediately preceding `MiningPlanetId`.
 
 ### Production: `lib/mining/next_goal_view.dart`
@@ -90,7 +91,7 @@ Implementation notes:
 - Walk `MiningPlanetId.values` for planet order and `content.planet(id).sites` for site order. Compute the commissioned-site set once and reuse `content.isPlanetMastered`.
 - Keep one private `_cashGoal(...)` helper that applies the detail precedence (ready, then sell hint, then reason) so every cash-gated rung shares it.
 - Keep one private `_surveyingGoal(state, content, neededFor)` helper for both the site and the planet Surveying rungs.
-- Move the thousands formatter used by `MiningController._formatCash` into a small shared top-level `formatMiningCash(int)` in `lib/mining/mining_content.dart` (or a new `lib/mining/mining_format.dart`), and make the controller call it, so goal copy and the mastery message format identically. This is the only controller-file change and it is formatting-only; `mining_controller_test.dart` must stay green unchanged.
+- Move the thousands formatter used by `MiningController._formatCash` into a small shared top-level `formatMiningCash(int)` in `lib/mining/mining_content.dart` (the shared leaf both files already import), and make the controller call it, so goal copy and the mastery message format identically. This is the only controller-file change and it is formatting-only; `mining_controller_test.dart` must stay green unchanged.
 - No Flutter imports beyond what `mining_content.dart` already pulls in.
 
 Run: `flutter test test/mining/next_goal_view_test.dart test/mining/mining_controller_test.dart`.
@@ -109,7 +110,7 @@ New `test/mining/presentation/mining_next_goal_strip_test.dart`:
 
 Extend `test/mining/presentation/site_deck_screen_test.dart`:
 
-- with a goal at 402×874: `Key('site-deck-next-goal')` exists; its rect is `left 14`, `right 388`, `bottom 770`, `height 56`; `site-deck-scroll` top stays 164 and bottom is 702;
+- with a goal at 402×874: `Key('site-deck-next-goal')` exists; its rect is `left 14`, `right 388`, `bottom 770`, `height 56`; `site-deck-scroll` top stays 164 and bottom is 706 (874 − 96 − 72), 8 px above the strip's top at 714;
 - without a goal: the existing geometry assertions (scroll bottom 778) stay untouched and no strip is found;
 - landscape 874×402 with a goal: the strip sits between the header row and the card list and nothing overflows;
 - 360×640 at text scale 1.3 with the longest copy (the mastery-reward detail on `Cobalt Chasm`): no exception, title and detail ellipsize.
@@ -195,7 +196,7 @@ flutter build ios --simulator --debug
 ```
 
 - Coverage must stay at or above the 90% Codecov gate; the new read model should be fully covered by Task 1.
-- Scope audit: `git diff --name-only origin/main...HEAD` lists only the spec, the plan, `CLAUDE.md`, the new read model and strip, `site_deck_screen.dart`, `mining_shell.dart`, the formatter move (`mining_controller.dart` plus its new home), and the test files named above. No change to the simulation, repository, save, content values, Stellar Map, Mine Site, Technology sheet, HUD, or assets.
+- Scope audit: `git diff --name-only origin/main...HEAD` lists only the spec, the plan, `CLAUDE.md`, the new read model and strip, `site_deck_screen.dart`, `mining_shell.dart`, the formatter move (`mining_controller.dart` plus `mining_content.dart`), and the test files named above. No change to the simulation, repository, save, content values, Stellar Map, Mine Site, Technology sheet, HUD, or assets.
 
 ## Expected changed paths
 
@@ -210,7 +211,7 @@ Implementation (same PR, after review):
 - `lib/mining/presentation/mining_next_goal_strip.dart` (new)
 - `lib/mining/presentation/site_deck_screen.dart`
 - `lib/mining/presentation/mining_shell.dart`
-- `lib/mining/mining_controller.dart` (formatter call only) and the formatter's new home
+- `lib/mining/mining_controller.dart` (formatter call only) and `lib/mining/mining_content.dart` (formatter home)
 - `CLAUDE.md`
 - `test/mining/next_goal_view_test.dart` (new)
 - `test/mining/presentation/mining_next_goal_strip_test.dart` (new)
