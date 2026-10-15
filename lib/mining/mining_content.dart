@@ -69,6 +69,12 @@ class MiningSiteDefinition {
   final String? discoveryText;
 }
 
+/// Formats [amount] with thousands separators, e.g. `25000` -> `25,000`.
+String formatMiningCash(int amount) => amount.toString().replaceAllMapped(
+  RegExp(r'\B(?=(\d{3})+(?!\d))'),
+  (_) => ',',
+);
+
 const _denseGridWidth = 50;
 const _denseGridHeight = 50;
 

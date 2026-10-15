@@ -4,6 +4,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
+import 'package:horologium/mining/next_goal_view.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
@@ -51,6 +52,22 @@ SiteProgress _progress({
 SiteDeckView _deckView(MiningSave state, {bool isBusy = false}) =>
     SiteDeckView.from(state: state, content: _content, isBusy: isBusy);
 
+MiningNextGoalView _goalFor(MiningSave state) => MiningNextGoalView.from(
+  state: state,
+  content: _content,
+  sellableValue: _deckView(state).projectedValue,
+);
+
+/// The longest authored strip copy: Mars's last site names its reward.
+const _longGoal = MiningNextGoalView(
+  kind: MiningGoalKind.commissionSite,
+  title: 'Commission Titanium Highlands',
+  detail: 'Last Mars Frontier site: mastery pays +25,000 cash.',
+  target: MiningGoalTarget.mineSite(MiningSiteId.titaniumHighlands),
+  cash: 12_000,
+  cashCost: 25_000,
+);
+
 /// A commissioned Lunar Frontier state so portrait header tests can exercise a
 /// long non-Homeworld planet name (`LUNAR FRONTIER`).
 MiningSave _lunarState() => _stateWith(
@@ -88,6 +105,8 @@ Future<void> _pumpDeck(
   ValueChanged<MiningSiteId>? onEnterSite,
   ValueChanged<MiningSiteId>? onUnlockSite,
   ValueChanged<MiningNavigationDestination>? onDestinationSelected,
+  MiningNextGoalView? nextGoal,
+  ValueChanged<MiningGoalTarget>? onGoalSelected,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -106,6 +125,8 @@ Future<void> _pumpDeck(
         onUnlockSite: onUnlockSite ?? (_) {},
         onSellCargo: onSellCargo ?? () {},
         onDestinationSelected: onDestinationSelected ?? (_) {},
+        nextGoal: nextGoal,
+        onGoalSelected: onGoalSelected,
       ),
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(
@@ -828,5 +849,140 @@ void main() {
     expect(cash.top, 54 + 59);
     expect(gauge.top, 50 + 59);
     expect(nav.bottom, 932 - 34);
+  });
+
+  group('next-goal strip', () {
+    testWidgets(
+      'portrait pins the strip above navigation and shortens the list',
+      (tester) async {
+        final state = _stateWith(
+          sites: {
+            MiningSiteId.landingBasin: _progress(
+              unlocked: true,
+              commissioned: true,
+            ),
+          },
+        );
+        await _pumpDeck(
+          tester,
+          view: _deckView(state),
+          nextGoal: _goalFor(state),
+          size: const Size(402, 874),
+        );
+
+        final strip = tester.getRect(
+          find.byKey(const Key('site-deck-next-goal')),
+        );
+        expect(strip, const Rect.fromLTRB(14, 714, 388, 770));
+        final scroll = tester.getRect(
+          find.byKey(const Key('site-deck-scroll')),
+        );
+        expect(scroll.top, 164);
+        expect(
+          scroll.bottom,
+          706,
+          reason: '874 - 96 - 72, 8 px above the strip',
+        );
+        final nav = tester.getRect(
+          find.byKey(const Key('mining-bottom-navigation')),
+        );
+        expect(strip.bottom, lessThanOrEqualTo(nav.top));
+        final stripFinder = find.byKey(const Key('site-deck-next-goal'));
+        expect(
+          find.descendant(
+            of: stripFinder,
+            matching: find.textContaining('Unlock Carbon Ridge'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: stripFinder, matching: find.text('100 / 250')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('no goal keeps the authored list geometry and no strip', (
+      tester,
+    ) async {
+      await _pumpDeck(
+        tester,
+        view: _deckView(_stateWith()),
+        size: const Size(402, 874),
+      );
+
+      expect(find.byKey(const Key('site-deck-next-goal')), findsNothing);
+      final scroll = tester.getRect(find.byKey(const Key('site-deck-scroll')));
+      expect(scroll.bottom, 778);
+    });
+
+    testWidgets('tapping the strip forwards its target', (tester) async {
+      final selected = <MiningGoalTarget>[];
+      final state = _stateWith();
+      await _pumpDeck(
+        tester,
+        view: _deckView(state),
+        nextGoal: _goalFor(state),
+        onGoalSelected: selected.add,
+      );
+
+      await tester.tap(find.byKey(const Key('site-deck-next-goal')));
+      await tester.pump();
+      expect(selected, [
+        const MiningGoalTarget.mineSite(MiningSiteId.landingBasin),
+      ]);
+    });
+
+    testWidgets('landscape places the strip between header and cards', (
+      tester,
+    ) async {
+      final selected = <MiningGoalTarget>[];
+      final state = _stateWith();
+      for (final textScale in [1.0, 1.3]) {
+        await _pumpDeck(
+          tester,
+          view: _deckView(state),
+          nextGoal: _goalFor(state),
+          onGoalSelected: selected.add,
+          size: const Size(874, 402),
+          textScale: textScale,
+        );
+        expect(tester.takeException(), isNull, reason: 'scale $textScale');
+
+        final strip = tester.getRect(
+          find.byKey(const Key('site-deck-next-goal')),
+        );
+        expect(strip.height, 48);
+        final hud = tester.getRect(find.byKey(const Key('mining-hud')));
+        final scroll = tester.getRect(
+          find.byKey(const Key('site-deck-scroll')),
+        );
+        expect(strip.top, greaterThanOrEqualTo(hud.bottom));
+        expect(strip.bottom, lessThanOrEqualTo(scroll.top));
+      }
+
+      await tester.tap(find.byKey(const Key('site-deck-next-goal')));
+      await tester.pump();
+      expect(selected, hasLength(1));
+    });
+
+    testWidgets('long copy fits at 360x640 and text scale 1.3', (tester) async {
+      await _pumpDeck(
+        tester,
+        view: _deckView(_lunarState()),
+        nextGoal: _longGoal,
+        size: const Size(360, 640),
+        textScale: 1.3,
+      );
+      expect(tester.takeException(), isNull);
+      final strip = tester.getRect(
+        find.byKey(const Key('site-deck-next-goal')),
+      );
+      expect(strip.height, greaterThanOrEqualTo(48));
+      final nav = tester.getRect(
+        find.byKey(const Key('mining-bottom-navigation')),
+      );
+      expect(strip.bottom, lessThanOrEqualTo(nav.top));
+    });
   });
 }

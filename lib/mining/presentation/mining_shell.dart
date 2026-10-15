@@ -13,6 +13,7 @@ import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_state.dart';
+import 'package:horologium/mining/next_goal_view.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_settings_sheet.dart';
@@ -372,6 +373,21 @@ class _MiningShellState extends State<MiningShell>
     setState(() => _openSiteId = id);
   }
 
+  /// The next-goal strip only navigates, through the same paths as the
+  /// Site Deck cards and bottom navigation.
+  void _openGoal(MiningGoalTarget target) {
+    switch (target.kind) {
+      case MiningGoalTargetKind.mineSite:
+        _enterSite(target.siteId!);
+      case MiningGoalTargetKind.technology:
+        openTechnology();
+      case MiningGoalTargetKind.stellarMap:
+        _handleNavigation(MiningNavigationDestination.stellarMap);
+      case MiningGoalTargetKind.none:
+        return;
+    }
+  }
+
   void _leaveSite() {
     if (!mounted) return;
     unawaited(_audioManager.playSound(GameSound.tap));
@@ -652,6 +668,12 @@ class _MiningShellState extends State<MiningShell>
           onUnlockSite: _unlockSite,
           onSellCargo: _sellCargo,
           onDestinationSelected: _handleNavigation,
+          nextGoal: MiningNextGoalView.from(
+            state: _displayState,
+            content: _content,
+            sellableValue: siteDeck.projectedValue,
+          ),
+          onGoalSelected: _openGoal,
         );
       } else {
         final fleetDock = FleetDockView.from(
