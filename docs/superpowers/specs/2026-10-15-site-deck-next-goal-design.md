@@ -68,7 +68,7 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
    2. Take the frontier's first site, in authored order, that is not commissioned.
       - If it is unlocked: **Commission {site}**, target that Mine Site.
       - If it is locked and Surveying is below the site's `requiredSurveyingLevel`: the Surveying rung (below), "needed for {site}".
-      - Otherwise: **Unlock {site}**, cash-gated on `unlockCost`, no target (the card with the Unlock button is directly below the strip).
+      - Otherwise: **Unlock {site}**, cash-gated on `unlockCost`, no target (the card with the Unlock button is directly below the strip). The rung does not re-check `requiredSite`: the first-uncommissioned walk has already passed every earlier site, and a content-invariant test pins that each `requiredSite` precedes its site, so the strip cannot say "Unlock X" while the controller would reject with "Unlock the previous site first."
 2. **Next planet.** If there is no frontier, take the first locked planet.
    - If Surveying is below its `unlockRequiredSurveyingLevel`: the Surveying rung, "needed for {planet}".
    - Otherwise: **Unlock {planet}**, cash-gated on `unlockCashCost`, target Stellar Map.
@@ -118,7 +118,7 @@ These calls already play the tap sound, respect `_initialized`, and (for `_enter
 
 ### 5. Placement
 
-**Portrait.** The strip is pinned directly above the bottom navigation so it stays visible while the card list scrolls: `left: 14`, `right: 14`, `height: 56`, `bottom: 96 + 8 + pad.bottom`. When a goal is present, `site-deck-scroll` keeps `top: 164 + pad.top` and its bottom moves from `96 + pad.bottom` to `96 + 72 + pad.bottom`, leaving an 8 px gap above the strip. At 402×874 that changes the scroll bottom from 778 to 702. When no goal is passed, geometry is unchanged, so existing Site Deck screen tests keep their current assertions.
+**Portrait.** The strip is pinned directly above the bottom navigation so it stays visible while the card list scrolls: `left: 14`, `right: 14`, `height: 56`, `bottom: 96 + 8 + pad.bottom`. When a goal is present, `site-deck-scroll` keeps `top: 164 + pad.top` and its bottom moves from `96 + pad.bottom` to `96 + 72 + pad.bottom`, leaving an 8 px gap above the strip. At 402×874 that changes the scroll bottom from 778 to 706. When no goal is passed, geometry is unchanged, so existing Site Deck screen tests keep their current assertions.
 
 **Landscape.** The strip is a 48 px row between the HUD/Sell header row and the card `ListView`, padded `12, 0, 12, 4`.
 
@@ -157,8 +157,8 @@ These calls already play the tap sound, respect `_initialized`, and (for `_enter
 ## Testing
 
 - **Read model:** table tests over hand-built `MiningSave` states for every rung and every detail-precedence branch, the empty-dock spawn variant, the mastery-reward variant, the return-to-frontier case, and both completion variants.
-- **Content invariants:** every site's and planet's Surveying requirement `N` has gate sites `technologySiteGates[0..N-1]` that precede it in authored progression order, and each planet's `unlockRequiredMasteryPlanetId` is the planet immediately before it.
-- **Widget:** strip copy, progress label, chevron presence and absence, tap callback with the target, semantics label and button flag, 48 px target, portrait pinned geometry with scroll bottom 702 at 402×874, landscape placement, and no overflow at 360×640 / text scale 1.3 and 874×402.
+- **Content invariants:** every site's and planet's Surveying requirement `N` has gate sites `technologySiteGates[0..N-1]` that precede it in authored progression order; every site's `requiredSite` appears earlier in its planet's authored site order; and each planet's `unlockRequiredMasteryPlanetId` is the planet immediately before it.
+- **Widget:** strip copy, progress label, chevron presence and absence, tap callback with the target, semantics label and button flag, 48 px target, portrait pinned geometry with scroll bottom 706 at 402×874, landscape placement, and no overflow at 360×640 / text scale 1.3 and 874×402.
 - **Shell:** on a fresh save the strip shows `Commission Landing Basin` and tapping it opens the Landing Basin Mine Site; a Homeworld-mastered save's strip opens the Technology sheet; a Surveying-3 save's strip opens the Stellar Map.
 - **Journey:** `test/integration/merge_mining_journey_test.dart` asserts the goal kind and title at the checkpoints in the table above, proving every state on the public-action route yields a goal.
 
