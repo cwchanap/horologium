@@ -66,6 +66,7 @@ flutter test test/mining
 ### Tests
 
 - `test/mining/presentation/site_deck_screen_test.dart`, `stellar_map_screen_test.dart`, `offline_return_sheet_test.dart`: a Ceres deck, a locked and an unlocked Ceres card, and a Ceres offline section, at 360×640 and 430×932 with no overflow.
+- `stellar_map_screen_test.dart`: the locked Ceres card's unlock copy shows the compact amount (`30.00M`), not raw digits. HPA-401 Task 1 already routes `stellar_map_screen.dart:768` through `formatMiningCash`; if this assertion fails, fix that string generically with its own test.
 - `test/integration/merge_mining_journey_test.dart`: after Mars, expect no reward and the next goal `Unlock Ceres Frontier`; earn to 30,000,000 with HPA-401's two-hour steps; unlock Ceres and check its starter dock and site; merge, deploy, commission Nickel Shoals, Platinum Rift, and Iridium Spire; expect the single 30,000,000 reward and `All frontiers mastered`; reload on Ceres. Keep the `CADENCE` and `SEQUENCE` lines and update the test name to "through Ceres".
 
 ```sh
