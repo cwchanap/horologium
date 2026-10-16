@@ -1,7 +1,7 @@
 # Site Deck Next Goal Design
 
 - Date: 2026-10-15
-- Status: Proposed
+- Status: Implemented
 - Linear: not yet filed (the workspace hit Linear's free issue limit); roadmap context is HPA-630
 - Baseline: `main` at `560041a9faf23c60a240427321a57fbfbcaaeb2b` after HPA-642 / PR #34
 
