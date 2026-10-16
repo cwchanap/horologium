@@ -108,6 +108,7 @@ New `test/mining/presentation/mining_next_goal_strip_test.dart`:
 - `none` target shows no chevron, is not a semantics button, and ignores taps;
 - the tap target is at least 48 px tall;
 - a navigable goal with no `onSelected` shows no chevron and is not a semantics button;
+- with real Orbitron metrics (skipped on web), `Unlock Cobalt Chasm` at `25,000 / 30,000` keeps an unellipsized title at 332 px and text scale 1.0 and at 374 px and 2.0, with the cash label on the detail line;
 - at text scale 1.5, 2.0, and 3.0 both variants keep their height without overflow and render at the 1.3 cap, with the cash label, and the portrait strip keeps the detail on its own visible line.
 
 Extend `test/mining/presentation/site_deck_screen_test.dart`:

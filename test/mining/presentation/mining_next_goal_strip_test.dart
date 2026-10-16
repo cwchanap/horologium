@@ -1,5 +1,9 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/next_goal_view.dart';
@@ -53,6 +57,19 @@ Future<void> _pumpStrip(
 }
 
 void main() {
+  // Real Orbitron metrics: the test font's square glyphs understate line
+  // height and overstate width, hiding both overflow and truncation.
+  setUpAll(() async {
+    if (kIsWeb) return;
+    final loader = FontLoader('Orbitron')
+      ..addFont(
+        File(
+          'assets/fonts/Orbitron-Variable.ttf',
+        ).readAsBytes().then(ByteData.sublistView),
+      );
+    await loader.load();
+  });
+
   testWidgets('renders the label, title, and detail', (tester) async {
     await _pumpStrip(tester, _commissionGoal);
 
@@ -211,6 +228,38 @@ void main() {
       }
     }
   });
+
+  testWidgets('portrait title keeps its own full line beside a large cost', (
+    tester,
+  ) async {
+    const goal = MiningNextGoalView(
+      kind: MiningGoalKind.unlockSite,
+      title: 'Unlock Cobalt Chasm',
+      detail: 'Unlock it on its site card.',
+      target: MiningGoalTarget.none(),
+      cash: 25_000,
+      cashCost: 30_000,
+    );
+    // 332 and 374 are the strip widths on 360 and 402 px portrait decks.
+    for (final (width, textScale) in [(332.0, 1.0), (374.0, 2.0)]) {
+      final reason = '$width at $textScale';
+      await _pumpStrip(tester, goal, width: width, textScale: textScale);
+
+      expect(tester.takeException(), isNull, reason: reason);
+      expect(
+        tester
+            .renderObject<RenderParagraph>(find.textContaining(goal.title))
+            .didExceedMaxLines,
+        isFalse,
+        reason: reason,
+      );
+      expect(
+        tester.getCenter(find.byKey(const Key('next-goal-cash'))).dy,
+        closeTo(tester.getCenter(find.text(goal.detail)).dy, 2),
+        reason: 'cash shares the detail line: $reason',
+      );
+    }
+  }, skip: kIsWeb);
 
   testWidgets('long copy ellipsizes at 1.3 text scale without overflow', (
     tester,

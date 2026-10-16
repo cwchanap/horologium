@@ -58,18 +58,40 @@ class MiningNextGoalStrip extends StatelessWidget {
     );
     final cashLabel = goal.cashLabel;
     final progress = goal.progress;
-
-    final text = compact
-        ? Text.rich(
-            TextSpan(
-              children: [
-                const TextSpan(text: 'NEXT GOAL  ', style: _labelStyle),
-                TextSpan(text: goal.title, style: _titleStyle),
-                TextSpan(text: '  ·  ${goal.detail}', style: detailStyle),
-              ],
-            ),
+    final cash = cashLabel == null
+        ? null
+        : Text(
+            cashLabel,
+            key: const Key('next-goal-cash'),
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: goal.isReady ? MiningTheme.accent : MiningTheme.warning,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          );
+
+    // Landscape has the width for one line. Portrait gives the title its own
+    // full-width line and shares the detail line with the cash label, so the
+    // goal's name is never squeezed out by its cost.
+    final body = compact
+        ? Row(
+            children: [
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(text: 'NEXT GOAL  ', style: _labelStyle),
+                      TextSpan(text: goal.title, style: _titleStyle),
+                      TextSpan(text: '  ·  ${goal.detail}', style: detailStyle),
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (cash != null) ...[const SizedBox(width: 6), cash],
+            ],
           )
         : Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -85,12 +107,18 @@ class MiningNextGoalStrip extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 2),
-              Text(
-                goal.detail,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: detailStyle,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      goal.detail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: detailStyle,
+                    ),
+                  ),
+                  if (cash != null) ...[const SizedBox(width: 6), cash],
+                ],
               ),
             ],
           );
@@ -125,22 +153,7 @@ class MiningNextGoalStrip extends StatelessWidget {
                         size: 18,
                       ),
                       const SizedBox(width: 8),
-                      Expanded(child: text),
-                      if (cashLabel != null) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          cashLabel,
-                          key: const Key('next-goal-cash'),
-                          maxLines: 1,
-                          style: TextStyle(
-                            color: goal.isReady
-                                ? MiningTheme.accent
-                                : MiningTheme.warning,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
+                      Expanded(child: body),
                       if (navigable)
                         const Icon(
                           Icons.chevron_right_rounded,
