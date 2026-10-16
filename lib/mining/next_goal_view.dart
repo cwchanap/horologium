@@ -160,8 +160,8 @@ class _GoalLadder {
       kind: MiningGoalKind.unlockSite,
       title: 'Unlock ${site.name}',
       cost: site.unlockCost,
-      defaultDetail: 'Unlock it on its card below.',
-      readyDetail: 'Ready: unlock it below.',
+      defaultDetail: 'Unlock it on its site card.',
+      readyDetail: 'Ready: unlock it on its site card.',
       target: const MiningGoalTarget.none(),
     );
   }
@@ -184,17 +184,19 @@ class _GoalLadder {
   MiningNextGoalView complete() {
     const max = MiningContentRegistry.maxTechnologyLevel;
     final technology = state.technology;
-    final upgradesLeft =
-        technology.extraction < max || technology.logistics < max;
+    final tracksLeft = [
+      if (technology.extraction < max) 'Extraction',
+      if (technology.logistics < max) 'Logistics',
+    ];
     return _plain(
       kind: MiningGoalKind.frontiersMastered,
       title: 'All frontiers mastered',
-      detail: upgradesLeft
-          ? 'Keep upgrading Extraction and Logistics.'
-          : 'Every frontier is mastered.',
-      target: upgradesLeft
-          ? const MiningGoalTarget.technology()
-          : const MiningGoalTarget.none(),
+      detail: tracksLeft.isEmpty
+          ? 'Every frontier is mastered.'
+          : 'Keep upgrading ${tracksLeft.join(' and ')}.',
+      target: tracksLeft.isEmpty
+          ? const MiningGoalTarget.none()
+          : const MiningGoalTarget.technology(),
     );
   }
 

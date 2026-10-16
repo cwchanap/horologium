@@ -16,7 +16,7 @@ const _commissionGoal = MiningNextGoalView(
 const _unlockGoal = MiningNextGoalView(
   kind: MiningGoalKind.unlockSite,
   title: 'Unlock Carbon Ridge',
-  detail: 'Unlock it on its card below.',
+  detail: 'Unlock it on its site card.',
   target: MiningGoalTarget.none(),
   cash: 100,
   cashCost: 250,
@@ -129,7 +129,7 @@ void main() {
         .getSemanticsData();
     expect(
       node.label,
-      'Next goal: Unlock Carbon Ridge. Unlock it on its card below. '
+      'Next goal: Unlock Carbon Ridge. Unlock it on its site card. '
       '100 of 250 cash.',
     );
     expect(node.flagsCollection.isButton, isFalse);
@@ -145,8 +145,67 @@ void main() {
     await _pumpStrip(tester, _unlockGoal, compact: true, width: 760);
 
     expect(tester.getSize(find.byType(MiningNextGoalStrip)).height, 48);
-    expect(find.textContaining('Unlock it on its card below.'), findsOneWidget);
+    expect(find.textContaining('Unlock it on its site card.'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a navigable goal without a handler is informational', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MiningNextGoalStrip(goal: _commissionGoal, onSelected: null),
+        ),
+      ),
+    );
+    final semantics = tester.ensureSemantics();
+
+    expect(find.byKey(const Key('next-goal-chevron')), findsNothing);
+    final node = tester
+        .getSemantics(find.byType(MiningNextGoalStrip))
+        .getSemanticsData();
+    expect(node.flagsCollection.isButton, isFalse);
+    expect(node.hasAction(SemanticsAction.tap), isFalse);
+    semantics.dispose();
+  });
+
+  testWidgets('large text falls back to one line without overflow', (
+    tester,
+  ) async {
+    for (final textScale in [1.5, 2.0, 3.0]) {
+      for (final goal in [_commissionGoal, _unlockGoal]) {
+        for (final compact in [false, true]) {
+          final reason = '$textScale ${goal.title} compact=$compact';
+          await _pumpStrip(
+            tester,
+            goal,
+            compact: compact,
+            width: compact ? 850 : 332,
+            textScale: textScale,
+          );
+
+          expect(tester.takeException(), isNull, reason: reason);
+          expect(
+            tester.getSize(find.byType(MiningNextGoalStrip)).height,
+            compact ? 48 : 56,
+            reason: reason,
+          );
+          expect(
+            find.textContaining('${goal.title}  ·  ${goal.detail}'),
+            findsOneWidget,
+            reason: 'detail shares the title line: $reason',
+          );
+          // Portrait has no room for the cash label at large text; the
+          // progress bar and semantics label still carry it.
+          expect(
+            find.byKey(const Key('next-goal-cash')),
+            goal.isCashGated && compact ? findsOneWidget : findsNothing,
+            reason: reason,
+          );
+        }
+      }
+    }
   });
 
   testWidgets('long copy ellipsizes at 1.3 text scale without overflow', (

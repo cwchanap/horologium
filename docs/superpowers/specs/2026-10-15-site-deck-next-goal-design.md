@@ -68,11 +68,11 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
    2. Take the frontier's first site, in authored order, that is not commissioned.
       - If it is unlocked: **Commission {site}**, target that Mine Site.
       - If it is locked and Surveying is below the site's `requiredSurveyingLevel`: the Surveying rung (below), "needed for {site}".
-      - Otherwise: **Unlock {site}**, cash-gated on `unlockCost`, no target (the card with the Unlock button is directly below the strip). The rung does not re-check `requiredSite`: the first-uncommissioned walk has already passed every earlier site, and a content-invariant test pins that each `requiredSite` precedes its site, so the strip cannot say "Unlock X" while the controller would reject with "Unlock the previous site first."
+      - Otherwise: **Unlock {site}**, cash-gated on `unlockCost`, no target (the site's own card on the Site Deck carries the Unlock button; the copy names the card rather than a direction because the strip sits below the list in portrait and above it in landscape). The rung does not re-check `requiredSite`: the first-uncommissioned walk has already passed every earlier site, and a content-invariant test pins that each `requiredSite` precedes its site, so the strip cannot say "Unlock X" while the controller would reject with "Unlock the previous site first."
 2. **Next planet.** If there is no frontier, take the first locked planet.
    - If Surveying is below its `unlockRequiredSurveyingLevel`: the Surveying rung, "needed for {planet}".
    - Otherwise: **Unlock {planet}**, cash-gated on `unlockCashCost`, target Stellar Map.
-3. **All frontiers mastered.** If no planet is locked: **All frontiers mastered**. If Extraction or Logistics is below max level the detail is "Keep upgrading Extraction and Logistics." and the target is Technology; otherwise the detail is "Every frontier is mastered." and there is no target.
+3. **All frontiers mastered.** If no planet is locked: **All frontiers mastered**. If Extraction or Logistics is below max level the detail names only the tracks still below max ("Keep upgrading Extraction and Logistics.", "Keep upgrading Extraction.", or "Keep upgrading Logistics.") and the target is Technology; otherwise the detail is "Every frontier is mastered." and there is no target.
 
 **Surveying rung.** With current Surveying level `L`, the gate is `MiningContentRegistry.technologySiteGates[L]` and the cost is `technologyCosts[L]`.
 
@@ -95,7 +95,7 @@ A cash-gated goal exposes `cashCost`, the current `cash`, `progress = (cash / ca
 
 Detail precedence for cash-gated goals:
 
-1. `cash >= cashCost`: a ready line ("Ready: unlock it below.", "Ready on the Stellar Map.", "Ready in Technology.");
+1. `cash >= cashCost`: a ready line ("Ready: unlock it on its site card.", "Ready on the Stellar Map.", "Ready in Technology.");
 2. `sellWouldAfford`: "Sell cargo to afford it.";
 3. otherwise the rung's reason ("Needed for Titanium Highlands.") or the default detail.
 
@@ -124,7 +124,7 @@ These calls already play the tap sound, respect `_initialized`, and (for `_enter
 
 **Content.** A flag icon, a small `NEXT GOAL` label, the title (one line, ellipsized), the detail (one line, ellipsized), a trailing chevron when targeted, and, for cash-gated goals, a 3 px progress bar plus the `{cash} / {cost}` label. Colors come from `MiningTheme`: accent for progress, `warning` for the sell hint, and `panel` for the background. The progress bar is a static fill with no implicit animation, so reduced motion needs no special case.
 
-**Accessibility.** The strip is one `Semantics` node, a button when targeted, labelled `Next goal: {title}. {detail}.` with `{cash} of {cost} cash.` appended for cash-gated goals. The tap target is at least 48 px tall. At 360×640 with text scale 1.3 and at 874×402 nothing overflows.
+**Accessibility.** The strip is one `Semantics` node, a button when targeted, labelled `Next goal: {title}. {detail}.` with `{cash} of {cost} cash.` appended for cash-gated goals. The tap target is at least 48 px tall. At 360×640 with text scale 1.3 and at 874×402 nothing overflows. Above text scale 1.3 the portrait strip uses the single-line layout and drops the inline `{cash} / {cost}` label (the progress bar and semantics label keep it), and the strip's text stops scaling at 2.0, so the fixed-height strip never overflows. A strip given no tap handler is informational: no chevron, button role, or tap.
 
 ## Copy
 
@@ -133,11 +133,11 @@ These calls already play the tap sound, respect `_initialized`, and (for `_enter
 | Commission | `Commission {site}` | `Deploy a rig beside a resource.` |
 | Commission, empty dock | `Commission {site}` | `Spawn a rig for {cost} cash, then deploy it.` |
 | Commission, last rewarded site | `Commission {site}` | `Last {planet} site: mastery pays +{reward} cash.` |
-| Unlock site | `Unlock {site}` | `Unlock it on its card below.` |
+| Unlock site | `Unlock {site}` | `Unlock it on its site card.` |
 | Surveying | `Research Surveying {n}` | `Needed for {site or planet}.` |
 | Unlock planet | `Unlock {planet}` | `Unlock it from the Stellar Map.` |
 | Return | `Return to {planet}` | `{commissioned}/{total} sites commissioned.` |
-| Complete, upgrades left | `All frontiers mastered` | `Keep upgrading Extraction and Logistics.` |
+| Complete, upgrades left | `All frontiers mastered` | `Keep upgrading {tracks below max}.` |
 | Complete | `All frontiers mastered` | `Every frontier is mastered.` |
 
 ## Expected sequence on the representative route

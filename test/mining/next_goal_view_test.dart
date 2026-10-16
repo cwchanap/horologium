@@ -138,7 +138,7 @@ void main() {
 
         expect(goal.kind, MiningGoalKind.unlockSite);
         expect(goal.title, 'Unlock Carbon Ridge');
-        expect(goal.detail, 'Unlock it on its card below.');
+        expect(goal.detail, 'Unlock it on its site card.');
         expect(goal.cashCost, 250);
         expect(goal.progress, closeTo(0.4, 1e-9));
         expect(goal.cashLabel, '100 / 250');
@@ -158,14 +158,14 @@ void main() {
       test('cargo short of the cost keeps the default detail', () {
         final goal = _goal(landingOnly(100), sellableValue: 149);
 
-        expect(goal.detail, 'Unlock it on its card below.');
+        expect(goal.detail, 'Unlock it on its site card.');
         expect(goal.sellWouldAfford, isFalse);
       });
 
       test('affordable unlock is ready', () {
         final goal = _goal(landingOnly(250), sellableValue: 500);
 
-        expect(goal.detail, 'Ready: unlock it below.');
+        expect(goal.detail, 'Ready: unlock it on its site card.');
         expect(goal.isReady, isTrue);
         expect(goal.sellWouldAfford, isFalse);
         expect(goal.progress, 1);
@@ -280,19 +280,29 @@ void main() {
       );
     });
 
-    test('mastering every frontier points at remaining upgrades', () {
-      final goal = _goal(
-        _stateWith(
-          technology: const TechnologyLevels(surveying: 5, logistics: 5),
-          unlockedPlanetIds: MiningPlanetId.values.toSet(),
-          sites: _commissionedSites(MiningSiteId.values),
+    test('mastering every frontier names only the tracks left to upgrade', () {
+      const cases = [
+        (TechnologyLevels(surveying: 5), 'Extraction and Logistics'),
+        (TechnologyLevels(surveying: 5, logistics: 5), 'Extraction'),
+        (
+          TechnologyLevels(surveying: 5, extraction: 5, logistics: 2),
+          'Logistics',
         ),
-      );
+      ];
+      for (final (technology, tracks) in cases) {
+        final goal = _goal(
+          _stateWith(
+            technology: technology,
+            unlockedPlanetIds: MiningPlanetId.values.toSet(),
+            sites: _commissionedSites(MiningSiteId.values),
+          ),
+        );
 
-      expect(goal.kind, MiningGoalKind.frontiersMastered);
-      expect(goal.title, 'All frontiers mastered');
-      expect(goal.detail, 'Keep upgrading Extraction and Logistics.');
-      expect(goal.target, const MiningGoalTarget.technology());
+        expect(goal.kind, MiningGoalKind.frontiersMastered);
+        expect(goal.title, 'All frontiers mastered');
+        expect(goal.detail, 'Keep upgrading $tracks.');
+        expect(goal.target, const MiningGoalTarget.technology());
+      }
     });
 
     test('mastering everything with maxed technology has no target', () {
@@ -347,7 +357,7 @@ void main() {
 
       expect(
         goal.semanticsLabel,
-        'Next goal: Unlock Carbon Ridge. Unlock it on its card below. '
+        'Next goal: Unlock Carbon Ridge. Unlock it on its site card. '
         '100 of 250 cash.',
       );
       expect(
