@@ -8,7 +8,9 @@
 
 One ticket = one PR. Planning lands first on this draft PR; implementation lands on the same PR after plan review. Do not open a second implementation PR.
 
-Task 1 is behavior-preserving and must be green before any Frozen Basin behavior lands. Task 2 is the only asset task and needs the image-generation skill, which this session does not have.
+Task 1 is behavior-preserving and must be green before any Frozen Basin behavior lands.
+
+This ticket generates no art. The water-ice frame family is its own art ticket and PR, [HPA-404](https://linear.app/cwchanap/issue/HPA-404/mining-art-water-ice-deposit-frame-family-for-frozen-basin), which blocks Task 2. Start Task 2 only after HPA-404 merges, by merging `main` into this branch so the 15 `node-water-ice-…` files are present.
 
 ## Task 1: Generalize the Landing Basin layer without changing behavior
 
@@ -46,28 +48,7 @@ flutter test test/mining/presentation/animated_mining_grid_visual_layer_test.dar
 
 All existing assertions, including goldens, must pass unchanged. Commit this task on its own.
 
-## Task 2: Water-ice frame family (image generation)
-
-This task runs where the image-generation skill is available. It produces files only; no Dart changes.
-
-1. Copy `assets/images/mining/nodes/water_ice.png` to `node-water-ice-s1.png` and `node-water-ice-idle-01.png`.
-2. Generate S2, S3, and S4 from S1 as the edit reference, using the briefs in the design. Register the base to S1's opaque footprint `(55, 4, 458, 509)`; only the top edge drops.
-3. **Prototype gate.** Wire S2 and Hit 01 temporarily (local only) and view Frozen Basin's Mine Site at 430×932 with one T1 rig. Continue only if the footprint and camera match S1 and the robot's contact point lands on the crystals. Show the owner S1–S4 and Hit 01 before generating the rest.
-4. Generate idle 02–04, hit 01–03, and exhaust 02–03, one image-generation call per frame, from the matching reference plate.
-5. Copy S3 to `node-water-ice-exhaust-01.png` and S4 to `node-water-ice-exhaust-04.png`.
-6. Normalize only edge-connected baked checkerboard pixels to alpha. Every file is 512×512 RGBA. Do not commit drafts or cleanup scripts.
-7. Owner approves the full set in the PR before Task 3 is merged.
-
-Expected new files, all under `assets/images/mining/nodes/`:
-
-```text
-node-water-ice-s1.png … node-water-ice-s4.png
-node-water-ice-idle-01.png … node-water-ice-idle-04.png
-node-water-ice-hit-01.png … node-water-ice-hit-03.png
-node-water-ice-exhaust-01.png … node-water-ice-exhaust-04.png
-```
-
-## Task 3: Turn Frozen Basin on
+## Task 2: Turn Frozen Basin on
 
 ### Tests first
 
@@ -97,7 +78,7 @@ node-water-ice-exhaust-01.png … node-water-ice-exhaust-04.png
 
 Run the Task 1 command plus the new tests.
 
-## Task 4: Guidance and gates
+## Task 3: Guidance and gates
 
 - `CLAUDE.md`:
   - replace "Landing Basin is the first authored animated mining site." with "Landing Basin and Frozen Basin are the authored animated mining sites, selected by the closed `MiningVisuals.depositFramesFor` switch."
@@ -134,7 +115,6 @@ Implementation (same PR, after review):
 - `lib/mining/presentation/mining_grid_map.dart`
 - `lib/mining/presentation/mining_shell.dart`
 - `assets/images/mining/robots/` (renamed from `landing_basin/`, byte-identical)
-- `assets/images/mining/nodes/node-water-ice-*.png` (15 files, 11 generated)
 - `pubspec.yaml` (asset directory rename only)
 - `CLAUDE.md`
 - `test/mining/presentation/animated_mining_grid_visual_layer_test.dart` (renamed)
@@ -143,5 +123,7 @@ Implementation (same PR, after review):
 - `test/mining/presentation/mine_site_screen_test.dart`
 - `test/mining/presentation/mining_shell_test.dart`
 - `test/support/mining_visual_frames.dart`
+
+The `node-water-ice-…` files arrive from `main` through HPA-404 and are not part of this PR's diff.
 
 No change to the controller, simulation, repository, save, content values, Site Deck, Stellar Map, Technology sheet, or goldens.

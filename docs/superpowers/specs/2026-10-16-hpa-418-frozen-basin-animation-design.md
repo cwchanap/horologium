@@ -4,6 +4,7 @@
 - Status: Draft for review
 - Linear: [HPA-418](https://linear.app/cwchanap/issue/HPA-418/mining-polish-animate-frozen-basin-as-the-second-mining-site) — Animate Frozen Basin as the second mining site
 - Baseline: `main` at `8f0881f` after PR #35
+- Depends on: [HPA-404](https://linear.app/cwchanap/issue/HPA-404/mining-art-water-ice-deposit-frame-family-for-frozen-basin) — water-ice deposit frame family (art only, its own PR)
 
 ## Problem
 
@@ -16,7 +17,7 @@ The first time a player reaches a new planet, the Lunar Frontier's Frozen Basin,
 ## Goals
 
 - Frozen Basin plays the same live mining loop as Landing Basin: robot strike, deposit hit reaction, S1 idle loop, S1–S4 stage art driven by cargo fill, the exhaust beat at 90%, transient HP and damage labels, and the strike sound.
-- Add a water-ice frame family that matches the gold family's structure, camera, and footprint.
+- Wire the water-ice frame family that HPA-404 delivers.
 - Turn the Landing Basin layer into one animated layer parameterized by a site's frame family, with Landing Basin behavior and goldens unchanged.
 - Keep the animated-site set a closed, explicit switch.
 
@@ -27,7 +28,7 @@ This work does not:
 - change `MiningController`, `MiningSimulation`, `MiningSaveRepository`, `MiningSave`, `MineSiteView`, or any economy value;
 - animate any site other than Landing Basin and Frozen Basin;
 - add a resource visual registry, data-driven animation format, sprite-sheet loader, Rive, Lottie, Flame, or particle system;
-- add new robot art, a new SFX, haptics, or a second audio path;
+- generate any art (the water-ice frames are HPA-404), or add new robot art, a new SFX, haptics, or a second audio path;
 - change HP or damage values, the impact timeline, stage thresholds, or reduced-motion rules;
 - persist or replay any animation state.
 
@@ -91,29 +92,11 @@ if (frames != null && site.rigPlacements.isNotEmpty && site.storedAmount > befor
 
 The sequence is still one integer because only the open site receives it. Opening a different site mounts a new layer, which never fires on mount, so switching from Landing Basin to Frozen Basin cannot replay a strike. `_playMiningImpact` plays `GameSound.mining` only when the open site is animated and the route is current, exactly as today for Landing Basin.
 
-### 5. Water-ice frame family
+### 5. Water-ice frame family comes from HPA-404
 
-The S1 plate is the existing `assets/images/mining/nodes/water_ice.png`, copied byte-for-byte to `node-water-ice-s1.png` (gold does the same with `gold.png`). As with gold, `idle-01` is a copy of S1, `exhaust-01` a copy of S3, and `exhaust-04` a copy of S4. That leaves **11 generated frames**: S2–S4, idle 02–04, hit 01–03, and exhaust 02–03.
+Art is its own task and PR. HPA-404 delivers the 15 `node-water-ice-…` files under `assets/images/mining/nodes/`, with the same names, 512×512 RGBA size, locked camera, and S1 footprint `(55, 4, 458, 509)` as the gold family. As with gold, S1 and idle-01 are copies of the existing `nodes/water_ice.png`, exhaust-01 copies S3, and exhaust-04 copies S4. HPA-404 holds the per-frame briefs and the owner's art approval.
 
-Every frame is a 512×512 transparent PNG in S1's locked camera. The rock base stays registered to S1's opaque footprint, measured at alpha > 16 as `(55, 4, 458, 509)`; depleting stages lower only the top edge, as gold's S3 and S4 do.
-
-| Frame | Brief |
-| --- | --- |
-| S2 | Tallest crystals snapped to two-thirds height, fresh pale fracture faces, a few loose shards on the rocks. |
-| S3 | Only stubs and mid-size crystals remain; glow halved; frost-dusted rubble dominates. |
-| S4 | Rock base with frost and a few small shards; faint residual glow in the cracks. |
-| Idle 02 | S1 geometry, inner glow 90%, a soft cyan bleed along crystal edges. |
-| Idle 03 | S1 geometry, inner glow 100%, one or two tiny frost sparkle motes. |
-| Idle 04 | S1 geometry, inner glow 85%, the motes fading. |
-| Hit 01 | S1 crystals compressed 4 px at the top, glow 130%, 3–5 ice chips at the upper-left contact point. |
-| Hit 02 | S1 at full height, chips flying a short distance outward, a small frost-mist puff kept inside the cell. |
-| Hit 03 | S1 settled, chips nearly gone, sparkle fading, a thin frost haze at the base. |
-| Exhaust 02 | S3 stubs crack and slump inward, glow dims, one small contained frost puff. |
-| Exhaust 03 | Lower slump approaching S4, sparse patchy glow. |
-
-The upper-left contact point matches the robot's default left-facing strike; the layer mirrors the robot, not the deposit. Normalize only edge-connected baked checkerboard pixels to alpha, and commit no generator drafts or cleanup scripts.
-
-This session has no image-generation tool, so the frames are produced where the image-generation skill is available (as for HPA-451's gold frames) and approved by the owner before they are wired.
+This ticket only consumes that contract: `MiningDepositFrames.waterIce` names the 15 paths, and the bundle test checks their size and the four byte-for-byte copies. Task 1 (the behavior-preserving generalization) does not need the art; Frozen Basin turns on only after HPA-404 merges.
 
 ### 6. Precache only the open site's family
 
@@ -133,10 +116,10 @@ HPA-401 lengthens storage from minutes to hours. Stage art follows `cargo / capa
 
 ## Risks
 
-- **Art drift.** Generated frames can change the footprint or camera. Mitigation: register every frame to S1's footprint, prove S2 and Hit 01 in the real Mine Site before generating the rest, and reject frames that need geometry changes.
+- **Art drift.** Generated frames can change the footprint or camera. Mitigation lives in HPA-404 (register to S1's footprint, prove S2 and Hit 01 in the real Mine Site first, owner approval); this ticket's bundle test catches a wrong size or broken copy.
 - **Rename churn.** Renaming the layer, helpers, and robot paths touches many tests. Mitigation: keys and values keep their shape, so test edits are mechanical; the rename lands in its own commit before any Frozen Basin behavior.
 - **Memory.** A second 15-frame family adds about 4 MB of PNGs to the bundle; only the open site's family is decoded.
 
 ## Assets
 
-Image generation is required: 11 water-ice frames, owner-approved before wiring. No SFX or robot art.
+No art is generated in this ticket. The water-ice frames come from HPA-404; no SFX or robot art.
