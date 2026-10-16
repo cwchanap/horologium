@@ -91,9 +91,11 @@ Using HPA-401's greedy-player model with the content above:
 
 | Scenario | Mars mastery (HPA-401) | Ceres unlock | Ceres mastery |
 | --- | ---: | ---: | ---: |
-| Four visits a day | 66 h (26 visits) | 84.5 h (29) | 128 h, about 5.3 days (36) |
-| One visit every 8 hours | 88 h | 112 h | 168 h, about 7 days |
+| Four visits a day | 66 h (11 visits) | 84.5 h (14) | 128 h, about 5.3 days (21) |
+| One visit every 8 hours | 88 h (11) | 112 h (14) | 168 h, about 7 days (21) |
 | Active, sells every minute | 17.5 h | 22.8 h | 34.5 h |
+
+Visit counts are return visits after the 15-minute opening session, as in HPA-401. They match HPA-401's 11 visits to Mars mastery.
 
 Ceres adds about two and a half days of four short visits, close to the Lunar-to-Mars span. Larger unlock prices stretch the Iridium Spire wait first: at a 60,000,000 unlock the same player needs 7.3 days, with a two-day gap before Iridium Spire, so 30,000,000 was kept. The highest single amount a player sees is the 45,000,000 Iridium Spire unlock, which HPA-401's compact formatter shows as `45.00M`.
 
