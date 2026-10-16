@@ -4,6 +4,7 @@
 - Status: Draft for review
 - Linear: [HPA-403](https://linear.app/cwchanap/issue/HPA-403/ship-a-fourth-planet-content-pack-after-mars) — Ship a fourth planet content pack after Mars
 - Baseline: `main` at `8f0881f`, plus HPA-401 (time-away pacing), which blocks this ticket
+- Depends on: [HPA-439](https://linear.app/cwchanap/issue/HPA-439/mining-art-ceres-frontier-planet-cavern-and-node-art) — Ceres planet, cavern, and node art (art only, its own PR)
 - Precedent: `docs/superpowers/specs/2026-08-22-hpa-641-mars-frontier-content-pack-design.md`
 
 ## Goal
@@ -68,13 +69,13 @@ Discovery copy:
 
 ### Art
 
-Seven new 512×512 images from the image-generation skill, matching the existing planet, cavern, and node families in camera, framing, and lighting:
+Art is its own task and PR, [HPA-439](https://linear.app/cwchanap/issue/HPA-439/mining-art-ceres-frontier-planet-cavern-and-node-art), which holds the briefs and the owner's approval. It delivers seven 512×512 images that this ticket's content points at:
 
 - `assets/images/mining/planets/ceres_frontier.png`
 - `assets/images/mining/caverns/{nickel_ore,platinum,iridium}.png`, also used as card art (as Lunar and Mars do)
 - `assets/images/mining/nodes/{nickel_ore,platinum,iridium}.png`
 
-The owner approves the set before it is wired. `pubspec.yaml` already lists the three folders.
+`pubspec.yaml` already lists the three folders. This ticket generates no art, and its implementation starts after HPA-439 merges, because the existing all-content-assets test loads every authored path.
 
 ## Design decisions
 
@@ -135,5 +136,5 @@ Everything else (controller, simulation, repository, Stellar Map, next-goal ladd
 ## Risks
 
 - **Order with HPA-401.** All prices assume HPA-401's storage and pricing. If HPA-401's numbers change after its playtest, Ceres' unlock, spawn, and site prices scale by the same factor as Mars'.
-- **Art quality.** Seven generated images must match existing families. Mitigation: owner approval of the set before wiring, and the existing fallback icons if an asset fails to load.
+- **Art timing.** The seven images come from HPA-439, and this ticket's implementation waits for it. If the art slips, the planning PR simply stays in draft; no placeholder images are committed.
 - **Stale exhaustive assertions.** Tests that list nine sites or nine resources break. Search for exact enum lists and counts, as HPA-641 did.
