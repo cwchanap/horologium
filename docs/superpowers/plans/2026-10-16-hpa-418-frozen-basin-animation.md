@@ -10,7 +10,7 @@ One ticket = one PR. Planning lands first on this draft PR; implementation lands
 
 Task 1 is behavior-preserving and must be green before any Frozen Basin behavior lands.
 
-This ticket generates no art. The water-ice frame family is its own art ticket and PR, [HPA-404](https://linear.app/cwchanap/issue/HPA-404/mining-art-water-ice-deposit-frame-family-for-frozen-basin), which blocks Task 2. Start Task 2 only after HPA-404 merges, by merging `main` into this branch so the 15 `node-water-ice-…` files are present.
+This ticket generates no art. The water-ice frame family is its own art ticket and PR, [HPA-404](https://linear.app/cwchanap/issue/HPA-404/mining-art-water-ice-deposit-frame-family-for-frozen-basin), which blocks Task 2. Start Task 2 only after HPA-404 merges, by rebasing this branch onto `main` (no merge commit; force-push with lease) so the 15 `node-water-ice-…` files are present.
 
 ## Task 1: Generalize the Landing Basin layer without changing behavior
 
