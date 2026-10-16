@@ -123,7 +123,10 @@ class _AnimatedMiningGridVisualLayerState
 
   double get _progress => _progressOf(widget.view);
 
-  String get _keyPrefix => MiningVisuals.siteKeyPrefix(widget.view.siteId);
+  /// The grid map keys this layer per site, so a State never changes site.
+  late final String _keyPrefix = MiningVisuals.siteKeyPrefix(
+    widget.view.siteId,
+  );
 
   static double _progressOf(MineSiteView view) => view.capacity <= 0
       ? 0.0

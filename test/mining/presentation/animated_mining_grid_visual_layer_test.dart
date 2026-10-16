@@ -263,12 +263,12 @@ void main() {
     });
   });
 
-  // The layer defers its first one-shot impact until the finite gold frames
+  // The layer defers its first one-shot impact until the finite deposit frames
   // finish precaching, and readiness is tied only to actual Future.wait
   // completion (the deferral budget drops a stalled impact, it does not fire
   // it). In the fake-async test environment a cold image cache never decodes
   // those frames, so impact tests warm the finite frame set in real async via
-  // [warmGoldFrames] before mounting the layer. Clearing the cache before each
+  // [warmDepositFrames] before mounting the layer. Clearing the cache before each
   // test keeps non-impact tests cold and deterministic.
   setUp(() {
     imageCache.clear();
