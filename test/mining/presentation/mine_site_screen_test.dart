@@ -14,6 +14,7 @@ import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 import '../../support/mining_grid_fixtures.dart';
+import '../../support/mining_visual_frames.dart';
 
 final _start = DateTime.utc(2026, 8, 26, 12);
 final _content = MiningContentRegistry.stellarMining();
@@ -144,30 +145,6 @@ Offset _cellPoint(WidgetTester tester, MiningGridCell cell) {
       );
 }
 
-// Resolve the finite gold frame set in real async before the Landing Basin
-// layer mounts, so its _precacheFrames Future.wait completes from cache hits
-// and _framesReady becomes true via actual precache completion (the deferral
-// budget drops a stalled impact, it does not fire it).
-Future<void> _warmGoldFrames(WidgetTester tester) async {
-  await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
-  final context = tester.element(find.byType(MaterialApp));
-  await tester.runAsync(() async {
-    for (final path in [
-      for (var stage = 1; stage <= 4; stage++)
-        MiningVisuals.goldNodeStageAsset(stage),
-      for (var frame = 1; frame <= 4; frame++)
-        MiningVisuals.goldNodeIdleAsset(frame),
-      for (var frame = 1; frame <= 3; frame++)
-        MiningVisuals.goldNodeHitAsset(frame),
-      for (var frame = 1; frame <= 4; frame++)
-        MiningVisuals.goldNodeExhaustAsset(frame),
-    ]) {
-      await precacheImage(AssetImage(path), context);
-    }
-  });
-  await tester.pump();
-}
-
 void main() {
   testWidgets(
     'uses the Landing Basin grid layer for an occupied T1 rig',
@@ -175,7 +152,7 @@ void main() {
       // Warm the finite gold frames in real async so the layer's
       // _framesReady becomes true via actual precache completion (see
       // landing_basin_grid_visual_layer_test for the rationale).
-      await _warmGoldFrames(tester);
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
       final state = _stateWith(
         landing: _progress(
           commissioned: true,
@@ -220,7 +197,7 @@ void main() {
                 widget is Image &&
                 widget.image is AssetImage &&
                 (widget.image as AssetImage).assetName ==
-                    MiningVisuals.goldNodeHitAsset(1),
+                    MiningDepositFrames.gold.hit(1),
           ),
         ),
         findsOneWidget,
@@ -261,8 +238,8 @@ void main() {
           findsOneWidget,
         );
         for (final assetPath in [
-          MiningVisuals.landingBasinRobotBodyAsset(tier),
-          MiningVisuals.landingBasinRobotArmAsset(tier),
+          MiningVisuals.miningRobotBodyAsset(tier),
+          MiningVisuals.miningRobotArmAsset(tier),
         ]) {
           expect(
             find.descendant(

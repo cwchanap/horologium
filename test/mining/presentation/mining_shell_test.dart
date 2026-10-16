@@ -14,6 +14,7 @@ import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/mining_shell.dart';
+import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/fake_background_music_player.dart';
@@ -1697,7 +1698,7 @@ void main() {
       soundEffectPlayer: effects,
     );
     addTearDown(audio.dispose);
-    await warmGoldFrames(tester);
+    await warmDepositFrames(tester, MiningDepositFrames.gold);
     await pumpShell(
       tester,
       repository: repository,

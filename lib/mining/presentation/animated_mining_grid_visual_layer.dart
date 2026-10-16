@@ -13,40 +13,42 @@ import 'package:horologium/mining/presentation/mining_visuals.dart';
 String _depositKey(MiningDepositDefinition definition) =>
     '${definition.x}-${definition.y}-${definition.size}';
 
-/// Maximum HP of a Landing Basin resource body of [size] cells per side:
+/// Maximum HP of an animated-site resource body of [size] cells per side:
 /// 40 HP per cell row (40 / 80 / 120 for 1x1 / 2x2 / 3x3).
-int landingBasinMaxHp(int size) => size * 40;
+int miningResourceMaxHp(int size) => size * 40;
 
 /// Damage one robot strike deals to its resource, by rig tier: 10 per tier.
-int landingBasinStrikeDamage(RigTier tier) => (tier.index + 1) * 10;
+int miningStrikeDamage(RigTier tier) => (tier.index + 1) * 10;
 
 /// Strike damage summed per distinct target resource, keyed by the authored
 /// deposit geometry (which has value equality).
-Map<MiningDepositDefinition, int> landingBasinGroupedDamage(
+Map<MiningDepositDefinition, int> miningGroupedDamage(
   Iterable<MineSiteRigView> rigs,
 ) {
   final groups = <MiningDepositDefinition, int>{};
   for (final rig in rigs) {
-    final damage = landingBasinStrikeDamage(rig.placement.tier);
+    final damage = miningStrikeDamage(rig.placement.tier);
     groups[rig.target] = (groups[rig.target] ?? 0) + damage;
   }
   return groups;
 }
 
 /// HP remaining after one strike, clamped at zero: overkill is discarded.
-int landingBasinRemainingHpAfterStrike(int remainingHp, int damage) =>
+int miningRemainingHpAfterStrike(int remainingHp, int damage) =>
     remainingHp > damage ? remainingHp - damage : 0;
 
-/// HPA-451 authored art/animation for the Landing Basin mine site grid.
-/// Owns only visuals: one impact controller, one S1 idle controller, finite
-/// frame precache, the stalled-first-impact drop, and transient per-resource
-/// strike HP (never persisted, never replayed from cold-load/resume). The
-/// grid map renders no generic deposit/rig art for Landing Basin; this layer
-/// is the object layer.
-class LandingBasinGridVisualLayer extends StatefulWidget {
-  const LandingBasinGridVisualLayer({
+/// HPA-451 authored art/animation for an animated mine site grid, drawn from
+/// one [MiningDepositFrames] family. Owns only visuals: one impact
+/// controller, one S1 idle controller, finite frame precache, the
+/// stalled-first-impact drop, and transient per-resource strike HP (never
+/// persisted, never replayed from cold-load/resume). The grid map renders no
+/// generic deposit/rig art for an animated site; this layer is the object
+/// layer.
+class AnimatedMiningGridVisualLayer extends StatefulWidget {
+  const AnimatedMiningGridVisualLayer({
     super.key,
     required this.view,
+    required this.frames,
     required this.impactSequence,
     required this.reducedMotion,
     required this.cellSize,
@@ -54,18 +56,19 @@ class LandingBasinGridVisualLayer extends StatefulWidget {
   });
 
   final MineSiteView view;
+  final MiningDepositFrames frames;
   final int impactSequence;
   final bool reducedMotion;
   final double cellSize;
   final VoidCallback? onMiningImpact;
 
   @override
-  State<LandingBasinGridVisualLayer> createState() =>
-      _LandingBasinGridVisualLayerState();
+  State<AnimatedMiningGridVisualLayer> createState() =>
+      _AnimatedMiningGridVisualLayerState();
 }
 
-class _LandingBasinGridVisualLayerState
-    extends State<LandingBasinGridVisualLayer>
+class _AnimatedMiningGridVisualLayerState
+    extends State<AnimatedMiningGridVisualLayer>
     with TickerProviderStateMixin {
   late final AnimationController _impactController = AnimationController(
     vsync: this,
@@ -80,7 +83,7 @@ class _LandingBasinGridVisualLayerState
     animationBehavior: AnimationBehavior.preserve,
   );
 
-  /// Maximum wait for the finite gold frames to decode before dropping the
+  /// Maximum wait for the finite deposit frames to decode before dropping the
   /// first one-shot impact. Production decode for these small PNGs normally
   /// completes well under this budget, so the authored hit/exhaust frames are
   /// ready before the first impact. The cap only triggers when decode stalls
@@ -120,6 +123,8 @@ class _LandingBasinGridVisualLayerState
 
   double get _progress => _progressOf(widget.view);
 
+  String get _keyPrefix => MiningVisuals.siteKeyPrefix(widget.view.siteId);
+
   static double _progressOf(MineSiteView view) => view.capacity <= 0
       ? 0.0
       : (view.cargo / view.capacity).clamp(0.0, 1.0).toDouble();
@@ -138,10 +143,10 @@ class _LandingBasinGridVisualLayerState
     // miss: it stays quiet and never marks handled, so it never mutates HP.
     if (_impactController.value >= .62) return;
     _impactContactHandled = true;
-    for (final entry in landingBasinGroupedDamage(widget.view.rigs).entries) {
+    for (final entry in miningGroupedDamage(widget.view.rigs).entries) {
       final definition = entry.key;
-      final remaining = landingBasinRemainingHpAfterStrike(
-        _remainingHp[definition] ?? landingBasinMaxHp(definition.size),
+      final remaining = miningRemainingHpAfterStrike(
+        _remainingHp[definition] ?? miningResourceMaxHp(definition.size),
         entry.value,
       );
       if (remaining > 0) {
@@ -149,7 +154,7 @@ class _LandingBasinGridVisualLayerState
       } else {
         // Broken: back the next cycle immediately; the chrome reads zero for
         // the rest of this impact via [_brokeOnContact].
-        _remainingHp[definition] = landingBasinMaxHp(definition.size);
+        _remainingHp[definition] = miningResourceMaxHp(definition.size);
         _brokeOnContact.add(definition);
       }
     }
@@ -168,7 +173,7 @@ class _LandingBasinGridVisualLayerState
     for (final definition in mined) {
       _remainingHp.putIfAbsent(
         definition,
-        () => landingBasinMaxHp(definition.size),
+        () => miningResourceMaxHp(definition.size),
       );
     }
     _remainingHp.removeWhere((definition, _) => !mined.contains(definition));
@@ -184,16 +189,7 @@ class _LandingBasinGridVisualLayerState
   }
 
   void _precacheFrames() {
-    final paths = <String>[
-      for (var stage = 1; stage <= 4; stage++)
-        MiningVisuals.goldNodeStageAsset(stage),
-      for (var frame = 1; frame <= 4; frame++)
-        MiningVisuals.goldNodeIdleAsset(frame),
-      for (var frame = 1; frame <= 3; frame++)
-        MiningVisuals.goldNodeHitAsset(frame),
-      for (var frame = 1; frame <= 4; frame++)
-        MiningVisuals.goldNodeExhaustAsset(frame),
-    ];
+    final paths = widget.frames.all;
     final configuration = createLocalImageConfiguration(context);
     final providers = [for (final path in paths) AssetImage(path)];
     // If every frame is already cached and decoded (e.g. warmed by a prior
@@ -277,7 +273,7 @@ class _LandingBasinGridVisualLayerState
   }
 
   @override
-  void didUpdateWidget(LandingBasinGridVisualLayer oldWidget) {
+  void didUpdateWidget(AnimatedMiningGridVisualLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     _syncHp();
     if (widget.view.rigs.isEmpty) {
@@ -307,7 +303,7 @@ class _LandingBasinGridVisualLayerState
   /// plate dimmed; mined deposits render the animated frame for tick [t].
   Positioned _depositNode(MineSiteDepositView deposit, double cell, double t) =>
       Positioned(
-        key: Key('landing-basin-deposit-${_depositKey(deposit.definition)}'),
+        key: Key('$_keyPrefix-deposit-${_depositKey(deposit.definition)}'),
         left: deposit.definition.x * cell,
         top: deposit.definition.y * cell,
         width: deposit.definition.size * cell,
@@ -337,7 +333,7 @@ class _LandingBasinGridVisualLayerState
   /// once the impact timeline completes.
   int _displayedHp(MiningDepositDefinition definition) {
     final backing =
-        _remainingHp[definition] ?? landingBasinMaxHp(definition.size);
+        _remainingHp[definition] ?? miningResourceMaxHp(definition.size);
     final t = _t;
     if (_brokeOnContact.contains(definition) && t >= .46 && t < 1.0) return 0;
     return backing;
@@ -364,7 +360,7 @@ class _LandingBasinGridVisualLayerState
     final drift = widget.reducedMotion ? 0.0 : tail * 18;
     return Positioned(
       key: Key(
-        'landing-basin-damage-'
+        '$_keyPrefix-damage-'
         '${rig.placement.cell.x}-${rig.placement.cell.y}',
       ),
       left: anchor.dx - 24,
@@ -374,7 +370,7 @@ class _LandingBasinGridVisualLayerState
         child: Opacity(
           opacity: (1 - tail).clamp(0.0, 1.0),
           child: Text(
-            '-${landingBasinStrikeDamage(rig.placement.tier)}',
+            '-${miningStrikeDamage(rig.placement.tier)}',
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: MiningTheme.primaryText,
@@ -394,7 +390,7 @@ class _LandingBasinGridVisualLayerState
   Positioned _hpChrome(MineSiteDepositView deposit, double cell) {
     final definition = deposit.definition;
     final visual = depositVisualSize(definition.size);
-    final max = landingBasinMaxHp(definition.size);
+    final max = miningResourceMaxHp(definition.size);
     final remaining = _displayedHp(definition);
     // [_displayedHp] reads zero only while the resource is broken by the
     // current contact and the impact timeline has not yet completed.
@@ -404,7 +400,7 @@ class _LandingBasinGridVisualLayerState
         ? 1 + .2 * (1 - tail)
         : 1.0;
     return Positioned(
-      key: Key('landing-basin-hp-${_depositKey(definition)}'),
+      key: Key('$_keyPrefix-hp-${_depositKey(definition)}'),
       left: (definition.x + definition.size / 2) * cell - visual / 2,
       top: (definition.y + definition.size / 2) * cell - visual / 2 - 18,
       width: visual,
@@ -501,11 +497,11 @@ class _LandingBasinGridVisualLayerState
     final mirror = targetCenterX > rigCenterX;
     final cellKey = '${rig.placement.cell.x}-${rig.placement.cell.y}';
     return Transform(
-      key: Key('landing-basin-robot-flip-$cellKey'),
+      key: Key('$_keyPrefix-robot-flip-$cellKey'),
       alignment: Alignment.center,
       transform: Matrix4.diagonal3Values(mirror ? -1 : 1, 1, 1),
       child: SizedBox(
-        key: Key('landing-basin-robot-$cellKey'),
+        key: Key('$_keyPrefix-robot-$cellKey'),
         width: cell + 12,
         height: cell + 12,
         child: Stack(
@@ -513,20 +509,20 @@ class _LandingBasinGridVisualLayerState
           clipBehavior: Clip.none,
           children: [
             Transform(
-              key: Key('landing-basin-robot-body-transform-$cellKey'),
+              key: Key('$_keyPrefix-robot-body-transform-$cellKey'),
               transform: Matrix4.identity(),
               child: Image.asset(
-                MiningVisuals.landingBasinRobotBodyAsset(rig.placement.tier),
+                MiningVisuals.miningRobotBodyAsset(rig.placement.tier),
                 width: cell + 12,
                 height: cell + 12,
               ),
             ),
             Transform.rotate(
-              key: Key('landing-basin-robot-arm-transform-$cellKey'),
+              key: Key('$_keyPrefix-robot-arm-transform-$cellKey'),
               alignment: const Alignment(.33, -.24),
               angle: widget.reducedMotion ? 0 : _armAngle(t),
               child: Image.asset(
-                MiningVisuals.landingBasinRobotArmAsset(rig.placement.tier),
+                MiningVisuals.miningRobotArmAsset(rig.placement.tier),
                 width: cell + 12,
                 height: cell + 12,
               ),
@@ -540,25 +536,25 @@ class _LandingBasinGridVisualLayerState
   String _depositAsset(MineSiteDepositView deposit, double t) {
     final stage = _stageForProgress(_progress);
     if (deposit.minerCount == 0 || widget.reducedMotion) {
-      return MiningVisuals.goldNodeStageAsset(stage);
+      return widget.frames.stage(stage);
     }
     if (_exhaustImpactSequence == widget.impactSequence) {
-      if (t < .24) return MiningVisuals.goldNodeStageAsset(3);
+      if (t < .24) return widget.frames.stage(3);
       if (t < .64) {
         final frame = ((t - .24) * 10).floor().clamp(0, 3).toInt() + 1;
-        return MiningVisuals.goldNodeExhaustAsset(frame);
+        return widget.frames.exhaust(frame);
       }
-      return MiningVisuals.goldNodeStageAsset(4);
+      return widget.frames.stage(4);
     }
     if (stage == 1 && t >= .24 && t < .49) {
       final frame = ((t - .24) * 12).floor().clamp(0, 2).toInt() + 1;
-      return MiningVisuals.goldNodeHitAsset(frame);
+      return widget.frames.hit(frame);
     }
     if (stage == 1) {
       final frame = (_idleController.value * 4).floor() % 4 + 1;
-      return MiningVisuals.goldNodeIdleAsset(frame);
+      return widget.frames.idle(frame);
     }
-    return MiningVisuals.goldNodeStageAsset(stage);
+    return widget.frames.stage(stage);
   }
 
   int _stageForProgress(double progress) {
