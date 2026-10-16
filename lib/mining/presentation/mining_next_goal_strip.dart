@@ -20,13 +20,10 @@ class MiningNextGoalStrip extends StatelessWidget {
   /// Single-line 48 px variant for the landscape Site Deck.
   final bool compact;
 
-  /// Above this text scale the two-line layout no longer fits the 56 px
-  /// portrait slot, so the strip switches to its single-line layout and drops
-  /// the inline cash label; the progress bar and semantics label keep it.
-  static const _twoLineMaxTextScale = 1.3;
-
-  /// The strip is fixed-height chrome, so its text stops growing here.
-  static const _maxTextScale = 2.0;
+  /// The strip is fixed-height chrome: its text grows up to the largest scale
+  /// at which the title and detail lines both fit the 56 px portrait slot.
+  /// The semantics label always carries the full copy.
+  static const _maxTextScale = 1.3;
 
   static const _labelStyle = TextStyle(
     color: MiningTheme.accent,
@@ -52,8 +49,6 @@ class MiningNextGoalStrip extends StatelessWidget {
         ? () => select(goal.target)
         : null;
     final navigable = onTap != null;
-    final largeText =
-        MediaQuery.textScalerOf(context).scale(1) > _twoLineMaxTextScale;
     final detailStyle = TextStyle(
       color: goal.sellWouldAfford
           ? MiningTheme.warning
@@ -61,10 +56,10 @@ class MiningNextGoalStrip extends StatelessWidget {
       fontSize: 11,
       fontWeight: FontWeight.w600,
     );
-    final cashLabel = compact || !largeText ? goal.cashLabel : null;
+    final cashLabel = goal.cashLabel;
     final progress = goal.progress;
 
-    final text = compact || largeText
+    final text = compact
         ? Text.rich(
             TextSpan(
               children: [
