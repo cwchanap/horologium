@@ -82,16 +82,20 @@ Commit Tasks 1 and 2 before any number changes.
   - Mars mastery expects `+20,000,000` in the goal detail and the `Mars mastered — +20,000,000 cash.` message, and the cash delta is 20,000,000;
   - the `CADENCE` lines remain, now reporting hours.
 - Keep the next-goal checkpoints and the reload step unchanged in structure.
+- Pacing is proven here, on the injected `TestClock`, not by waiting in real time. Run the same route for two visit cadences and assert, not just print, the elapsed clock time from the fresh save to Mars mastery:
+  - `step: Duration(hours: 2)` (a return each storage window): between 30 and 60 hours;
+  - `step: Duration(hours: 6)` (four visits a day, so storage caps between visits): between 2 and 4 days.
+- One reload after a 30-hour gap accrues exactly 24 hours and reports the offline cap.
 
 ```sh
 flutter test test/integration/merge_mining_journey_test.dart
 ```
 
-Record the emitted `CADENCE` totals in the PR. If the journey's total accrued time to Mars mastery falls outside 30–60 hours of storage windows for the route, return to Task 3's numbers before continuing.
+Record the emitted `CADENCE` totals in the PR. If either band fails, return to Task 3's numbers before continuing; the bands are the merge gate for pacing.
 
-## Task 5: Playtest and docs
+## Task 5: UX check and docs
 
-- Run a fresh-to-Mars playtest on a debug build with a controllable clock where available, otherwise in real time across visits a few hours apart. Record visits, elapsed time, purchases per visit, and any copy or overflow problems in `docs/playtests/2026-10-hpa-401-time-away-pacing.md`.
+- Pacing is already proven by Task 4, so the human check covers UX only: copy, overflow, and feel of the new numbers and labels. The app has no debug clock, and this ticket does not add one. On an Android emulator or iOS simulator, move the device clock forward between sessions to see a part-full return, a full site, and a capped 24-hour return. Check the `FULL IN` line, the `Away` sheet and cap note, compact amounts (`16.00M`) on the deck, Technology, Stellar Map, Fleet Dock, and Sell, and Logistics copy. Record findings in `docs/playtests/2026-10-hpa-401-time-away-pacing.md`. This takes one sitting and never waits on wall-clock days.
 - `CLAUDE.md`, Economy and progression:
   - storage holds two hours of base production per site; Logistics extends it, Extraction shortens it;
   - offline accrual is capped at a fixed 24 hours as a clock safety net and Logistics no longer changes it;
