@@ -966,23 +966,56 @@ void main() {
       expect(selected, hasLength(1));
     });
 
-    testWidgets('long copy fits at 360x640 and text scale 1.3', (tester) async {
-      await _pumpDeck(
+    // The Lunar deck's own header fits up to 1.3; the fresh deck fits at 1.5,
+    // where the strip switches to its single-line layout.
+    for (final (textScale, state) in [
+      (1.3, _lunarState()),
+      (1.5, MiningSave.initial(nowUtc: _start)),
+    ]) {
+      testWidgets('long copy fits at 360x640 and text scale $textScale', (
         tester,
-        view: _deckView(_lunarState()),
-        nextGoal: _longGoal,
-        size: const Size(360, 640),
-        textScale: 1.3,
-      );
-      expect(tester.takeException(), isNull);
-      final strip = tester.getRect(
-        find.byKey(const Key('site-deck-next-goal')),
-      );
-      expect(strip.height, greaterThanOrEqualTo(48));
-      final nav = tester.getRect(
-        find.byKey(const Key('mining-bottom-navigation')),
-      );
-      expect(strip.bottom, lessThanOrEqualTo(nav.top));
+      ) async {
+        await _pumpDeck(
+          tester,
+          view: _deckView(state),
+          nextGoal: _longGoal,
+          size: const Size(360, 640),
+          textScale: textScale,
+        );
+        expect(tester.takeException(), isNull);
+        final strip = tester.getRect(
+          find.byKey(const Key('site-deck-next-goal')),
+        );
+        expect(strip.height, greaterThanOrEqualTo(48));
+        final nav = tester.getRect(
+          find.byKey(const Key('mining-bottom-navigation')),
+        );
+        expect(strip.bottom, lessThanOrEqualTo(nav.top));
+      });
+    }
+
+    testWidgets('a goal without a handler shows no tap affordance', (
+      tester,
+    ) async {
+      for (final size in const [Size(402, 874), Size(874, 402)]) {
+        await _pumpDeck(
+          tester,
+          view: _deckView(MiningSave.initial(nowUtc: _start)),
+          nextGoal: _goalFor(MiningSave.initial(nowUtc: _start)),
+          size: size,
+        );
+
+        expect(
+          find.byKey(const Key('site-deck-next-goal')),
+          findsOneWidget,
+          reason: '$size',
+        );
+        expect(
+          find.byKey(const Key('next-goal-chevron')),
+          findsNothing,
+          reason: '$size',
+        );
+      }
     });
   });
 }

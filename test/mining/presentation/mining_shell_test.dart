@@ -1952,7 +1952,7 @@ void main() {
       await pumpShell(tester, repository: repository, clock: clock);
 
       expect(
-        _inGoalStrip(find.text('Unlock it on its card below.')),
+        _inGoalStrip(find.text('Unlock it on its site card.')),
         findsOneWidget,
       );
 
@@ -1966,7 +1966,7 @@ void main() {
       await tester.tap(find.byKey(const Key('site-deck-sell')));
       await tester.pump(const Duration(milliseconds: 300));
       expect(
-        _inGoalStrip(find.text('Ready: unlock it below.')),
+        _inGoalStrip(find.text('Ready: unlock it on its site card.')),
         findsOneWidget,
       );
       expect(shellHandles(tester).controller.state.cash, greaterThan(250));

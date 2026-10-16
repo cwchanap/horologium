@@ -90,7 +90,7 @@ class SiteDeckScreen extends StatelessWidget {
                   key: const Key('site-deck-next-goal'),
                   goal: goal,
                   compact: true,
-                  onSelected: onGoalSelected ?? (_) {},
+                  onSelected: onGoalSelected,
                 ),
               ),
             Expanded(
@@ -263,7 +263,7 @@ class _PortraitSiteDeck extends StatelessWidget {
               child: MiningNextGoalStrip(
                 key: const Key('site-deck-next-goal'),
                 goal: goal,
-                onSelected: onGoalSelected ?? (_) {},
+                onSelected: onGoalSelected,
               ),
             ),
           Positioned(

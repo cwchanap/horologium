@@ -13,10 +13,20 @@ class MiningNextGoalStrip extends StatelessWidget {
   });
 
   final MiningNextGoalView goal;
-  final ValueChanged<MiningGoalTarget> onSelected;
+
+  /// Null leaves the strip informational: no chevron, button role, or tap.
+  final ValueChanged<MiningGoalTarget>? onSelected;
 
   /// Single-line 48 px variant for the landscape Site Deck.
   final bool compact;
+
+  /// Above this text scale the two-line layout no longer fits the 56 px
+  /// portrait slot, so the strip switches to its single-line layout and drops
+  /// the inline cash label; the progress bar and semantics label keep it.
+  static const _twoLineMaxTextScale = 1.3;
+
+  /// The strip is fixed-height chrome, so its text stops growing here.
+  static const _maxTextScale = 2.0;
 
   static const _labelStyle = TextStyle(
     color: MiningTheme.accent,
@@ -31,9 +41,19 @@ class MiningNextGoalStrip extends StatelessWidget {
   );
 
   @override
-  Widget build(BuildContext context) {
-    final navigable = goal.target.isNavigable;
-    final onTap = navigable ? () => onSelected(goal.target) : null;
+  Widget build(BuildContext context) => MediaQuery.withClampedTextScaling(
+    maxScaleFactor: _maxTextScale,
+    child: Builder(builder: _buildStrip),
+  );
+
+  Widget _buildStrip(BuildContext context) {
+    final select = onSelected;
+    final onTap = goal.target.isNavigable && select != null
+        ? () => select(goal.target)
+        : null;
+    final navigable = onTap != null;
+    final largeText =
+        MediaQuery.textScalerOf(context).scale(1) > _twoLineMaxTextScale;
     final detailStyle = TextStyle(
       color: goal.sellWouldAfford
           ? MiningTheme.warning
@@ -41,10 +61,10 @@ class MiningNextGoalStrip extends StatelessWidget {
       fontSize: 11,
       fontWeight: FontWeight.w600,
     );
-    final cashLabel = goal.cashLabel;
+    final cashLabel = compact || !largeText ? goal.cashLabel : null;
     final progress = goal.progress;
 
-    final text = compact
+    final text = compact || largeText
         ? Text.rich(
             TextSpan(
               children: [
