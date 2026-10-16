@@ -44,11 +44,11 @@ abstract final class MiningVisuals {
 
 /// One animated deposit's frame family: four fill stages, a four-frame idle
 /// loop, a three-frame hit, and a four-frame exhaust beat.
-final class MiningDepositFrames {
-  const MiningDepositFrames._(this.slug);
+enum MiningDepositFrames {
+  gold('gold'),
+  waterIce('water-ice');
 
-  static const gold = MiningDepositFrames._('gold');
-  static const waterIce = MiningDepositFrames._('water-ice');
+  const MiningDepositFrames(this.slug);
 
   final String slug;
 
