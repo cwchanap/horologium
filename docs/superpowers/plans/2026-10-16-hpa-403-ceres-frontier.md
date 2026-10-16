@@ -6,19 +6,11 @@
 
 ## Delivery rule
 
-One ticket = one PR. Planning lands first on this draft PR; implementation lands on the same PR after plan review **and after HPA-401 merges**. Before Task 2, merge `main` into this branch so the Ceres numbers sit on HPA-401's capacities, prices, compact formatter, and journey.
+One ticket = one PR. Planning lands first on this draft PR; implementation lands on the same PR after plan review **and after both HPA-401 and [HPA-439](https://linear.app/cwchanap/issue/HPA-439/mining-art-ceres-frontier-planet-cavern-and-node-art) merge**. Before Task 1, merge `main` into this branch so the Ceres numbers sit on HPA-401's capacities, prices, compact formatter, and journey, and the seven Ceres images are present.
 
-Task 1 is the only art task and needs the image-generation skill, which the planning session does not have. Tasks 2–4 can run with the existing fallback icons while art is pending, but the PR does not leave draft until the owner approves the art.
+This ticket generates no art; HPA-439 is the art-only ticket and PR. Implementation waits for it because the existing all-content-assets test in `test/mining/presentation/mining_visuals_test.dart` loads every authored planet, cavern, node, and card path, so pushing Ceres content before the art is on `main` would turn CI red.
 
-## Task 1: Ceres art (image generation)
-
-1. Generate `planets/ceres_frontier.png` from the design's visual brief, matching the framing and lighting of `planets/mars_frontier.png`.
-2. Generate `caverns/{nickel_ore,platinum,iridium}.png`, each matching the camera and composition of `caverns/cobalt_ore.png`.
-3. Generate `nodes/{nickel_ore,platinum,iridium}.png`, each a single deposit on transparency matching `nodes/cobalt_ore.png`'s footprint.
-4. Every file is 512×512 RGBA; normalize only edge-connected baked checkerboard pixels to alpha. Do not commit drafts or scripts.
-5. Show the owner all seven images on the PR and wait for approval before Task 4 wires the paths into screens.
-
-## Task 2: Content, resources, and save shape
+## Task 1: Content, resources, and save shape
 
 ### Production
 
@@ -44,7 +36,7 @@ flutter test test/resources test/mining/mining_content_test.dart \
   test/mining/mining_state_test.dart test/mining/mining_save_repository_test.dart
 ```
 
-## Task 3: Controller, simulation, and views
+## Task 2: Controller, simulation, and views
 
 No production change is expected. Add characterization tests; change code only where a test exposes a generic bug.
 
@@ -57,7 +49,7 @@ No production change is expected. Add characterization tests; change code only w
 flutter test test/mining
 ```
 
-## Task 4: Presentation and journey
+## Task 3: Presentation and journey
 
 ### Production
 
@@ -75,7 +67,7 @@ flutter test test/integration/merge_mining_journey_test.dart test/mining/present
 
 Record the journey's `CADENCE` totals in the PR. If the Ceres phase takes more than twice the Lunar-to-Mars phase in the journey, lower the three Ceres prices and the reward by the same factor.
 
-## Task 5: Docs and gates
+## Task 4: Docs and gates
 
 - `CLAUDE.md`:
   - Active ownership boundary and economy sections: three sites on each of Homeworld, Lunar Frontier, Mars Frontier, and Ceres Frontier; Mars mastery plus Surveying 5 plus cash unlocks Ceres; Ceres mastery grants exactly one 30,000,000 reward and Mars grants none.
