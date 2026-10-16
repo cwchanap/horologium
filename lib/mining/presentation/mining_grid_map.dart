@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
-import 'package:horologium/mining/presentation/landing_basin_grid_visual_layer.dart';
+import 'package:horologium/mining/presentation/animated_mining_grid_visual_layer.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 const double miningGridCellSize = 56;
@@ -39,20 +39,27 @@ class MiningGridMap extends StatelessWidget {
   final VoidCallback? onMiningImpact;
   final bool reducedMotion;
 
-  Widget _objectLayer() => view.siteId == MiningSiteId.landingBasin
-      ? LandingBasinGridVisualLayer(
-          key: const Key('landing-basin-grid-visual-layer'),
-          view: view,
-          impactSequence: impactSequence,
-          onMiningImpact: onMiningImpact,
-          reducedMotion: reducedMotion,
-          cellSize: miningGridCellSize,
-        )
-      : _StaticMiningGridVisualLayer(
-          key: const Key('static-mining-grid-visual-layer'),
-          view: view,
-          cellSize: miningGridCellSize,
-        );
+  Widget _objectLayer() {
+    final frames = MiningVisuals.depositFramesFor(view.siteId);
+    if (frames != null) {
+      return AnimatedMiningGridVisualLayer(
+        key: Key(
+          '${MiningVisuals.siteKeyPrefix(view.siteId)}-grid-visual-layer',
+        ),
+        view: view,
+        frames: frames,
+        impactSequence: impactSequence,
+        onMiningImpact: onMiningImpact,
+        reducedMotion: reducedMotion,
+        cellSize: miningGridCellSize,
+      );
+    }
+    return _StaticMiningGridVisualLayer(
+      key: const Key('static-mining-grid-visual-layer'),
+      view: view,
+      cellSize: miningGridCellSize,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

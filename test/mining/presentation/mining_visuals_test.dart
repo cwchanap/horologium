@@ -57,7 +57,7 @@ void main() {
       3: 'assets/images/mining/nodes/node-gold-s3.png',
       4: 'assets/images/mining/nodes/node-gold-s4.png',
     }.entries) {
-      expect(MiningVisuals.goldNodeStageAsset(entry.key), entry.value);
+      expect(MiningDepositFrames.gold.stage(entry.key), entry.value);
     }
     for (final entry in {
       1: 'assets/images/mining/nodes/node-gold-idle-01.png',
@@ -65,14 +65,14 @@ void main() {
       3: 'assets/images/mining/nodes/node-gold-idle-03.png',
       4: 'assets/images/mining/nodes/node-gold-idle-04.png',
     }.entries) {
-      expect(MiningVisuals.goldNodeIdleAsset(entry.key), entry.value);
+      expect(MiningDepositFrames.gold.idle(entry.key), entry.value);
     }
     for (final entry in {
       1: 'assets/images/mining/nodes/node-gold-hit-01.png',
       2: 'assets/images/mining/nodes/node-gold-hit-02.png',
       3: 'assets/images/mining/nodes/node-gold-hit-03.png',
     }.entries) {
-      expect(MiningVisuals.goldNodeHitAsset(entry.key), entry.value);
+      expect(MiningDepositFrames.gold.hit(entry.key), entry.value);
     }
     for (final entry in {
       1: 'assets/images/mining/nodes/node-gold-exhaust-01.png',
@@ -80,22 +80,66 @@ void main() {
       3: 'assets/images/mining/nodes/node-gold-exhaust-03.png',
       4: 'assets/images/mining/nodes/node-gold-exhaust-04.png',
     }.entries) {
-      expect(MiningVisuals.goldNodeExhaustAsset(entry.key), entry.value);
+      expect(MiningDepositFrames.gold.exhaust(entry.key), entry.value);
     }
-    expect(() => MiningVisuals.goldNodeIdleAsset(0), throwsRangeError);
-    expect(() => MiningVisuals.goldNodeHitAsset(4), throwsRangeError);
-    expect(() => MiningVisuals.goldNodeExhaustAsset(5), throwsRangeError);
+    expect(() => MiningDepositFrames.gold.idle(0), throwsRangeError);
+    expect(() => MiningDepositFrames.gold.hit(4), throwsRangeError);
+    expect(() => MiningDepositFrames.gold.exhaust(5), throwsRangeError);
   });
 
-  test('maps every articulated Landing Basin layer by closed identity', () {
+  test('lists every frame of a family in precache order', () {
+    expect(MiningDepositFrames.gold.all, [
+      for (var i = 1; i <= 4; i++) MiningDepositFrames.gold.stage(i),
+      for (var i = 1; i <= 4; i++) MiningDepositFrames.gold.idle(i),
+      for (var i = 1; i <= 3; i++) MiningDepositFrames.gold.hit(i),
+      for (var i = 1; i <= 4; i++) MiningDepositFrames.gold.exhaust(i),
+    ]);
+    expect(MiningDepositFrames.gold.all.toSet(), hasLength(15));
+    expect(
+      MiningDepositFrames.waterIce.stage(2),
+      'assets/images/mining/nodes/node-water-ice-s2.png',
+    );
+    expect(
+      MiningDepositFrames.waterIce.hit(1),
+      'assets/images/mining/nodes/node-water-ice-hit-01.png',
+    );
+    expect(() => MiningDepositFrames.waterIce.stage(0), throwsRangeError);
+  });
+
+  test('animates only Landing Basin through the closed frame switch', () {
+    for (final id in MiningSiteId.values) {
+      expect(
+        MiningVisuals.depositFramesFor(id),
+        id == MiningSiteId.landingBasin ? MiningDepositFrames.gold : isNull,
+        reason: id.name,
+      );
+    }
+  });
+
+  test('derives kebab-case widget key prefixes from site IDs', () {
+    expect(
+      MiningVisuals.siteKeyPrefix(MiningSiteId.landingBasin),
+      'landing-basin',
+    );
+    expect(
+      MiningVisuals.siteKeyPrefix(MiningSiteId.frozenBasin),
+      'frozen-basin',
+    );
+    expect(
+      MiningVisuals.siteKeyPrefix(MiningSiteId.titaniumHighlands),
+      'titanium-highlands',
+    );
+  });
+
+  test('maps every shared robot layer by closed identity', () {
     for (final tier in RigTier.values) {
       expect(
-        MiningVisuals.landingBasinRobotBodyAsset(tier),
-        'assets/images/mining/landing_basin/robot_${tier.name}_body.png',
+        MiningVisuals.miningRobotBodyAsset(tier),
+        'assets/images/mining/robots/robot_${tier.name}_body.png',
       );
       expect(
-        MiningVisuals.landingBasinRobotArmAsset(tier),
-        'assets/images/mining/landing_basin/robot_${tier.name}_arm.png',
+        MiningVisuals.miningRobotArmAsset(tier),
+        'assets/images/mining/robots/robot_${tier.name}_arm.png',
       );
     }
   });
@@ -123,11 +167,11 @@ void main() {
     }
     final framePaths = [
       for (var frame = 1; frame <= 4; frame++)
-        MiningVisuals.goldNodeIdleAsset(frame),
+        MiningDepositFrames.gold.idle(frame),
       for (var frame = 1; frame <= 3; frame++)
-        MiningVisuals.goldNodeHitAsset(frame),
+        MiningDepositFrames.gold.hit(frame),
       for (var frame = 1; frame <= 4; frame++)
-        MiningVisuals.goldNodeExhaustAsset(frame),
+        MiningDepositFrames.gold.exhaust(frame),
     ];
     for (final planet in content.planets.values) {
       await rootBundle.load(planet.planetAsset);
@@ -141,11 +185,11 @@ void main() {
     }
     for (final tier in RigTier.values) {
       await rootBundle.load(MiningVisuals.rigAsset(tier));
-      await rootBundle.load(MiningVisuals.landingBasinRobotBodyAsset(tier));
-      await rootBundle.load(MiningVisuals.landingBasinRobotArmAsset(tier));
+      await rootBundle.load(MiningVisuals.miningRobotBodyAsset(tier));
+      await rootBundle.load(MiningVisuals.miningRobotArmAsset(tier));
     }
     for (var stage = 1; stage <= 4; stage++) {
-      await rootBundle.load(MiningVisuals.goldNodeStageAsset(stage));
+      await rootBundle.load(MiningDepositFrames.gold.stage(stage));
     }
     for (final path in framePaths) {
       await rootBundle.load(path);
