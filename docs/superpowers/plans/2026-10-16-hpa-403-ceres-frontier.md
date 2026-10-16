@@ -6,7 +6,7 @@
 
 ## Delivery rule
 
-One ticket = one PR. Planning lands first on this draft PR; implementation lands on the same PR after plan review **and after both HPA-401 and [HPA-439](https://linear.app/cwchanap/issue/HPA-439/mining-art-ceres-frontier-planet-cavern-and-node-art) merge**. Before Task 1, merge `main` into this branch so the Ceres numbers sit on HPA-401's capacities, prices, compact formatter, and journey, and the seven Ceres images are present.
+One ticket = one PR. Planning lands first on this draft PR; implementation lands on the same PR after plan review **and after both HPA-401 and [HPA-439](https://linear.app/cwchanap/issue/HPA-439/mining-art-ceres-frontier-planet-cavern-and-node-art) merge**. Before Task 1, rebase this branch onto `main` (no merge commit; force-push with lease) so the Ceres numbers sit on HPA-401's capacities, prices, compact formatter, and journey, and the seven Ceres images are present.
 
 This ticket generates no art; HPA-439 is the art-only ticket and PR. Implementation waits for it because the existing all-content-assets test in `test/mining/presentation/mining_visuals_test.dart` loads every authored planet, cavern, node, and card path, so pushing Ceres content before the art is on `main` would turn CI red.
 
