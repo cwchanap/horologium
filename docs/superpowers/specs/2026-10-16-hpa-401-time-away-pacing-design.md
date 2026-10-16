@@ -135,7 +135,7 @@ The numbers above come from a scratch model of a greedy player over the authored
 
 Proposed phase timeline for four visits a day: the opening session reaches Surveying 3; the first visit the next morning unlocks Lunar Frontier, Titanium Highlands, and Surveying 4; Helium Mare follows that afternoon; Mars Frontier on day two; Silica Dunes the visit after; Cobalt Chasm and Mars mastery on day three.
 
-The implementation re-measures this with the public-action journey and a live fresh-to-Mars playtest. Tuning after measurement changes only the numbers in sections 1 and 3.
+The implementation re-measures this deterministically with the public-action journey on its injected clock, at a two-hour and a six-hour visit cadence, and asserts the elapsed time to Mars mastery. Tuning after measurement changes only the numbers in sections 1 and 3.
 
 ## Testing
 
@@ -144,12 +144,12 @@ The implementation re-measures this with the public-action journey and a live fr
 - **Formatting:** `formatMiningCash` at 0, 999, 1,000, 999,999, 1,000,000, 1,250,000, 16,000,000, and 1,000,000,000; `formatMiningDuration` at 0, 30 s, 59 s, 61 s, 14 m, 1 h 52 m 01 s, and 24 h.
 - **Views:** `timeToFull` for idle, operational, full, and zero-rate sites; Logistics copy at Extraction 0 and 5.
 - **Widgets:** Site Deck card shows `FULL IN …` and no overflow at 360×640 / text scale 1.3 with a `16.00M` cash chip and Mars-sized prices; offline-return headline `Away`; the cap note; Technology, Stellar Map, Fleet Dock, and Sell labels show compact amounts.
-- **Journey:** `merge_mining_journey_test.dart` keeps its public-action route and next-goal checkpoints, waits in storage windows rather than 5-minute steps, buys the extra rigs the route needs, and still reaches Mars mastery and the single 20,000,000 reward. Its emitted cadence is the re-baselined evidence.
-- **Playtest:** a fresh-to-Mars live run recorded under `docs/playtests/`, using visits a few hours apart, replacing the HPA-285 cadence as current evidence.
+- **Journey:** `merge_mining_journey_test.dart` keeps its public-action route and next-goal checkpoints, waits in storage windows rather than 5-minute steps, buys the extra rigs the route needs, and still reaches Mars mastery and the single 20,000,000 reward. It runs at two-hour and six-hour steps and asserts Mars mastery within 30–60 hours and 2–4 days of clock time respectively; that is the pacing evidence and merge gate.
+- **UX check:** one sitting on an emulator or simulator, moving the device clock forward between sessions (no debug clock is added), checking copy, overflow, and feel; recorded under `docs/playtests/`. It is not a pacing measurement and never waits on wall-clock days.
 
 ## Risks
 
-- **The model is wrong about humans.** It plays greedily and taps instantly. Mitigation: the journey and the live playtest are the acceptance evidence, and every number lives in `MiningContentRegistry`.
+- **The model is wrong about humans.** It plays greedily and taps instantly. Mitigation: the journey's two cadence bands are the acceptance evidence, the UX check catches copy and feel problems, and every number lives in `MiningContentRegistry`, so retuning after real play is a numbers-only change.
 - **Large numbers overflow chrome.** Mitigation: one compact formatter everywhere and overflow tests at 360×640 / 1.3 with Mars-sized values.
 - **Fewer FULL moments in active play.** HPA-286's FULL labels and cargo-full cue now mostly appear on return. The next-goal strip's "Sell cargo to afford it" hint carries active-play selling.
 - **Order with HPA-403.** The fourth planet authors its numbers on this pacing and is blocked by this ticket.
