@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/next_goal_view.dart';
@@ -170,7 +170,7 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('large text falls back to one line without overflow', (
+  testWidgets('large text keeps both lines visible at the 1.3 cap', (
     tester,
   ) async {
     for (final textScale in [1.5, 2.0, 3.0]) {
@@ -186,23 +186,27 @@ void main() {
           );
 
           expect(tester.takeException(), isNull, reason: reason);
-          expect(
-            tester.getSize(find.byType(MiningNextGoalStrip)).height,
-            compact ? 48 : 56,
-            reason: reason,
-          );
-          expect(
-            find.textContaining('${goal.title}  ·  ${goal.detail}'),
-            findsOneWidget,
-            reason: 'detail shares the title line: $reason',
-          );
-          // Portrait has no room for the cash label at large text; the
-          // progress bar and semantics label still carry it.
+          final strip = tester.getRect(find.byType(MiningNextGoalStrip));
+          expect(strip.height, compact ? 48 : 56, reason: reason);
           expect(
             find.byKey(const Key('next-goal-cash')),
-            goal.isCashGated && compact ? findsOneWidget : findsNothing,
+            goal.isCashGated ? findsOneWidget : findsNothing,
             reason: reason,
           );
+          final title = find.textContaining(goal.title);
+          expect(
+            tester.renderObject<RenderParagraph>(title).textScaler.scale(10),
+            closeTo(13, 0.001),
+            reason: reason,
+          );
+          if (compact) continue;
+
+          // Portrait keeps the detail on its own line inside the strip.
+          final detail = find.text(goal.detail);
+          expect(detail, findsOneWidget, reason: reason);
+          final detailRect = tester.getRect(detail);
+          expect(detailRect.top, greaterThan(tester.getRect(title).top));
+          expect(detailRect.bottom, lessThanOrEqualTo(strip.bottom));
         }
       }
     }
