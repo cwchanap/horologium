@@ -1,7 +1,7 @@
 # HPA-418 Frozen Basin Animated Mining Site Design
 
 - Date: 2026-10-16
-- Status: Draft for review
+- Status: Implemented
 - Linear: [HPA-418](https://linear.app/cwchanap/issue/HPA-418/mining-polish-animate-frozen-basin-as-the-second-mining-site) — Animate Frozen Basin as the second mining site
 - Baseline: `main` at `8f0881f` after PR #35
 - Depends on: [HPA-404](https://linear.app/cwchanap/issue/HPA-404/mining-art-water-ice-deposit-frame-family-for-frozen-basin) — water-ice deposit frame family (art only, its own PR)
