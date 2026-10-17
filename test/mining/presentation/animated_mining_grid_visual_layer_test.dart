@@ -222,6 +222,107 @@ Transform _robotArmTransform(WidgetTester tester, MiningGridCell cell) =>
       find.byKey(Key('landing-basin-robot-arm-transform-${cell.x}-${cell.y}')),
     );
 
+final _frozen = _content.site(MiningSiteId.frozenBasin);
+
+/// Frozen Basin's first progression resources need Surveying 3.
+const _frozenSurveying = 3;
+
+/// First legal Frozen Basin cell at Surveying 3 and the resource it mines.
+final _frozenCell = deployableMiningCells(
+  _frozen,
+  surveyingLevel: _frozenSurveying,
+).first;
+final _frozenDeposit = uniqueAdjacentDeposit(
+  deposits: _frozen.deposits,
+  cell: _frozenCell,
+)!;
+
+Key _frozenDepositKey() => Key(
+  'frozen-basin-deposit-${_frozenDeposit.x}-${_frozenDeposit.y}-'
+  '${_frozenDeposit.size}',
+);
+
+String _frozenAsset(WidgetTester tester) {
+  final image = tester.widget<Image>(
+    find.descendant(
+      of: find.byKey(_frozenDepositKey()),
+      matching: find.byType(Image),
+    ),
+  );
+  return (image.image as AssetImage).assetName;
+}
+
+String _frozenHpText(WidgetTester tester) => tester
+    .widget<Text>(
+      find.descendant(
+        of: find.byKey(
+          Key(
+            'frozen-basin-hp-${_frozenDeposit.x}-${_frozenDeposit.y}-'
+            '${_frozenDeposit.size}',
+          ),
+        ),
+        matching: find.byType(Text),
+      ),
+    )
+    .data!;
+
+Key _frozenDamageKey() =>
+    Key('frozen-basin-damage-${_frozenCell.x}-${_frozenCell.y}');
+
+MineSiteView _frozenView({double progress = 0}) {
+  final placements = [MiningRigPlacement(tier: RigTier.t1, cell: _frozenCell)];
+  final initial = MiningSave.initial(nowUtc: _start);
+  final capacity = _content.effectiveSiteCapacity(MiningSiteId.frozenBasin, [
+    RigTier.t1,
+  ], 0);
+  final state = initial.copyWith(
+    technology: const TechnologyLevels(surveying: _frozenSurveying),
+    sites: {
+      ...initial.sites,
+      MiningSiteId.frozenBasin: initial.sites[MiningSiteId.frozenBasin]!
+          .copyWith(
+            unlocked: true,
+            commissioned: true,
+            storedAmount: (progress * capacity).clamp(0.0, capacity),
+            rigPlacements: placements,
+          ),
+    },
+  );
+  return MineSiteView.from(
+    state: state,
+    content: _content,
+    siteId: MiningSiteId.frozenBasin,
+    selectedBayId: null,
+    isBusy: false,
+  );
+}
+
+Future<void> _pumpFrozen(
+  WidgetTester tester, {
+  double progress = 0,
+  int impactSequence = 0,
+  bool reducedMotion = false,
+}) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = const Size(430, 932);
+  addTearDown(() {
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+  await tester.pumpWidget(
+    MaterialApp(
+      home: AnimatedMiningGridVisualLayer(
+        view: _frozenView(progress: progress),
+        frames: MiningDepositFrames.waterIce,
+        impactSequence: impactSequence,
+        reducedMotion: reducedMotion,
+        cellSize: 56,
+      ),
+    ),
+  );
+  await tester.pump();
+}
+
 void main() {
   group('feedback math', () {
     test('scales resource max HP by body size', () {
@@ -906,5 +1007,115 @@ void main() {
       expect(find.byKey(_damageKey(_defaultCell)), findsNothing);
       expect(_hpText(tester), '80/80');
     }, skip: kIsWeb);
+  });
+
+  group('Frozen Basin', () {
+    const frames = MiningDepositFrames.waterIce;
+
+    testWidgets('selects the staged water-ice plate at progress boundaries', (
+      tester,
+    ) async {
+      for (final entry in {
+        .24: frames.stage(1),
+        .25: frames.stage(2),
+        .60: frames.stage(3),
+        .90: frames.stage(4),
+      }.entries) {
+        await _pumpFrozen(tester, progress: entry.key, reducedMotion: true);
+        expect(_frozenAsset(tester), entry.value, reason: '${entry.key}');
+      }
+    });
+
+    testWidgets('loops the four water-ice idle frames and stops outside S1', (
+      tester,
+    ) async {
+      await _pumpFrozen(tester);
+      for (var frame = 1; frame <= 4; frame++) {
+        expect(_frozenAsset(tester), frames.idle(frame));
+        await tester.pump(const Duration(milliseconds: 125));
+      }
+      expect(_frozenAsset(tester), frames.idle(1));
+
+      await _pumpFrozen(tester, progress: .25);
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(_frozenAsset(tester), frames.stage(2));
+    });
+
+    testWidgets('a warmed impact plays the water-ice hit and drops HP once', (
+      tester,
+    ) async {
+      await warmDepositFrames(tester, frames);
+      await _pumpFrozen(tester);
+      final maxHp = miningResourceMaxHp(_frozenDeposit.size);
+      expect(_frozenHpText(tester), '$maxHp/$maxHp');
+
+      await _pumpFrozen(tester, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 240));
+      expect(_frozenAsset(tester), frames.hit(1));
+      await tester.pump(const Duration(milliseconds: 84));
+      expect(_frozenAsset(tester), frames.hit(2));
+      await tester.pump(const Duration(milliseconds: 84));
+      expect(_frozenAsset(tester), frames.hit(3));
+
+      await tester.pump(const Duration(milliseconds: 62));
+      expect(find.byKey(_frozenDamageKey()), findsOneWidget);
+      expect(_frozenHpText(tester), '${maxHp - 10}/$maxHp');
+      await tester.pump(const Duration(seconds: 1));
+      expect(_frozenHpText(tester), '${maxHp - 10}/$maxHp');
+      expect(find.byKey(_frozenDamageKey()), findsNothing);
+    }, skip: kIsWeb);
+
+    testWidgets(
+      'crossing into S4 plays the water-ice exhaust and settles on S4',
+      (tester) async {
+        await warmDepositFrames(tester, frames);
+        await _pumpFrozen(tester, progress: .899);
+        expect(_frozenAsset(tester), frames.stage(3));
+
+        await _pumpFrozen(tester, progress: .90, impactSequence: 1);
+        await tester.pump(const Duration(milliseconds: 240));
+        for (var frame = 1; frame <= 4; frame++) {
+          expect(_frozenAsset(tester), frames.exhaust(frame));
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        expect(_frozenAsset(tester), frames.stage(4));
+      },
+      skip: kIsWeb,
+    );
+
+    testWidgets('a cold-cache impact is dropped with full HP and no label', (
+      tester,
+    ) async {
+      final maxHp = miningResourceMaxHp(_frozenDeposit.size);
+      await _pumpFrozen(tester);
+      await _pumpFrozen(tester, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(_frozenHpText(tester), '$maxHp/$maxHp');
+      expect(find.byKey(_frozenDamageKey()), findsNothing);
+      expect({
+        for (var f = 1; f <= 4; f++) frames.idle(f),
+      }, contains(_frozenAsset(tester)));
+    });
+
+    testWidgets('reduced motion shows the static plate and a still arm', (
+      tester,
+    ) async {
+      Matrix4 arm() => tester
+          .widget<Transform>(
+            find.byKey(
+              Key(
+                'frozen-basin-robot-arm-transform-'
+                '${_frozenCell.x}-${_frozenCell.y}',
+              ),
+            ),
+          )
+          .transform;
+      await _pumpFrozen(tester, reducedMotion: true);
+      final rest = arm();
+      await _pumpFrozen(tester, reducedMotion: true, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(_frozenAsset(tester), frames.stage(1));
+      expect(arm(), equals(rest));
+    });
   });
 }

@@ -22,9 +22,9 @@ abstract final class MiningVisuals {
   /// means adding an approved frame family and a case here.
   static MiningDepositFrames? depositFramesFor(MiningSiteId id) => switch (id) {
     MiningSiteId.landingBasin => MiningDepositFrames.gold,
+    MiningSiteId.frozenBasin => MiningDepositFrames.waterIce,
     MiningSiteId.carbonRidge ||
     MiningSiteId.graniteCrater ||
-    MiningSiteId.frozenBasin ||
     MiningSiteId.titaniumHighlands ||
     MiningSiteId.heliumMare ||
     MiningSiteId.ochreBasin ||
