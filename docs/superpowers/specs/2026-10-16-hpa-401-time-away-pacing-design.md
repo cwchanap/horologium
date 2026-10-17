@@ -107,6 +107,8 @@ Cash now reaches tens of millions. `formatMiningCash` becomes the only formatter
 
 It replaces every raw `$cost`, `$cash`, and `'${…Cost}'` interpolation in the cash chip, Site Deck cards and Sell action, Technology sheet, Stellar Map, Fleet Dock spawn label, sale and mastery messages, and the next-goal strip. Semantics labels use the same text.
 
+Resource amounts on the offline-return sheet reach about 13,000 units per planet, so they get a sibling `formatMiningUnits(double)`: one decimal below 1,000 (unchanged from today), whole units with separators from 1,000, and the same `M`/`B` rule from 1,000,000.
+
 ### 5. Time to full on Site Deck cards
 
 `MiningSiteCardView` gains `Duration? timeToFull`: `(capacity − cargo) / rate` for an operational site with `rate > 0` and room left, else `null`. An operational card that is not full shows a second status line, `FULL IN 1H 52M`, matching the existing two-line `FULL … / SELL TO RESUME` layout. Minutes round up, so the line never says `0M` before the site is full. One shared `formatMiningDuration(Duration)` (`1h 52m`, `14m`, `<1m`) replaces the offline-return sheet's private formatter.
@@ -141,7 +143,7 @@ The implementation re-measures this deterministically with the public-action jou
 
 - **Content invariants:** every site's `baseCapacity == baseRatePerSecond × 7200`; the price table above; `offlineAccrualCap == 24h`.
 - **Simulation:** accrual stops at capacity after 2 h for a T1 site and after 4 h at Logistics 5; elapsed time above 24 h is capped and reported as capped; foreground and resume paths still agree.
-- **Formatting:** `formatMiningCash` at 0, 999, 1,000, 999,999, 1,000,000, 1,250,000, 16,000,000, and 1,000,000,000; `formatMiningDuration` at 0, 30 s, 59 s, 61 s, 14 m, 1 h 52 m 01 s, and 24 h.
+- **Formatting:** `formatMiningCash` at 0, 999, 1,000, 999,999, 1,000,000, 1,250,000, 16,000,000, and 1,000,000,000; `formatMiningDuration` at 0, 30 s, 59 s, 61 s, 14 m, 1 h 52 m 01 s, and 24 h; `formatMiningUnits` at 0, 0.5, 90, 999.9, 1,000, 12,960.4, and 1,250,000.
 - **Views:** `timeToFull` for idle, operational, full, and zero-rate sites; Logistics copy at Extraction 0 and 5.
 - **Widgets:** Site Deck card shows `FULL IN …` and no overflow at 360×640 / text scale 1.3 with a `16.00M` cash chip and Mars-sized prices; offline-return headline `Away`; the cap note; Technology, Stellar Map, Fleet Dock, and Sell labels show compact amounts.
 - **Journey:** `merge_mining_journey_test.dart` keeps its public-action route and next-goal checkpoints, waits in storage windows rather than 5-minute steps, buys the extra rigs the route needs, and still reaches Mars mastery and the single 20,000,000 reward. It runs at two-hour and six-hour steps and asserts Mars mastery within 30–60 hours and 2–4 days of clock time respectively; that is the pacing evidence and merge gate.

@@ -15,18 +15,20 @@ Tasks 1 and 2 change no economy number and must be green on their own. Task 3 is
 ### Production
 
 - `lib/mining/mining_content.dart`: `formatMiningCash(int)` keeps thousands separators below 1,000,000; at and above it returns two decimals with `M`, and at and above 1,000,000,000 two decimals with `B`. Truncate rather than round (`999,999,999` → `999.99M`), so a displayed amount never exceeds what the player has.
-- Replace raw interpolation with `formatMiningCash` in:
-  - `lib/mining/presentation/mining_hud.dart` (cash chip at `:122`, and `:171`; drop the chip's private thousands logic);
-  - `lib/mining/presentation/mining_shell.dart:454` (`Sold … cash.`);
+- Replace raw interpolation with `formatMiningCash` in the sites below. Line numbers are a guide only; find each site by grep.
+  - `lib/mining/presentation/mining_hud.dart` (cash chip text at `:122` and its semantics label `Cash $cash` at `:86`, and the cargo gauge label at `:171`; drop the chip's private thousands logic);
+  - `lib/mining/presentation/mining_shell.dart:457` (`Sold … cash.`);
   - `lib/mining/presentation/fleet_dock.dart:176` and `lib/mining/fleet_dock_view.dart:82, :124`;
-  - `lib/mining/presentation/technology_sheet.dart:378-379` and `lib/mining/mining_progression_views.dart:387`;
-  - `lib/mining/presentation/site_deck_screen.dart:565, :665, :1100` and `lib/mining/site_deck_view.dart:125, :276`;
+  - `lib/mining/presentation/technology_sheet.dart:378-379` and `lib/mining/mining_progression_views.dart:106` (`Need $cost cash.`) and `:387`;
+  - `lib/mining/presentation/site_deck_screen.dart:565, :665, :878, :1100` (`:878` is the Sell sheet's `+${view.projectedValue}`) and `lib/mining/site_deck_view.dart:125, :276`;
   - `lib/mining/presentation/stellar_map_screen.dart:768`.
 - `next_goal_view.dart` and `mining_controller.dart` already call it.
+- Finish with a sweep instead of trusting this list: `grep -rnE '\$\{?[a-zA-Z_.]*(ost|ash|alue|eward)' lib/mining` must return no player-visible cash interpolation that skips `formatMiningCash`.
 
 ### Tests
 
 - `test/mining/mining_content_test.dart`: formatter table from the design's Testing section, plus `999,999,999`.
+- `test/mining/presentation/mining_hud_test.dart` (or the existing chip test): the cash chip's semantics label is `Cash 16.00M` at 16,000,000, since no visual test sees it.
 - Update view and widget expectations that compare raw numbers. Under today's prices every displayed amount is below 1,000,000, so text changes only where the old code omitted separators (for example `Need 2500 cash.` → `Need 2,500 cash.`).
 
 ```sh
@@ -42,14 +44,16 @@ flutter test test/mining/mining_content_test.dart test/mining/site_deck_view_tes
 - `lib/mining/mining_content.dart`: add `String formatMiningDuration(Duration)` (`<1m`, `14m`, `1h 52m`, `24h 00m`), rounding minutes up for durations that are not whole minutes. It replaces `OfflineReturnSheet._formatDuration`; keep that sheet's existing output for whole minutes.
 - `lib/mining/site_deck_view.dart`: add `Duration? timeToFull` to `MiningSiteCardView`, computed in `SiteDeckView.from` as `(capacity − cargo) / rate` seconds for an operational card with `rate > 0` and `cargo < capacity`, else `null`.
 - `lib/mining/presentation/site_deck_screen.dart` (card status around `:910-921`): an operational, not-full card shows `rate/s · cargo / cap\nFULL IN ${formatMiningDuration(timeToFull).toUpperCase()}`. Full cards keep `FULL … / SELL TO RESUME`. Add the same text to the card's semantics label.
-- `lib/mining/presentation/offline_return_sheet.dart`: headline `Away\n{elapsed}`; cap note `Capped at {elapsedUsed}.` with the Logistics suffix and the `logisticsLevel` constructor parameter removed (update the shell call site).
+- `lib/mining/mining_content.dart`: add `String formatMiningUnits(double)` for resource amounts: one decimal below 1,000 (today's `90.0` output is unchanged), whole units with thousands separators from 1,000 (`12,960`), and the cash rule's compact `M`/`B` from 1,000,000. Truncate like the cash formatter.
+- `lib/mining/presentation/offline_return_sheet.dart`: per-resource rows (`:395`) use `+${formatMiningUnits(entry.value)}`; headline `Away\n{elapsed}`; cap note `Capped at {elapsedUsed}.` with the Logistics suffix and the `logisticsLevel` constructor parameter removed (update the shell call site).
 
 ### Tests
 
 - `test/mining/site_deck_view_test.dart`: `timeToFull` is `null` for locked, available, idle, full, and zero-rate cards, and exact for a partially filled operational card.
 - `test/mining/presentation/site_deck_screen_test.dart`: the `FULL IN` line appears and the card does not overflow at 360×640 and text scale 1.3.
 - `test/mining/presentation/offline_return_sheet_test.dart`: `Away` headline; the cap note without a Logistics level.
-- Formatter tests for `formatMiningDuration`.
+- Formatter tests for `formatMiningDuration`, and for `formatMiningUnits` at 0, 0.5, 90, 999.9, 1,000, 12,960.4, and 1,250,000.
+- `test/mining/presentation/offline_return_sheet_test.dart`: a 12,960-unit row renders `+12,960`.
 
 Commit Tasks 1 and 2 before any number changes.
 
