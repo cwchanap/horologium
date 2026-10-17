@@ -5,7 +5,7 @@ import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
-import 'package:horologium/mining/presentation/landing_basin_grid_visual_layer.dart';
+import 'package:horologium/mining/presentation/animated_mining_grid_visual_layer.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 import '../../support/mining_grid_fixtures.dart';
@@ -140,7 +140,7 @@ Future<void> _pumpLayer(
   });
   await tester.pumpWidget(
     MaterialApp(
-      home: LandingBasinGridVisualLayer(
+      home: AnimatedMiningGridVisualLayer(
         view: _view(
           rigTier: rigTier,
           cell: cell,
@@ -148,6 +148,7 @@ Future<void> _pumpLayer(
           progress: progress,
           rigs: rigs,
         ),
+        frames: MiningDepositFrames.gold,
         impactSequence: impactSequence,
         onMiningImpact: onMiningImpact,
         reducedMotion: reducedMotion,
@@ -221,24 +222,125 @@ Transform _robotArmTransform(WidgetTester tester, MiningGridCell cell) =>
       find.byKey(Key('landing-basin-robot-arm-transform-${cell.x}-${cell.y}')),
     );
 
+final _frozen = _content.site(MiningSiteId.frozenBasin);
+
+/// Frozen Basin's first progression resources need Surveying 3.
+const _frozenSurveying = 3;
+
+/// First legal Frozen Basin cell at Surveying 3 and the resource it mines.
+final _frozenCell = deployableMiningCells(
+  _frozen,
+  surveyingLevel: _frozenSurveying,
+).first;
+final _frozenDeposit = uniqueAdjacentDeposit(
+  deposits: _frozen.deposits,
+  cell: _frozenCell,
+)!;
+
+Key _frozenDepositKey() => Key(
+  'frozen-basin-deposit-${_frozenDeposit.x}-${_frozenDeposit.y}-'
+  '${_frozenDeposit.size}',
+);
+
+String _frozenAsset(WidgetTester tester) {
+  final image = tester.widget<Image>(
+    find.descendant(
+      of: find.byKey(_frozenDepositKey()),
+      matching: find.byType(Image),
+    ),
+  );
+  return (image.image as AssetImage).assetName;
+}
+
+String _frozenHpText(WidgetTester tester) => tester
+    .widget<Text>(
+      find.descendant(
+        of: find.byKey(
+          Key(
+            'frozen-basin-hp-${_frozenDeposit.x}-${_frozenDeposit.y}-'
+            '${_frozenDeposit.size}',
+          ),
+        ),
+        matching: find.byType(Text),
+      ),
+    )
+    .data!;
+
+Key _frozenDamageKey() =>
+    Key('frozen-basin-damage-${_frozenCell.x}-${_frozenCell.y}');
+
+MineSiteView _frozenView({double progress = 0}) {
+  final placements = [MiningRigPlacement(tier: RigTier.t1, cell: _frozenCell)];
+  final initial = MiningSave.initial(nowUtc: _start);
+  final capacity = _content.effectiveSiteCapacity(MiningSiteId.frozenBasin, [
+    RigTier.t1,
+  ], 0);
+  final state = initial.copyWith(
+    technology: const TechnologyLevels(surveying: _frozenSurveying),
+    sites: {
+      ...initial.sites,
+      MiningSiteId.frozenBasin: initial.sites[MiningSiteId.frozenBasin]!
+          .copyWith(
+            unlocked: true,
+            commissioned: true,
+            storedAmount: (progress * capacity).clamp(0.0, capacity),
+            rigPlacements: placements,
+          ),
+    },
+  );
+  return MineSiteView.from(
+    state: state,
+    content: _content,
+    siteId: MiningSiteId.frozenBasin,
+    selectedBayId: null,
+    isBusy: false,
+  );
+}
+
+Future<void> _pumpFrozen(
+  WidgetTester tester, {
+  double progress = 0,
+  int impactSequence = 0,
+  bool reducedMotion = false,
+}) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = const Size(430, 932);
+  addTearDown(() {
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+  await tester.pumpWidget(
+    MaterialApp(
+      home: AnimatedMiningGridVisualLayer(
+        view: _frozenView(progress: progress),
+        frames: MiningDepositFrames.waterIce,
+        impactSequence: impactSequence,
+        reducedMotion: reducedMotion,
+        cellSize: 56,
+      ),
+    ),
+  );
+  await tester.pump();
+}
+
 void main() {
   group('feedback math', () {
     test('scales resource max HP by body size', () {
-      expect(landingBasinMaxHp(1), 40);
-      expect(landingBasinMaxHp(2), 80);
-      expect(landingBasinMaxHp(3), 120);
+      expect(miningResourceMaxHp(1), 40);
+      expect(miningResourceMaxHp(2), 80);
+      expect(miningResourceMaxHp(3), 120);
     });
 
     test('scales strike damage by rig tier', () {
       expect(
-        [for (final tier in RigTier.values) landingBasinStrikeDamage(tier)],
+        [for (final tier in RigTier.values) miningStrikeDamage(tier)],
         [10, 20, 30, 40, 50],
       );
     });
 
     test('groups strike damage of rigs targeting one resource', () {
       final cell = _firstAdjacentCell(_minedDeposit);
-      final groups = landingBasinGroupedDamage([
+      final groups = miningGroupedDamage([
         _rig(RigTier.t1, cell, _minedDeposit),
         _rig(RigTier.t5, _defaultCell, _minedDeposit),
       ]);
@@ -247,7 +349,7 @@ void main() {
 
     test('keeps rigs targeting different resources in separate groups', () {
       expect(_unminedDeposit, isNot(equals(_minedDeposit)));
-      final groups = landingBasinGroupedDamage([
+      final groups = miningGroupedDamage([
         _rig(RigTier.t1, _firstAdjacentCell(_minedDeposit), _minedDeposit),
         _rig(RigTier.t2, _firstAdjacentCell(_unminedDeposit), _unminedDeposit),
       ]);
@@ -255,19 +357,19 @@ void main() {
     });
 
     test('clamps remaining HP at zero and discards overkill', () {
-      expect(landingBasinRemainingHpAfterStrike(40, 10), 30);
-      expect(landingBasinRemainingHpAfterStrike(30, 50), 0);
-      expect(landingBasinRemainingHpAfterStrike(10, 50), 0);
-      expect(landingBasinRemainingHpAfterStrike(0, 10), 0);
+      expect(miningRemainingHpAfterStrike(40, 10), 30);
+      expect(miningRemainingHpAfterStrike(30, 50), 0);
+      expect(miningRemainingHpAfterStrike(10, 50), 0);
+      expect(miningRemainingHpAfterStrike(0, 10), 0);
     });
   });
 
-  // The layer defers its first one-shot impact until the finite gold frames
+  // The layer defers its first one-shot impact until the finite deposit frames
   // finish precaching, and readiness is tied only to actual Future.wait
   // completion (the deferral budget drops a stalled impact, it does not fire
   // it). In the fake-async test environment a cold image cache never decodes
   // those frames, so impact tests warm the finite frame set in real async via
-  // [warmGoldFrames] before mounting the layer. Clearing the cache before each
+  // [warmDepositFrames] before mounting the layer. Clearing the cache before each
   // test keeps non-impact tests cold and deterministic.
   setUp(() {
     imageCache.clear();
@@ -277,7 +379,7 @@ void main() {
   testWidgets(
     'emits one sound at a visible strike, never on load or reduced motion',
     (tester) async {
-      await warmGoldFrames(tester);
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
       var impacts = 0;
       void onImpact() => impacts++;
       await _pumpLayer(tester, impactSequence: 8, onMiningImpact: onImpact);
@@ -321,7 +423,7 @@ void main() {
 
     expect(find.byKey(_depositKey(_minedDeposit)), findsOneWidget);
     expect(find.byKey(_robotKey(_defaultCell)), findsNothing);
-    expect(_depositAsset(tester), MiningVisuals.goldNodeStageAsset(1));
+    expect(_depositAsset(tester), MiningDepositFrames.gold.stage(1));
   });
 
   testWidgets('animates only the mined deposit and keeps others static', (
@@ -330,17 +432,17 @@ void main() {
     // The default rig at (2,3) mines the (1,1) deposit only: it runs its idle
     // loop while unmined deposits stay on their static stage plate.
     await _pumpLayer(tester, reducedMotion: false);
-    expect(_depositAsset(tester), MiningVisuals.goldNodeIdleAsset(1));
+    expect(_depositAsset(tester), MiningDepositFrames.gold.idle(1));
     expect(
       _depositAsset(tester, _unminedDeposit),
-      MiningVisuals.goldNodeStageAsset(1),
+      MiningDepositFrames.gold.stage(1),
     );
 
     await tester.pump(const Duration(milliseconds: 125));
-    expect(_depositAsset(tester), MiningVisuals.goldNodeIdleAsset(2));
+    expect(_depositAsset(tester), MiningDepositFrames.gold.idle(2));
     expect(
       _depositAsset(tester, _unminedDeposit),
-      MiningVisuals.goldNodeStageAsset(1),
+      MiningDepositFrames.gold.stage(1),
     );
   });
 
@@ -440,36 +542,36 @@ void main() {
 
   testWidgets('loops the four S1 idle frames every 125ms', (tester) async {
     await _pumpLayer(tester, reducedMotion: false);
-    expect(_depositAsset(tester), MiningVisuals.goldNodeIdleAsset(1));
+    expect(_depositAsset(tester), MiningDepositFrames.gold.idle(1));
 
     await tester.pump(const Duration(milliseconds: 125));
-    expect(_depositAsset(tester), MiningVisuals.goldNodeIdleAsset(2));
+    expect(_depositAsset(tester), MiningDepositFrames.gold.idle(2));
     await tester.pump(const Duration(milliseconds: 125));
-    expect(_depositAsset(tester), MiningVisuals.goldNodeIdleAsset(3));
+    expect(_depositAsset(tester), MiningDepositFrames.gold.idle(3));
     await tester.pump(const Duration(milliseconds: 125));
-    expect(_depositAsset(tester), MiningVisuals.goldNodeIdleAsset(4));
+    expect(_depositAsset(tester), MiningDepositFrames.gold.idle(4));
     await tester.pump(const Duration(milliseconds: 125));
-    expect(_depositAsset(tester), MiningVisuals.goldNodeIdleAsset(1));
+    expect(_depositAsset(tester), MiningDepositFrames.gold.idle(1));
   });
 
   testWidgets('stops the idle loop outside S1', (tester) async {
     await _pumpLayer(tester, progress: 0);
     await tester.pump(const Duration(milliseconds: 125));
-    expect(_depositAsset(tester), MiningVisuals.goldNodeIdleAsset(2));
+    expect(_depositAsset(tester), MiningDepositFrames.gold.idle(2));
 
     await _pumpLayer(tester, progress: .25);
-    expect(_depositAsset(tester), MiningVisuals.goldNodeStageAsset(2));
+    expect(_depositAsset(tester), MiningDepositFrames.gold.stage(2));
     await tester.pump(const Duration(milliseconds: 500));
-    expect(_depositAsset(tester), MiningVisuals.goldNodeStageAsset(2));
+    expect(_depositAsset(tester), MiningDepositFrames.gold.stage(2));
 
     await _pumpLayer(tester, progress: 0);
-    expect(_depositAsset(tester), MiningVisuals.goldNodeIdleAsset(1));
+    expect(_depositAsset(tester), MiningDepositFrames.gold.idle(1));
   });
 
   testWidgets(
     'selects every S1 hit frame while the chassis stays fixed',
     (tester) async {
-      await warmGoldFrames(tester);
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
       await _pumpLayer(tester, impactSequence: 0);
       final restBody = _robotBodyTransform(tester, _defaultCell).transform;
       final restArm = _robotArmTransform(tester, _defaultCell).transform;
@@ -479,11 +581,11 @@ void main() {
       // Advance into the S1 hit window and step through the three hit frames.
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 240));
-      expect(_depositAsset(tester), MiningVisuals.goldNodeHitAsset(1));
+      expect(_depositAsset(tester), MiningDepositFrames.gold.hit(1));
       // The impact one-shot animates the mined deposit, never unmined ones.
       expect(
         _depositAsset(tester, _unminedDeposit),
-        MiningVisuals.goldNodeStageAsset(1),
+        MiningDepositFrames.gold.stage(1),
       );
       expect(
         _robotBodyTransform(tester, _defaultCell).transform,
@@ -495,7 +597,7 @@ void main() {
       );
 
       await tester.pump(const Duration(milliseconds: 84));
-      expect(_depositAsset(tester), MiningVisuals.goldNodeHitAsset(2));
+      expect(_depositAsset(tester), MiningDepositFrames.gold.hit(2));
       expect(
         _robotBodyTransform(tester, _defaultCell).transform,
         equals(restBody),
@@ -506,7 +608,7 @@ void main() {
       );
 
       await tester.pump(const Duration(milliseconds: 84));
-      expect(_depositAsset(tester), MiningVisuals.goldNodeHitAsset(3));
+      expect(_depositAsset(tester), MiningDepositFrames.gold.hit(3));
       expect(
         _robotBodyTransform(tester, _defaultCell).transform,
         equals(restBody),
@@ -524,29 +626,29 @@ void main() {
   testWidgets(
     'plays exhaust frames only when progress crosses into S4',
     (tester) async {
-      await warmGoldFrames(tester);
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
       await _pumpLayer(tester, progress: .899, impactSequence: 0);
-      expect(_depositAsset(tester), MiningVisuals.goldNodeStageAsset(3));
+      expect(_depositAsset(tester), MiningDepositFrames.gold.stage(3));
 
       // With the finite frames warmed, _framesReady is true and the exhaust
       // one-shot fires immediately on the sequence change. The controller parks
       // at value 0 so the S3 wind-up hold shows before the exhaust window.
       await _pumpLayer(tester, progress: .90, impactSequence: 1);
-      expect(_depositAsset(tester), MiningVisuals.goldNodeStageAsset(3));
+      expect(_depositAsset(tester), MiningDepositFrames.gold.stage(3));
 
       await tester.pump(const Duration(milliseconds: 240));
-      expect(_depositAsset(tester), MiningVisuals.goldNodeExhaustAsset(1));
+      expect(_depositAsset(tester), MiningDepositFrames.gold.exhaust(1));
       await tester.pump(const Duration(milliseconds: 100));
-      expect(_depositAsset(tester), MiningVisuals.goldNodeExhaustAsset(2));
+      expect(_depositAsset(tester), MiningDepositFrames.gold.exhaust(2));
       await tester.pump(const Duration(milliseconds: 100));
-      expect(_depositAsset(tester), MiningVisuals.goldNodeExhaustAsset(3));
+      expect(_depositAsset(tester), MiningDepositFrames.gold.exhaust(3));
       await tester.pump(const Duration(milliseconds: 100));
-      expect(_depositAsset(tester), MiningVisuals.goldNodeExhaustAsset(4));
+      expect(_depositAsset(tester), MiningDepositFrames.gold.exhaust(4));
       await tester.pump(const Duration(milliseconds: 100));
-      expect(_depositAsset(tester), MiningVisuals.goldNodeStageAsset(4));
+      expect(_depositAsset(tester), MiningDepositFrames.gold.stage(4));
 
       await _pumpLayer(tester, progress: 0, impactSequence: 1);
-      expect(_depositAsset(tester), MiningVisuals.goldNodeIdleAsset(1));
+      expect(_depositAsset(tester), MiningDepositFrames.gold.idle(1));
     },
     // Finite-frame precache needs the VM asset channel; frame selection is
     // pure Dart covered on VM. The cold-cache drop path is covered on web.
@@ -569,11 +671,11 @@ void main() {
       // hit or exhaust frame) and the controller rests at value 1.
       await tester.pump(const Duration(milliseconds: 200));
       final idleFrames = {
-        for (var f = 1; f <= 4; f++) MiningVisuals.goldNodeIdleAsset(f),
+        for (var f = 1; f <= 4; f++) MiningDepositFrames.gold.idle(f),
       };
       final impactFrames = {
-        for (var f = 1; f <= 3; f++) MiningVisuals.goldNodeHitAsset(f),
-        for (var f = 1; f <= 4; f++) MiningVisuals.goldNodeExhaustAsset(f),
+        for (var f = 1; f <= 3; f++) MiningDepositFrames.gold.hit(f),
+        for (var f = 1; f <= 4; f++) MiningDepositFrames.gold.exhaust(f),
       };
       expect(idleFrames, contains(_depositAsset(tester)));
       expect(impactFrames, isNot(contains(_depositAsset(tester))));
@@ -598,7 +700,7 @@ void main() {
       await _pumpLayer(tester, reducedMotion: true, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(_depositAsset(tester), MiningVisuals.goldNodeStageAsset(1));
+      expect(_depositAsset(tester), MiningDepositFrames.gold.stage(1));
       expect(
         _robotFlipTransform(tester, _defaultCell).transform,
         equals(restFlip),
@@ -663,11 +765,11 @@ void main() {
 
       expect(
         (bodyImage.image as AssetImage).assetName,
-        MiningVisuals.landingBasinRobotBodyAsset(tier),
+        MiningVisuals.miningRobotBodyAsset(tier),
       );
       expect(
         (armImage.image as AssetImage).assetName,
-        MiningVisuals.landingBasinRobotArmAsset(tier),
+        MiningVisuals.miningRobotArmAsset(tier),
       );
     }
   });
@@ -719,7 +821,7 @@ void main() {
     testWidgets('a warmed valid T1 contact drops visible HP exactly once', (
       tester,
     ) async {
-      await warmGoldFrames(tester);
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
       await _pumpLayer(tester, impactSequence: 0);
       expect(_hpText(tester), '80/80');
 
@@ -736,7 +838,7 @@ void main() {
     testWidgets('a cargo update without a new impact keeps the struck HP', (
       tester,
     ) async {
-      await warmGoldFrames(tester);
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
       await _pumpLayer(tester, impactSequence: 0);
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 470));
@@ -762,7 +864,7 @@ void main() {
     testWidgets('a warmed late miss at or past 0.62 keeps full HP', (
       tester,
     ) async {
-      await warmGoldFrames(tester);
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
       await _pumpLayer(tester, impactSequence: 0);
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 450));
@@ -775,7 +877,7 @@ void main() {
     }, skip: kIsWeb);
 
     testWidgets('remounting the layer resets visible HP', (tester) async {
-      await warmGoldFrames(tester);
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
       await _pumpLayer(tester, impactSequence: 0);
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 470));
@@ -795,7 +897,7 @@ void main() {
         (RigTier.t1, _sharedAdjacentCells[0]),
         (RigTier.t2, _sharedAdjacentCells[1]),
       ];
-      await warmGoldFrames(tester);
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
       await _pumpLayer(tester, rigs: rigs, impactSequence: 0);
       await _pumpLayer(tester, rigs: rigs, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 450));
@@ -819,7 +921,7 @@ void main() {
     testWidgets(
       'reduced motion still applies HP and fades the value in place',
       (tester) async {
-        await warmGoldFrames(tester);
+        await warmDepositFrames(tester, MiningDepositFrames.gold);
         await _pumpLayer(tester, impactSequence: 0, reducedMotion: true);
         await _pumpLayer(tester, impactSequence: 1, reducedMotion: true);
         await tester.pump(const Duration(milliseconds: 450));
@@ -849,7 +951,7 @@ void main() {
         (RigTier.t5, _sharedAdjacentCells[0]),
         (RigTier.t5, _sharedAdjacentCells[1]),
       ];
-      await warmGoldFrames(tester);
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
       await _pumpLayer(
         tester,
         rigs: rigs,
@@ -870,7 +972,7 @@ void main() {
     }, skip: kIsWeb);
 
     testWidgets('damage labels are gone at timeline end', (tester) async {
-      await warmGoldFrames(tester);
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
       await _pumpLayer(tester, impactSequence: 0);
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 470));
@@ -895,7 +997,7 @@ void main() {
     testWidgets('a warmed late miss at or past 0.62 renders no damage labels', (
       tester,
     ) async {
-      await warmGoldFrames(tester);
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
       await _pumpLayer(tester, impactSequence: 0);
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 450));
@@ -905,5 +1007,115 @@ void main() {
       expect(find.byKey(_damageKey(_defaultCell)), findsNothing);
       expect(_hpText(tester), '80/80');
     }, skip: kIsWeb);
+  });
+
+  group('Frozen Basin', () {
+    const frames = MiningDepositFrames.waterIce;
+
+    testWidgets('selects the staged water-ice plate at progress boundaries', (
+      tester,
+    ) async {
+      for (final entry in {
+        .24: frames.stage(1),
+        .25: frames.stage(2),
+        .60: frames.stage(3),
+        .90: frames.stage(4),
+      }.entries) {
+        await _pumpFrozen(tester, progress: entry.key, reducedMotion: true);
+        expect(_frozenAsset(tester), entry.value, reason: '${entry.key}');
+      }
+    });
+
+    testWidgets('loops the four water-ice idle frames and stops outside S1', (
+      tester,
+    ) async {
+      await _pumpFrozen(tester);
+      for (var frame = 1; frame <= 4; frame++) {
+        expect(_frozenAsset(tester), frames.idle(frame));
+        await tester.pump(const Duration(milliseconds: 125));
+      }
+      expect(_frozenAsset(tester), frames.idle(1));
+
+      await _pumpFrozen(tester, progress: .25);
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(_frozenAsset(tester), frames.stage(2));
+    });
+
+    testWidgets('a warmed impact plays the water-ice hit and drops HP once', (
+      tester,
+    ) async {
+      await warmDepositFrames(tester, frames);
+      await _pumpFrozen(tester);
+      final maxHp = miningResourceMaxHp(_frozenDeposit.size);
+      expect(_frozenHpText(tester), '$maxHp/$maxHp');
+
+      await _pumpFrozen(tester, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 240));
+      expect(_frozenAsset(tester), frames.hit(1));
+      await tester.pump(const Duration(milliseconds: 84));
+      expect(_frozenAsset(tester), frames.hit(2));
+      await tester.pump(const Duration(milliseconds: 84));
+      expect(_frozenAsset(tester), frames.hit(3));
+
+      await tester.pump(const Duration(milliseconds: 62));
+      expect(find.byKey(_frozenDamageKey()), findsOneWidget);
+      expect(_frozenHpText(tester), '${maxHp - 10}/$maxHp');
+      await tester.pump(const Duration(seconds: 1));
+      expect(_frozenHpText(tester), '${maxHp - 10}/$maxHp');
+      expect(find.byKey(_frozenDamageKey()), findsNothing);
+    }, skip: kIsWeb);
+
+    testWidgets(
+      'crossing into S4 plays the water-ice exhaust and settles on S4',
+      (tester) async {
+        await warmDepositFrames(tester, frames);
+        await _pumpFrozen(tester, progress: .899);
+        expect(_frozenAsset(tester), frames.stage(3));
+
+        await _pumpFrozen(tester, progress: .90, impactSequence: 1);
+        await tester.pump(const Duration(milliseconds: 240));
+        for (var frame = 1; frame <= 4; frame++) {
+          expect(_frozenAsset(tester), frames.exhaust(frame));
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        expect(_frozenAsset(tester), frames.stage(4));
+      },
+      skip: kIsWeb,
+    );
+
+    testWidgets('a cold-cache impact is dropped with full HP and no label', (
+      tester,
+    ) async {
+      final maxHp = miningResourceMaxHp(_frozenDeposit.size);
+      await _pumpFrozen(tester);
+      await _pumpFrozen(tester, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(_frozenHpText(tester), '$maxHp/$maxHp');
+      expect(find.byKey(_frozenDamageKey()), findsNothing);
+      expect({
+        for (var f = 1; f <= 4; f++) frames.idle(f),
+      }, contains(_frozenAsset(tester)));
+    });
+
+    testWidgets('reduced motion shows the static plate and a still arm', (
+      tester,
+    ) async {
+      Matrix4 arm() => tester
+          .widget<Transform>(
+            find.byKey(
+              Key(
+                'frozen-basin-robot-arm-transform-'
+                '${_frozenCell.x}-${_frozenCell.y}',
+              ),
+            ),
+          )
+          .transform;
+      await _pumpFrozen(tester, reducedMotion: true);
+      final rest = arm();
+      await _pumpFrozen(tester, reducedMotion: true, impactSequence: 1);
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(_frozenAsset(tester), frames.stage(1));
+      expect(arm(), equals(rest));
+    });
   });
 }

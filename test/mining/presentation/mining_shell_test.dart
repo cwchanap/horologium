@@ -14,6 +14,7 @@ import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/mining_shell.dart';
+import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/fake_background_music_player.dart';
@@ -159,6 +160,32 @@ final _freeLandingDeployCell = deployableMiningCells(
 ).firstWhere((cell) => cell != landingRigCell);
 
 const frozenRigCell = MiningGridCell(4, 2);
+
+/// Homeworld mastered, Lunar Frontier unlocked and active at Surveying 3,
+/// with one T1 rig mining Frozen Basin from [frozenRigCell].
+MiningSave deployedFrozenBasinState(
+  DateTime now, {
+  double cargo = 0,
+  bool withRig = true,
+}) {
+  final base = homeworldMasteredState(now, surveying: 3);
+  return base.copyWith(
+    unlockedPlanetIds: {MiningPlanetId.homeworld, MiningPlanetId.lunarFrontier},
+    activePlanetId: MiningPlanetId.lunarFrontier,
+    sites: {
+      ...base.sites,
+      MiningSiteId.frozenBasin: base.sites[MiningSiteId.frozenBasin]!.copyWith(
+        unlocked: true,
+        commissioned: true,
+        storedAmount: cargo,
+        rigPlacements: [
+          if (withRig)
+            MiningRigPlacement(tier: RigTier.t1, cell: frozenRigCell),
+        ],
+      ),
+    },
+  );
+}
 
 /// Surveying-0 legal deploy cell for Carbon Ridge, used to prove dock
 /// selection does not leak across sites.
@@ -1697,7 +1724,7 @@ void main() {
       soundEffectPlayer: effects,
     );
     addTearDown(audio.dispose);
-    await warmGoldFrames(tester);
+    await warmDepositFrames(tester, MiningDepositFrames.gold);
     await pumpShell(
       tester,
       repository: repository,
@@ -1717,6 +1744,192 @@ void main() {
       'audio/mining.wav',
     ]);
   }, skip: kIsWeb);
+
+  group('Frozen Basin impacts', () {
+    int impactSequence(WidgetTester tester) => tester
+        .widget<MineSiteScreen>(find.byType(MineSiteScreen))
+        .impactSequence;
+
+    Future<void> openFrozenBasin(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('site-card-frozenBasin-enter')));
+      await tester.pump();
+    }
+
+    testWidgets('passive production strikes once and plays the mining cue', (
+      tester,
+    ) async {
+      final clock = TestClock(_start);
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedFrozenBasinState(clock.now));
+      final effects = FakeBackgroundMusicPlayer();
+      final audio = AudioManager(
+        backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+        soundEffectPlayer: effects,
+      );
+      addTearDown(audio.dispose);
+      await warmDepositFrames(tester, MiningDepositFrames.waterIce);
+      await pumpShell(
+        tester,
+        repository: repository,
+        clock: clock,
+        audioManager: audio,
+      );
+      await openFrozenBasin(tester);
+
+      final before = impactSequence(tester);
+      await pumpMiningTick(tester, clock);
+      expect(impactSequence(tester) - before, 1);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(effects.playedAssets, [
+        'audio/tap.wav',
+        'audio/tap.wav',
+        'audio/mining.wav',
+      ]);
+    }, skip: kIsWeb);
+
+    testWidgets('closed Frozen Basin production emits no impact', (
+      tester,
+    ) async {
+      final clock = TestClock(_start);
+      final initial = deployedFrozenBasinState(clock.now);
+      final repository = CountingMiningSaveRepository();
+      await repository.save(
+        initial.copyWith(
+          sites: {
+            ...initial.sites,
+            MiningSiteId.titaniumHighlands: initial
+                .sites[MiningSiteId.titaniumHighlands]!
+                .copyWith(unlocked: true, commissioned: true),
+          },
+        ),
+      );
+      await pumpShell(tester, repository: repository, clock: clock);
+      final titanium = find.byKey(
+        const Key('site-card-titaniumHighlands-enter'),
+      );
+      await tester.ensureVisible(titanium);
+      await tester.tap(titanium);
+      await tester.pump();
+
+      final before = impactSequence(tester);
+      await pumpMiningTick(tester, clock);
+      expect(impactSequence(tester) - before, 0);
+      expect(
+        shellHandles(
+          tester,
+        ).controller.state.sites[MiningSiteId.frozenBasin]!.storedAmount,
+        greaterThan(0),
+      );
+    });
+
+    testWidgets('unrigged Frozen Basin emits no impact', (tester) async {
+      final clock = TestClock(_start);
+      final repository = CountingMiningSaveRepository();
+      await repository.save(
+        deployedFrozenBasinState(clock.now, withRig: false),
+      );
+      await pumpShell(tester, repository: repository, clock: clock);
+      await openFrozenBasin(tester);
+
+      final before = impactSequence(tester);
+      await pumpMiningTick(tester, clock);
+      expect(impactSequence(tester) - before, 0);
+    });
+
+    testWidgets('already-full Frozen Basin emits no impact', (tester) async {
+      final clock = TestClock(_start);
+      final content = MiningContentRegistry.stellarMining();
+      final capacity = content.effectiveSiteCapacity(MiningSiteId.frozenBasin, [
+        RigTier.t1,
+      ], 0);
+      final repository = CountingMiningSaveRepository();
+      await repository.save(
+        deployedFrozenBasinState(clock.now, cargo: capacity),
+      );
+      await pumpShell(tester, repository: repository, clock: clock);
+      await openFrozenBasin(tester);
+
+      final before = impactSequence(tester);
+      await pumpMiningTick(tester, clock);
+      expect(impactSequence(tester) - before, 0);
+    });
+
+    testWidgets('lifecycle resume emits no Frozen Basin impact', (
+      tester,
+    ) async {
+      final clock = TestClock(_start);
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedFrozenBasinState(clock.now));
+      await pumpShell(tester, repository: repository, clock: clock);
+      await openFrozenBasin(tester);
+
+      final before = impactSequence(tester);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      clock.now = clock.now.add(const Duration(minutes: 10));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump();
+
+      expect(impactSequence(tester) - before, 0);
+      expect(
+        shellHandles(
+          tester,
+        ).controller.state.sites[MiningSiteId.frozenBasin]!.storedAmount,
+        greaterThan(0),
+      );
+    });
+
+    testWidgets(
+      'leaving Landing Basin for Frozen Basin waits for the next tick',
+      (tester) async {
+        final clock = TestClock(_start);
+        final frozen = deployedFrozenBasinState(clock.now);
+        final repository = CountingMiningSaveRepository();
+        await repository.save(
+          frozen.copyWith(
+            activePlanetId: MiningPlanetId.homeworld,
+            sites: {
+              ...frozen.sites,
+              MiningSiteId.landingBasin: frozen
+                  .sites[MiningSiteId.landingBasin]!
+                  .copyWith(
+                    rigPlacements: [
+                      MiningRigPlacement(
+                        tier: RigTier.t1,
+                        cell: landingRigCell,
+                      ),
+                    ],
+                  ),
+            },
+          ),
+        );
+        await pumpShell(tester, repository: repository, clock: clock);
+        await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+        await tester.pump();
+        await pumpMiningTick(tester, clock);
+
+        await tester.tap(find.byKey(const Key('mining-nav-stellarMap')));
+        await tester.pump();
+        final travel = find.byKey(
+          const Key('mining-stellar-map-travel-lunarFrontier'),
+        );
+        await tester.ensureVisible(travel);
+        await tester.tap(travel);
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(find.byKey(const Key('mining-nav-siteDeck')));
+        await tester.pump();
+        await openFrozenBasin(tester);
+
+        final opened = impactSequence(tester);
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(impactSequence(tester), opened);
+        await pumpMiningTick(tester, clock);
+        expect(impactSequence(tester) - opened, 1);
+      },
+    );
+  });
 
   testWidgets('tapping an empty dock bay rejects with guidance', (
     tester,

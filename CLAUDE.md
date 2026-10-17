@@ -31,11 +31,11 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
   is no Flame runtime in this ownership path.
 
 - `MiningNextGoalView` is a stateless Site Deck read model derived from the display state; the strip only navigates through existing shell paths and never mutates, persists, or adds tutorial state.
-- Landing Basin is the first authored animated mining site. Its transient shell-owned `impactSequence` presents passive one-second deterministic production; animation is not an economy clock.
+- Landing Basin and Frozen Basin are the authored animated mining sites, selected by the closed `MiningVisuals.depositFramesFor` switch. Their transient shell-owned `impactSequence` presents passive one-second deterministic production; animation is not an economy clock.
 - `MiningController`, `MiningSimulation`, `MineSiteView`, and `_displayState` remain authoritative. User-initiated mutations may publish their accrued state immediately and do not fabricate mining impacts.
-- Landing Basin robot/deposit animation never calls the controller or persists animation/variant state. Cold-load/resume production is never replayed as historical strikes.
-- Landing Basin resource HP and strike-damage labels are transient visual-layer state driven by the existing valid-contact latch; they never feed persistence or production.
-- Add another site-specific visual path only when a concrete second animated site needs it; do not pre-build a generic resource visual registry.
+- Animated-site robot/deposit animation never calls the controller or persists animation/variant state. Cold-load/resume production is never replayed as historical strikes.
+- Animated-site resource HP and strike-damage labels are transient visual-layer state driven by the existing valid-contact latch; they never feed persistence or production.
+- Add an animated site only with an approved frame family and a new `depositFramesFor` case; there is no visual registry.
 
 Mine Site is a Flutter InteractiveViewer over a deterministic 50×50 grid.
 Each site derives 100 1×1/2×2/3×3 resource bodies from its site ID; resources
@@ -43,9 +43,9 @@ are not persisted. Rigs occupy one cell and mine their unique orthogonally
 adjacent resource. Free unique perimeter cells are the only resource-level
 placement capacity, sites remain capped at four rigs, static perimeter geometry
 is cached with content, placement legality stays centralized in mining_grid.dart,
-and production remains aggregate/deterministic in MiningSimulation. Landing
-Basin remains the only site-specific animated visual layer and only mined
-resources participate in its per-frame animation builder. An invalid persisted
+and production remains aggregate/deterministic in MiningSimulation. Animated
+sites share one visual layer and only mined resources participate in its
+per-frame animation builder. An invalid persisted
 placement resets the complete mining save through the existing recovery
 boundary; there is no migration.
 
@@ -113,7 +113,7 @@ contract change.
 `audio.musicVolume`, and `audio.soundEnabled`, and the shell
 loads preferences, forwards gestures/lifecycle events, supplies Settings, and
 disposes it. Mining code must not create audio players independently.
-The Landing Basin visual reports its visible strike through `onMiningImpact`;
+An animated site's visual reports its visible strike through `onMiningImpact`;
 the shell decides whether to play it. Cargo-full cues are foreground transitions,
 and commissioning/mastery cues follow successful persistence. Taps and mining
 must not interrupt action/milestone audio; offline accrual never replays SFX.

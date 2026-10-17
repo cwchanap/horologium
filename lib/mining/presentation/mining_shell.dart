@@ -17,6 +17,7 @@ import 'package:horologium/mining/next_goal_view.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_settings_sheet.dart';
+import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/offline_return_sheet.dart';
 import 'package:horologium/mining/presentation/site_deck_screen.dart';
@@ -66,7 +67,7 @@ class _MiningShellState extends State<MiningShell>
   bool _recoverySnackBarScheduled = false;
   DockBayId? _selectedBayId;
   MiningSiteId? _openSiteId;
-  int _landingBasinImpactSequence = 0;
+  int _miningImpactSequence = 0;
   MiningNavigationDestination _selectedDestination =
       MiningNavigationDestination.siteDeck;
 
@@ -120,14 +121,14 @@ class _MiningShellState extends State<MiningShell>
 
     _controller.refresh();
 
-    final landing = _controller.state.sites[MiningSiteId.landingBasin]!;
-    final hasRig = landing.rigPlacements.isNotEmpty;
-
-    if (_openSiteId == MiningSiteId.landingBasin &&
-        hasRig &&
-        landing.storedAmount >
-            before.sites[MiningSiteId.landingBasin]!.storedAmount) {
-      _landingBasinImpactSequence++;
+    final openSiteId = _openSiteId;
+    if (openSiteId != null &&
+        MiningVisuals.depositFramesFor(openSiteId) != null) {
+      final site = _controller.state.sites[openSiteId]!;
+      if (site.rigPlacements.isNotEmpty &&
+          site.storedAmount > before.sites[openSiteId]!.storedAmount) {
+        _miningImpactSequence++;
+      }
     }
 
     _refreshPresentation();
@@ -152,8 +153,10 @@ class _MiningShellState extends State<MiningShell>
   }
 
   void _playMiningImpact() {
+    final openSiteId = _openSiteId;
     if (mounted &&
-        _openSiteId == MiningSiteId.landingBasin &&
+        openSiteId != null &&
+        MiningVisuals.depositFramesFor(openSiteId) != null &&
         (ModalRoute.of(context)?.isCurrent ?? false)) {
       unawaited(_audioManager.playSound(GameSound.mining));
     }
@@ -694,7 +697,7 @@ class _MiningShellState extends State<MiningShell>
           fleetDock: fleetDock,
           cash: _displayState.cash,
           reducedMotion: _reducedMotion,
-          impactSequence: _landingBasinImpactSequence,
+          impactSequence: _miningImpactSequence,
           onMiningImpact: _playMiningImpact,
           onGridCellTap: _handleSiteGridCellTap,
           onBayTap: _handleDockBayTap,
