@@ -152,7 +152,23 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('hosts the static object layer for non-Landing sites', (
+  testWidgets('hosts the Frozen Basin animated layer and no static layer', (
+    tester,
+  ) async {
+    await _pumpMap(tester, _view(MiningSiteId.frozenBasin), (_) {});
+
+    expect(
+      find.byKey(const Key('frozen-basin-grid-visual-layer')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('static-mining-grid-visual-layer')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('hosts the static object layer for non-animated sites', (
     tester,
   ) async {
     final taps = <MiningGridCell>[];
@@ -162,10 +178,13 @@ void main() {
       find.byKey(const Key('static-mining-grid-visual-layer')),
       findsOneWidget,
     );
-    expect(
-      find.byKey(const Key('landing-basin-grid-visual-layer')),
-      findsNothing,
-    );
+    for (final key in [
+      'landing-basin-grid-visual-layer',
+      'frozen-basin-grid-visual-layer',
+      'carbon-ridge-grid-visual-layer',
+    ]) {
+      expect(find.byKey(Key(key)), findsNothing);
+    }
     expect(find.byKey(const Key('mining-deposit-1-1-2')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

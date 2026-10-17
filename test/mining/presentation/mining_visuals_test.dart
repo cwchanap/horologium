@@ -50,42 +50,30 @@ void main() {
     expect(MiningTheme.warning, const Color(0xFFFFD54A));
   });
 
-  test('maps staged gold plates and frame paths by closed identity', () {
-    for (final entry in {
-      1: 'assets/images/mining/nodes/node-gold-s1.png',
-      2: 'assets/images/mining/nodes/node-gold-s2.png',
-      3: 'assets/images/mining/nodes/node-gold-s3.png',
-      4: 'assets/images/mining/nodes/node-gold-s4.png',
-    }.entries) {
-      expect(MiningDepositFrames.gold.stage(entry.key), entry.value);
-    }
-    for (final entry in {
-      1: 'assets/images/mining/nodes/node-gold-idle-01.png',
-      2: 'assets/images/mining/nodes/node-gold-idle-02.png',
-      3: 'assets/images/mining/nodes/node-gold-idle-03.png',
-      4: 'assets/images/mining/nodes/node-gold-idle-04.png',
-    }.entries) {
-      expect(MiningDepositFrames.gold.idle(entry.key), entry.value);
-    }
-    for (final entry in {
-      1: 'assets/images/mining/nodes/node-gold-hit-01.png',
-      2: 'assets/images/mining/nodes/node-gold-hit-02.png',
-      3: 'assets/images/mining/nodes/node-gold-hit-03.png',
-    }.entries) {
-      expect(MiningDepositFrames.gold.hit(entry.key), entry.value);
-    }
-    for (final entry in {
-      1: 'assets/images/mining/nodes/node-gold-exhaust-01.png',
-      2: 'assets/images/mining/nodes/node-gold-exhaust-02.png',
-      3: 'assets/images/mining/nodes/node-gold-exhaust-03.png',
-      4: 'assets/images/mining/nodes/node-gold-exhaust-04.png',
-    }.entries) {
-      expect(MiningDepositFrames.gold.exhaust(entry.key), entry.value);
-    }
-    expect(() => MiningDepositFrames.gold.idle(0), throwsRangeError);
-    expect(() => MiningDepositFrames.gold.hit(4), throwsRangeError);
-    expect(() => MiningDepositFrames.gold.exhaust(5), throwsRangeError);
-  });
+  for (final family in MiningDepositFrames.values) {
+    test(
+      'maps staged ${family.slug} plates and frame paths by closed identity',
+      () {
+        const nodes = 'assets/images/mining/nodes';
+        for (var i = 1; i <= 4; i++) {
+          expect(family.stage(i), '$nodes/node-${family.slug}-s$i.png');
+          expect(family.idle(i), '$nodes/node-${family.slug}-idle-0$i.png');
+          expect(
+            family.exhaust(i),
+            '$nodes/node-${family.slug}-exhaust-0$i.png',
+          );
+        }
+        for (var i = 1; i <= 3; i++) {
+          expect(family.hit(i), '$nodes/node-${family.slug}-hit-0$i.png');
+        }
+        expect(() => family.stage(0), throwsRangeError);
+        expect(() => family.stage(5), throwsRangeError);
+        expect(() => family.idle(0), throwsRangeError);
+        expect(() => family.hit(4), throwsRangeError);
+        expect(() => family.exhaust(5), throwsRangeError);
+      },
+    );
+  }
 
   test('lists every frame of a family in precache order', () {
     expect(MiningDepositFrames.gold.all, [
@@ -95,24 +83,16 @@ void main() {
       for (var i = 1; i <= 4; i++) MiningDepositFrames.gold.exhaust(i),
     ]);
     expect(MiningDepositFrames.gold.all.toSet(), hasLength(15));
-    expect(
-      MiningDepositFrames.waterIce.stage(2),
-      'assets/images/mining/nodes/node-water-ice-s2.png',
-    );
-    expect(
-      MiningDepositFrames.waterIce.hit(1),
-      'assets/images/mining/nodes/node-water-ice-hit-01.png',
-    );
-    expect(() => MiningDepositFrames.waterIce.stage(0), throwsRangeError);
+    expect(MiningDepositFrames.waterIce.all.toSet(), hasLength(15));
   });
 
-  test('animates only Landing Basin through the closed frame switch', () {
+  test('animates Landing Basin and Frozen Basin through the closed switch', () {
     for (final id in MiningSiteId.values) {
-      expect(
-        MiningVisuals.depositFramesFor(id),
-        id == MiningSiteId.landingBasin ? MiningDepositFrames.gold : isNull,
-        reason: id.name,
-      );
+      expect(MiningVisuals.depositFramesFor(id), switch (id) {
+        MiningSiteId.landingBasin => MiningDepositFrames.gold,
+        MiningSiteId.frozenBasin => MiningDepositFrames.waterIce,
+        _ => isNull,
+      }, reason: id.name);
     }
   });
 
@@ -166,12 +146,7 @@ void main() {
       }
     }
     final framePaths = [
-      for (var frame = 1; frame <= 4; frame++)
-        MiningDepositFrames.gold.idle(frame),
-      for (var frame = 1; frame <= 3; frame++)
-        MiningDepositFrames.gold.hit(frame),
-      for (var frame = 1; frame <= 4; frame++)
-        MiningDepositFrames.gold.exhaust(frame),
+      for (final family in MiningDepositFrames.values) ...family.all,
     ];
     for (final planet in content.planets.values) {
       await rootBundle.load(planet.planetAsset);
@@ -187,9 +162,6 @@ void main() {
       await rootBundle.load(MiningVisuals.rigAsset(tier));
       await rootBundle.load(MiningVisuals.miningRobotBodyAsset(tier));
       await rootBundle.load(MiningVisuals.miningRobotArmAsset(tier));
-    }
-    for (var stage = 1; stage <= 4; stage++) {
-      await rootBundle.load(MiningDepositFrames.gold.stage(stage));
     }
     for (final path in framePaths) {
       await rootBundle.load(path);
@@ -213,5 +185,22 @@ void main() {
       expect(image!.width, 512, reason: path);
       expect(image.height, 512, reason: path);
     }
+  }, skip: kIsWeb);
+
+  // Same host-only reason as above. The copied water-ice frames must stay
+  // byte-identical to their sources so the stage and beat edges never pop.
+  testWidgets('water-ice copy frames match their source plates', (
+    tester,
+  ) async {
+    Future<List<int>> bytes(String path) async =>
+        (await rootBundle.load(path)).buffer.asUint8List();
+    const frames = MiningDepositFrames.waterIce;
+    final source = await bytes(
+      content.site(MiningSiteId.frozenBasin).depositAsset,
+    );
+    expect(await bytes(frames.stage(1)), source);
+    expect(await bytes(frames.idle(1)), source);
+    expect(await bytes(frames.exhaust(1)), await bytes(frames.stage(3)));
+    expect(await bytes(frames.exhaust(4)), await bytes(frames.stage(4)));
   }, skip: kIsWeb);
 }
