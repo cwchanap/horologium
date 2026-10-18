@@ -267,7 +267,7 @@ void main() {
     const longGoal = MiningNextGoalView(
       kind: MiningGoalKind.commissionSite,
       title: 'Commission Titanium Highlands',
-      detail: 'Last Mars Frontier site: mastery pays +25,000 cash.',
+      detail: 'Last Mars Frontier site: mastery pays +20.00M cash.',
       target: MiningGoalTarget.mineSite(MiningSiteId.titaniumHighlands),
       cash: 12_000,
       cashCost: 25_000,
