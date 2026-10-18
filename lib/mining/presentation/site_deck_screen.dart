@@ -349,7 +349,7 @@ class _PrototypeSiteCard extends StatelessWidget {
     final locked = !card.isUnlocked && !card.canUnlock;
     return Semantics(
       container: true,
-      label: '${card.name}, ${_siteCardLabel(card)} site',
+      label: _siteCardSemantics(card),
       child: Container(
         key: Key('site-card-${card.id.name}'),
         height: height,
@@ -760,7 +760,8 @@ class _SiteProgress extends StatelessWidget {
               child: Text(
                 card.isCargoFull
                     ? 'FULL · SELL TO RESUME'
-                    : '${(progress * 100).clamp(0, 100).round()}%',
+                    : '${(progress * 100).clamp(0, 100).round()}%'
+                          '${card.timeToFull == null ? '' : ' · FULL IN ${formatMiningDuration(card.timeToFull!).toUpperCase()}'}',
                 maxLines: 1,
                 style: const TextStyle(
                   color: MiningTheme.warning,
@@ -815,6 +816,13 @@ String _siteCardLabel(MiningSiteCardView card) => card.isCargoFull
         MiningSiteCardState.idle => 'IDLE',
         MiningSiteCardState.operational => 'OPERATIONAL',
       };
+
+/// Card semantics: name and state, plus the time to full while producing.
+String _siteCardSemantics(MiningSiteCardView card) {
+  final timeToFull = card.timeToFull;
+  return '${card.name}, ${_siteCardLabel(card)} site'
+      '${timeToFull == null ? '' : ', full in ${formatMiningDuration(timeToFull)}'}';
+}
 
 /// Planet-wide Sell action for Site Deck chrome. Enabled only by
 /// `view.sale.canSell`; carries `view.sale.label` for semantics and shows the
@@ -918,10 +926,11 @@ class _SiteCard extends StatelessWidget {
               'SELL TO RESUME'
         : card.rate <= 0
         ? 'IDLE'
-        : '${card.rate.toStringAsFixed(2)}/s  ·  ${_amount(card.cargo)} / ${_amount(card.capacity)}';
+        : '${card.rate.toStringAsFixed(2)}/s  ·  ${_amount(card.cargo)} / ${_amount(card.capacity)}'
+              '${card.timeToFull == null ? '' : '\nFULL IN ${formatMiningDuration(card.timeToFull!).toUpperCase()}'}';
     return Semantics(
       container: true,
-      label: '${card.name}, $stateLabel site',
+      label: _siteCardSemantics(card),
       child: Container(
         key: Key('site-card-${card.id.name}'),
         clipBehavior: Clip.antiAlias,

@@ -12,13 +12,11 @@ class OfflineReturnSheet extends StatelessWidget {
     super.key,
     required this.summary,
     required this.content,
-    this.logisticsLevel,
     this.cash = 0,
   });
 
   final OfflineProductionSummary summary;
   final MiningContentRegistry content;
-  final int? logisticsLevel;
   final int cash;
 
   @override
@@ -220,7 +218,7 @@ class OfflineReturnSheet extends StatelessWidget {
       ),
       const SizedBox(height: 10),
       Text(
-        'Mining ran\n${_formatDuration(summary.elapsedUsed)}',
+        'Away\n${formatMiningDuration(summary.elapsedUsed)}',
         style: TextStyle(
           color: Colors.white,
           fontSize: compact ? 26 : 30,
@@ -246,7 +244,7 @@ class OfflineReturnSheet extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Capped at ${_formatDuration(summary.elapsedUsed)}${logisticsLevel == null ? '' : ' — Logistics LV $logisticsLevel'}',
+                'Capped at ${formatMiningDuration(summary.elapsedUsed)}.',
                 key: const Key('offline-return-cap'),
                 style: const TextStyle(
                   fontFamily: 'IBM Plex Mono',
@@ -392,7 +390,7 @@ class OfflineReturnSheet extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '+${entry.value.toStringAsFixed(1)}',
+                    '+${formatMiningUnits(entry.value)}',
                     style: const TextStyle(
                       color: MiningTheme.accent,
                       fontSize: 17,
@@ -465,15 +463,5 @@ class OfflineReturnSheet extends StatelessWidget {
               errorBuilder: (_, _, _) => icon,
             ),
     );
-  }
-
-  static String _formatDuration(Duration duration) {
-    if (duration.inHours > 0) {
-      return '${duration.inHours}h ${duration.inMinutes.remainder(60).toString().padLeft(2, '0')}m';
-    }
-    if (duration.inMinutes > 0) {
-      return '${duration.inMinutes}m ${duration.inSeconds.remainder(60)}s';
-    }
-    return '${duration.inSeconds}s';
   }
 }

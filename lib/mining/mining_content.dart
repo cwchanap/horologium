@@ -78,6 +78,27 @@ String formatMiningCash(int amount) {
   return _groupThousands(amount);
 }
 
+/// Formats resource amounts: one truncated decimal below 1,000 (`90.0`),
+/// whole units with separators from 1,000 (`12,960`), then the cash rule's
+/// compact `M`/`B`.
+String formatMiningUnits(double amount) {
+  if (amount >= 1000) return formatMiningCash(amount.floor());
+  // The epsilon keeps binary fractions such as 0.3 from truncating to 0.2.
+  return ((amount * 10 + 1e-9).floorToDouble() / 10).toStringAsFixed(1);
+}
+
+/// Formats a wait in whole minutes, rounding up so a nonzero wait never
+/// reads as finished: `<1m`, `14m`, `1h 52m`, `24h 00m`.
+String formatMiningDuration(Duration duration) {
+  if (duration <= Duration.zero) return '0m';
+  if (duration < const Duration(minutes: 1)) return '<1m';
+  final minutes =
+      (duration.inMicroseconds + Duration.microsecondsPerMinute - 1) ~/
+      Duration.microsecondsPerMinute;
+  if (minutes < 60) return '${minutes}m';
+  return '${minutes ~/ 60}h ${(minutes % 60).toString().padLeft(2, '0')}m';
+}
+
 String _compactAmount(int amount, int unit, String suffix) {
   final hundredths = amount ~/ (unit ~/ 100);
   final cents = (hundredths % 100).toString().padLeft(2, '0');

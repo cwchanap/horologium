@@ -478,6 +478,60 @@ void main() {
     );
   });
 
+  testWidgets('shows time to full on a producing card at phone text scale', (
+    tester,
+  ) async {
+    final state = _stateWith(
+      cash: 16_000_000,
+      sites: {
+        MiningSiteId.landingBasin: _progress(
+          unlocked: true,
+          commissioned: true,
+          storedAmount: 45,
+          rigs: [MiningRigPlacement(tier: RigTier.t1, cell: _landingCells[0])],
+        ),
+      },
+    );
+    await _pumpDeck(
+      tester,
+      view: _deckView(state),
+      size: const Size(360, 640),
+      textScale: 1.3,
+    );
+    expect(tester.takeException(), isNull);
+
+    final copy = find.text('50% · FULL IN 2M');
+    expect(copy, findsOneWidget);
+    expect(
+      tester.renderObject<RenderParagraph>(copy).didExceedMaxLines,
+      isFalse,
+    );
+    expect(
+      find.bySemanticsLabel(
+        RegExp(r'Landing Basin, OPERATIONAL site, full in 2m'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('adds a FULL IN line to a producing landscape card', (
+    tester,
+  ) async {
+    final state = _stateWith(
+      sites: {
+        MiningSiteId.landingBasin: _progress(
+          unlocked: true,
+          commissioned: true,
+          storedAmount: 45,
+          rigs: [MiningRigPlacement(tier: RigTier.t1, cell: _landingCells[0])],
+        ),
+      },
+    );
+    await _pumpDeck(tester, view: _deckView(state), size: const Size(874, 402));
+    expect(tester.takeException(), isNull);
+    expect(find.text('0.50/s  ·  45 / 90\nFULL IN 2M'), findsOneWidget);
+  });
+
   testWidgets('marks a full landscape card FULL with operational accent', (
     tester,
   ) async {

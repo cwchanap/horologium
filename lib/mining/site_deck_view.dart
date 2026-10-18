@@ -42,6 +42,16 @@ class MiningSiteCardView {
   String get cardAsset => definition.cardAsset;
   bool get isOperational => state == MiningSiteCardState.operational;
   bool get isCargoFull => isOperational && capacity > 0 && cargo >= capacity;
+
+  /// How long until storage is full at the current rate, or `null` when the
+  /// site is not producing or already full.
+  Duration? get timeToFull => !isOperational || rate <= 0 || cargo >= capacity
+      ? null
+      : Duration(
+          microseconds:
+              ((capacity - cargo) / rate * Duration.microsecondsPerSecond)
+                  .ceil(),
+        );
   MiningSiteId? get requiredSite => definition.requiredSite;
   int get requiredSurveyingLevel => definition.requiredSurveyingLevel;
 }

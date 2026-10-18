@@ -111,7 +111,7 @@ Resource amounts on the offline-return sheet reach about 13,000 units per planet
 
 ### 5. Time to full on Site Deck cards
 
-`MiningSiteCardView` gains `Duration? timeToFull`: `(capacity − cargo) / rate` for an operational site with `rate > 0` and room left, else `null`. An operational card that is not full shows a second status line, `FULL IN 1H 52M`, matching the existing two-line `FULL … / SELL TO RESUME` layout. Minutes round up, so the line never says `0M` before the site is full. One shared `formatMiningDuration(Duration)` (`1h 52m`, `14m`, `<1m`) replaces the offline-return sheet's private formatter.
+`MiningSiteCardView` gains `Duration? timeToFull`: `(capacity − cargo) / rate` for an operational site with `rate > 0` and room left, else `null`. An operational card that is not full shows `FULL IN 1H 52M`: as a second status line on the landscape card, matching its two-line `FULL … / SELL TO RESUME` layout, and after the fill percentage on the portrait card (`50% · FULL IN 2M`), where `FULL · SELL TO RESUME` already sits. The card's semantics label adds `, full in 1h 52m`. Minutes round up, so the line never says `0M` before the site is full. One shared `formatMiningDuration(Duration)` (`1h 52m`, `14m`, `<1m`) replaces the offline-return sheet's private formatter.
 
 ### 6. Honest copy
 
