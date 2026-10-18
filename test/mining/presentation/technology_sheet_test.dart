@@ -292,4 +292,53 @@ void main() {
     expect(selectionCalls, 1);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('a 750,000 cost fits the landscape button at text scale 1.3', (
+    tester,
+  ) async {
+    const viewport = Size(874, 402);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = viewport;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: viewport,
+            textScaler: TextScaler.linear(1.3),
+          ),
+          child: Scaffold(
+            body: TechnologySheet(view: _highCostView(), onPurchase: (_) {}),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('750,000'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
 }
+
+TechnologySheetView _highCostView() => TechnologySheetView(
+  tracks: [
+    for (final track in TechnologyTrack.values)
+      TechnologyTrackView(
+        track: track,
+        name: _trackDisplayName(track),
+        level: 4,
+        currentEffect: 'Level 4',
+        nextEffect: 'Level 5',
+        cost: 750000,
+        gateSiteName: null,
+        isGateSatisfied: true,
+        isAffordable: true,
+        isMaxLevel: false,
+        disabledReason: null,
+      ),
+  ],
+);

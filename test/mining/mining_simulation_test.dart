@@ -344,6 +344,7 @@ void main() {
       start.add(const Duration(hours: 30)),
     );
 
+    expect(result.summary.elapsedAway, const Duration(hours: 30));
     expect(result.summary.elapsedUsed, const Duration(hours: 24));
     expect(result.state.lastAccruedAtUtc, start.add(const Duration(hours: 30)));
     expect(result.summary.wasOfflineCapped, isTrue);

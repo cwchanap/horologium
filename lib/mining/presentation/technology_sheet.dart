@@ -364,22 +364,25 @@ class _TechnologySheetState extends State<TechnologySheet> {
           : null,
       child: track.isMaxLevel
           ? const Text('Max Level')
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(
-                  MiningVisuals.cashIcon,
-                  width: 17,
-                  height: 17,
-                  errorBuilder: (_, _, _) => const Icon(Icons.paid),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  formatMiningCash(track.cost!),
-                  semanticsLabel:
-                      'Upgrade for ${formatMiningCash(track.cost!)} cash',
-                ),
-              ],
+          : FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    MiningVisuals.cashIcon,
+                    width: 17,
+                    height: 17,
+                    errorBuilder: (_, _, _) => const Icon(Icons.paid),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    formatMiningCash(track.cost!),
+                    semanticsLabel:
+                        'Upgrade for ${formatMiningCash(track.cost!)} cash',
+                  ),
+                ],
+              ),
             ),
     ),
   );

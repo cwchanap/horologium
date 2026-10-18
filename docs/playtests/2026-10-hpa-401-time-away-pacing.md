@@ -15,7 +15,7 @@ A human pass on a phone, moving the device clock, is still worth doing for feel;
 | Surface | Result |
 | --- | --- |
 | Offline return, part full | `Away 47m`; per-resource rows `+18,289`, `+27,433`; no cap note. |
-| Offline return, 30 h away | `Away 24h 00m`, `Capped at 24h 00m.`, `Storage full: …` per site, rows up to `+56,160`. |
+| Offline return, 30 h away | `Away 24h 00m` (review follow-up: now `Away 30h 00m`, the full time away), `Capped at 24h 00m.`, `Storage full: …` per site, rows up to `+56,160`. |
 | Cash chip | `16.40M`, `16.50M` after a sale, `1.24M`. |
 | Site Deck, portrait | `44% · FULL IN 1H 01M` fits beside the bar. |
 | Site Deck, landscape | `4.35/s · 12,004 / 28,080` over `FULL IN 1H 02M`. |

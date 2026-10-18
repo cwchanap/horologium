@@ -218,7 +218,7 @@ class OfflineReturnSheet extends StatelessWidget {
       ),
       const SizedBox(height: 10),
       Text(
-        'Away\n${formatMiningDuration(summary.elapsedUsed)}',
+        'Away\n${formatMiningDuration(summary.elapsedAway)}',
         style: TextStyle(
           color: Colors.white,
           fontSize: compact ? 26 : 30,
