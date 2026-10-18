@@ -375,8 +375,9 @@ class _TechnologySheetState extends State<TechnologySheet> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${track.cost}',
-                  semanticsLabel: 'Upgrade for ${track.cost} cash',
+                  formatMiningCash(track.cost!),
+                  semanticsLabel:
+                      'Upgrade for ${formatMiningCash(track.cost!)} cash',
                 ),
               ],
             ),

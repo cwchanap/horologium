@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
@@ -83,7 +84,7 @@ class MiningCashChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Cash $cash',
+      label: 'Cash ${formatMiningCash(cash)}',
       child: Container(
         key: const Key('mining-cash-chip'),
         height: compact ? 39 : 46,
@@ -119,10 +120,7 @@ class MiningCashChip extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  cash.toString().replaceAllMapped(
-                    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-                    (_) => ',',
-                  ),
+                  formatMiningCash(cash),
                   style: TextStyle(
                     color: MiningTheme.warning,
                     fontSize: compact ? 19 : 22,
@@ -168,7 +166,7 @@ class MiningCargoGauge extends StatelessWidget {
     final progress = capacity <= 0 ? 0.0 : (cargo / capacity).clamp(0.0, 1.0);
     final label =
         semanticLabel ??
-        'Cargo ${_amount(cargo)} of ${_amount(capacity)}, value $projectedValue cash';
+        'Cargo ${_amount(cargo)} of ${_amount(capacity)}, value ${formatMiningCash(projectedValue)} cash';
     return Semantics(
       button: onPressed != null,
       enabled: onPressed != null,

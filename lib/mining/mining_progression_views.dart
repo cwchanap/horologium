@@ -103,7 +103,7 @@ class TechnologySheetView {
       disabledReason: !gateSatisfied
           ? 'Commission the ${content.site(gateSite).name} site first.'
           : !affordable
-          ? 'Need $cost cash.'
+          ? 'Need ${formatMiningCash(cost)} cash.'
           : null,
       depositAvailability: track == TechnologyTrack.surveying
           ? _depositAvailability(state, content, level)
@@ -384,7 +384,7 @@ class StellarMapView {
     if (requiredMasteryPlanetId != null && definition.unlockCashCost > 0) {
       requirements.add(
         StellarMapRequirementView(
-          label: '${definition.unlockCashCost} cash',
+          label: '${formatMiningCash(definition.unlockCashCost)} cash',
           isSatisfied: state.cash >= definition.unlockCashCost,
         ),
       );

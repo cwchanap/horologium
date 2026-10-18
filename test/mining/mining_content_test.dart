@@ -5,6 +5,22 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
 
 void main() {
+  test('formats cash with separators, then truncated M and B', () {
+    for (final entry in {
+      0: '0',
+      999: '999',
+      1000: '1,000',
+      999999: '999,999',
+      1000000: '1.00M',
+      1250000: '1.25M',
+      16000000: '16.00M',
+      999999999: '999.99M',
+      1000000000: '1.00B',
+    }.entries) {
+      expect(formatMiningCash(entry.key), entry.value, reason: '${entry.key}');
+    }
+  });
+
   test('keeps closed site, bay, and rig identities', () {
     expect(MiningSiteId.values, hasLength(9));
     expect(DockBayId.values.map((id) => id.name), ['b1', 'b2', 'b3', 'b4']);

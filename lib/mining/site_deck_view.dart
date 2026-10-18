@@ -122,7 +122,7 @@ class MiningSaleAffordance {
     final label = isBusy
         ? 'Finishing previous action…'
         : canSell
-        ? 'Sell all cargo for $projectedValue cash.'
+        ? 'Sell all cargo for ${formatMiningCash(projectedValue)} cash.'
         : hasUnsellableCargo
         ? 'Keep mining until cargo is worth at least 1 cash.'
         : 'No cargo to sell.';
@@ -273,7 +273,7 @@ class SiteDeckView {
       return 'Requires Surveying ${definition.requiredSurveyingLevel}.';
     }
     if (state.cash < definition.unlockCost) {
-      return 'Need ${definition.unlockCost} cash.';
+      return 'Need ${formatMiningCash(definition.unlockCost)} cash.';
     }
     return null;
   }

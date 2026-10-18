@@ -409,7 +409,7 @@ void main() {
         expect(lunar.requirements.map((requirement) => requirement.label), [
           'Homeworld sites 0/3',
           'Surveying 3',
-          '2500 cash',
+          '2,500 cash',
         ]);
       },
     );

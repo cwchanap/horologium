@@ -69,8 +69,22 @@ class MiningSiteDefinition {
   final String? discoveryText;
 }
 
-/// Formats [amount] with thousands separators, e.g. `25000` -> `25,000`.
-String formatMiningCash(int amount) => amount.toString().replaceAllMapped(
+/// Formats player-visible cash: thousands separators below one million
+/// (`25000` -> `25,000`), then two truncated decimals with `M` or `B`
+/// (`16000000` -> `16.00M`), so a shown amount never exceeds the real one.
+String formatMiningCash(int amount) {
+  if (amount >= 1000000000) return _compactAmount(amount, 1000000000, 'B');
+  if (amount >= 1000000) return _compactAmount(amount, 1000000, 'M');
+  return _groupThousands(amount);
+}
+
+String _compactAmount(int amount, int unit, String suffix) {
+  final hundredths = amount ~/ (unit ~/ 100);
+  final cents = (hundredths % 100).toString().padLeft(2, '0');
+  return '${_groupThousands(hundredths ~/ 100)}.$cents$suffix';
+}
+
+String _groupThousands(int amount) => amount.toString().replaceAllMapped(
   RegExp(r'\B(?=(\d{3})+(?!\d))'),
   (_) => ',',
 );

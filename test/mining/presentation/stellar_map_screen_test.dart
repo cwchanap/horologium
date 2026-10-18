@@ -254,7 +254,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(of: mars, matching: find.text('20000')),
+      find.descendant(of: mars, matching: find.text('20,000')),
       findsOneWidget,
     );
     expect(
@@ -305,7 +305,7 @@ void main() {
             .getRect(find.descendant(of: mars, matching: find.text('LV 5')))
             .bottom,
         tester
-            .getRect(find.descendant(of: mars, matching: find.text('20000')))
+            .getRect(find.descendant(of: mars, matching: find.text('20,000')))
             .bottom,
         tester
             .getRect(

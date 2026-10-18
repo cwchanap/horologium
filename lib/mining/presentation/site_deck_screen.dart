@@ -562,7 +562,7 @@ class _PrototypeSiteCard extends StatelessWidget {
                                         height: 18,
                                       ),
                                       const SizedBox(width: 7),
-                                      Text('${card.unlockCost}'),
+                                      Text(formatMiningCash(card.unlockCost)),
                                     ],
                                   ),
                                 ),
@@ -662,7 +662,7 @@ class _LockedSite extends StatelessWidget {
                     Image.asset(MiningVisuals.cashIcon, width: 19, height: 19),
                     const SizedBox(width: 8),
                     Text(
-                      '${card.unlockCost}',
+                      formatMiningCash(card.unlockCost),
                       style: const TextStyle(
                         color: MiningTheme.gate,
                         fontSize: 13,
@@ -875,7 +875,7 @@ class _SiteDeckSellAction extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              '+${view.projectedValue}',
+              '+${formatMiningCash(view.projectedValue)}',
               maxLines: 1,
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
             ),
@@ -1097,7 +1097,7 @@ class _SiteCard extends StatelessWidget {
                               child: FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Text(
-                                  'UNLOCK · ${card.unlockCost}',
+                                  'UNLOCK · ${formatMiningCash(card.unlockCost)}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
