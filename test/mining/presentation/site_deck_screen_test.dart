@@ -535,6 +535,32 @@ void main() {
     );
   });
 
+  testWidgets('keeps small landscape cargo unseparated', (tester) async {
+    for (final (stored, status) in const [
+      (0.0, '0.50/s  ·  0 / 3,600\nFULL IN 2H 00M'),
+      (12.5, '0.50/s  ·  12.5 / 3,600\nFULL IN 2H 00M'),
+    ]) {
+      final state = _stateWith(
+        sites: {
+          MiningSiteId.landingBasin: _progress(
+            unlocked: true,
+            commissioned: true,
+            storedAmount: stored,
+            rigs: [
+              MiningRigPlacement(tier: RigTier.t1, cell: _landingCells[0]),
+            ],
+          ),
+        },
+      );
+      await _pumpDeck(
+        tester,
+        view: _deckView(state),
+        size: const Size(874, 402),
+      );
+      expect(find.text(status), findsOneWidget);
+    }
+  });
+
   testWidgets('marks a full landscape card FULL with operational accent', (
     tester,
   ) async {
