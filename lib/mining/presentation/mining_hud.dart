@@ -213,13 +213,21 @@ class MiningCargoGauge extends StatelessWidget {
                         size: size < 68 ? 16 : (size < 80 ? 18 : 20),
                       ),
                     ),
-                    Text(
-                      _amount(cargo),
-                      maxLines: 1,
-                      style: TextStyle(
-                        color: MiningTheme.accent,
-                        fontSize: size < 68 ? 9 : (size < 80 ? 12 : 14),
-                        fontWeight: FontWeight.w900,
+                    // Hour-long storage holds tens of thousands of units;
+                    // the amount scales down rather than clipping.
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: size * .14),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          _amount(cargo),
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: MiningTheme.accent,
+                            fontSize: size < 68 ? 9 : (size < 80 ? 12 : 14),
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                       ),
                     ),
                     if (rate case final value?)
@@ -241,7 +249,9 @@ class MiningCargoGauge extends StatelessWidget {
     );
   }
 
-  static String _amount(double value) => value == value.roundToDouble()
+  static String _amount(double value) => value >= 1000
+      ? formatMiningUnits(value)
+      : value == value.roundToDouble()
       ? value.toStringAsFixed(0)
       : value.toStringAsFixed(1);
 }

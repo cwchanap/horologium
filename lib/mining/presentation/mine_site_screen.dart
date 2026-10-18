@@ -541,7 +541,7 @@ class _SellControl extends StatelessWidget {
         ),
         const SizedBox(height: 5),
         Text(
-          '+${view.activePlanetProjectedSale}',
+          '+${formatMiningCash(view.activePlanetProjectedSale)}',
           style: TextStyle(
             color: MiningTheme.warning,
             fontSize: compact ? 12 : 14,

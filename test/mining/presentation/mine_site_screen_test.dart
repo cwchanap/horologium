@@ -504,6 +504,20 @@ void main() {
     );
   });
 
+  testWidgets('shows a large active-planet sale with separators', (
+    tester,
+  ) async {
+    final state = _stateWithTwoSites(landingCargo: 0, carbonCargo: 5000);
+    await _pumpMineSite(tester, view: _siteView(state), dock: _dockView(state));
+
+    expect(find.text('+15,000'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp(r'Sell all cargo for 15,000 cash')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('binds sale control to active-planet aggregate cargo and value', (
     tester,
   ) async {
