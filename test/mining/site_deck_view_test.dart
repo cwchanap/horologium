@@ -57,7 +57,7 @@ void main() {
     expect(view.commissionedCount, 2);
     expect(view.siteCount, 3);
     expect(view.totalCargo, 3);
-    expect(view.totalCapacity, 120);
+    expect(view.totalCapacity, 4320);
     expect(view.projectedValue, 15);
     expect(view.totalRate, 0.6);
     expect(
@@ -114,7 +114,7 @@ void main() {
             MiningSiteId.landingBasin: progress(
               unlocked: true,
               commissioned: true,
-              storedAmount: 90,
+              storedAmount: 3600,
               rigs: const [
                 MiningRigPlacement(
                   tier: RigTier.t1,
@@ -130,8 +130,8 @@ void main() {
 
       final card = view.cards[MiningSiteId.landingBasin]!;
       expect(card.state, MiningSiteCardState.operational);
-      expect(card.capacity, 90);
-      expect(card.cargo, 90);
+      expect(card.capacity, 3600);
+      expect(card.cargo, 3600);
       expect(card.isCargoFull, isTrue);
     });
 
@@ -142,7 +142,7 @@ void main() {
             MiningSiteId.landingBasin: progress(
               unlocked: true,
               commissioned: true,
-              storedAmount: 89,
+              storedAmount: 3599,
               rigs: const [
                 MiningRigPlacement(
                   tier: RigTier.t1,
@@ -218,7 +218,7 @@ void main() {
           progress(
             unlocked: true,
             commissioned: true,
-            storedAmount: 90,
+            storedAmount: 3600,
             rigs: rig,
           ),
         ).timeToFull,

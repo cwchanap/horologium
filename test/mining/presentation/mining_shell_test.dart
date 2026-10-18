@@ -411,7 +411,7 @@ void main() {
       final repository = CountingMiningSaveRepository();
       await repository.save(
         initial.copyWith(
-          cash: 3_000,
+          cash: 203_000,
           technology: const TechnologyLevels(surveying: 3),
           sites: sites,
         ),
@@ -459,7 +459,7 @@ void main() {
       };
       await repository.save(
         initial.copyWith(
-          cash: 5_000,
+          cash: 205_000,
           technology: const TechnologyLevels(surveying: 3),
           unlockedPlanetIds: {
             MiningPlanetId.homeworld,
@@ -513,7 +513,7 @@ void main() {
     }
     await repository.save(
       initial.copyWith(
-        cash: 5_000,
+        cash: 205_000,
         technology: const TechnologyLevels(surveying: 3),
         sites: sites,
       ),
@@ -1338,7 +1338,7 @@ void main() {
   ) async {
     final clock = TestClock(_start);
     final repository = CountingMiningSaveRepository();
-    await repository.save(deployedLandingState(clock.now, cargo: 89.5));
+    await repository.save(deployedLandingState(clock.now, cargo: 3599.5));
     final effects = FakeBackgroundMusicPlayer();
     final audio = AudioManager(
       backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
@@ -1368,7 +1368,7 @@ void main() {
       shellHandles(
         tester,
       ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
-      90,
+      3600,
     );
 
     await pumpMiningTick(tester, clock);
@@ -1448,7 +1448,7 @@ void main() {
   ) async {
     final clock = TestClock(_start);
     final repository = CountingMiningSaveRepository();
-    await repository.save(deployedLandingState(clock.now, cargo: 90));
+    await repository.save(deployedLandingState(clock.now, cargo: 3600));
     final effects = FakeBackgroundMusicPlayer();
     final audio = AudioManager(
       backgroundMusicPlayer: FakeBackgroundMusicPlayer(),

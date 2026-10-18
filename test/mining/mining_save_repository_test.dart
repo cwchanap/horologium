@@ -256,7 +256,7 @@ void main() {
   });
 
   group('capacity normalization', () {
-    test('one deployed T1 cargo above 90 clamps without recovery', () async {
+    test('one deployed T1 cargo above 3,600 clamps without recovery', () async {
       final initial = MiningSave.initial(nowUtc: now);
       final state = initial.copyWith(
         technology: const TechnologyLevels(surveying: 3),
@@ -265,7 +265,7 @@ void main() {
           MiningSiteId.landingBasin: initial.sites[MiningSiteId.landingBasin]!
               .copyWith(
                 commissioned: true,
-                storedAmount: 120,
+                storedAmount: 4000,
                 rigPlacements: [
                   MiningRigPlacement(
                     tier: RigTier.t1,
@@ -282,10 +282,10 @@ void main() {
       final result = await MiningSaveRepository().load(nowUtc: now);
 
       expect(result.recoveredFromInvalidSave, isFalse);
-      expect(result.state.sites[MiningSiteId.landingBasin]!.storedAmount, 90);
+      expect(result.state.sites[MiningSiteId.landingBasin]!.storedAmount, 3600);
     });
 
-    test('four deployed T1 rigs preserve cargo below 360', () async {
+    test('four deployed T1 rigs preserve cargo below 14,400', () async {
       final initial = MiningSave.initial(nowUtc: now);
       final state = initial.copyWith(
         technology: const TechnologyLevels(surveying: 3),
@@ -294,7 +294,7 @@ void main() {
           MiningSiteId.landingBasin: initial.sites[MiningSiteId.landingBasin]!
               .copyWith(
                 commissioned: true,
-                storedAmount: 359,
+                storedAmount: 14399,
                 rigPlacements: [
                   for (final cell in deployableMiningCells(
                     _landingSite,
@@ -312,7 +312,10 @@ void main() {
       final result = await MiningSaveRepository().load(nowUtc: now);
 
       expect(result.recoveredFromInvalidSave, isFalse);
-      expect(result.state.sites[MiningSiteId.landingBasin]!.storedAmount, 359);
+      expect(
+        result.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+        14399,
+      );
     });
   });
 

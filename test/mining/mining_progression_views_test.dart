@@ -146,14 +146,27 @@ void main() {
       expect(extraction.disabledReason, 'Technology is at max level.');
     });
 
-    test('logistics effect strings reflect multipliers and offline cap', () {
+    test('logistics effect strings show storage and its fill window', () {
       final view = TechnologySheetView.from(
         state: stateWith(now: now),
         content: content,
       );
       final logistics = view.track(TechnologyTrack.logistics);
-      expect(logistics.currentEffect, 'Mine capacity ×1.00, offline cap 8h');
-      expect(logistics.nextEffect, 'Mine capacity ×1.15, offline cap 10h');
+      expect(logistics.currentEffect, 'Storage ×1.00 · fills in 2h 00m');
+      expect(logistics.nextEffect, 'Storage ×1.15 · fills in 2h 18m');
+    });
+
+    test('logistics fill window shortens with current Extraction', () {
+      final view = TechnologySheetView.from(
+        state: stateWith(
+          now: now,
+          technology: const TechnologyLevels(extraction: 5, logistics: 1),
+        ),
+        content: content,
+      );
+      final logistics = view.track(TechnologyTrack.logistics);
+      expect(logistics.currentEffect, 'Storage ×1.15 · fills in 1h 09m');
+      expect(logistics.nextEffect, 'Storage ×1.30 · fills in 1h 18m');
     });
 
     test(
@@ -311,7 +324,7 @@ void main() {
       final view = StellarMapView.from(
         state: stateWith(
           now: now,
-          cash: 20000,
+          cash: 16000000,
           technology: const TechnologyLevels(surveying: 5),
           unlockedPlanets: {
             MiningPlanetId.homeworld,
@@ -330,7 +343,7 @@ void main() {
       expect(mars.hasRequiredMastery, isTrue);
       expect(mars.requiredSurveyingLevel, 5);
       expect(mars.hasSurveying, isTrue);
-      expect(mars.unlockCashCost, 20000);
+      expect(mars.unlockCashCost, 16000000);
       expect(mars.hasCash, isTrue);
       expect(mars.canUnlock, isTrue);
     });
@@ -339,7 +352,7 @@ void main() {
       final view = StellarMapView.from(
         state: stateWith(
           now: now,
-          cash: 20000,
+          cash: 16000000,
           technology: const TechnologyLevels(surveying: 5),
           unlockedPlanets: {
             MiningPlanetId.homeworld,
@@ -409,7 +422,7 @@ void main() {
         expect(lunar.requirements.map((requirement) => requirement.label), [
           'Homeworld sites 0/3',
           'Surveying 3',
-          '2,500 cash',
+          '200,000 cash',
         ]);
       },
     );

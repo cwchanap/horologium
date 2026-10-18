@@ -197,7 +197,7 @@ void main() {
       expect(goal.kind, MiningGoalKind.researchSurveying);
       expect(goal.title, 'Research Surveying 4');
       expect(goal.detail, 'Needed for Titanium Highlands.');
-      expect(goal.cashCost, 4000);
+      expect(goal.cashCost, 300000);
       expect(goal.target, const MiningGoalTarget.technology());
     });
 
@@ -223,13 +223,13 @@ void main() {
       expect(goal.kind, MiningGoalKind.unlockPlanet);
       expect(goal.title, 'Unlock Lunar Frontier');
       expect(goal.detail, 'Unlock it from the Stellar Map.');
-      expect(goal.cashCost, 2500);
-      expect(goal.cashLabel, '1,000 / 2,500');
+      expect(goal.cashCost, 200000);
+      expect(goal.cashLabel, '1,000 / 200,000');
       expect(goal.target, const MiningGoalTarget.stellarMap());
     });
 
     test('ready planet unlock says so', () {
-      final goal = _goal(_homeworldMastered(cash: 2_500, surveying: 3));
+      final goal = _goal(_homeworldMastered(cash: 200_000, surveying: 3));
 
       expect(goal.detail, 'Ready on the Stellar Map.');
     });
@@ -276,7 +276,7 @@ void main() {
       expect(goal.title, 'Commission Cobalt Chasm');
       expect(
         goal.detail,
-        'Last Mars Frontier site: mastery pays +25,000 cash.',
+        'Last Mars Frontier site: mastery pays +20.00M cash.',
       );
     });
 

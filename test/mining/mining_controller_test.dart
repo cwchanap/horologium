@@ -200,7 +200,7 @@ MiningSave deployedLandingBasinState(
 
 MiningSave landingWithTwoT1RigsAndCargo(
   DateTime now, {
-  double storedAmount = 150,
+  double storedAmount = 6000,
 }) => deployedLandingBasinState(
   now,
   storedAmount: storedAmount,
@@ -209,7 +209,7 @@ MiningSave landingWithTwoT1RigsAndCargo(
 
 MiningSave homeworldMasteredState(
   DateTime now, {
-  int cash = 5000,
+  int cash = 202500,
   TechnologyLevels technology = const TechnologyLevels(surveying: 3),
   Set<MiningPlanetId> unlockedPlanets = const {MiningPlanetId.homeworld},
   MiningPlanetId activePlanet = MiningPlanetId.homeworld,
@@ -229,7 +229,7 @@ MiningSave homeworldMasteredState(
 
 MiningSave lunarMasteredState(
   DateTime now, {
-  int cash = 20000,
+  int cash = 16000000,
   TechnologyLevels technology = const TechnologyLevels(surveying: 5),
   Set<MiningPlanetId> unlockedPlanets = const {
     MiningPlanetId.homeworld,
@@ -1003,8 +1003,8 @@ void main() {
           MiningSiteId.cobaltChasm,
           cobaltCell,
         );
-        expect(first.message, 'Mars mastered — +25,000 cash.');
-        expect(controller.state.cash, 75000);
+        expect(first.message, 'Mars mastered — +20.00M cash.');
+        expect(controller.state.cash, 20050000);
 
         final recall = await controller.recallRig(
           MiningSiteId.cobaltChasm,
@@ -1018,7 +1018,7 @@ void main() {
         );
         expect(redeploy.isSuccess, isTrue);
         expect(redeploy.message, isNull);
-        expect(controller.state.cash, 75000);
+        expect(controller.state.cash, 20050000);
       },
     );
 

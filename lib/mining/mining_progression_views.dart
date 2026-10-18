@@ -128,9 +128,19 @@ class TechnologySheetView {
         return 'Mining rate ×'
             '${MiningContentRegistry.extractionRateMultipliers[level].toStringAsFixed(2)}';
       case TechnologyTrack.logistics:
-        return 'Mine capacity ×'
-            '${MiningContentRegistry.logisticsCapacityMultipliers[level].toStringAsFixed(2)}'
-            ', offline cap ${content.offlineCapFor(level).inHours}h';
+        final storage =
+            MiningContentRegistry.logisticsCapacityMultipliers[level];
+        final rate = MiningContentRegistry
+            .extractionRateMultipliers[state.technology.extraction];
+        final window = Duration(
+          microseconds:
+              (MiningContentRegistry.storageWindow.inMicroseconds *
+                      storage /
+                      rate)
+                  .round(),
+        );
+        return 'Storage ×${storage.toStringAsFixed(2)}'
+            ' · fills in ${formatMiningDuration(window)}';
       case TechnologyTrack.surveying:
         final unlockedPlanets = content.planets.values.where(
           (planet) => state.unlockedPlanetIds.contains(planet.id),

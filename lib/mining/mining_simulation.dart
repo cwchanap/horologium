@@ -47,7 +47,7 @@ class MiningSimulation {
       );
     }
 
-    final offlineCap = content.offlineCapFor(state.technology.logistics);
+    const offlineCap = MiningContentRegistry.offlineAccrualCap;
     final elapsed = rawElapsed > offlineCap ? offlineCap : rawElapsed;
     final seconds = elapsed.inMicroseconds / Duration.microsecondsPerSecond;
     final produced = <ResourceType, double>{};

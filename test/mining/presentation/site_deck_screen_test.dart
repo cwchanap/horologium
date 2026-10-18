@@ -86,12 +86,12 @@ MiningSave _lunarState() => _stateWith(
   },
 );
 
-/// Landing Basin with one T1 rig: rate 0.50/s, capacity 90. Stored at
+/// Landing Basin with one T1 rig: rate 0.50/s, capacity 3,600. Stored at
 /// capacity makes the card cargo-full.
 SiteProgress _fullLandingBasin() => _progress(
   unlocked: true,
   commissioned: true,
-  storedAmount: 90,
+  storedAmount: 3600,
   rigs: [MiningRigPlacement(tier: RigTier.t1, cell: _landingCells[0])],
 );
 
@@ -487,7 +487,7 @@ void main() {
         MiningSiteId.landingBasin: _progress(
           unlocked: true,
           commissioned: true,
-          storedAmount: 45,
+          storedAmount: 1800,
           rigs: [MiningRigPlacement(tier: RigTier.t1, cell: _landingCells[0])],
         ),
       },
@@ -500,7 +500,7 @@ void main() {
     );
     expect(tester.takeException(), isNull);
 
-    final copy = find.text('50% · FULL IN 2M');
+    final copy = find.text('50% · FULL IN 1H 00M');
     expect(copy, findsOneWidget);
     expect(
       tester.renderObject<RenderParagraph>(copy).didExceedMaxLines,
@@ -508,7 +508,7 @@ void main() {
     );
     expect(
       find.bySemanticsLabel(
-        RegExp(r'Landing Basin, OPERATIONAL site, full in 2m'),
+        RegExp(r'Landing Basin, OPERATIONAL site, full in 1h 00m'),
       ),
       findsOneWidget,
     );
@@ -522,14 +522,17 @@ void main() {
         MiningSiteId.landingBasin: _progress(
           unlocked: true,
           commissioned: true,
-          storedAmount: 45,
+          storedAmount: 1800,
           rigs: [MiningRigPlacement(tier: RigTier.t1, cell: _landingCells[0])],
         ),
       },
     );
     await _pumpDeck(tester, view: _deckView(state), size: const Size(874, 402));
     expect(tester.takeException(), isNull);
-    expect(find.text('0.50/s  ·  45 / 90\nFULL IN 2M'), findsOneWidget);
+    expect(
+      find.text('0.50/s  ·  1,800 / 3,600\nFULL IN 1H 00M'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('marks a full landscape card FULL with operational accent', (
@@ -556,7 +559,7 @@ void main() {
       MiningTheme.accent.withAlpha(180),
     );
     expect(
-      find.text('FULL · 0.50/s · 90 / 90\nSELL TO RESUME'),
+      find.text('FULL · 0.50/s · 3,600 / 3,600\nSELL TO RESUME'),
       findsOneWidget,
       reason: 'Full status keeps rate and cargo numbers plus recovery copy.',
     );

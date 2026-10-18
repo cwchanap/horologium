@@ -102,7 +102,7 @@ void main() {
     );
 
     expect(view.rate, 0.5);
-    expect(view.capacity, 90);
+    expect(view.capacity, 3600);
     expect(view.cargo, 10);
     expect(view.projectedSale, 40);
     expect(view.canSell, isTrue);
@@ -227,7 +227,7 @@ void main() {
       ];
       final view = viewFor(
         stateWith(
-          landing: progress(commissioned: true, storedAmount: 150, rigs: rigs),
+          landing: progress(commissioned: true, storedAmount: 6000, rigs: rigs),
         ),
       );
 
