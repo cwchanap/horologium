@@ -91,11 +91,18 @@ dock stores a `RigTier` or null.
 each of Homeworld, Lunar Frontier, and Mars Frontier. Commissioning every site
 on a planet is its mastery condition. Homeworld mastery plus Surveying 3
 unlocks Lunar Frontier; Lunar mastery plus Surveying 5 unlocks Mars Frontier;
-Mars mastery grants exactly one 25,000 cash reward. Newly unlocked planets
+Mars mastery grants exactly one 20,000,000 cash reward. Newly unlocked planets
 start with their authored starter dock bays and starter site.
 
-Rig tier and Extraction determine rate. Logistics determines site capacity and
-the offline accrual cap. The simulation stores cargo per flat site, produces
+Rig tier and Extraction determine rate. Each site's `baseCapacity` is its base
+rate times `MiningContentRegistry.storageWindow` (2 hours), so storage holds
+two hours of base production; Logistics extends that window and Extraction
+shortens it. Offline accrual is capped at a fixed 24 hours
+(`offlineAccrualCap`) as a clock safety net; Logistics no longer changes it.
+All player-visible cash goes through `formatMiningCash` (compact `M`/`B` from
+one million) and resource amounts through `formatMiningUnits`. Pacing is
+proven by the public-action journey on its injected clock, never by a
+wall-clock playtest. The simulation stores cargo per flat site, produces
 across all unlocked planets, and selling empties only the active planet's
 cargo. A recall with cargo that cannot fit the replacement rig is rejected;
 the user must sell before recalling. The shell's foreground timer refreshes
