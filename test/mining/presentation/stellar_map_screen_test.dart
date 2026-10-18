@@ -254,7 +254,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(of: mars, matching: find.text('20,000')),
+      find.descendant(of: mars, matching: find.text('16.00M')),
       findsOneWidget,
     );
     expect(
@@ -305,7 +305,7 @@ void main() {
             .getRect(find.descendant(of: mars, matching: find.text('LV 5')))
             .bottom,
         tester
-            .getRect(find.descendant(of: mars, matching: find.text('20,000')))
+            .getRect(find.descendant(of: mars, matching: find.text('16.00M')))
             .bottom,
         tester
             .getRect(
@@ -339,7 +339,7 @@ void main() {
     }
     final view = StellarMapView.from(
       state: _stateWith(
-        cash: 20_000,
+        cash: 16_000_000,
         technology: const TechnologyLevels(surveying: 5),
         unlockedPlanets: {
           MiningPlanetId.homeworld,

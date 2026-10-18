@@ -571,7 +571,7 @@ void main() {
       final state = _stateWith(
         landing: _progress(
           commissioned: true,
-          storedAmount: 150,
+          storedAmount: 6000,
           rigs: [
             MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
             MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCells[1]),
@@ -896,6 +896,39 @@ void main() {
       expect(lastBay.bottom, lessThanOrEqualTo(402 - padBottom));
     },
   );
+
+  testWidgets('fits frontier spawn costs inside the Spawn hex', (tester) async {
+    for (final (planet, site, cost) in const [
+      (MiningPlanetId.lunarFrontier, MiningSiteId.frozenBasin, '40,000'),
+      (MiningPlanetId.marsFrontier, MiningSiteId.ochreBasin, '4.00M'),
+    ]) {
+      final initial = MiningSave.initial(nowUtc: _start);
+      final state = initial.copyWith(
+        unlockedPlanetIds: {MiningPlanetId.homeworld, planet},
+        activePlanetId: planet,
+        sites: {
+          ...initial.sites,
+          site: _progress(unlocked: true, commissioned: true),
+        },
+      );
+      for (final size in const [Size(360, 640), Size(874, 402)]) {
+        await _pumpMineSite(
+          tester,
+          size: size,
+          view: _siteView(state, siteId: site),
+          dock: _dockView(state),
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('fleet-dock-spawn')),
+            matching: find.text(cost),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull, reason: '$cost at $size');
+      }
+    }
+  });
 
   testWidgets(
     'keeps four bays plus Spawn with one hint row in both orientations',

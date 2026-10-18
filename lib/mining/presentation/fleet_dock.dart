@@ -163,24 +163,28 @@ class _SpawnHex extends StatelessWidget {
               width: 30,
               height: 30,
             ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.add_rounded,
-                color: MiningTheme.highlight,
-                size: showRig ? 12 : 18,
-              ),
-              if (showRig) const SizedBox(width: 2),
-              Text(
-                formatMiningCash(view.spawnCost),
-                style: TextStyle(
+          // Frontier spawn costs (`40,000`, `4.00M`) scale down to fit the hex.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.add_rounded,
                   color: MiningTheme.highlight,
-                  fontSize: showRig ? 9 : 8,
-                  fontWeight: FontWeight.w800,
+                  size: showRig ? 12 : 18,
                 ),
-              ),
-            ],
+                if (showRig) const SizedBox(width: 2),
+                Text(
+                  formatMiningCash(view.spawnCost),
+                  style: TextStyle(
+                    color: MiningTheme.highlight,
+                    fontSize: showRig ? 9 : 8,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

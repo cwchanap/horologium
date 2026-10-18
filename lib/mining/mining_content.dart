@@ -217,7 +217,7 @@ class MiningContentRegistry {
 
   static const int maxTechnologyLevel = 5;
   static const int maxDeployedRigsPerSite = 4;
-  static const technologyCosts = <int>[300, 700, 1500, 4000, 9000];
+  static const technologyCosts = <int>[300, 700, 1500, 300000, 750000];
   static const technologySiteGates = <MiningSiteId>[
     MiningSiteId.landingBasin,
     MiningSiteId.carbonRidge,
@@ -225,14 +225,14 @@ class MiningContentRegistry {
     MiningSiteId.frozenBasin,
     MiningSiteId.titaniumHighlands,
   ];
-  static const offlineCapsByLogistics = <Duration>[
-    Duration(hours: 8),
-    Duration(hours: 10),
-    Duration(hours: 12),
-    Duration(hours: 16),
-    Duration(hours: 20),
-    Duration(hours: 24),
-  ];
+
+  /// Clock safety net for offline accrual. Storage fills within four hours at
+  /// most, so this only guards against device clock jumps.
+  static const offlineAccrualCap = Duration(hours: 24);
+
+  /// How long every site's storage holds at T1 with no technology: each
+  /// site's `baseCapacity` is its base rate times this window.
+  static const storageWindow = Duration(hours: 2);
   static const rateMultipliers = <double>[1.0, 1.5, 2.25, 3.25, 4.5];
   static const capacityMultipliers = <double>[1.0, 1.5, 2.0, 3.0, 4.0];
   static const extractionRateMultipliers = <double>[
@@ -326,7 +326,7 @@ class MiningContentRegistry {
           requiredSite: null,
           requiredSurveyingLevel: 0,
           baseRatePerSecond: 0.50,
-          baseCapacity: 90,
+          baseCapacity: 3600,
           saleValuePerUnit: 4,
           gridWidth: _denseGridWidth,
           gridHeight: _denseGridHeight,
@@ -343,7 +343,7 @@ class MiningContentRegistry {
           requiredSite: MiningSiteId.landingBasin,
           requiredSurveyingLevel: 0,
           baseRatePerSecond: 0.75,
-          baseCapacity: 120,
+          baseCapacity: 5400,
           saleValuePerUnit: 3,
           gridWidth: _denseGridWidth,
           gridHeight: _denseGridHeight,
@@ -360,7 +360,7 @@ class MiningContentRegistry {
           requiredSite: MiningSiteId.carbonRidge,
           requiredSurveyingLevel: 0,
           baseRatePerSecond: 0.60,
-          baseCapacity: 120,
+          baseCapacity: 4320,
           saleValuePerUnit: 5,
           gridWidth: _denseGridWidth,
           gridHeight: _denseGridHeight,
@@ -376,9 +376,9 @@ class MiningContentRegistry {
       name: 'Lunar Frontier',
       unlockRequiredMasteryPlanetId: MiningPlanetId.homeworld,
       unlockRequiredSurveyingLevel: 3,
-      unlockCashCost: 2500,
+      unlockCashCost: 200000,
       masteryRewardCash: 0,
-      rigSpawnCost: 500,
+      rigSpawnCost: 40000,
       planetAsset: 'assets/images/mining/planets/lunar_frontier.png',
       sites: [
         MiningSiteDefinition(
@@ -389,7 +389,7 @@ class MiningContentRegistry {
           requiredSite: null,
           requiredSurveyingLevel: 3,
           baseRatePerSecond: 1.00,
-          baseCapacity: 150,
+          baseCapacity: 7200,
           saleValuePerUnit: 6,
           gridWidth: _denseGridWidth,
           gridHeight: _denseGridHeight,
@@ -402,11 +402,11 @@ class MiningContentRegistry {
           id: MiningSiteId.titaniumHighlands,
           name: 'Titanium Highlands',
           resource: ResourceType.titaniumOre,
-          unlockCost: 3000,
+          unlockCost: 250000,
           requiredSite: MiningSiteId.frozenBasin,
           requiredSurveyingLevel: 4,
           baseRatePerSecond: 0.80,
-          baseCapacity: 140,
+          baseCapacity: 5760,
           saleValuePerUnit: 12,
           gridWidth: _denseGridWidth,
           gridHeight: _denseGridHeight,
@@ -419,11 +419,11 @@ class MiningContentRegistry {
           id: MiningSiteId.heliumMare,
           name: 'Helium Mare',
           resource: ResourceType.helium3,
-          unlockCost: 8000,
+          unlockCost: 650000,
           requiredSite: MiningSiteId.titaniumHighlands,
           requiredSurveyingLevel: 5,
           baseRatePerSecond: 0.55,
-          baseCapacity: 120,
+          baseCapacity: 3960,
           saleValuePerUnit: 30,
           gridWidth: _denseGridWidth,
           gridHeight: _denseGridHeight,
@@ -439,9 +439,9 @@ class MiningContentRegistry {
       name: 'Mars Frontier',
       unlockRequiredMasteryPlanetId: MiningPlanetId.lunarFrontier,
       unlockRequiredSurveyingLevel: 5,
-      unlockCashCost: 20000,
-      masteryRewardCash: 25000,
-      rigSpawnCost: 5000,
+      unlockCashCost: 16000000,
+      masteryRewardCash: 20000000,
+      rigSpawnCost: 4000000,
       planetAsset: 'assets/images/mining/planets/mars_frontier.png',
       sites: [
         MiningSiteDefinition(
@@ -452,7 +452,7 @@ class MiningContentRegistry {
           requiredSite: null,
           requiredSurveyingLevel: 5,
           baseRatePerSecond: 0.75,
-          baseCapacity: 180,
+          baseCapacity: 5400,
           saleValuePerUnit: 32,
           gridWidth: _denseGridWidth,
           gridHeight: _denseGridHeight,
@@ -468,11 +468,11 @@ class MiningContentRegistry {
           id: MiningSiteId.silicaDunes,
           name: 'Silica Dunes',
           resource: ResourceType.silica,
-          unlockCost: 12000,
+          unlockCost: 10000000,
           requiredSite: MiningSiteId.ochreBasin,
           requiredSurveyingLevel: 5,
           baseRatePerSecond: 0.55,
-          baseCapacity: 160,
+          baseCapacity: 3960,
           saleValuePerUnit: 55,
           gridWidth: _denseGridWidth,
           gridHeight: _denseGridHeight,
@@ -488,11 +488,11 @@ class MiningContentRegistry {
           id: MiningSiteId.cobaltChasm,
           name: 'Cobalt Chasm',
           resource: ResourceType.cobaltOre,
-          unlockCost: 30000,
+          unlockCost: 25000000,
           requiredSite: MiningSiteId.silicaDunes,
           requiredSurveyingLevel: 5,
           baseRatePerSecond: 0.35,
-          baseCapacity: 130,
+          baseCapacity: 2520,
           saleValuePerUnit: 110,
           gridWidth: _denseGridWidth,
           gridHeight: _denseGridHeight,
@@ -539,8 +539,6 @@ class MiningContentRegistry {
       site(id).baseCapacity *
       rigs.fold<double>(0, (sum, tier) => sum + rigCapacityMultiplier(tier)) *
       logisticsCapacityMultipliers[logistics];
-
-  Duration offlineCapFor(int logistics) => offlineCapsByLogistics[logistics];
 
   /// Planet mastery: every site on [planetId] is commissioned. Takes only
   /// site ids so content never imports mining state.

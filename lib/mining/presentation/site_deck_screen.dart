@@ -1136,7 +1136,9 @@ class _SiteCard extends StatelessWidget {
     }
   }
 
-  static String _amount(double value) => value == value.roundToDouble()
+  static String _amount(double value) => value >= 1000
+      ? formatMiningUnits(value)
+      : value == value.roundToDouble()
       ? value.toStringAsFixed(0)
       : value.toStringAsFixed(1);
 }

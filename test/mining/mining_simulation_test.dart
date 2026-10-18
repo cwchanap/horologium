@@ -109,18 +109,48 @@ void main() {
   );
   final carbonRidgeCell = _firstCell(MiningSiteId.carbonRidge);
 
-  test('one T1 keeps Landing Basin roughly 180 seconds to full', () {
+  test('one T1 fills Landing Basin in exactly two hours and stops', () {
     final state = stateWithLandingRigs(
       now: start,
       rigs: placements([(landingCells[0], RigTier.t1)]),
     );
-    final result = simulation.accrue(
+    final almost = simulation.accrue(
       state,
-      state.lastAccruedAtUtc.add(const Duration(seconds: 180)),
+      state.lastAccruedAtUtc.add(const Duration(hours: 2, seconds: -1)),
+    );
+    expect(almost.summary.fullSites, isEmpty);
+    expect(
+      almost.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+      closeTo(3599.5, 1e-9),
     );
 
-    expect(result.state.sites[MiningSiteId.landingBasin]!.storedAmount, 90);
-    expect(result.summary.produced[ResourceType.gold], 90);
+    final result = simulation.accrue(
+      state,
+      state.lastAccruedAtUtc.add(const Duration(hours: 3)),
+    );
+    expect(result.state.sites[MiningSiteId.landingBasin]!.storedAmount, 3600);
+    expect(result.summary.produced[ResourceType.gold], 3600);
+    expect(result.summary.fullSites, contains(MiningSiteId.landingBasin));
+  });
+
+  test('Logistics 5 stretches one T1 Landing Basin to four hours', () {
+    final state = stateWithLandingRigs(
+      now: start,
+      rigs: placements([(landingCells[0], RigTier.t1)]),
+      logistics: 5,
+    );
+    final almost = simulation.accrue(
+      state,
+      state.lastAccruedAtUtc.add(const Duration(hours: 4, seconds: -1)),
+    );
+    expect(almost.summary.fullSites, isEmpty);
+
+    final result = simulation.accrue(
+      state,
+      state.lastAccruedAtUtc.add(const Duration(hours: 4)),
+    );
+    expect(result.state.sites[MiningSiteId.landingBasin]!.storedAmount, 7200);
+    expect(result.summary.fullSites, contains(MiningSiteId.landingBasin));
   });
 
   test('four max rigs preserve the old max-tier fill curve', () {
@@ -134,11 +164,17 @@ void main() {
     );
     final result = simulation.accrue(
       state,
-      state.lastAccruedAtUtc.add(const Duration(seconds: 160)),
+      state.lastAccruedAtUtc.add(const Duration(hours: 4)),
     );
 
-    expect(result.state.sites[MiningSiteId.landingBasin]!.storedAmount, 2880);
-    expect(result.summary.produced[ResourceType.gold], 2880);
+    // 18/s fills 115,200 in 6,400 s, so the old 160 s curve scales by 40.
+    expect(result.state.sites[MiningSiteId.landingBasin]!.storedAmount, 115200);
+    expect(result.summary.produced[ResourceType.gold], 115200);
+    final early = simulation.accrue(
+      state,
+      state.lastAccruedAtUtc.add(const Duration(seconds: 160)),
+    );
+    expect(early.summary.produced[ResourceType.gold], closeTo(2880, 1e-9));
   });
 
   test('mixed rig tiers sum rate and capacity shares', () {
@@ -273,27 +309,43 @@ void main() {
       stateWithLandingRigs(
         now: start,
         rigs: placements([(landingCells[0], RigTier.t1)]),
-        storedAmount: 90,
+        storedAmount: 3600,
       ),
       start.add(const Duration(seconds: 10)),
     );
 
     expect(result.summary.fullSites, contains(MiningSiteId.landingBasin));
     expect(result.summary.produced[ResourceType.gold], 0);
-    expect(result.state.sites[MiningSiteId.landingBasin]!.storedAmount, 90);
+    expect(result.state.sites[MiningSiteId.landingBasin]!.storedAmount, 3600);
   });
 
-  test('offline production uses the logistics cap and rig capacity', () {
+  test('offline accrual caps at 24 hours whatever the Logistics level', () {
+    for (final logistics in [0, 5]) {
+      final result = simulation.accrue(
+        stateWithLandingRigs(
+          now: start,
+          rigs: placements([(landingCells[0], RigTier.t1)]),
+          logistics: logistics,
+        ),
+        start.add(const Duration(hours: 24)),
+      );
+      expect(result.summary.elapsedUsed, const Duration(hours: 24));
+      expect(result.summary.wasOfflineCapped, isFalse);
+    }
+  });
+
+  test('a 30-hour gap accrues 24 hours to rig capacity', () {
     final result = simulation.accrue(
       stateWithLandingRigs(
         now: start,
         rigs: placements([(landingCells[0], RigTier.t1)]),
         logistics: 2,
       ),
-      start.add(const Duration(hours: 13)),
+      start.add(const Duration(hours: 30)),
     );
 
-    expect(result.summary.elapsedUsed, const Duration(hours: 12));
+    expect(result.summary.elapsedUsed, const Duration(hours: 24));
+    expect(result.state.lastAccruedAtUtc, start.add(const Duration(hours: 30)));
     expect(result.summary.wasOfflineCapped, isTrue);
     expect(result.summary.fullSites, contains(MiningSiteId.landingBasin));
     expect(

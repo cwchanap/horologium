@@ -123,7 +123,7 @@ void main() {
         'surveying': 0,
         'unlock': 0,
         'rate': 0.50,
-        'capacity': 90,
+        'capacity': 3600,
         'sale': 4,
         'deposits': [0, 0, 1, 2],
       },
@@ -133,7 +133,7 @@ void main() {
         'surveying': 0,
         'unlock': 250,
         'rate': 0.75,
-        'capacity': 120,
+        'capacity': 5400,
         'sale': 3,
         'deposits': [0, 1, 2, 3],
       },
@@ -143,7 +143,7 @@ void main() {
         'surveying': 0,
         'unlock': 700,
         'rate': 0.60,
-        'capacity': 120,
+        'capacity': 4320,
         'sale': 5,
         'deposits': [0, 1, 2, 3],
       },
@@ -153,7 +153,7 @@ void main() {
         'surveying': 3,
         'unlock': 0,
         'rate': 1.00,
-        'capacity': 150,
+        'capacity': 7200,
         'sale': 6,
         'deposits': [3, 3, 4, 5],
       },
@@ -161,9 +161,9 @@ void main() {
         'resource': ResourceType.titaniumOre,
         'requiredSite': MiningSiteId.frozenBasin,
         'surveying': 4,
-        'unlock': 3000,
+        'unlock': 250000,
         'rate': 0.80,
-        'capacity': 140,
+        'capacity': 5760,
         'sale': 12,
         'deposits': [4, 4, 5, 5],
       },
@@ -171,9 +171,9 @@ void main() {
         'resource': ResourceType.helium3,
         'requiredSite': MiningSiteId.titaniumHighlands,
         'surveying': 5,
-        'unlock': 8000,
+        'unlock': 650000,
         'rate': 0.55,
-        'capacity': 120,
+        'capacity': 3960,
         'sale': 30,
         'deposits': [5, 5, 5, 5],
       },
@@ -183,7 +183,7 @@ void main() {
         'surveying': 5,
         'unlock': 0,
         'rate': 0.75,
-        'capacity': 180,
+        'capacity': 5400,
         'sale': 32,
         'deposits': [5, 5, 5, 5],
       },
@@ -191,9 +191,9 @@ void main() {
         'resource': ResourceType.silica,
         'requiredSite': MiningSiteId.ochreBasin,
         'surveying': 5,
-        'unlock': 12000,
+        'unlock': 10000000,
         'rate': 0.55,
-        'capacity': 160,
+        'capacity': 3960,
         'sale': 55,
         'deposits': [5, 5, 5, 5],
       },
@@ -201,9 +201,9 @@ void main() {
         'resource': ResourceType.cobaltOre,
         'requiredSite': MiningSiteId.silicaDunes,
         'surveying': 5,
-        'unlock': 30000,
+        'unlock': 25000000,
         'rate': 0.35,
-        'capacity': 130,
+        'capacity': 2520,
         'sale': 110,
         'deposits': [5, 5, 5, 5],
       },
@@ -232,7 +232,13 @@ void main() {
   test('freezes technology, offline, planet, and Mars reward metadata', () {
     final content = MiningContentRegistry.stellarMining();
 
-    expect(MiningContentRegistry.technologyCosts, [300, 700, 1500, 4000, 9000]);
+    expect(MiningContentRegistry.technologyCosts, [
+      300,
+      700,
+      1500,
+      300000,
+      750000,
+    ]);
     expect(MiningContentRegistry.technologySiteGates, [
       MiningSiteId.landingBasin,
       MiningSiteId.carbonRidge,
@@ -240,14 +246,19 @@ void main() {
       MiningSiteId.frozenBasin,
       MiningSiteId.titaniumHighlands,
     ]);
-    expect(MiningContentRegistry.offlineCapsByLogistics, [
-      const Duration(hours: 8),
-      const Duration(hours: 10),
-      const Duration(hours: 12),
-      const Duration(hours: 16),
-      const Duration(hours: 20),
-      const Duration(hours: 24),
-    ]);
+    expect(MiningContentRegistry.offlineAccrualCap, const Duration(hours: 24));
+    expect(MiningContentRegistry.storageWindow, const Duration(hours: 2));
+    for (final site in content.planets.values.expand((p) => p.sites)) {
+      expect(
+        site.baseCapacity,
+        closeTo(
+          site.baseRatePerSecond *
+              MiningContentRegistry.storageWindow.inSeconds,
+          1e-9,
+        ),
+        reason: '${site.name} storage holds two hours of base production',
+      );
+    }
 
     final homeworld = content.planet(MiningPlanetId.homeworld);
     expect(homeworld.rigSpawnCost, 25);
@@ -258,10 +269,10 @@ void main() {
     expect(homeworld.planetAsset, 'assets/images/mining/planets/homeworld.png');
 
     final lunar = content.planet(MiningPlanetId.lunarFrontier);
-    expect(lunar.rigSpawnCost, 500);
+    expect(lunar.rigSpawnCost, 40000);
     expect(lunar.unlockRequiredMasteryPlanetId, MiningPlanetId.homeworld);
     expect(lunar.unlockRequiredSurveyingLevel, 3);
-    expect(lunar.unlockCashCost, 2500);
+    expect(lunar.unlockCashCost, 200000);
     expect(lunar.masteryRewardCash, 0);
     expect(
       lunar.planetAsset,
@@ -270,11 +281,11 @@ void main() {
 
     final mars = content.planet(MiningPlanetId.marsFrontier);
     expect(mars.name, 'Mars Frontier');
-    expect(mars.rigSpawnCost, 5000);
+    expect(mars.rigSpawnCost, 4000000);
     expect(mars.unlockRequiredMasteryPlanetId, MiningPlanetId.lunarFrontier);
     expect(mars.unlockRequiredSurveyingLevel, 5);
-    expect(mars.unlockCashCost, 20000);
-    expect(mars.masteryRewardCash, 25000);
+    expect(mars.unlockCashCost, 16000000);
+    expect(mars.masteryRewardCash, 20000000);
     expect(mars.planetAsset, 'assets/images/mining/planets/mars_frontier.png');
   });
 
@@ -298,7 +309,7 @@ void main() {
       content.effectiveSiteCapacity(MiningSiteId.landingBasin, const [
         RigTier.t1,
       ], 0),
-      90,
+      3600,
     );
   });
 
@@ -311,7 +322,7 @@ void main() {
         RigTier.t1,
         RigTier.t1,
       ], 0),
-      360,
+      14400,
     );
     expect(
       content.effectiveSiteCapacity(MiningSiteId.landingBasin, const [
@@ -320,7 +331,7 @@ void main() {
         RigTier.t5,
         RigTier.t5,
       ], 5),
-      2880,
+      115200,
     );
   });
 
