@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
+import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:horologium/mining/presentation/technology_sheet.dart';
 
 const _viewports = [
@@ -293,6 +295,24 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('purchase buttons fall back to a cash icon without the asset', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DefaultAssetBundle(
+          bundle: _MissingCashIconBundle(),
+          child: Scaffold(
+            body: TechnologySheet(view: _highCostView(), onPurchase: (_) {}),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.paid), findsWidgets);
+  });
+
   testWidgets('a 750,000 cost fits the landscape button at text scale 1.3', (
     tester,
   ) async {
@@ -342,3 +362,11 @@ TechnologySheetView _highCostView() => TechnologySheetView(
       ),
   ],
 );
+
+class _MissingCashIconBundle extends CachingAssetBundle {
+  @override
+  Future<ByteData> load(String key) async {
+    if (key == MiningVisuals.cashIcon) throw FlutterError('Missing $key');
+    return rootBundle.load(key);
+  }
+}
