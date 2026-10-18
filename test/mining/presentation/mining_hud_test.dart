@@ -37,6 +37,30 @@ void main() {
     expect(path.contains(Offset(2, rect.height - 2)), isTrue);
   });
 
+  testWidgets('cargo gauge fits hour-long storage amounts', (tester) async {
+    for (final size in const [62.0, 80.0]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: MiningCargoGauge(
+              cargo: 115596.3,
+              capacity: 172800,
+              projectedValue: 4623852,
+              size: size,
+            ),
+          ),
+        ),
+      );
+      final amount = find.text('115,596');
+      expect(amount, findsOneWidget);
+      final gauge = tester.getRect(find.byKey(const Key('mining-cargo-gauge')));
+      final text = tester.getRect(amount);
+      expect(text.left, greaterThanOrEqualTo(gauge.left));
+      expect(text.right, lessThanOrEqualTo(gauge.right));
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   testWidgets('cargo gauge uses the prototype ring width and colors', (
     tester,
   ) async {
