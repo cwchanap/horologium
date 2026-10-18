@@ -182,6 +182,102 @@ void main() {
     });
   });
 
+  group('timeToFull', () {
+    MiningSiteCardView landingBasin(SiteProgress site) => SiteDeckView.from(
+      state: stateWith(sites: {MiningSiteId.landingBasin: site}),
+      content: content,
+      isBusy: false,
+    ).cards[MiningSiteId.landingBasin]!;
+
+    const rig = [
+      MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+    ];
+
+    test('is exact for a partially filled operational card', () {
+      final card = landingBasin(
+        progress(
+          unlocked: true,
+          commissioned: true,
+          storedAmount: 45,
+          rigs: rig,
+        ),
+      );
+      expect(card.state, MiningSiteCardState.operational);
+      expect(card.rate, greaterThan(0));
+      expect(
+        card.timeToFull,
+        Duration(
+          microseconds: ((card.capacity - 45) / card.rate * 1000000).ceil(),
+        ),
+      );
+    });
+
+    test('is null for full, idle, available, and locked cards', () {
+      expect(
+        landingBasin(
+          progress(
+            unlocked: true,
+            commissioned: true,
+            storedAmount: 90,
+            rigs: rig,
+          ),
+        ).timeToFull,
+        isNull,
+      );
+      expect(
+        landingBasin(progress(unlocked: true, commissioned: true)).timeToFull,
+        isNull,
+      );
+      final view = SiteDeckView.from(
+        state: stateWith(),
+        content: content,
+        isBusy: false,
+      );
+      for (final card in view.cards.values.where(
+        (card) => !card.isOperational,
+      )) {
+        expect(card.timeToFull, isNull, reason: card.name);
+      }
+      expect(
+        view.cards.values.map((card) => card.state),
+        containsAll([
+          MiningSiteCardState.available,
+          MiningSiteCardState.locked,
+        ]),
+      );
+    });
+
+    test('is null for an operational card with no rate', () {
+      final producing = landingBasin(
+        progress(
+          unlocked: true,
+          commissioned: true,
+          storedAmount: 45,
+          rigs: rig,
+        ),
+      );
+      final card = MiningSiteCardView(
+        id: producing.id,
+        definition: producing.definition,
+        state: producing.state,
+        isUnlocked: producing.isUnlocked,
+        isCommissioned: producing.isCommissioned,
+        deployedRigs: producing.deployedRigs,
+        cargo: producing.cargo,
+        capacity: producing.capacity,
+        rate: 0,
+        projectedValue: producing.projectedValue,
+        canEnter: producing.canEnter,
+        canUnlock: producing.canUnlock,
+        unlockCost: producing.unlockCost,
+        unlockDisabledReason: producing.unlockDisabledReason,
+        isBusy: producing.isBusy,
+      );
+      expect(card.isOperational, isTrue);
+      expect(card.timeToFull, isNull);
+    });
+  });
+
   group('MiningSaleAffordance', () {
     test('disables sale with busy copy while an action is in flight', () {
       final sale = MiningSaleAffordance.from(

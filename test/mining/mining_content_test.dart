@@ -21,6 +21,42 @@ void main() {
     }
   });
 
+  test('formats resource units with one decimal, then separators', () {
+    for (final entry in {
+      0.0: '0.0',
+      0.5: '0.5',
+      0.3: '0.3',
+      90.0: '90.0',
+      999.9: '999.9',
+      999.99: '999.9',
+      1000.0: '1,000',
+      12960.4: '12,960',
+      1250000.0: '1.25M',
+    }.entries) {
+      expect(formatMiningUnits(entry.key), entry.value, reason: '${entry.key}');
+    }
+  });
+
+  test('formats waits in whole minutes, rounding up', () {
+    for (final entry in {
+      Duration.zero: '0m',
+      const Duration(seconds: 59): '<1m',
+      const Duration(minutes: 1): '1m',
+      const Duration(minutes: 14): '14m',
+      const Duration(minutes: 14, seconds: 1): '15m',
+      const Duration(hours: 1, minutes: 52): '1h 52m',
+      const Duration(hours: 1, minutes: 52, seconds: 1): '1h 53m',
+      const Duration(hours: 2): '2h 00m',
+      const Duration(hours: 24): '24h 00m',
+    }.entries) {
+      expect(
+        formatMiningDuration(entry.key),
+        entry.value,
+        reason: '${entry.key}',
+      );
+    }
+  });
+
   test('keeps closed site, bay, and rig identities', () {
     expect(MiningSiteId.values, hasLength(9));
     expect(DockBayId.values.map((id) => id.name), ['b1', 'b2', 'b3', 'b4']);

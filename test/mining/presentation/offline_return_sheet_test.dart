@@ -25,7 +25,6 @@ void main() {
               padding: EdgeInsets.zero,
               child: OfflineReturnSheet(
                 content: MiningContentRegistry.stellarMining(),
-                logisticsLevel: 3,
                 summary: const OfflineProductionSummary(
                   elapsedUsed: Duration(hours: 16),
                   produced: {ResourceType.gold: 742.5},
@@ -53,7 +52,9 @@ void main() {
     expect(tester.getRect(report).top, 52);
     expect(tester.getRect(report).left, 421);
     expect(tester.getRect(button).bottom, lessThanOrEqualTo(402));
-    expect(find.textContaining('Logistics LV 3'), findsOneWidget);
+    expect(find.text('Away\n16h 00m'), findsOneWidget);
+    expect(find.text('Capped at 16h 00m.'), findsOneWidget);
+    expect(find.textContaining('Logistics'), findsNothing);
     expect(
       tester.getRect(find.byKey(const Key('offline-return-cap'))).bottom,
       lessThanOrEqualTo(402),
@@ -198,17 +199,17 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('renders the Logistics 2 offline cap in the capped message', (
+  testWidgets('renders the capped duration without a Logistics level', (
     tester,
   ) async {
     final content = MiningContentRegistry.stellarMining();
-    final summary = OfflineProductionSummary(
-      elapsedUsed: content.offlineCapFor(2),
-      produced: const {ResourceType.gold: 1.0},
-      productionByPlanet: const {
+    const summary = OfflineProductionSummary(
+      elapsedUsed: Duration(hours: 12),
+      produced: {ResourceType.gold: 1.0},
+      productionByPlanet: {
         MiningPlanetId.homeworld: {ResourceType.gold: 1.0},
       },
-      fullSites: const {},
+      fullSites: {},
       wasOfflineCapped: true,
     );
 
@@ -221,11 +222,37 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Capped at 12h 00m'), findsOneWidget);
+    expect(find.text('Capped at 12h 00m.'), findsOneWidget);
+    expect(find.textContaining('Logistics'), findsNothing);
     expect(
       find.text('Offline production was capped at 8 hours.'),
       findsNothing,
     );
+  });
+
+  testWidgets('renders large hauls as whole separated units', (tester) async {
+    const summary = OfflineProductionSummary(
+      elapsedUsed: Duration(hours: 2),
+      produced: {ResourceType.gold: 12960.4},
+      productionByPlanet: {
+        MiningPlanetId.homeworld: {ResourceType.gold: 12960.4},
+      },
+      fullSites: {},
+      wasOfflineCapped: false,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: OfflineReturnSheet(
+            summary: summary,
+            content: MiningContentRegistry.stellarMining(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('+12,960'), findsOneWidget);
+    expect(find.text('Away\n2h 00m'), findsOneWidget);
   });
 
   testWidgets('keeps the continue action reachable at phone text scale', (

@@ -200,7 +200,6 @@ class _MiningShellState extends State<MiningShell>
       OfflineReturnSheet(
         summary: summary,
         content: _content,
-        logisticsLevel: _displayState.technology.logistics,
         cash: _displayState.cash,
       ),
     );
