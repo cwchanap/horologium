@@ -152,8 +152,8 @@ void main() {
         content: content,
       );
       final logistics = view.track(TechnologyTrack.logistics);
-      expect(logistics.currentEffect, 'Storage ×1.00 · fills in 2h 00m');
-      expect(logistics.nextEffect, 'Storage ×1.15 · fills in 2h 18m');
+      expect(logistics.currentEffect, 'Storage ×1.00 · fills in 2h 00m at T1');
+      expect(logistics.nextEffect, 'Storage ×1.15 · fills in 2h 18m at T1');
     });
 
     test('logistics fill window shortens with current Extraction', () {
@@ -165,8 +165,8 @@ void main() {
         content: content,
       );
       final logistics = view.track(TechnologyTrack.logistics);
-      expect(logistics.currentEffect, 'Storage ×1.15 · fills in 1h 09m');
-      expect(logistics.nextEffect, 'Storage ×1.30 · fills in 1h 18m');
+      expect(logistics.currentEffect, 'Storage ×1.15 · fills in 1h 09m at T1');
+      expect(logistics.nextEffect, 'Storage ×1.30 · fills in 1h 18m at T1');
     });
 
     test(

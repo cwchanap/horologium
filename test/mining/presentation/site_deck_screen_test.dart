@@ -537,7 +537,7 @@ void main() {
 
   testWidgets('keeps small landscape cargo unseparated', (tester) async {
     for (final (stored, status) in const [
-      (0.0, '0.50/s  ·  0 / 3,600\nFULL IN 2H 00M'),
+      (0.0, '0.50/s  ·  0.0 / 3,600\nFULL IN 2H 00M'),
       (12.5, '0.50/s  ·  12.5 / 3,600\nFULL IN 2H 00M'),
     ]) {
       final state = _stateWith(

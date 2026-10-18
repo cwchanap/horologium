@@ -166,7 +166,7 @@ class MiningCargoGauge extends StatelessWidget {
     final progress = capacity <= 0 ? 0.0 : (cargo / capacity).clamp(0.0, 1.0);
     final label =
         semanticLabel ??
-        'Cargo ${_amount(cargo)} of ${_amount(capacity)}, value ${formatMiningCash(projectedValue)} cash';
+        'Cargo ${formatMiningUnits(cargo)} of ${formatMiningUnits(capacity)}, value ${formatMiningCash(projectedValue)} cash';
     return Semantics(
       button: onPressed != null,
       enabled: onPressed != null,
@@ -220,7 +220,7 @@ class MiningCargoGauge extends StatelessWidget {
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          _amount(cargo),
+                          formatMiningUnits(cargo),
                           maxLines: 1,
                           style: TextStyle(
                             color: MiningTheme.accent,
@@ -248,12 +248,6 @@ class MiningCargoGauge extends StatelessWidget {
       ),
     );
   }
-
-  static String _amount(double value) => value >= 1000
-      ? formatMiningUnits(value)
-      : value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(1);
 }
 
 class _CashChipBorder extends OutlinedBorder {

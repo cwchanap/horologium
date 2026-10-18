@@ -117,7 +117,7 @@ Resource amounts on the offline-return sheet reach about 13,000 units per planet
 
 - Offline-return headline: `Mining ran\n{elapsed}` becomes `Away\n{elapsed}`, where `{elapsed}` is the full time away (the summary's new `elapsedAway`), not the capped `elapsedUsed`. The existing `Storage full: {site}.` lines already say which sites stopped.
 - The cap note becomes `Capped at 24h 00m.` with no Logistics level, since Logistics no longer changes the cap.
-- Logistics effect: `Storage ×1.15 · fills in 2h 18m`, where the window is computed at the player's current Extraction level (`2h × Logistics multiplier ÷ Extraction multiplier`).
+- Logistics effect: `Storage ×1.15 · fills in 2h 18m at T1`, where the window is the T1-rig baseline computed at the player's current Extraction level (`2h × Logistics multiplier ÷ Extraction multiplier`). Upgraded rigs fill faster, so Site Deck cards carry the actual `timeToFull`.
 
 ### 7. Persistence is unchanged
 

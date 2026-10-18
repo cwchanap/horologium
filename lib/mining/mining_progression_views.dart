@@ -140,7 +140,7 @@ class TechnologySheetView {
                   .round(),
         );
         return 'Storage ×${storage.toStringAsFixed(2)}'
-            ' · fills in ${formatMiningDuration(window)}';
+            ' · fills in ${formatMiningDuration(window)} at T1';
       case TechnologyTrack.surveying:
         final unlockedPlanets = content.planets.values.where(
           (planet) => state.unlockedPlanetIds.contains(planet.id),
