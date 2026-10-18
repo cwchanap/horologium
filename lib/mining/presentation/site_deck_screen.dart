@@ -922,11 +922,11 @@ class _SiteCard extends StatelessWidget {
                   : 'Previous site required')
         : card.isCargoFull
         ? 'FULL · ${card.rate.toStringAsFixed(2)}/s · '
-              '${_amount(card.cargo)} / ${_amount(card.capacity)}\n'
+              '${formatMiningUnits(card.cargo)} / ${formatMiningUnits(card.capacity)}\n'
               'SELL TO RESUME'
         : card.rate <= 0
         ? 'IDLE'
-        : '${card.rate.toStringAsFixed(2)}/s  ·  ${_amount(card.cargo)} / ${_amount(card.capacity)}'
+        : '${card.rate.toStringAsFixed(2)}/s  ·  ${formatMiningUnits(card.cargo)} / ${formatMiningUnits(card.capacity)}'
               '${card.timeToFull == null ? '' : '\nFULL IN ${formatMiningDuration(card.timeToFull!).toUpperCase()}'}';
     return Semantics(
       container: true,
@@ -1135,12 +1135,6 @@ class _SiteCard extends StatelessWidget {
         return MiningTheme.accent.withAlpha(180);
     }
   }
-
-  static String _amount(double value) => value >= 1000
-      ? formatMiningUnits(value)
-      : value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(1);
 }
 
 class _StateChip extends StatelessWidget {
