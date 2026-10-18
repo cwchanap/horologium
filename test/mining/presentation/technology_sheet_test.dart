@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -295,23 +296,27 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('purchase buttons fall back to a cash icon without the asset', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: DefaultAssetBundle(
-          bundle: _MissingCashIconBundle(),
-          child: Scaffold(
-            body: TechnologySheet(view: _highCostView(), onPurchase: (_) {}),
+  testWidgets(
+    'purchase buttons fall back to a cash icon without the asset',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DefaultAssetBundle(
+            bundle: _MissingCashIconBundle(),
+            child: Scaffold(
+              body: TechnologySheet(view: _highCostView(), onPurchase: (_) {}),
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.paid), findsWidgets);
-  });
+      expect(find.byIcon(Icons.paid), findsWidgets);
+    },
+    // A failing asset bundle needs the VM image path; web loads images by URL
+    // and never asks the bundle.
+    skip: kIsWeb,
+  );
 
   testWidgets('a 750,000 cost fits the landscape button at text scale 1.3', (
     tester,
