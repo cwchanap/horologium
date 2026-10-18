@@ -4,6 +4,7 @@ import 'package:horologium/mining/mining_state.dart';
 
 class OfflineProductionSummary {
   const OfflineProductionSummary({
+    required this.elapsedAway,
     required this.elapsedUsed,
     required this.produced,
     required this.productionByPlanet,
@@ -11,6 +12,7 @@ class OfflineProductionSummary {
     required this.wasOfflineCapped,
   });
 
+  final Duration elapsedAway;
   final Duration elapsedUsed;
   final Map<ResourceType, double> produced;
   final Map<MiningPlanetId, Map<ResourceType, double>> productionByPlanet;
@@ -38,6 +40,7 @@ class MiningSimulation {
       return AccrualResult(
         state: state,
         summary: const OfflineProductionSummary(
+          elapsedAway: Duration.zero,
           elapsedUsed: Duration.zero,
           produced: {},
           productionByPlanet: {},
@@ -100,6 +103,7 @@ class MiningSimulation {
     return AccrualResult(
       state: state.copyWith(lastAccruedAtUtc: now, sites: sites),
       summary: OfflineProductionSummary(
+        elapsedAway: rawElapsed,
         elapsedUsed: elapsed,
         produced: Map.unmodifiable(produced),
         productionByPlanet:

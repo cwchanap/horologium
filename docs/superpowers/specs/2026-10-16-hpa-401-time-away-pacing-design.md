@@ -115,7 +115,7 @@ Resource amounts on the offline-return sheet reach about 13,000 units per planet
 
 ### 6. Honest copy
 
-- Offline-return headline: `Mining ran\n{elapsed}` becomes `Away\n{elapsed}`. The existing `Storage full: {site}.` lines already say which sites stopped.
+- Offline-return headline: `Mining ran\n{elapsed}` becomes `Away\n{elapsed}`, where `{elapsed}` is the full time away (the summary's new `elapsedAway`), not the capped `elapsedUsed`. The existing `Storage full: {site}.` lines already say which sites stopped.
 - The cap note becomes `Capped at 24h 00m.` with no Logistics level, since Logistics no longer changes the cap.
 - Logistics effect: `Storage ×1.15 · fills in 2h 18m`, where the window is computed at the player's current Extraction level (`2h × Logistics multiplier ÷ Extraction multiplier`).
 
@@ -146,7 +146,7 @@ The implementation re-measures this deterministically with the public-action jou
 - **Formatting:** `formatMiningCash` at 0, 999, 1,000, 999,999, 1,000,000, 1,250,000, 16,000,000, and 1,000,000,000; `formatMiningDuration` at 0, 30 s, 59 s, 61 s, 14 m, 1 h 52 m 01 s, and 24 h; `formatMiningUnits` at 0, 0.5, 90, 999.9, 1,000, 12,960.4, and 1,250,000.
 - **Views:** `timeToFull` for idle, operational, full, and zero-rate sites; Logistics copy at Extraction 0 and 5.
 - **Widgets:** Site Deck card shows `FULL IN …` and no overflow at 360×640 / text scale 1.3 with a `16.00M` cash chip and Mars-sized prices; offline-return headline `Away`; the cap note; Technology, Stellar Map, Fleet Dock, and Sell labels show compact amounts.
-- **Journey:** `merge_mining_journey_test.dart` keeps its public-action route and next-goal checkpoints, waits in storage windows rather than 5-minute steps, buys the extra rigs the route needs, and still reaches Mars mastery and the single 20,000,000 reward. It runs at two-hour and six-hour steps and asserts Mars mastery within 30–60 hours and 2–4 days of clock time respectively; that is the pacing evidence and merge gate.
+- **Journey:** `merge_mining_journey_test.dart` keeps its public-action route and next-goal checkpoints, waits in storage windows rather than 5-minute steps, buys the extra rigs the route needs, and still reaches Mars mastery and the single 20,000,000 reward. It runs at two-hour and six-hour steps and asserts Mars mastery within 24–60 hours and 2–4 days of clock time respectively; that is the pacing evidence and merge gate.
 - **UX check:** one sitting on an emulator or simulator, moving the device clock forward between sessions (no debug clock is added), checking copy, overflow, and feel; recorded under `docs/playtests/`. It is not a pacing measurement and never waits on wall-clock days.
 
 ## Risks

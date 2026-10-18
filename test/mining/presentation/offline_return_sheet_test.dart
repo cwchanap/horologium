@@ -26,6 +26,7 @@ void main() {
               child: OfflineReturnSheet(
                 content: MiningContentRegistry.stellarMining(),
                 summary: const OfflineProductionSummary(
+                  elapsedAway: Duration(hours: 16),
                   elapsedUsed: Duration(hours: 16),
                   produced: {ResourceType.gold: 742.5},
                   productionByPlanet: {
@@ -76,6 +77,7 @@ void main() {
     });
 
     const summary = OfflineProductionSummary(
+      elapsedAway: Duration(hours: 2),
       elapsedUsed: Duration(hours: 2),
       produced: {
         ResourceType.gold: 5.0,
@@ -199,11 +201,12 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('renders the capped duration without a Logistics level', (
+  testWidgets('shows the full time away and the capped duration', (
     tester,
   ) async {
     final content = MiningContentRegistry.stellarMining();
     const summary = OfflineProductionSummary(
+      elapsedAway: Duration(hours: 30),
       elapsedUsed: Duration(hours: 12),
       produced: {ResourceType.gold: 1.0},
       productionByPlanet: {
@@ -222,6 +225,7 @@ void main() {
     );
     await tester.pump();
 
+    expect(find.text('Away\n30h 00m'), findsOneWidget);
     expect(find.text('Capped at 12h 00m.'), findsOneWidget);
     expect(find.textContaining('Logistics'), findsNothing);
     expect(
@@ -232,6 +236,7 @@ void main() {
 
   testWidgets('renders large hauls as whole separated units', (tester) async {
     const summary = OfflineProductionSummary(
+      elapsedAway: Duration(hours: 2),
       elapsedUsed: Duration(hours: 2),
       produced: {ResourceType.gold: 12960.4},
       productionByPlanet: {
@@ -265,6 +270,7 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
     const summary = OfflineProductionSummary(
+      elapsedAway: Duration(minutes: 30),
       elapsedUsed: Duration(minutes: 30),
       produced: {ResourceType.gold: 1},
       productionByPlanet: {
