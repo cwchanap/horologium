@@ -79,7 +79,7 @@ class FleetDockView {
         : !hasEmptyBay
         ? 'Dock is full.'
         : state.cash < spawnCost
-        ? 'Need $spawnCost cash.'
+        ? 'Need ${formatMiningCash(spawnCost)} cash.'
         : null;
 
     final bays = <DockBayId, FleetDockBayView>{};
@@ -121,7 +121,7 @@ class FleetDockView {
       canSpawn: canSpawn,
       spawnDisabledReason: spawnDisabledReason,
       spawnHint: canSpawn
-          ? 'Spawn a T1 rig for $spawnCost cash.'
+          ? 'Spawn a T1 rig for ${formatMiningCash(spawnCost)} cash.'
           : spawnDisabledReason,
       dockHint: dockHint,
       isBusy: isBusy,

@@ -3,6 +3,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/presentation/mining_hud.dart';
 
 void main() {
+  testWidgets('cash chip shows and announces compact millions', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: Align(child: MiningCashChip(cash: 16000000))),
+    );
+
+    expect(find.text('16.00M'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^Cash 16\.00M')), findsOneWidget);
+  });
+
   testWidgets('cash chip keeps the prototype one-sided trapezoid and alpha', (
     tester,
   ) async {
@@ -17,7 +26,7 @@ void main() {
     final rect = tester.getRect(find.byKey(const Key('mining-cash-chip')));
     expect(rect.height, 46);
     expect(find.text('1,840'), findsOneWidget);
-    expect(find.bySemanticsLabel(RegExp(r'^Cash 1840')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^Cash 1,840')), findsOneWidget);
     final path = decoration.shape.getOuterPath(
       Rect.fromLTWH(0, 0, rect.width, rect.height),
     );

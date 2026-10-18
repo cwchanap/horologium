@@ -454,7 +454,7 @@ class _MiningShellState extends State<MiningShell>
             }
             _showResult(
               result.isSuccess
-                  ? 'Sold ${result.revenue} cash.'
+                  ? 'Sold ${formatMiningCash(result.revenue!)} cash.'
                   : result.message ?? 'Sale failed.',
             );
           })

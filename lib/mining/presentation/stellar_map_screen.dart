@@ -765,7 +765,7 @@ class _PlanetAction extends StatelessWidget {
           shape: const StadiumBorder(),
         ),
         child: canUnlock
-            ? Text('UNLOCK FOR ${view.unlockCashCost} CASH')
+            ? Text('UNLOCK FOR ${formatMiningCash(view.unlockCashCost)} CASH')
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

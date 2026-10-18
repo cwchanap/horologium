@@ -173,7 +173,7 @@ class _SpawnHex extends StatelessWidget {
               ),
               if (showRig) const SizedBox(width: 2),
               Text(
-                '${view.spawnCost}',
+                formatMiningCash(view.spawnCost),
                 style: TextStyle(
                   color: MiningTheme.highlight,
                   fontSize: showRig ? 9 : 8,
