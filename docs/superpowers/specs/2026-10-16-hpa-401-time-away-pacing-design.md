@@ -1,7 +1,7 @@
 # HPA-401 Time-Away Pacing Design
 
 - Date: 2026-10-16
-- Status: Draft for review
+- Status: Implemented
 - Linear: [HPA-401](https://linear.app/cwchanap/issue/HPA-401/mining-pacing-make-time-away-pay-with-hour-long-storage) — Make time away pay with hour-long storage
 - Baseline: `main` at `8f0881f` after PR #35
 
