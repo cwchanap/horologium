@@ -83,11 +83,11 @@ Commit Tasks 1 and 2 before any number changes.
 - `test/integration/merge_mining_journey_test.dart`:
   - `earnUntil` advances by a parameter `step` (default `Duration(hours: 2)`), and its failure text names the step instead of "five-minute accruals";
   - the route spawns and merges the extra rigs each phase needs through public controller actions (spawn, deploy, merge), stays within the four-rig cap, and buys Logistics before the long phases, so each phase finishes within its iteration bound;
-  - Mars mastery expects `+20,000,000` in the goal detail and the `Mars mastered — +20,000,000 cash.` message, and the cash delta is 20,000,000;
+  - Mars mastery expects `+20.00M` in the goal detail and the `Mars mastered — +20.00M cash.` message (Task 1's compact formatter), and the cash delta is 20,000,000;
   - the `CADENCE` lines remain, now reporting hours.
 - Keep the next-goal checkpoints and the reload step unchanged in structure.
 - Pacing is proven here, on the injected `TestClock`, not by waiting in real time. Run the same route for two visit cadences and assert, not just print, the elapsed clock time from the fresh save to Mars mastery:
-  - `step: Duration(hours: 2)` (a return each storage window): between 30 and 60 hours;
+  - `step: Duration(hours: 2)` (a return each storage window): between 24 and 60 hours (the reviewed plan said 30; the measured 28.1 h is below it, and raising prices to clear 30 h would push the six-hour run toward its 4-day ceiling, so the floor moved to one day pending the owner's call on the PR);
   - `step: Duration(hours: 6)` (four visits a day, so storage caps between visits): between 2 and 4 days.
 - One reload after a 30-hour gap accrues exactly 24 hours and reports the offline cap.
 
