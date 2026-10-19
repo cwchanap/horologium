@@ -26,8 +26,8 @@ void main() {
               child: OfflineReturnSheet(
                 content: MiningContentRegistry.stellarMining(),
                 summary: const OfflineProductionSummary(
-                  elapsedAway: Duration(hours: 16),
-                  elapsedUsed: Duration(hours: 16),
+                  elapsedAway: Duration(hours: 30),
+                  elapsedUsed: Duration(hours: 24),
                   produced: {ResourceType.gold: 742.5},
                   productionByPlanet: {
                     MiningPlanetId.homeworld: {
@@ -53,8 +53,8 @@ void main() {
     expect(tester.getRect(report).top, 52);
     expect(tester.getRect(report).left, 421);
     expect(tester.getRect(button).bottom, lessThanOrEqualTo(402));
-    expect(find.text('Away\n16h 00m'), findsOneWidget);
-    expect(find.text('Capped at 16h 00m.'), findsOneWidget);
+    expect(find.text('Away\n30h 00m'), findsOneWidget);
+    expect(find.text('Capped at 24h 00m.'), findsOneWidget);
     expect(find.textContaining('Logistics'), findsNothing);
     expect(
       tester.getRect(find.byKey(const Key('offline-return-cap'))).bottom,
@@ -207,7 +207,7 @@ void main() {
     final content = MiningContentRegistry.stellarMining();
     const summary = OfflineProductionSummary(
       elapsedAway: Duration(hours: 30),
-      elapsedUsed: Duration(hours: 12),
+      elapsedUsed: Duration(hours: 24),
       produced: {ResourceType.gold: 1.0},
       productionByPlanet: {
         MiningPlanetId.homeworld: {ResourceType.gold: 1.0},
@@ -226,7 +226,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Away\n30h 00m'), findsOneWidget);
-    expect(find.text('Capped at 12h 00m.'), findsOneWidget);
+    expect(find.text('Capped at 24h 00m.'), findsOneWidget);
   });
 
   testWidgets('renders large hauls as whole separated units', (tester) async {
