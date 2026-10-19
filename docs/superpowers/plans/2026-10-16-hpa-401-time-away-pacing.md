@@ -81,7 +81,7 @@ Commit Tasks 1 and 2 before any number changes.
 ## Task 4: Re-baseline the public-action journey
 
 - `test/integration/merge_mining_journey_test.dart`:
-  - `earnUntil` advances by a parameter `step` (default `Duration(hours: 2)`), and its failure text names the step instead of "five-minute accruals";
+  - `earnUntil` advances by a parameter `step` (default `Duration(hours: 2)`), and its failure text names the step instead of "five-minute accruals" (merged as a `JourneyPlayer.step` field defaulting to one minute for the active-play opening; the journey sets the 2h/6h cadence before the return phases);
   - the route spawns and merges the extra rigs each phase needs through public controller actions (spawn, deploy, merge), stays within the four-rig cap, and buys Logistics before the long phases, so each phase finishes within its iteration bound;
   - Mars mastery expects `+20.00M` in the goal detail and the `Mars mastered — +20.00M cash.` message (Task 1's compact formatter), and the cash delta is 20,000,000;
   - the `CADENCE` lines remain, now reporting hours.
