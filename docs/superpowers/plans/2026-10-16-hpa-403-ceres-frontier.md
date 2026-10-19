@@ -40,10 +40,10 @@ flutter test test/resources test/mining/mining_content_test.dart \
 
 No production change is expected. Add characterization tests; change code only where a test exposes a generic bug.
 
-- `test/mining/mining_controller_test.dart`: Ceres unlock guard order (Mars mastery, Surveying 5, cash) and success effects; the final Mars commission returns no message and adds no cash; the final Ceres commission adds 30,000,000 once with `Ceres mastered — +30,000,000 cash.`.
+- `test/mining/mining_controller_test.dart`: Ceres unlock guard order (Mars mastery, Surveying 5, cash) and success effects; the final Mars commission returns no message and adds no cash; the final Ceres commission adds 30,000,000 once with `Ceres mastered — +30.00M cash.`.
 - `test/mining/mining_simulation_test.dart`: one window over four unlocked planets; a full Ceres site; a locked Ceres producing nothing.
 - `test/mining/mining_progression_views_test.dart`: Stellar Map hides Ceres before Mars is unlocked and shows it locked with Mars as prerequisite afterwards; Surveying copy `12 of 12` with all planets unlocked.
-- `test/mining/next_goal_view_test.dart`: Mars last site shows no reward line; ladder goes Mars mastery → `Unlock Ceres Frontier` → Ceres sites → `All frontiers mastered`; last Ceres site shows `+30,000,000`.
+- `test/mining/next_goal_view_test.dart`: Mars last site shows no reward line; ladder goes Mars mastery → `Unlock Ceres Frontier` → Ceres sites → `All frontiers mastered`; last Ceres site shows `+30.00M`.
 
 ```sh
 flutter test test/mining
@@ -59,7 +59,7 @@ flutter test test/mining
 
 - `test/mining/presentation/site_deck_screen_test.dart`, `stellar_map_screen_test.dart`, `offline_return_sheet_test.dart`: a Ceres deck, a locked and an unlocked Ceres card, and a Ceres offline section, at 360×640 and 430×932 with no overflow.
 - `stellar_map_screen_test.dart`: the locked Ceres card's unlock copy shows the compact amount (`30.00M`), not raw digits. HPA-401 Task 1 already routes `stellar_map_screen.dart:768` through `formatMiningCash`; if this assertion fails, fix that string generically with its own test.
-- `test/integration/merge_mining_journey_test.dart`: after Mars, expect no reward and the next goal `Unlock Ceres Frontier`; earn to 30,000,000 with HPA-401's two-hour steps; unlock Ceres and check its starter dock and site; merge, deploy, commission Nickel Shoals, Platinum Rift, and Iridium Spire; expect the single 30,000,000 reward and `All frontiers mastered`; reload on Ceres. Keep the `CADENCE` and `SEQUENCE` lines and update the test name to "through Ceres".
+- `test/integration/merge_mining_journey_test.dart`: after Mars, expect no reward and the next goal `Unlock Ceres Frontier`; earn to 30,000,000 at both of HPA-401's cadences (two-hour and six-hour visits); unlock Ceres and check its starter dock and site; merge, deploy, commission Nickel Shoals, Platinum Rift, and Iridium Spire; expect the single 30,000,000 reward and `All frontiers mastered`; reload on Ceres. Keep the `CADENCE`, `SEQUENCE`, and `MASTERY` lines, keep the existing Mars bands (24–60 h and 2–4 days), add a Ceres-mastery band per cadence from the measured times, and update the test name to "through Ceres".
 
 ```sh
 flutter test test/integration/merge_mining_journey_test.dart test/mining/presentation

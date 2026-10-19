@@ -3,7 +3,7 @@
 - Date: 2026-10-16
 - Status: Draft for review
 - Linear: [HPA-403](https://linear.app/cwchanap/issue/HPA-403/ship-a-fourth-planet-content-pack-after-mars) — Ship a fourth planet content pack after Mars
-- Baseline: `main` at `8f0881f`, plus HPA-401 (time-away pacing), which blocks this ticket
+- Baseline: `main` at `0affef0`, which includes HPA-401 (time-away pacing, PR #37)
 - Depends on: [HPA-439](https://linear.app/cwchanap/issue/HPA-439/mining-art-ceres-frontier-planet-cavern-and-node-art) — Ceres planet, cavern, and node art (art only, its own PR)
 - Precedent: `docs/superpowers/specs/2026-08-22-hpa-641-mars-frontier-content-pack-design.md`
 
@@ -20,7 +20,7 @@ This work does not add:
 - a technology level above 5, a Surveying 6 gate, a new technology track, or a new currency;
 - a generic content, requirement, or reward engine, or a per-planet simulation rule;
 - a fifth planet slot, procedural sites, or randomized content;
-- an animated Ceres site (Landing Basin stays the only animated site; Frozen Basin is HPA-418);
+- an animated Ceres site (Landing Basin and Frozen Basin stay the only animated sites);
 - a save version, migration, or compatibility reader.
 
 ## Content
@@ -81,7 +81,7 @@ Art is its own task and PR, [HPA-439](https://linear.app/cwchanap/issue/HPA-439/
 
 ### 1. The completion reward moves from Mars to Ceres
 
-HPA-641 made the Mars reward "a completion flourish, not funding for another tier". With a fourth planet, a Mars reward would fund the Ceres unlock. So Mars' `masteryRewardCash` becomes 0 and Ceres gets 30,000,000, about the size of its unlock, keeping HPA-641's proportion. The controller and next-goal ladder already handle any planet's reward generically, so the message becomes `Ceres mastered — +30,000,000 cash.` with no code change.
+HPA-641 made the Mars reward "a completion flourish, not funding for another tier". With a fourth planet, a Mars reward would fund the Ceres unlock. So Mars' `masteryRewardCash` becomes 0 and Ceres gets 30,000,000, about the size of its unlock, keeping HPA-641's proportion. The controller and next-goal ladder already handle any planet's reward generically, so the message becomes `Ceres mastered — +30.00M cash.` (HPA-401's compact formatter) with no code change.
 
 The game still grants exactly one mastery reward.
 
@@ -89,13 +89,15 @@ The game still grants exactly one mastery reward.
 
 Using HPA-401's greedy-player model with the content above:
 
-| Scenario | Mars mastery (HPA-401) | Ceres unlock | Ceres mastery |
+| Scenario | Mars mastery (HPA-401 model) | Ceres unlock | Ceres mastery |
 | --- | ---: | ---: | ---: |
 | Four visits a day | 66 h (11 visits) | 84.5 h (14) | 128 h, about 5.3 days (21) |
 | One visit every 8 hours | 88 h (11) | 112 h (14) | 168 h, about 7 days (21) |
 | Active, sells every minute | 17.5 h | 22.8 h | 34.5 h |
 
 Visit counts are return visits after the 15-minute opening session, as in HPA-401. They match HPA-401's 11 visits to Mars mastery.
+
+These rows are model estimates. HPA-401's journey later measured Mars mastery at 78 h with six-hour visits and 28.1 h with two-hour visits, so the real Ceres times will run longer than the table. The implementation re-measures them on the journey clock (plan Task 3).
 
 Ceres adds about two and a half days of four short visits, close to the Lunar-to-Mars span. Larger unlock prices stretch the Iridium Spire wait first: at a 60,000,000 unlock the same player needs 7.3 days, with a two-day gap before Iridium Spire, so 30,000,000 was kept. The highest single amount a player sees is the 45,000,000 Iridium Spire unlock, which HPA-401's compact formatter shows as `45.00M`.
 
@@ -131,12 +133,12 @@ Everything else (controller, simulation, repository, Stellar Map, next-goal ladd
 - **State and repository:** initial state has Ceres docks empty and its sites locked; a current twelve-site save round-trips; a nine-site save without `ceresFrontier` clean-resets with the recovered flag; a locked Ceres with a docked rig or an unlocked site is rejected.
 - **Controller:** `unlockPlanet(ceresFrontier)` fails before Mars mastery, below Surveying 5, and below 30,000,000 cash, and on success debits, activates, docks two T1 rigs, unlocks Nickel Shoals, and saves once; Mars mastery grants nothing; the final Ceres commission grants 30,000,000 once with the Ceres message.
 - **Simulation:** four unlocked planets accrue in one window; inactive Ceres cargo is kept and only the active planet sells.
-- **Views:** Stellar Map shows Ceres only after Mars is unlocked, with Mars as its prerequisite; next-goal ladder walks Mars mastery → Unlock Ceres Frontier → its sites → `All frontiers mastered`, and the last Ceres site shows `+30,000,000`; Surveying copy counts twelve sites when all planets are unlocked; the offline-return sheet lists a Ceres section.
+- **Views:** Stellar Map shows Ceres only after Mars is unlocked, with Mars as its prerequisite; next-goal ladder walks Mars mastery → Unlock Ceres Frontier → its sites → `All frontiers mastered`, and the last Ceres site shows `+30.00M`; Surveying copy counts twelve sites when all planets are unlocked; the offline-return sheet lists a Ceres section.
 - **Widgets:** Ceres Site Deck, Mine Site, and Stellar Map at 360×640 and 430×932 with no overflow and the new art resolving.
 - **Journey:** `merge_mining_journey_test.dart` continues past Mars mastery (now no reward) through Ceres unlock and mastery with the single 30,000,000 reward, then reloads on Ceres.
 
 ## Risks
 
-- **Order with HPA-401.** All prices assume HPA-401's storage and pricing. If HPA-401's numbers change after its playtest, Ceres' unlock, spawn, and site prices scale by the same factor as Mars'.
+- **Order with HPA-401.** All prices assume HPA-401's storage and pricing, which merged unchanged. HPA-401's UX check noted that Mars rigs never pay back before the next target, so Mars progress is funded by older planets; a 7,500,000 Ceres spawn behaves the same way, which the journey will show.
 - **Art timing.** The seven images come from HPA-439, and this ticket's implementation waits for it. If the art slips, the planning PR simply stays in draft; no placeholder images are committed.
 - **Stale exhaustive assertions.** Tests that list nine sites or nine resources break. Search for exact enum lists and counts, as HPA-641 did.
