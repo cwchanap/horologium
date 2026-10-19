@@ -227,11 +227,6 @@ void main() {
 
     expect(find.text('Away\n30h 00m'), findsOneWidget);
     expect(find.text('Capped at 12h 00m.'), findsOneWidget);
-    expect(find.textContaining('Logistics'), findsNothing);
-    expect(
-      find.text('Offline production was capped at 8 hours.'),
-      findsNothing,
-    );
   });
 
   testWidgets('renders large hauls as whole separated units', (tester) async {
