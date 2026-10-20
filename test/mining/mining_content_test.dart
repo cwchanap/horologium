@@ -657,6 +657,9 @@ void main() {
       MiningSiteId.ochreBasin: [0, 0, 0, 0, 0, 4],
       MiningSiteId.silicaDunes: [0, 0, 0, 0, 0, 4],
       MiningSiteId.cobaltChasm: [0, 0, 0, 0, 0, 4],
+      MiningSiteId.nickelShoals: [0, 0, 0, 0, 0, 4],
+      MiningSiteId.platinumRift: [0, 0, 0, 0, 0, 4],
+      MiningSiteId.iridiumSpire: [0, 0, 0, 0, 0, 4],
     };
 
     for (final entry in expectedBySite.entries) {

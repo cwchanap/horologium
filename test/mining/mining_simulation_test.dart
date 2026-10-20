@@ -293,7 +293,6 @@ void main() {
       sites: {
         ...base.sites,
         MiningSiteId.nickelShoals: progress(
-          unlocked: false,
           rigs: [
             MiningRigPlacement(
               tier: RigTier.t1,
