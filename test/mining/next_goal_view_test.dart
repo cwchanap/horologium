@@ -28,6 +28,10 @@ final _lunarSites = _content
     .planet(MiningPlanetId.lunarFrontier)
     .sites
     .map((site) => site.id);
+final _marsSites = _content
+    .planet(MiningPlanetId.marsFrontier)
+    .sites
+    .map((site) => site.id);
 
 MiningSave _stateWith({
   int? cash,
@@ -256,11 +260,15 @@ void main() {
       expect(goal.target, const MiningGoalTarget.stellarMap());
     });
 
-    test('the last rewarded site names the mastery reward', () {
+    test('the last Mars site no longer names a reward', () {
       final goal = _goal(
         _stateWith(
           technology: const TechnologyLevels(surveying: 5),
-          unlockedPlanetIds: MiningPlanetId.values.toSet(),
+          unlockedPlanetIds: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+            MiningPlanetId.marsFrontier,
+          },
           activePlanetId: MiningPlanetId.marsFrontier,
           docks: {MiningPlanetId.marsFrontier: _dock(RigTier.t1)},
           sites: {
@@ -274,9 +282,91 @@ void main() {
       );
 
       expect(goal.title, 'Commission Cobalt Chasm');
+      expect(goal.detail, 'Deploy a rig beside a resource.');
+    });
+
+    test('Mars mastery points at the Ceres unlock', () {
+      final goal = _goal(
+        _stateWith(
+          cash: 1_000_000,
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanetIds: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+            MiningPlanetId.marsFrontier,
+          },
+          activePlanetId: MiningPlanetId.marsFrontier,
+          sites: {
+            ..._commissionedSites(_homeworldSites),
+            ..._commissionedSites(_lunarSites),
+            ..._commissionedSites(_marsSites),
+          },
+        ),
+      );
+
+      expect(goal.kind, MiningGoalKind.unlockPlanet);
+      expect(goal.title, 'Unlock Ceres Frontier');
+      expect(goal.cashCost, 30000000);
+      expect(goal.cashLabel, '1.00M / 30.00M');
+      expect(goal.target, const MiningGoalTarget.stellarMap());
+    });
+
+    test('the Ceres ladder walks its sites in order', () {
+      MiningNextGoalView ceresGoal(Map<MiningSiteId, SiteProgress> ceres) =>
+          _goal(
+            _stateWith(
+              technology: const TechnologyLevels(surveying: 5),
+              unlockedPlanetIds: MiningPlanetId.values.toSet(),
+              activePlanetId: MiningPlanetId.ceresFrontier,
+              docks: {MiningPlanetId.ceresFrontier: _dock(RigTier.t1)},
+              sites: {
+                ..._commissionedSites(_homeworldSites),
+                ..._commissionedSites(_lunarSites),
+                ..._commissionedSites(_marsSites),
+                ...ceres,
+              },
+            ),
+          );
+
+      expect(
+        ceresGoal({MiningSiteId.nickelShoals: _progress(unlocked: true)}).title,
+        'Commission Nickel Shoals',
+      );
+      expect(
+        ceresGoal({MiningSiteId.nickelShoals: _commissioned()}).title,
+        'Unlock Platinum Rift',
+      );
+      expect(
+        ceresGoal({
+          MiningSiteId.nickelShoals: _commissioned(),
+          MiningSiteId.platinumRift: _commissioned(),
+        }).title,
+        'Unlock Iridium Spire',
+      );
+    });
+
+    test('the last Ceres site names the completion reward', () {
+      final goal = _goal(
+        _stateWith(
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanetIds: MiningPlanetId.values.toSet(),
+          activePlanetId: MiningPlanetId.ceresFrontier,
+          docks: {MiningPlanetId.ceresFrontier: _dock(RigTier.t1)},
+          sites: {
+            ..._commissionedSites(_homeworldSites),
+            ..._commissionedSites(_lunarSites),
+            ..._commissionedSites(_marsSites),
+            MiningSiteId.nickelShoals: _commissioned(),
+            MiningSiteId.platinumRift: _commissioned(),
+            MiningSiteId.iridiumSpire: _progress(unlocked: true),
+          },
+        ),
+      );
+
+      expect(goal.title, 'Commission Iridium Spire');
       expect(
         goal.detail,
-        'Last Mars Frontier site: mastery pays +20.00M cash.',
+        'Last Ceres Frontier site: mastery pays +30.00M cash.',
       );
     });
 

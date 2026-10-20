@@ -65,6 +65,10 @@ void main() {
     expect(state.sites[MiningSiteId.landingBasin]!.commissioned, isFalse);
     expect(state.sites[MiningSiteId.landingBasin]!.storedAmount, 0);
     expect(state.sites[MiningSiteId.landingBasin]!.rigPlacements, isEmpty);
+    expect(
+      state.docks[MiningPlanetId.ceresFrontier]!.values,
+      everyElement(isNull),
+    );
   });
 
   test('fresh state has exact bay keys on every planet and empty sites', () {
@@ -86,6 +90,9 @@ void main() {
       MiningSiteId.ochreBasin,
       MiningSiteId.silicaDunes,
       MiningSiteId.cobaltChasm,
+      MiningSiteId.nickelShoals,
+      MiningSiteId.platinumRift,
+      MiningSiteId.iridiumSpire,
     ]) {
       final progress = state.sites[id]!;
       expect(progress.unlocked, isFalse);

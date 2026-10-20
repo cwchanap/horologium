@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_grid.dart';
 
-enum MiningPlanetId { homeworld, lunarFrontier, marsFrontier }
+enum MiningPlanetId { homeworld, lunarFrontier, marsFrontier, ceresFrontier }
 
 enum MiningSiteId {
   landingBasin,
@@ -14,6 +14,9 @@ enum MiningSiteId {
   ochreBasin,
   silicaDunes,
   cobaltChasm,
+  nickelShoals,
+  platinumRift,
+  iridiumSpire,
 }
 
 enum DockBayId { b1, b2, b3, b4 }
@@ -123,6 +126,9 @@ const _surveyingProgressionLevels = <MiningSiteId, List<int>>{
   MiningSiteId.ochreBasin: [5, 5, 5, 5],
   MiningSiteId.silicaDunes: [5, 5, 5, 5],
   MiningSiteId.cobaltChasm: [5, 5, 5, 5],
+  MiningSiteId.nickelShoals: [5, 5, 5, 5],
+  MiningSiteId.platinumRift: [5, 5, 5, 5],
+  MiningSiteId.iridiumSpire: [5, 5, 5, 5],
 };
 
 Map<MiningDepositDefinition, Set<MiningGridCell>> _perimeterCellsByDeposit({
@@ -300,6 +306,21 @@ class MiningContentRegistry {
       name: 'Cobalt Ore',
       color: Colors.blueAccent,
     ),
+    ResourceType.nickelOre: ResourceSilhouette(
+      icon: Icons.hexagon,
+      name: 'Nickel Ore',
+      color: Colors.lightGreenAccent,
+    ),
+    ResourceType.platinum: ResourceSilhouette(
+      icon: Icons.auto_awesome,
+      name: 'Platinum',
+      color: Color(0xFFE5E4E2),
+    ),
+    ResourceType.iridium: ResourceSilhouette(
+      icon: Icons.flare,
+      name: 'Iridium',
+      color: Colors.purpleAccent,
+    ),
   };
 
   static final MiningContentRegistry _stellar = _buildStellarMining();
@@ -440,7 +461,7 @@ class MiningContentRegistry {
       unlockRequiredMasteryPlanetId: MiningPlanetId.lunarFrontier,
       unlockRequiredSurveyingLevel: 5,
       unlockCashCost: 16000000,
-      masteryRewardCash: 20000000,
+      masteryRewardCash: 0,
       rigSpawnCost: 4000000,
       planetAsset: 'assets/images/mining/planets/mars_frontier.png',
       sites: [
@@ -503,6 +524,77 @@ class MiningContentRegistry {
           facilityName: 'Cobalt Drill',
           discoveryText:
               'deep cobalt seams are the final high-value Mars target.',
+        ),
+      ],
+    ),
+    MiningPlanetId.ceresFrontier: MiningPlanetDefinition(
+      id: MiningPlanetId.ceresFrontier,
+      name: 'Ceres Frontier',
+      unlockRequiredMasteryPlanetId: MiningPlanetId.marsFrontier,
+      unlockRequiredSurveyingLevel: 5,
+      unlockCashCost: 30000000,
+      masteryRewardCash: 30000000,
+      rigSpawnCost: 7500000,
+      planetAsset: 'assets/images/mining/planets/ceres_frontier.png',
+      sites: [
+        MiningSiteDefinition(
+          id: MiningSiteId.nickelShoals,
+          name: 'Nickel Shoals',
+          resource: ResourceType.nickelOre,
+          unlockCost: 0,
+          requiredSite: null,
+          requiredSurveyingLevel: 5,
+          baseRatePerSecond: 0.60,
+          baseCapacity: 4320,
+          saleValuePerUnit: 100,
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.nickelShoals),
+          cavernAsset: 'assets/images/mining/caverns/nickel_ore.png',
+          depositAsset: 'assets/images/mining/nodes/nickel_ore.png',
+          cardAsset: 'assets/images/mining/caverns/nickel_ore.png',
+          facilityName: 'Nickel Dredge',
+          discoveryText: 'shallow nickel-iron shoals ring the crater floor.',
+        ),
+        MiningSiteDefinition(
+          id: MiningSiteId.platinumRift,
+          name: 'Platinum Rift',
+          resource: ResourceType.platinum,
+          unlockCost: 18000000,
+          requiredSite: MiningSiteId.nickelShoals,
+          requiredSurveyingLevel: 5,
+          baseRatePerSecond: 0.45,
+          baseCapacity: 3240,
+          saleValuePerUnit: 180,
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.platinumRift),
+          cavernAsset: 'assets/images/mining/caverns/platinum.png',
+          depositAsset: 'assets/images/mining/nodes/platinum.png',
+          cardAsset: 'assets/images/mining/caverns/platinum.png',
+          facilityName: 'Platinum Cutter',
+          discoveryText:
+              'a fractured rift exposes platinum seams under the salt crust.',
+        ),
+        MiningSiteDefinition(
+          id: MiningSiteId.iridiumSpire,
+          name: 'Iridium Spire',
+          resource: ResourceType.iridium,
+          unlockCost: 45000000,
+          requiredSite: MiningSiteId.platinumRift,
+          requiredSurveyingLevel: 5,
+          baseRatePerSecond: 0.30,
+          baseCapacity: 2160,
+          saleValuePerUnit: 350,
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.iridiumSpire),
+          cavernAsset: 'assets/images/mining/caverns/iridium.png',
+          depositAsset: 'assets/images/mining/nodes/iridium.png',
+          cardAsset: 'assets/images/mining/caverns/iridium.png',
+          facilityName: 'Iridium Lance',
+          discoveryText:
+              "the ice volcano's flank hides the belt's richest iridium.",
         ),
       ],
     ),

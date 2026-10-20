@@ -58,7 +58,7 @@ void main() {
   });
 
   test('keeps closed site, bay, and rig identities', () {
-    expect(MiningSiteId.values, hasLength(9));
+    expect(MiningSiteId.values, hasLength(12));
     expect(DockBayId.values.map((id) => id.name), ['b1', 'b2', 'b3', 'b4']);
     expect(RigTier.values.map((tier) => tier.name), [
       't1',
@@ -87,11 +87,13 @@ void main() {
       MiningPlanetId.homeworld,
       MiningPlanetId.lunarFrontier,
       MiningPlanetId.marsFrontier,
+      MiningPlanetId.ceresFrontier,
     ]);
     expect(content.planets.keys, [
       MiningPlanetId.homeworld,
       MiningPlanetId.lunarFrontier,
       MiningPlanetId.marsFrontier,
+      MiningPlanetId.ceresFrontier,
     ]);
     expect(content.planet(MiningPlanetId.homeworld).sites.map((s) => s.id), [
       MiningSiteId.landingBasin,
@@ -111,6 +113,14 @@ void main() {
       MiningSiteId.silicaDunes,
       MiningSiteId.cobaltChasm,
     ]);
+    expect(
+      content.planet(MiningPlanetId.ceresFrontier).sites.map((s) => s.id),
+      [
+        MiningSiteId.nickelShoals,
+        MiningSiteId.platinumRift,
+        MiningSiteId.iridiumSpire,
+      ],
+    );
   });
 
   test('freezes all site economy and progression availability values', () {
@@ -207,7 +217,39 @@ void main() {
         'sale': 110,
         'deposits': [5, 5, 5, 5],
       },
+      MiningSiteId.nickelShoals: {
+        'resource': ResourceType.nickelOre,
+        'requiredSite': null,
+        'surveying': 5,
+        'unlock': 0,
+        'rate': 0.60,
+        'capacity': 4320,
+        'sale': 100,
+        'deposits': [5, 5, 5, 5],
+      },
+      MiningSiteId.platinumRift: {
+        'resource': ResourceType.platinum,
+        'requiredSite': MiningSiteId.nickelShoals,
+        'surveying': 5,
+        'unlock': 18000000,
+        'rate': 0.45,
+        'capacity': 3240,
+        'sale': 180,
+        'deposits': [5, 5, 5, 5],
+      },
+      MiningSiteId.iridiumSpire: {
+        'resource': ResourceType.iridium,
+        'requiredSite': MiningSiteId.platinumRift,
+        'surveying': 5,
+        'unlock': 45000000,
+        'rate': 0.30,
+        'capacity': 2160,
+        'sale': 350,
+        'deposits': [5, 5, 5, 5],
+      },
     };
+
+    expect(expected.keys, MiningSiteId.values);
 
     for (final entry in expected.entries) {
       final site = content.site(entry.key);
@@ -229,7 +271,7 @@ void main() {
     }
   });
 
-  test('freezes technology, offline, planet, and Mars reward metadata', () {
+  test('freezes technology, offline, planet, and Ceres reward metadata', () {
     final content = MiningContentRegistry.stellarMining();
 
     expect(MiningContentRegistry.technologyCosts, [
@@ -285,8 +327,39 @@ void main() {
     expect(mars.unlockRequiredMasteryPlanetId, MiningPlanetId.lunarFrontier);
     expect(mars.unlockRequiredSurveyingLevel, 5);
     expect(mars.unlockCashCost, 16000000);
-    expect(mars.masteryRewardCash, 20000000);
+    expect(mars.masteryRewardCash, 0);
     expect(mars.planetAsset, 'assets/images/mining/planets/mars_frontier.png');
+
+    final ceres = content.planet(MiningPlanetId.ceresFrontier);
+    expect(ceres.name, 'Ceres Frontier');
+    expect(ceres.rigSpawnCost, 7500000);
+    expect(ceres.unlockRequiredMasteryPlanetId, MiningPlanetId.marsFrontier);
+    expect(ceres.unlockRequiredSurveyingLevel, 5);
+    expect(ceres.unlockCashCost, 30000000);
+    expect(ceres.masteryRewardCash, 30000000);
+    expect(
+      ceres.planetAsset,
+      'assets/images/mining/planets/ceres_frontier.png',
+    );
+
+    expect(
+      content.planets.values
+          .where((planet) => planet.masteryRewardCash > 0)
+          .map((planet) => planet.id),
+      [MiningPlanetId.ceresFrontier],
+      reason: 'the game grants exactly one completion reward',
+    );
+    for (final planet in content.planets.values) {
+      final ids = planet.sites.map((site) => site.id).toList();
+      for (final (index, site) in planet.sites.indexed) {
+        if (site.requiredSite == null) continue;
+        expect(
+          ids.indexOf(site.requiredSite!),
+          lessThan(index),
+          reason: '${site.name} requires an earlier site on ${planet.name}',
+        );
+      }
+    }
   });
 
   test('preserves optional Mars site copy and final asset paths', () {
@@ -301,6 +374,41 @@ void main() {
     expect(ochre.cavernAsset, 'assets/images/mining/caverns/iron_ore.png');
     expect(ochre.depositAsset, 'assets/images/mining/nodes/iron_ore.png');
     expect(ochre.cardAsset, 'assets/images/mining/caverns/iron_ore.png');
+  });
+
+  test('authors Ceres facility copy and asset paths', () {
+    final content = MiningContentRegistry.stellarMining();
+    final expected = {
+      MiningSiteId.nickelShoals: (
+        'Nickel Shoals',
+        'Nickel Dredge',
+        'shallow nickel-iron shoals ring the crater floor.',
+        'nickel_ore',
+      ),
+      MiningSiteId.platinumRift: (
+        'Platinum Rift',
+        'Platinum Cutter',
+        'a fractured rift exposes platinum seams under the salt crust.',
+        'platinum',
+      ),
+      MiningSiteId.iridiumSpire: (
+        'Iridium Spire',
+        'Iridium Lance',
+        "the ice volcano's flank hides the belt's richest iridium.",
+        'iridium',
+      ),
+    };
+
+    for (final MapEntry(key: id, value: (name, facility, discovery, art))
+        in expected.entries) {
+      final site = content.site(id);
+      expect(site.name, name);
+      expect(site.facilityName, facility);
+      expect(site.discoveryText, discovery);
+      expect(site.cavernAsset, 'assets/images/mining/caverns/$art.png');
+      expect(site.depositAsset, 'assets/images/mining/nodes/$art.png');
+      expect(site.cardAsset, 'assets/images/mining/caverns/$art.png');
+    }
   });
 
   test('one T1 preserves the current Landing Basin base capacity', () {
@@ -375,6 +483,22 @@ void main() {
       isTrue,
     );
     expect(content.isPlanetMastered(MiningPlanetId.marsFrontier, mars), isTrue);
+    const ceres = {
+      MiningSiteId.nickelShoals,
+      MiningSiteId.platinumRift,
+      MiningSiteId.iridiumSpire,
+    };
+    expect(
+      content.isPlanetMastered(MiningPlanetId.ceresFrontier, ceres),
+      isTrue,
+    );
+    expect(
+      content.isPlanetMastered(
+        MiningPlanetId.ceresFrontier,
+        {...ceres}..remove(MiningSiteId.iridiumSpire),
+      ),
+      isFalse,
+    );
     expect(
       content.isPlanetMastered(
         MiningPlanetId.homeworld,
@@ -402,6 +526,22 @@ void main() {
     expect({water.name, titanium.name, helium.name}.length, 3);
     expect({water.color, titanium.color, helium.color}.length, 3);
     expect(water.icon, isA<IconData>());
+    final nickel = silhouettes[ResourceType.nickelOre]!;
+    final platinum = silhouettes[ResourceType.platinum]!;
+    final iridium = silhouettes[ResourceType.iridium]!;
+    expect(
+      (nickel.icon, nickel.name, nickel.color),
+      (Icons.hexagon, 'Nickel Ore', Colors.lightGreenAccent),
+    );
+    expect(
+      (platinum.icon, platinum.name, platinum.color),
+      (Icons.auto_awesome, 'Platinum', const Color(0xFFE5E4E2)),
+    );
+    expect(
+      (iridium.icon, iridium.name, iridium.color),
+      (Icons.flare, 'Iridium', Colors.purpleAccent),
+    );
+    expect(silhouettes.values.map((s) => s.icon).toSet(), hasLength(12));
   });
 
   test('caches the generated stellar mining registry', () {

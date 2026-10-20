@@ -58,11 +58,11 @@ MiningNextGoalView _goalFor(MiningSave state) => MiningNextGoalView.from(
   sellableValue: _deckView(state).projectedValue,
 );
 
-/// The longest authored strip copy: Mars's last site names its reward.
+/// The longest authored strip copy: Ceres's last site names its reward.
 const _longGoal = MiningNextGoalView(
   kind: MiningGoalKind.commissionSite,
   title: 'Commission Titanium Highlands',
-  detail: 'Last Mars Frontier site: mastery pays +20.00M cash.',
+  detail: 'Last Ceres Frontier site: mastery pays +30.00M cash.',
   target: MiningGoalTarget.mineSite(MiningSiteId.titaniumHighlands),
   cash: 12_000,
   cashCost: 25_000,
@@ -304,6 +304,55 @@ void main() {
       MiningSiteCardState.operational,
     ]);
   });
+
+  for (final size in const [Size(360, 640), Size(430, 932)]) {
+    testWidgets('renders a Ceres deck with its planet art at '
+        '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+      final state = _stateWith(
+        cash: 30_000_000,
+        unlockedPlanetIds: MiningPlanetId.values.toSet(),
+        activePlanetId: MiningPlanetId.ceresFrontier,
+        sites: {
+          MiningSiteId.frozenBasin: _progress(unlocked: true),
+          MiningSiteId.ochreBasin: _progress(unlocked: true),
+          MiningSiteId.nickelShoals: _progress(
+            unlocked: true,
+            commissioned: true,
+            storedAmount: 1200,
+            rigs: [
+              MiningRigPlacement(
+                tier: RigTier.t1,
+                cell: firstPlayableCell(
+                  _content.site(MiningSiteId.nickelShoals),
+                ),
+              ),
+            ],
+          ),
+        },
+      );
+      await _pumpDeck(tester, view: _deckView(state), size: size);
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('CERES FRONTIER'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Image &&
+              widget.image is AssetImage &&
+              (widget.image as AssetImage).assetName ==
+                  'assets/images/mining/planets/ceres_frontier.png',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('site-card-nickelShoals')), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(
+          RegExp(r'Platinum Rift.*locked', caseSensitive: false),
+        ),
+        findsOneWidget,
+      );
+    });
+  }
 
   testWidgets('keeps site art dominant and exposes visual HUD gauges', (
     tester,

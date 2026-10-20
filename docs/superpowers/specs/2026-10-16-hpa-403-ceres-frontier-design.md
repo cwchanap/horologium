@@ -1,7 +1,7 @@
 # HPA-403 Ceres Frontier Content Pack Design
 
 - Date: 2026-10-16
-- Status: Draft for review
+- Status: Implemented
 - Linear: [HPA-403](https://linear.app/cwchanap/issue/HPA-403/ship-a-fourth-planet-content-pack-after-mars) — Ship a fourth planet content pack after Mars
 - Baseline: `main` at `0affef0`, which includes HPA-401 (time-away pacing, PR #37)
 - Depends on: [HPA-439](https://linear.app/cwchanap/issue/HPA-439/mining-art-ceres-frontier-planet-cavern-and-node-art) — Ceres planet, cavern, and node art (art only, its own PR)
@@ -97,17 +97,24 @@ Using HPA-401's greedy-player model with the content above:
 
 Visit counts are return visits after the 15-minute opening session, as in HPA-401. They match HPA-401's 11 visits to Mars mastery.
 
-These rows are model estimates. HPA-401's journey later measured Mars mastery at 78 h with six-hour visits and 28.1 h with two-hour visits, so the real Ceres times will run longer than the table. The implementation re-measures them on the journey clock (plan Task 3).
+These rows are model estimates. The journey measures the real times on its injected clock:
+
+| Visits | Mars mastery | Ceres mastery | Ceres phase | Gate |
+| --- | ---: | ---: | ---: | --- |
+| Every 2 hours | 28.1 h | 50.0 h | 22.0 h | Ceres 40–90 h |
+| Every 6 hours | 78.0 h | 144.1 h (6 days) | 66.0 h | Ceres 4–8 days |
+
+The Ceres phase runs 1.6× and 1.8× the Mars phase (Mars unlock to mastery, 14 h and 36 h), under the plan's 2× limit, so prices stay as authored. As with Mars, the greedy player buys no Ceres rigs: progress is funded by older planets' sales.
 
 Ceres adds about two and a half days of four short visits, close to the Lunar-to-Mars span. Larger unlock prices stretch the Iridium Spire wait first: at a 60,000,000 unlock the same player needs 7.3 days, with a two-day gap before Iridium Spire, so 30,000,000 was kept. The highest single amount a player sees is the 45,000,000 Iridium Spire unlock, which HPA-401's compact formatter shows as `45.00M`.
 
 ### 3. Progressive Stellar Map disclosure is unchanged
 
-The existing rule shows a planet once its prerequisite is unlocked. Ceres therefore appears as a locked card once Mars is unlocked, showing Mars mastery, Surveying 5, and cash, and a fresh player still sees only Homeworld and Lunar Frontier.
+The existing rule shows a planet card once its prerequisite is unlocked, and every other planet as a dimmed teaser. Ceres therefore appears as a locked card once Mars is unlocked, showing Mars mastery, Surveying 5, and cash. Before that it is a teaser reading `UNLOCK MARS FIRST`, below the existing Mars teaser on a fresh map.
 
 ### 4. The duplicated planet asset switch goes away
 
-`site_deck_screen.dart` keeps a private `_planetAsset(MiningPlanetId)` switch that repeats `MiningPlanetDefinition.planetAsset`. Rather than adding a fourth arm, the Site Deck reads `content.planet(id).planetAsset`. The Stellar Map navigation icon keeps its fixed Lunar art.
+`site_deck_screen.dart` keeps a private `_planetAsset(MiningPlanetId)` switch that repeats `MiningPlanetDefinition.planetAsset`. Rather than adding a fourth arm, `SiteDeckView` carries the active planet's `planetAsset` from content and the header draws it. The Stellar Map navigation icon keeps its fixed Lunar art.
 
 ### 5. Persistence follows the strict contract
 

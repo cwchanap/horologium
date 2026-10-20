@@ -354,25 +354,48 @@ void main() {
     },
   );
 
-  for (final (cadence, minimum, maximum) in const [
-    // A return every storage window: about a day of returns.
-    (Duration(hours: 2), Duration(hours: 24), Duration(hours: 60)),
-    // Four visits a day: storage caps between visits.
-    (Duration(hours: 6), Duration(days: 2), Duration(days: 4)),
-  ]) {
+  for (final (cadence, marsMinimum, marsMaximum, ceresMinimum, ceresMaximum)
+      in const [
+        // A return every storage window: about a day of returns to Mars,
+        // about two to Ceres.
+        (
+          Duration(hours: 2),
+          Duration(hours: 24),
+          Duration(hours: 60),
+          Duration(hours: 40),
+          Duration(hours: 90),
+        ),
+        // Four visits a day: storage caps between visits.
+        (
+          Duration(hours: 6),
+          Duration(days: 2),
+          Duration(days: 4),
+          Duration(days: 4),
+          Duration(days: 8),
+        ),
+      ]) {
     test(
       'fresh public actions master Mars at ${cadence.inHours}h visits within '
-      '${minimum.inHours}-${maximum.inHours}h and reload the save',
-      () => _journey(cadence, minimum, maximum),
+      '${marsMinimum.inHours}-${marsMaximum.inHours}h, Ceres within '
+      '${ceresMinimum.inHours}-${ceresMaximum.inHours}h, and reload the save',
+      () => _journey(
+        cadence,
+        marsMinimum: marsMinimum,
+        marsMaximum: marsMaximum,
+        ceresMinimum: ceresMinimum,
+        ceresMaximum: ceresMaximum,
+      ),
     );
   }
 }
 
 Future<void> _journey(
-  Duration cadence,
-  Duration minimum,
-  Duration maximum,
-) async {
+  Duration cadence, {
+  required Duration marsMinimum,
+  required Duration marsMaximum,
+  required Duration ceresMinimum,
+  required Duration ceresMaximum,
+}) async {
   SharedPreferences.setMockInitialValues({});
   final start = DateTime.utc(2026, 8, 27, 12);
   final clock = TestClock(start);
@@ -661,47 +684,141 @@ Future<void> _journey(
     'Commission Cobalt Chasm',
     'final Mars site',
   );
-  expect(goal().detail, contains('+20.00M'));
+  expect(goal().detail, 'Deploy a rig beside a resource.');
   final cashBeforeMarsMastery = controller.state.cash;
-  final mastery = await controller.deployRig(
+  final marsMastery = await controller.deployRig(
     cobaltSpawn.dockBayId!,
     MiningSiteId.cobaltChasm,
     journeyCell[MiningSiteId.cobaltChasm]!,
   );
-  expect(mastery.isSuccess, isTrue);
-  expect(mastery.message, 'Mars mastered — +20.00M cash.');
-  expect(controller.state.cash, cashBeforeMarsMastery + 20000000);
-  expect(goal().kind, MiningGoalKind.frontiersMastered);
-  final toMastery = clock.now.difference(start);
+  expect(marsMastery.isSuccess, isTrue);
+  expect(marsMastery.message, isNull);
+  expect(controller.state.cash, cashBeforeMarsMastery);
+  expect(
+    content.isPlanetMastered(
+      MiningPlanetId.marsFrontier,
+      MiningSiteId.values.where(
+        (id) => controller.state.sites[id]!.commissioned,
+      ),
+    ),
+    isTrue,
+  );
+  expectGoal(
+    MiningGoalKind.unlockPlanet,
+    'Unlock Ceres Frontier',
+    'Mars mastery',
+  );
+  final toMarsMastery = clock.now.difference(start);
   debugPrint(
-    'MASTERY step=${cadence.inHours}h elapsed='
-    '${(toMastery.inMinutes / 60).toStringAsFixed(1)}h '
-    'visits=${player.visits} reward=20000000 '
-    'cash=$cashBeforeMarsMastery->${controller.state.cash} '
+    'MASTERY planet=Mars step=${cadence.inHours}h elapsed='
+    '${(toMarsMastery.inMinutes / 60).toStringAsFixed(1)}h '
+    'visits=${player.visits} cash=${controller.state.cash} '
     'tech=${controller.state.technology.toJson()}',
   );
-  expect(toMastery, greaterThanOrEqualTo(minimum));
-  expect(toMastery, lessThanOrEqualTo(maximum));
-  for (final siteId in const [
-    MiningSiteId.ochreBasin,
-    MiningSiteId.silicaDunes,
-    MiningSiteId.cobaltChasm,
-  ]) {
+  expect(toMarsMastery, greaterThanOrEqualTo(marsMinimum));
+  expect(toMarsMastery, lessThanOrEqualTo(marsMaximum));
+
+  await player.earnUntil(
+    cashAtLeast: 30000000,
+    phase: 'Mars mastery before Ceres unlock',
+  );
+  await expectAction(
+    'unlock Ceres Frontier',
+    controller.unlockPlanet(MiningPlanetId.ceresFrontier),
+  );
+  expect(controller.state.activePlanetId, MiningPlanetId.ceresFrontier);
+  expect(controller.state.docks[MiningPlanetId.ceresFrontier], {
+    DockBayId.b1: RigTier.t1,
+    DockBayId.b2: RigTier.t1,
+    DockBayId.b3: null,
+    DockBayId.b4: null,
+  });
+  expect(controller.state.sites[MiningSiteId.nickelShoals]!.unlocked, isTrue);
+  expectGoal(
+    MiningGoalKind.commissionSite,
+    'Commission Nickel Shoals',
+    'Ceres unlock',
+  );
+
+  await expectAction(
+    'merge the fresh Ceres rigs',
+    controller.mergeDockRigs(DockBayId.b1, DockBayId.b2),
+  );
+  await expectAction(
+    'commission Nickel Shoals',
+    controller.deployRig(
+      DockBayId.b2,
+      MiningSiteId.nickelShoals,
+      journeyCell[MiningSiteId.nickelShoals]!,
+    ),
+  );
+  debugPrint('SEQUENCE Ceres merge t1+t1->t2; deploy Nickel Shoals');
+
+  await player.earnUntil(
+    cashAtLeast: 25500000,
+    phase: 'Ceres before Platinum Rift',
+  );
+  await expectAction(
+    'unlock Platinum Rift',
+    controller.unlockSite(MiningSiteId.platinumRift),
+  );
+  await commission(MiningSiteId.platinumRift);
+
+  await player.earnUntil(
+    cashAtLeast: 52500000,
+    phase: 'Ceres before Iridium Spire',
+  );
+  await expectAction(
+    'unlock Iridium Spire',
+    controller.unlockSite(MiningSiteId.iridiumSpire),
+  );
+  final iridiumSpawn = await controller.spawnRig();
+  expect(iridiumSpawn.isSuccess, isTrue);
+  expectGoal(
+    MiningGoalKind.commissionSite,
+    'Commission Iridium Spire',
+    'final Ceres site',
+  );
+  expect(goal().detail, contains('+30.00M'));
+  final cashBeforeCeresMastery = controller.state.cash;
+  final mastery = await controller.deployRig(
+    iridiumSpawn.dockBayId!,
+    MiningSiteId.iridiumSpire,
+    journeyCell[MiningSiteId.iridiumSpire]!,
+  );
+  expect(mastery.isSuccess, isTrue);
+  expect(mastery.message, 'Ceres mastered — +30.00M cash.');
+  expect(controller.state.cash, cashBeforeCeresMastery + 30000000);
+  expect(goal().kind, MiningGoalKind.frontiersMastered);
+  expect(goal().title, 'All frontiers mastered');
+  final toMastery = clock.now.difference(start);
+  final ceresPhase = toMastery - toMarsMastery;
+  debugPrint(
+    'MASTERY planet=Ceres step=${cadence.inHours}h elapsed='
+    '${(toMastery.inMinutes / 60).toStringAsFixed(1)}h '
+    'ceresPhase=${(ceresPhase.inMinutes / 60).toStringAsFixed(1)}h '
+    'visits=${player.visits} reward=30000000 '
+    'cash=$cashBeforeCeresMastery->${controller.state.cash} '
+    'tech=${controller.state.technology.toJson()}',
+  );
+  expect(toMastery, greaterThanOrEqualTo(ceresMinimum));
+  expect(toMastery, lessThanOrEqualTo(ceresMaximum));
+  for (final siteId in MiningSiteId.values) {
     expect(controller.state.sites[siteId]!.commissioned, isTrue);
   }
 
   final cashAfterFirstMastery = controller.state.cash;
   await expectAction(
-    'recall the mastered Cobalt Chasm rig',
+    'recall the mastered Iridium Spire rig',
     controller.recallRig(
-      MiningSiteId.cobaltChasm,
-      journeyCell[MiningSiteId.cobaltChasm]!,
+      MiningSiteId.iridiumSpire,
+      journeyCell[MiningSiteId.iridiumSpire]!,
     ),
   );
   final redeploy = await controller.deployRig(
-    cobaltSpawn.dockBayId!,
-    MiningSiteId.cobaltChasm,
-    journeyCell[MiningSiteId.cobaltChasm]!,
+    iridiumSpawn.dockBayId!,
+    MiningSiteId.iridiumSpire,
+    journeyCell[MiningSiteId.iridiumSpire]!,
   );
   expect(redeploy.isSuccess, isTrue);
   expect(redeploy.message, isNull);
@@ -717,8 +834,8 @@ Future<void> _journey(
   expect(reloaded.recoveredFromInvalidSave, isFalse);
   expect(reloaded.state.cash, beforeReload.cash);
   expect(reloaded.state.technology, beforeReload.technology);
-  expect(reloaded.state.unlockedPlanetIds, beforeReload.unlockedPlanetIds);
-  expect(reloaded.state.activePlanetId, MiningPlanetId.marsFrontier);
+  expect(reloaded.state.unlockedPlanetIds, MiningPlanetId.values.toSet());
+  expect(reloaded.state.activePlanetId, MiningPlanetId.ceresFrontier);
   for (final planetId in MiningPlanetId.values) {
     expect(reloaded.state.docks[planetId], beforeReload.docks[planetId]);
   }
@@ -728,7 +845,7 @@ Future<void> _journey(
   debugPrint(
     'RELOAD active=${reloaded.state.activePlanetId.name} '
     'surveying=${reloaded.state.technology.surveying} '
-    'marsCash=${reloaded.state.cash} marsSites=3/3',
+    'ceresCash=${reloaded.state.cash} ceresSites=3/3',
   );
 
   // A 30-hour absence accrues exactly the 24-hour safety cap.

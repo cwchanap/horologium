@@ -71,7 +71,7 @@ cash, lastAccruedAtUtc, technology, unlockedPlanetIds, activePlanetId, docks, si
 ```
 
 `technology` has exactly `extraction`, `logistics`, and `surveying`. `sites` is
-one flat map containing all nine authored `MiningSiteId` values. `docks` is a
+one flat map containing all twelve authored `MiningSiteId` values. `docks` is a
 separate map from each `MiningPlanetId` to four `DockBayId` slots. Each site
 tracks unlock/commission state, grid rig placements, and stored cargo; each
 dock stores a `RigTier` or null.
@@ -88,11 +88,13 @@ dock stores a `RigTier` or null.
 ## Economy and progression
 
 `MiningContentRegistry` owns all authored numeric content. Three sites exist on
-each of Homeworld, Lunar Frontier, and Mars Frontier. Commissioning every site
-on a planet is its mastery condition. Homeworld mastery plus Surveying 3
-unlocks Lunar Frontier; Lunar mastery plus Surveying 5 unlocks Mars Frontier;
-Mars mastery grants exactly one 20,000,000 cash reward. Newly unlocked planets
-start with their authored starter dock bays and starter site.
+each of Homeworld, Lunar Frontier, Mars Frontier, and Ceres Frontier.
+Commissioning every site on a planet is its mastery condition. Homeworld
+mastery plus Surveying 3 unlocks Lunar Frontier; Lunar mastery plus Surveying 5
+unlocks Mars Frontier; Mars mastery plus Surveying 5 and 30,000,000 cash unlocks
+Ceres Frontier. Ceres mastery grants the game's single 30,000,000 cash reward;
+Mars grants none. Newly unlocked planets start with their authored starter dock
+bays and starter site.
 
 Rig tier and Extraction determine rate. Each site's `baseCapacity` is its base
 rate times `MiningContentRegistry.storageWindow` (2 hours), so storage holds
@@ -155,6 +157,6 @@ flutter build ios --simulator --debug
 The public-action journey is
 `test/integration/merge_mining_journey_test.dart`; it must initialize a fresh
 save and use only controller actions to merge, commission, sell, research,
-unlock, travel, reward, and reload through Mars.
+unlock, travel, reward, and reload through Ceres.
 
 `AGENTS.md` is the repository-relative symlink to this guidance file.

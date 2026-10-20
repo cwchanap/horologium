@@ -911,10 +911,69 @@ void main() {
     },
   );
 
+  for (final size in const [Size(360, 640), Size(430, 932)]) {
+    testWidgets('renders a Ceres site on its cavern and node art at '
+        '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+      final initial = MiningSave.initial(nowUtc: _start);
+      final state = initial.copyWith(
+        technology: const TechnologyLevels(surveying: 5),
+        unlockedPlanetIds: MiningPlanetId.values.toSet(),
+        activePlanetId: MiningPlanetId.ceresFrontier,
+        sites: {
+          ...initial.sites,
+          MiningSiteId.nickelShoals: _progress(
+            unlocked: true,
+            commissioned: true,
+            rigs: [
+              MiningRigPlacement(
+                tier: RigTier.t1,
+                cell: firstPlayableCell(
+                  _content.site(MiningSiteId.nickelShoals),
+                ),
+              ),
+            ],
+          ),
+        },
+      );
+      final view = _siteView(state, siteId: MiningSiteId.nickelShoals);
+      await _pumpMineSite(
+        tester,
+        size: size,
+        view: view,
+        dock: _dockView(state),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(
+        find.byKey(const Key('static-mining-grid-visual-layer')),
+        findsOneWidget,
+      );
+      bool usesAsset(Widget widget, String asset) =>
+          widget is Image &&
+          widget.image is AssetImage &&
+          (widget.image as AssetImage).assetName == asset;
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              usesAsset(widget, 'assets/images/mining/caverns/nickel_ore.png'),
+        ),
+        findsWidgets,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              usesAsset(widget, 'assets/images/mining/nodes/nickel_ore.png'),
+        ),
+        findsNWidgets(view.deposits.length),
+      );
+    });
+  }
+
   testWidgets('fits frontier spawn costs inside the Spawn hex', (tester) async {
     for (final (planet, site, cost) in const [
       (MiningPlanetId.lunarFrontier, MiningSiteId.frozenBasin, '40,000'),
       (MiningPlanetId.marsFrontier, MiningSiteId.ochreBasin, '4.00M'),
+      (MiningPlanetId.ceresFrontier, MiningSiteId.nickelShoals, '7.50M'),
     ]) {
       final initial = MiningSave.initial(nowUtc: _start);
       final state = initial.copyWith(
