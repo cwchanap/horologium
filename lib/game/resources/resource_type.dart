@@ -8,4 +8,7 @@ enum ResourceType {
   ironOre,
   silica,
   cobaltOre,
+  nickelOre,
+  platinum,
+  iridium,
 }

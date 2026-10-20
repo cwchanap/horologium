@@ -153,6 +153,7 @@ class SiteDeckView {
   const SiteDeckView({
     required this.activePlanetId,
     required this.planetName,
+    required this.planetAsset,
     required this.sites,
     required this.cards,
     required this.commissionedCount,
@@ -166,6 +167,7 @@ class SiteDeckView {
 
   final MiningPlanetId activePlanetId;
   final String planetName;
+  final String planetAsset;
   final List<MiningSiteCardView> sites;
   final Map<MiningSiteId, MiningSiteCardView> cards;
   final int commissionedCount;
@@ -256,6 +258,7 @@ class SiteDeckView {
     return SiteDeckView(
       activePlanetId: state.activePlanetId,
       planetName: planet.name,
+      planetAsset: planet.planetAsset,
       sites: List<MiningSiteCardView>.unmodifiable(cardList),
       cards: Map<MiningSiteId, MiningSiteCardView>.unmodifiable(cards),
       commissionedCount: commissionedCount,

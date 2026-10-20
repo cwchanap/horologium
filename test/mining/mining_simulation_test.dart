@@ -244,6 +244,77 @@ void main() {
     },
   );
 
+  test('one window accrues all four planets and fills Ceres storage', () {
+    final base = threePlanetState(start);
+    MiningRigPlacement t1(MiningSiteId id) =>
+        MiningRigPlacement(tier: RigTier.t1, cell: _firstCell(id));
+    final state = base.copyWith(
+      unlockedPlanetIds: MiningPlanetId.values.toSet(),
+      activePlanetId: MiningPlanetId.ceresFrontier,
+      sites: {
+        ...base.sites,
+        MiningSiteId.nickelShoals: progress(
+          rigs: [t1(MiningSiteId.nickelShoals)],
+        ),
+        MiningSiteId.platinumRift: progress(
+          storedAmount: 3238,
+          rigs: [t1(MiningSiteId.platinumRift)],
+        ),
+      },
+    );
+    final result = simulation.accrue(
+      state,
+      start.add(const Duration(seconds: 10)),
+    );
+
+    expect(
+      result.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+      closeTo(5, 0.0001),
+    );
+    expect(
+      result.state.sites[MiningSiteId.ochreBasin]!.storedAmount,
+      closeTo(7.5, 0.0001),
+    );
+    expect(
+      result.state.sites[MiningSiteId.nickelShoals]!.storedAmount,
+      closeTo(6, 0.0001),
+    );
+    expect(result.state.sites[MiningSiteId.platinumRift]!.storedAmount, 3240);
+    expect(result.summary.fullSites, {MiningSiteId.platinumRift});
+    expect(result.summary.productionByPlanet[MiningPlanetId.ceresFrontier], {
+      ResourceType.nickelOre: closeTo(6, 0.0001),
+      ResourceType.platinum: closeTo(2, 0.0001),
+    });
+  });
+
+  test('a locked Ceres produces nothing', () {
+    final base = threePlanetState(start);
+    final state = base.copyWith(
+      sites: {
+        ...base.sites,
+        MiningSiteId.nickelShoals: progress(
+          unlocked: false,
+          rigs: [
+            MiningRigPlacement(
+              tier: RigTier.t1,
+              cell: _firstCell(MiningSiteId.nickelShoals),
+            ),
+          ],
+        ),
+      },
+    );
+    final result = simulation.accrue(
+      state,
+      start.add(const Duration(seconds: 10)),
+    );
+
+    expect(result.state.sites[MiningSiteId.nickelShoals]!.storedAmount, 0);
+    expect(
+      result.summary.productionByPlanet[MiningPlanetId.ceresFrontier] ?? {},
+      isEmpty,
+    );
+  });
+
   test('locked and empty sites do not accrue', () {
     final base = stateWithLandingRigs(
       now: start,

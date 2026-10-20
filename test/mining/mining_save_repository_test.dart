@@ -152,6 +152,54 @@ void main() {
       expect(loaded.wasMissing, isFalse);
     });
 
+    test('round-trips a four-planet save with Ceres progress', () async {
+      final repository = MiningSaveRepository();
+      final initial = MiningSave.initial(nowUtc: now);
+      final nickel = _content.site(MiningSiteId.nickelShoals);
+      final expected = initial.copyWith(
+        cash: 30000000,
+        technology: const TechnologyLevels(surveying: 5),
+        unlockedPlanetIds: MiningPlanetId.values.toSet(),
+        activePlanetId: MiningPlanetId.ceresFrontier,
+        docks: {
+          ...initial.docks,
+          MiningPlanetId.ceresFrontier: {
+            DockBayId.b1: RigTier.t1,
+            DockBayId.b2: null,
+            DockBayId.b3: null,
+            DockBayId.b4: null,
+          },
+        },
+        sites: {
+          ...initial.sites,
+          MiningSiteId.frozenBasin: initial.sites[MiningSiteId.frozenBasin]!
+              .copyWith(unlocked: true),
+          MiningSiteId.ochreBasin: initial.sites[MiningSiteId.ochreBasin]!
+              .copyWith(unlocked: true),
+          MiningSiteId.nickelShoals: initial.sites[MiningSiteId.nickelShoals]!
+              .copyWith(
+                unlocked: true,
+                commissioned: true,
+                storedAmount: 120,
+                rigPlacements: [
+                  MiningRigPlacement(
+                    tier: RigTier.t2,
+                    cell: firstPlayableCell(nickel),
+                  ),
+                ],
+              ),
+        },
+      );
+
+      await repository.save(expected);
+      final loaded = await repository.load(nowUtc: now);
+
+      expect(loaded.recoveredFromInvalidSave, isFalse);
+      expect(loaded.state, expected);
+      expect(loaded.state.sites, hasLength(12));
+      expect(loaded.state.docks, hasLength(4));
+    });
+
     test('current save root has exactly the current keys', () async {
       final repository = MiningSaveRepository();
       await repository.save(MiningSave.initial(nowUtc: now));
@@ -464,6 +512,46 @@ void main() {
         ..['docks'] = {
           ...(_rawDocument(nowUtc: now)['docks']! as Map<String, Object?>),
           'lunarFrontier': {'b1': 't1', 'b2': null, 'b3': null, 'b4': null},
+        },
+      'pre-Ceres nine-site save': _rawDocument(nowUtc: now)
+        ..['docks'] = {
+          ...(_rawDocument(nowUtc: now)['docks']! as Map<String, Object?>),
+        }
+        ..['sites'] = {
+          ...(_rawDocument(nowUtc: now)['sites']! as Map<String, Object?>),
+        }
+        ..update('docks', (docks) {
+          (docks! as Map<String, Object?>).remove('ceresFrontier');
+          return docks;
+        })
+        ..update('sites', (sites) {
+          (sites! as Map<String, Object?>)
+            ..remove('nickelShoals')
+            ..remove('platinumRift')
+            ..remove('iridiumSpire');
+          return sites;
+        }),
+      'Ceres unlocked without Mars': _rawDocument(nowUtc: now)
+        ..['unlockedPlanetIds'] = [
+          'homeworld',
+          'lunarFrontier',
+          'ceresFrontier',
+        ]
+        ..['activePlanetId'] = 'homeworld',
+      'locked Ceres has a docked rig': _rawDocument(nowUtc: now)
+        ..['docks'] = {
+          ...(_rawDocument(nowUtc: now)['docks']! as Map<String, Object?>),
+          'ceresFrontier': {'b1': 't1', 'b2': null, 'b3': null, 'b4': null},
+        },
+      'locked Ceres has an unlocked site': _rawDocument(nowUtc: now)
+        ..['sites'] = {
+          ...(_rawDocument(nowUtc: now)['sites']! as Map<String, Object?>),
+          'nickelShoals': {
+            'unlocked': true,
+            'commissioned': false,
+            'storedAmount': 0,
+            'rigPlacements': <Object?>[],
+          },
         },
       'locked planet has non-pristine site': _rawDocument(nowUtc: now)
         ..['sites'] = {

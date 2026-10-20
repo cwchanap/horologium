@@ -213,6 +213,19 @@ void main() {
           mars.track(TechnologyTrack.surveying).currentEffect,
           '9 of 9 sites revealable',
         );
+
+        final ceres = TechnologySheetView.from(
+          state: stateWith(
+            now: now,
+            technology: const TechnologyLevels(surveying: 5),
+            unlockedPlanets: MiningPlanetId.values.toSet(),
+          ),
+          content: content,
+        );
+        expect(
+          ceres.track(TechnologyTrack.surveying).currentEffect,
+          '12 of 12 sites revealable',
+        );
       },
     );
   });
@@ -262,6 +275,53 @@ void main() {
       ]);
       expect(view.planet(MiningPlanetId.marsFrontier).isUnlocked, isFalse);
       expect(view.planet(MiningPlanetId.marsFrontier).canUnlock, isFalse);
+    });
+
+    test('Ceres stays hidden until Mars is unlocked', () {
+      final lunar = StellarMapView.from(
+        state: stateWith(
+          now: now,
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+        ),
+        content: content,
+      );
+      expect(
+        lunar.planets.any(
+          (planet) => planet.id == MiningPlanetId.ceresFrontier,
+        ),
+        isFalse,
+      );
+
+      final mars = StellarMapView.from(
+        state: stateWith(
+          now: now,
+          cash: 30000000,
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+            MiningPlanetId.marsFrontier,
+          },
+          sites: {
+            ...commissionedSites(MiningPlanetId.homeworld),
+            ...commissionedSites(MiningPlanetId.lunarFrontier),
+            ...commissionedSites(MiningPlanetId.marsFrontier),
+          },
+        ),
+        content: content,
+      );
+      expect(mars.planets.map((planet) => planet.id), MiningPlanetId.values);
+      final ceres = mars.planet(MiningPlanetId.ceresFrontier);
+      expect(ceres.isUnlocked, isFalse);
+      expect(ceres.requiredMasteryPlanetId, MiningPlanetId.marsFrontier);
+      expect(ceres.hasRequiredMastery, isTrue);
+      expect(ceres.requiredSurveyingLevel, 5);
+      expect(ceres.unlockCashCost, 30000000);
+      expect(ceres.siteTotal, 3);
+      expect(ceres.canUnlock, isTrue);
     });
 
     test('each planet reports commissioned progress from its own sites', () {

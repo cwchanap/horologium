@@ -201,6 +201,83 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final size in const [Size(360, 640), Size(430, 932)]) {
+    testWidgets('lists a Ceres section with its silhouettes at '
+        '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      const summary = OfflineProductionSummary(
+        elapsedAway: Duration(hours: 2),
+        elapsedUsed: Duration(hours: 2),
+        produced: {
+          ResourceType.nickelOre: 4320.0,
+          ResourceType.platinum: 3240.0,
+          ResourceType.iridium: 12.5,
+        },
+        productionByPlanet: {
+          MiningPlanetId.ceresFrontier: {
+            ResourceType.nickelOre: 4320.0,
+            ResourceType.platinum: 3240.0,
+            ResourceType.iridium: 12.5,
+          },
+        },
+        fullSites: {MiningSiteId.nickelShoals},
+        wasOfflineCapped: false,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: OfflineReturnSheet(
+              summary: summary,
+              content: MiningContentRegistry.stellarMining(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final ceres = find.byKey(
+        const Key('offline-return-planet-ceresFrontier'),
+      );
+      expect(ceres, findsOneWidget);
+      for (final (resource, name, amount) in const [
+        (ResourceType.nickelOre, 'Nickel Ore', '+4,320'),
+        (ResourceType.platinum, 'Platinum', '+3,240'),
+        (ResourceType.iridium, 'Iridium', '+12.5'),
+      ]) {
+        expect(
+          find.descendant(of: ceres, matching: find.text(name)),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: ceres, matching: find.text(amount)),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: ceres,
+            matching: find.byKey(Key('offline-resource-${resource.name}')),
+          ),
+          findsOneWidget,
+        );
+      }
+      expect(
+        find.descendant(
+          of: ceres,
+          matching: find.textContaining('Nickel Shoals'),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('shows the full time away and the capped duration', (
     tester,
   ) async {

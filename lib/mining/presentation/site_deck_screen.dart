@@ -289,7 +289,7 @@ class _PlanetProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Image.asset(_planetAsset(view.activePlanetId), width: 34, height: 34),
+      Image.asset(view.planetAsset, width: 34, height: 34),
       const SizedBox(width: 9),
       Expanded(
         child: Column(
@@ -795,14 +795,6 @@ class _CardAction extends StatelessWidget {
     ),
   );
 }
-
-String _planetAsset(MiningPlanetId id) => switch (id) {
-  MiningPlanetId.homeworld => 'assets/images/mining/planets/homeworld.png',
-  MiningPlanetId.lunarFrontier =>
-    'assets/images/mining/planets/lunar_frontier.png',
-  MiningPlanetId.marsFrontier =>
-    'assets/images/mining/planets/mars_frontier.png',
-};
 
 /// One card-label helper owns the `FULL` overlay: a cargo-full operational
 /// card reads FULL in portrait semantics, landscape semantics, and the

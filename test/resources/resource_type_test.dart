@@ -15,6 +15,9 @@ void main() {
         ResourceType.ironOre,
         ResourceType.silica,
         ResourceType.cobaltOre,
+        ResourceType.nickelOre,
+        ResourceType.platinum,
+        ResourceType.iridium,
       ]),
     );
   });
@@ -29,5 +32,8 @@ void main() {
     expect(ResourceType.ironOre.name, 'ironOre');
     expect(ResourceType.silica.name, 'silica');
     expect(ResourceType.cobaltOre.name, 'cobaltOre');
+    expect(ResourceType.nickelOre.name, 'nickelOre');
+    expect(ResourceType.platinum.name, 'platinum');
+    expect(ResourceType.iridium.name, 'iridium');
   });
 }
