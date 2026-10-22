@@ -52,7 +52,7 @@ Current `main` confirms:
 - `CLAUDE.md` already labels the city production-chain documents as historical.
 - `README.md` still describes pre-Ceres/pre-HPA-401 details, including the old site count, Mars reward, Logistics offline-cap behavior, and a fresh-to-Mars journey.
 
-The deletion list is therefore supported by current repository evidence, but implementation must still inventory directories before using recursive deletion.
+The tracked deletion list is supported by current repository evidence. However, ignored or untracked files may also be present locally: the review reports generated `original/` artwork under the retired asset roots and `scripts/__pycache__/`. Git-tracked inventory alone cannot verify local directory contents. Inspect both tracked and ignored/untracked entries before any recursive deletion.
 
 ## Design decisions
 
@@ -63,19 +63,21 @@ Do not trust historical file counts as a deletion contract.
 Before deleting, run:
 
 ```sh
-git ls-files assets/images/building assets/images/resource assets/images/background scripts
+git ls-files -- assets/images/building assets/images/resource assets/images/background scripts
+git status --short --ignored --untracked-files=all -- \
+  assets/images/building assets/images/resource assets/images/background scripts
 ```
 
 Expected intent:
 
 - every tracked file under `assets/images/building/` is city-era;
 - every tracked file under `assets/images/resource/` is city-era;
-- `assets/images/background/` contains only the placeholder being removed;
-- `scripts/` contains only the retired terrain/building-resource tooling.
+- `assets/images/background/` contains only the placeholder **among tracked files**; local ignored `original/` terrain images may also exist;
+- `scripts/` tracks only the retired terrain/building-resource tooling; local ignored `__pycache__/` may also exist.
 
-If an unexpected file is active or mining-related, stop and narrow the deletion instead of deleting the whole directory.
+Review local ignored/untracked entries before proceeding. If any item is unexpected, active, or personally valuable, stop and preserve it outside the deletion target or narrow the deletion. Never blindly delete unknown local files.
 
-This keeps HPA-184 deletion-first without turning a stale ticket inventory into an unsafe command.
+Once the directories contain only confirmed obsolete material, a scoped recursive removal can clear both tracked and ignored leftovers in **the executing checkout**. A Git PR cannot delete ignored files from other contributors' checkouts.
 
 ### 2. Asset cleanup is manifest cleanup too
 
@@ -83,7 +85,7 @@ Delete the retired building/resource image roots and remove their two Flutter as
 
 Do not touch any path under `assets/images/mining/`, `assets/audio/`, or `assets/fonts/`.
 
-The background placeholder may be removed because the old script is its only current repository consumer and the folder carries no active asset.
+The background placeholder may be removed because the old script is its only current tracked repository consumer. Any ignored local `background/original/` files require the same review-and-preserve check before removal.
 
 ### 3. Delete obsolete scripts as one retired toolchain
 
@@ -94,7 +96,7 @@ The named scripts form one obsolete preprocessing toolchain:
 - `scripts/resize_images.py`
 - `scripts/requirements.txt`
 
-After the inventory gate confirms there are no other live scripts in that directory, remove the directory.
+After both tracked and local ignored/untracked inventories confirm there are no other live scripts or valuable local data in that directory, remove it (including confirmed obsolete `__pycache__/`).
 
 Do not replace the scripts with a new asset pipeline. Mining art already has its own authored workflow and this ticket is cleanup only.
 
@@ -122,7 +124,7 @@ Merged mining specs/plans remain even if they mention these paths as part of his
 
 Replace the current paragraph that names the soon-to-be-deleted production-chain files with one durable rule:
 
-> Do not revive the city-era `Building`/`Resources`/recipe/worker/city-tick architecture in mining; its docs were removed by HPA-184 and remain in git history.
+> Do not revive the city-era `Building`/`Resources`/recipe/worker/city-tick architecture in mining; its docs were removed and remain in git history.
 
 Do not add links to deleted files.
 
@@ -193,7 +195,7 @@ git diff --name-status main...HEAD
 
 Expected shape:
 
-- deletions only under the explicitly approved legacy asset/script/doc paths;
+- deletions only under the explicitly approved legacy asset/script/doc paths (local ignored files are not represented in the Git diff);
 - edits to `pubspec.yaml`, `CLAUDE.md`, and `README.md`;
 - this design and implementation plan;
 - no `lib/`, `test/`, dependency, platform, or CI changes.
