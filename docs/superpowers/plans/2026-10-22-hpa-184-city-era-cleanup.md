@@ -18,7 +18,9 @@ No image generation or SFX work is required.
 Before deleting anything:
 
 ```sh
-git ls-files assets/images/building assets/images/resource assets/images/background scripts
+git ls-files -- assets/images/building assets/images/resource assets/images/background scripts
+git status --short --ignored --untracked-files=all -- \
+  assets/images/building assets/images/resource assets/images/background scripts
 
 rg -n "images/building|images/resource|images/background|scripts/" \
   lib test pubspec.yaml .github README.md CLAUDE.md
@@ -30,22 +32,23 @@ rg -n "PARALLAX_TERRAIN_GUIDE|TERRAIN_ASSETS_GUIDE|TERRAIN_SYSTEM_SUMMARY|terrai
 Expected current ownership:
 
 - old building/resource image roots are not used by active `lib/` or `test/`;
-- background is only the retired placeholder/tooling path;
-- `scripts/` is only the obsolete terrain/building-resource toolchain;
+- only the `.keep` placeholder is tracked under background, but ignored `assets/images/background/original/` terrain images may exist on the executing machine;
+- `scripts/` tracks the obsolete terrain/building-resource toolchain, but ignored `scripts/__pycache__/` may exist;
+- ignored/generated originals may likewise exist beneath the building and resource folders;
 - the only active production-chain-doc reference is the historical guardrail in `CLAUDE.md`.
 
-If inventory reveals another live/mining file under a recursive-deletion directory, stop and narrow the deletion instead of removing the whole directory.
+Inspect **both** outputs before deletion. The ignored/untracked listing is local to the executing checkout, not something GitHub can verify for every contributor. If it reveals unexpected or personally valuable content, preserve that material outside the deletion targets or narrow the deletion; never remove it blindly.
 
 ## Task 2 — Remove unused asset roots and obsolete scripts
 
-Delete:
+Once every tracked and local ignored/untracked entry in the target directories has been reviewed and confirmed obsolete, remove the four retired roots in the executing checkout:
 
-```text
-assets/images/building/
-assets/images/resource/
-assets/images/background/.keep
-scripts/
+```sh
+rm -rf -- assets/images/building assets/images/resource assets/images/background scripts
+git add -A -- assets/images/building assets/images/resource assets/images/background scripts
 ```
+
+This removes both tracked content and confirmed obsolete local ignored leftovers (including `original/` and `__pycache__/`); staging is restricted to the intended paths. Do **not** run the recursive removal on a machine with unknown or wanted files in these directories. A merged PR can delete tracked paths but cannot clean ignored files out of other contributors' checkouts.
 
 Edit `pubspec.yaml`:
 
@@ -53,7 +56,7 @@ Edit `pubspec.yaml`:
 - remove `assets/images/resource/`;
 - leave every `assets/images/mining/`, audio, and font entry unchanged.
 
-Do not introduce replacement scripts or asset tooling.
+Do not introduce replacement scripts or asset tooling. Leave `.gitignore`'s generic `assets/**/original` protection unchanged: it is not an active-reference link to city-era assets and may protect future local source art from accidental commits.
 
 Focused check:
 
@@ -87,8 +90,7 @@ Edit `CLAUDE.md` so its durable rule no longer names deleted working-tree files:
 
 ```text
 Do not revive the city-era Building/Resources/recipe/worker/city-tick
-architecture in mining; its docs were removed by HPA-184 and remain in git
-history.
+architecture in mining; its docs were removed and remain in git history.
 ```
 
 No `AGENTS.md` edit is needed because it is a repository-relative symlink to `CLAUDE.md`.
