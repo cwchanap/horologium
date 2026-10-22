@@ -80,9 +80,11 @@ The final planet's 30,000,000 mastery reward is unchanged and is paid again in e
 
 ### 5. Pacing
 
-Rates, storage, and prices are unchanged, so a run's cash income scales with the multiplier. The public-action journey measures it: after the existing Ceres mastery and reload, it relaunches, replays Homeworld through the Lunar Frontier unlock with the same player and cadence, and asserts that run 2 reaches the Lunar unlock in less time than run 1 did. The numbers go in the PR.
+Rates, storage, and prices are unchanged, so a run's cash income scales with the multiplier. The public-action journey measures it: after the existing Ceres mastery and reload, it relaunches and plays the whole run again with the same player and cadence, then compares run 2's Ceres mastery time with run 1's. The numbers go in the PR.
 
-The 0.5 step is a starting point. If run 2 is not clearly shorter in the journey (at least 20% faster to the Lunar unlock at the two-hour cadence), raise the step; if it skips whole sites, lower it. No other number changes.
+The comparison uses the whole run, not an early milestone, because the journey moves in whole visits: at the two-hour cadence run 1 already unlocks Lunar Frontier on its first visit (HPA-401's cadence log), so an early milestone cannot get any shorter.
+
+The 0.5 step is a starting point. If run 2 is not at least 20% shorter at the two-hour cadence, raise the step; if run 2 skips whole planets' worth of waiting, lower it. No other number changes.
 
 ## Touch points
 
@@ -105,7 +107,7 @@ No new controller, repository, simulation, save key other than `relaunchCount`, 
 - **Controller:** `relaunch()` fails before Ceres mastery with no save; on success the state equals `MiningSave.initial` at the clock time with `relaunchCount + 1`, it saves once, and a following sale pays ×1.5.
 - **Views:** Site Deck, Mine Site, and Stellar Map projected values include the multiplier; the next goal after Ceres mastery is `relaunch` with the next multiplier; `canRelaunch` is false until the final planet is mastered.
 - **Widgets:** the Relaunch card and sheet at 360×640 and 430×932 with no overflow; Cancel changes nothing; confirming calls the controller once, plays `milestone`, and lands on the Homeworld Site Deck.
-- **Journey:** after the existing Ceres reload, relaunch and replay to the Lunar Frontier unlock; assert run 2 is faster than run 1 and that a reload keeps `relaunchCount` 1.
+- **Journey:** after the existing Ceres reload, relaunch and replay the run to Ceres mastery; assert run 2 is at least 20% shorter at the two-hour cadence and shorter at the six-hour cadence, and that a reload keeps `relaunchCount` 1.
 
 ## Risks
 
