@@ -10,7 +10,7 @@
 Horologium is now a mining-only Flutter game, but the repository still carries city-era artifacts that look current enough to mislead future work:
 
 - old building/resource image roots remain in the Flutter asset manifest even though active mining code does not load them;
-- an obsolete terrain/building-resource preprocessing `scripts/` directory remains even though it does not target the mining asset families;
+- the unimported Flame-era `lib/constants/assets_path.dart` still lists the retired `building/` and `resource/` paths, alongside an obsolete terrain/building-resource preprocessing `scripts/` directory;
 - city-builder PRD, terrain guides, and production-chain documents remain under `docs/`;
 - `README.md` duplicates detailed economy/save facts and is already stale after the storage-pacing and Ceres work;
 - `CLAUDE.md` currently has to warn contributors not to revive production-chain documents that should simply no longer be present in the working tree.
@@ -19,7 +19,7 @@ This is repository hygiene, not a gameplay change.
 
 ## Goals
 
-- Remove city-era assets that are still bundled only because `pubspec.yaml` lists them.
+- Remove city-era assets that are still bundled only because `pubspec.yaml` lists them, and the dead `lib/constants/assets_path.dart` constants.
 - Remove obsolete non-mining preprocessing scripts.
 - Delete stale city/terrain/production-chain documentation that no longer describes the active product.
 - Keep the durable "do not revive city production architecture" rule in `CLAUDE.md`, with git history as the historical source.
@@ -31,7 +31,7 @@ This is repository hygiene, not a gameplay change.
 
 This PR does not:
 
-- change `lib/` or `test/` behavior;
+- change `lib/` except deleting the unimported `lib/constants/assets_path.dart`, or change any `test/` source/behavior;
 - change mining content, pacing, save schema, persistence, or balance;
 - regenerate, replace, optimize, or add mining art;
 - alter audio, fonts, native platform code, dependencies, or CI behavior;
@@ -48,44 +48,38 @@ Current `main` confirms:
 - Repository search finds `assets/images/building/` in the stale city PRD and manifest, not active mining code.
 - Repository search finds `assets/images/resource/` in the manifest, not active mining code.
 - `scripts/process_terrain_assets.py` points at retired `assets/images/background/` paths.
+- `lib/constants/assets_path.dart` defines only Flame-prefixed city building/resource paths; repository search finds no active `lib/` or `test/` imports or uses of its `flutterAssetPath` helper.
 - The four named script files and all ten named stale docs currently exist.
 - `CLAUDE.md` already labels the city production-chain documents as historical.
 - `README.md` still describes pre-Ceres/pre-HPA-401 details, including the old site count, Mars reward, Logistics offline-cap behavior, and a fresh-to-Mars journey.
+- The active `docs/audio-assets.md` is linked only from that README's detailed economy/audio prose, so the replacement must retain one audio-doc link.
+- `test/mining/presentation/mining_visuals_test.dart` already resolves every authored mining visual through `rootBundle`, including the font manifest; reuse it rather than adding a cleanup-specific test.
 
-The tracked deletion list is supported by current repository evidence. However, ignored or untracked files may also be present locally: the review reports generated `original/` artwork under the retired asset roots and `scripts/__pycache__/`. Git-tracked inventory alone cannot verify local directory contents. Inspect both tracked and ignored/untracked entries before any recursive deletion.
+The tracked deletion list is supported by current repository evidence. The review also found local **ignored** `original/` art PNGs and `scripts/__pycache__/`, which do **not** belong to the Git commit and cannot be restored from its history. This PR must delete **tracked files only**. Local ignored/generated sources remain untouched for the owner to inspect or remove separately.
 
 ## Design decisions
 
-### 1. Inventory before recursive deletion
+### 1. Tracked-only removal protects uncommitted source images
 
-Do not trust historical file counts as a deletion contract.
-
-Before deleting, run:
+The relevant tracked paths have been surveyed. Avoid any local `rm -rf` or ignored-file inventory as a merge gate. Remove only files registered in Git:
 
 ```sh
-git ls-files -- assets/images/building assets/images/resource assets/images/background scripts
-git status --short --ignored --untracked-files=all -- \
-  assets/images/building assets/images/resource assets/images/background scripts
+git rm -r -q -- \
+  assets/images/building assets/images/resource assets/images/background \
+  scripts lib/constants/assets_path.dart
 ```
 
-Expected intent:
+This deletes the tracked background placeholder, retired asset images and scripts, and dead Flame constants file. Git leaves ignored `original/` images, `.DS_Store`, and `scripts/__pycache__/` untouched. Those local-only files will no longer be bundled after the manifest edit, and deciding whether to discard their source art is the owner's separate local-cleanup choice.
 
-- every tracked file under `assets/images/building/` is city-era;
-- every tracked file under `assets/images/resource/` is city-era;
-- `assets/images/background/` contains only the placeholder **among tracked files**; local ignored `original/` terrain images may also exist;
-- `scripts/` tracks only the retired terrain/building-resource tooling; local ignored `__pycache__/` may also exist.
-
-Review local ignored/untracked entries before proceeding. If any item is unexpected, active, or personally valuable, stop and preserve it outside the deletion target or narrow the deletion. Never blindly delete unknown local files.
-
-Once the directories contain only confirmed obsolete material, a scoped recursive removal can clear both tracked and ignored leftovers in **the executing checkout**. A Git PR cannot delete ignored files from other contributors' checkouts.
+Do not promise that merging this PR removes ignored files from any contributor's checkout. The PR description may note that owners can manually remove the four directories locally **if they no longer want the source PNGs**.
 
 ### 2. Asset cleanup is manifest cleanup too
 
-Delete the retired building/resource image roots and remove their two Flutter asset-directory entries from `pubspec.yaml`.
+Delete the **tracked** retired building/resource image roots and remove their two Flutter asset-directory entries from `pubspec.yaml`. Also delete `lib/constants/assets_path.dart`, which is unimported and contains exclusively deleted Flame-era building/resource paths. There is no replacement asset-path helper: live mining assets are already defined in `lib/mining/presentation/mining_visuals.dart` and `lib/mining/mining_content.dart`.
 
 Do not touch any path under `assets/images/mining/`, `assets/audio/`, or `assets/fonts/`.
 
-The background placeholder may be removed because the old script is its only current tracked repository consumer. Any ignored local `background/original/` files require the same review-and-preserve check before removal.
+The tracked background placeholder is deleted with the old toolchain; leave any ignored `background/original/` source images intact.
 
 ### 3. Delete obsolete scripts as one retired toolchain
 
@@ -96,7 +90,7 @@ The named scripts form one obsolete preprocessing toolchain:
 - `scripts/resize_images.py`
 - `scripts/requirements.txt`
 
-After both tracked and local ignored/untracked inventories confirm there are no other live scripts or valuable local data in that directory, remove it (including confirmed obsolete `__pycache__/`).
+Remove the tracked scripts through the same `git rm` command. Leave any ignored `__pycache__/` local files intact rather than bundling their disposal into a repository PR.
 
 Do not replace the scripts with a new asset pipeline. Mining art already has its own authored workflow and this ticket is cleanup only.
 
@@ -135,7 +129,7 @@ Do not add links to deleted files.
 Keep:
 
 - the short product summary;
-- the active ownership diagram;
+- the active ownership diagram **without** the ownership prose below it, which duplicates `CLAUDE.md`;
 - Run, test, and build;
 - Local agent commands.
 
@@ -144,13 +138,15 @@ Replace the detailed state/economy/persistence and asset/resource sections with 
 1. Horologium is an authored multi-planet mining game where the player merges/deploys rigs, sells cargo, researches technology, and unlocks the next frontier.
 2. `CLAUDE.md` is the authoritative architecture, save-contract, and economy reference.
 
+Retain the sole README pointer to the live audio source/playback documentation: `Audio sources and playback notes: [docs/audio-assets.md](docs/audio-assets.md).`
+
 Do **not** put planet counts, site counts, reward values, storage durations, offline caps, or save root-key inventories in README. HPA-184 explicitly wants README free of numeric facts that can drift.
 
 Update the integration-test description from "fresh-to-Mars" to the current final frontier without hard-coding another count.
 
 ### 7. No test edits are planned
 
-No runtime behavior changes, so no test source should need modification.
+No runtime behavior changes, so no test source should need modification. After removing the dead asset constants and updating the asset manifest, run `flutter analyze` and the existing `flutter test test/mining/presentation/mining_visuals_test.dart` asset bundle check before the full gates.
 
 If a test or build fails because a deleted asset/script/doc was actually consumed, restore that item and record the live dependency rather than rewriting behavior to make the cleanup pass.
 
@@ -159,7 +155,7 @@ If a test or build fails because a deleted asset/script/doc was actually consume
 Before deletion, use active-surface searches to prove expected ownership:
 
 ```sh
-rg -n "images/building|images/resource|images/background|scripts/" \
+rg -n "(building|resource|background)/|scripts/" \
   lib test pubspec.yaml .github README.md CLAUDE.md
 
 rg -n "PARALLAX_TERRAIN_GUIDE|TERRAIN_ASSETS_GUIDE|TERRAIN_SYSTEM_SUMMARY|terrain_camera_alignment|terrain_grouping_todo|features_prd|production_chains|production_chain_recommendations|2026-05-03-production-chain" \
@@ -195,10 +191,10 @@ git diff --name-status main...HEAD
 
 Expected shape:
 
-- deletions only under the explicitly approved legacy asset/script/doc paths (local ignored files are not represented in the Git diff);
+- deletions only under the explicitly approved tracked legacy asset/script/doc paths plus `lib/constants/assets_path.dart` (local ignored files are untouched and not represented in the Git diff);
 - edits to `pubspec.yaml`, `CLAUDE.md`, and `README.md`;
 - this design and implementation plan;
-- no `lib/`, `test/`, dependency, platform, or CI changes.
+- no `lib/` change except deletion of `lib/constants/assets_path.dart`; no `test/`, dependency, platform, or CI changes.
 
 ## Delivery
 
