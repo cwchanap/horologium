@@ -1,7 +1,7 @@
 # HPA-184 — City-Era Repository Cleanup Design
 
 - Date: 2026-10-22
-- Status: Proposed
+- Status: Implemented
 - Linear: HPA-184 — [Cleanup] Remove city-era assets, scripts, and stale docs
 - Baseline: `main` at `15fd4c0887a18168dd2a7366da2637c103f9f74e`
 
