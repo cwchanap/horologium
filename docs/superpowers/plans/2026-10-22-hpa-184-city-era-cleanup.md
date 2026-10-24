@@ -23,6 +23,9 @@ rg -n "(building|resource|background)/|scripts/" \
 
 rg -n "PARALLAX_TERRAIN_GUIDE|TERRAIN_ASSETS_GUIDE|TERRAIN_SYSTEM_SUMMARY|terrain_camera_alignment|terrain_grouping_todo|features_prd|production_chains|production_chain_recommendations|2026-05-03-production-chain" \
   lib test README.md CLAUDE.md pubspec.yaml .github
+
+rg -n "assets_path\.dart|flutterAssetPath" \
+  lib test --glob '!lib/constants/assets_path.dart'
 ```
 
 Expected old references: retired image roots in `pubspec.yaml`, and relative `building/` / `resource/` constants in `lib/constants/assets_path.dart`. Repository search finds no active imports of that Dart file or use of its `flutterAssetPath` helper. The only active production-chain-document reference is the historical guardrail in `CLAUDE.md`.
