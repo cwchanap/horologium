@@ -3,7 +3,8 @@
 - Date: 2026-10-22
 - Status: Proposed
 - Linear: [HPA-427](https://linear.app/cwchanap/issue/HPA-427/mining-endgame-relaunch-after-the-final-frontier-for-a-permanent-cash) — Relaunch after the final frontier for a permanent cash bonus
-- Baseline: `main` at `15fd4c0`, after HPA-403 (Ceres Frontier) and HPA-200 (Ceres caverns)
+- Original baseline: `main` at `15fd4c0`, after HPA-403 (Ceres Frontier) and HPA-200 (Ceres caverns)
+- Rechecked 2026-10-23 against `main` at `49d8a97` (HPA-184 cleanup landed; relevant mining ownership and sale paths unchanged). Rebase this PR before implementation.
 - Related: [HPA-262](https://linear.app/cwchanap/issue/HPA-262/mining-content-ship-io-frontier-as-the-fifth-planet-after-ceres) — Io Frontier, which moves the final planet
 
 ## Problem
@@ -58,6 +59,8 @@ double cargoValue(MiningSiteId site, double amount, int relaunchCount);
 
 so the Sell button, the cargo gauge, the Site Deck card, the Stellar Map, and the actual sale cannot disagree.
 
+**Rounding contract:** `cargoValue` returns an unrounded `double`. Each site's individual preview may floor its own amount, but the controller and every active-planet aggregate preview must sum unrounded site values and floor **once at the end**, as they do today. Do not sum separately floored card values: fractional cargo can make that differ from actual sale revenue. Test with non-integral amounts on at least two sites.
+
 ### 3. Relaunch is a controller action
 
 ```dart
@@ -73,9 +76,9 @@ The final planet's 30,000,000 mastery reward is unchanged and is paid again in e
 ### 4. Where the player meets it
 
 - **Next goal.** `MiningGoalKind.frontiersMastered` becomes `MiningGoalKind.relaunch`: title `Relaunch`, detail `Start again with sales ×<next multiplier>.`, target the Stellar Map. The old "keep upgrading Extraction and Logistics" step goes away, because a relaunch resets technology anyway.
-- **Stellar Map.** Below the planet cards, a Relaunch card appears once the final planet is mastered. It shows the next multiplier and a Relaunch button.
+- **Stellar Map.** Below the planet cards, a Relaunch card appears once the final planet is mastered. `StellarMapView.isRelaunchUnlocked` is derived from mastery and controls visibility; `canRelaunch` additionally checks `!isBusy` and disables the button during a pending action instead of making the card disappear. It shows the next multiplier and a Relaunch button.
 - **Confirmation.** The button opens a sheet in the existing `MiningSheetFrame` that lists what resets (cash, technology, rigs, planets, cargo) and what stays (the relaunch count and the new multiplier), with Cancel and Relaunch. Relaunch is the only destructive action in the game, so it is the only one with a confirmation.
-- **After relaunch.** The shell plays the milestone cue after the save succeeds, shows the controller's message in the usual snackbar, and returns to the Homeworld Site Deck.
+- **After relaunch.** The shell plays the milestone cue only after the save succeeds, shows the controller's message in the usual snackbar, and returns to the Homeworld Site Deck. Cancel never invokes the controller; double confirmation is blocked by the shell's existing busy guard.
 - **Current bonus.** Once `relaunchCount > 0`, the Stellar Map header shows `RELAUNCH <n> · SALES ×<multiplier>`. Everywhere else the bonus is already visible in the numbers, since every projected and sold value goes through `cargoValue`.
 
 ### 5. Pacing
@@ -92,7 +95,7 @@ The 0.5 step is a starting point. If run 2 is not at least 20% shorter at the tw
 - `lib/mining/mining_save_repository.dart`: the eighth root key and its decode.
 - `lib/mining/mining_content.dart`: `relaunchSaleBonus`, `saleMultiplier`, `finalPlanetId`, `cargoValue`.
 - `lib/mining/mining_controller.dart`: `relaunch()`; `sellAllCargo` uses `cargoValue`.
-- `lib/mining/site_deck_view.dart`, `lib/mining/mine_site_view.dart`, `lib/mining/mining_progression_views.dart`: `cargoValue`; `StellarMapView` gains `relaunchCount`, `canRelaunch`, and `nextSaleMultiplier`.
+- `lib/mining/site_deck_view.dart`, `lib/mining/mine_site_view.dart`, `lib/mining/mining_progression_views.dart`: `cargoValue`; `StellarMapView` gains `relaunchCount`, `isRelaunchUnlocked`, `canRelaunch`, and `nextSaleMultiplier` as derived fields.
 - `lib/mining/next_goal_view.dart`: the `relaunch` kind.
 - `lib/mining/presentation/stellar_map_screen.dart`: the Relaunch card and header line; a new `relaunch_sheet.dart` beside the other sheets.
 - `lib/mining/presentation/mining_shell.dart`: opens the sheet, calls `relaunch()`, plays the cue, navigates.
@@ -105,7 +108,7 @@ No new controller, repository, simulation, save key other than `relaunchCount`, 
 - **State and repository:** initial state has `relaunchCount` 0; a save with `relaunchCount` 3 round-trips; a save without the key, with a negative value, or with a non-int clean-resets with the recovered flag.
 - **Content:** `saleMultiplier` is 1.0 / 1.5 / 2.0 for 0 / 1 / 2; `finalPlanetId` is Ceres; `cargoValue` matches `amount × saleValuePerUnit × multiplier`.
 - **Controller:** `relaunch()` fails before Ceres mastery with no save; on success the state equals `MiningSave.initial` at the clock time with `relaunchCount + 1`, it saves once, and a following sale pays ×1.5.
-- **Views:** Site Deck, Mine Site, and Stellar Map projected values include the multiplier; the next goal after Ceres mastery is `relaunch` with the next multiplier; `canRelaunch` is false until the final planet is mastered.
+- **Views:** Site Deck, Mine Site, and Stellar Map projected values include the multiplier; the next goal after the currently final planet's mastery is `relaunch` with the next multiplier; `isRelaunchUnlocked` is false until mastery and `canRelaunch` also becomes false during a pending action.
 - **Widgets:** the Relaunch card and sheet at 360×640 and 430×932 with no overflow; Cancel changes nothing; confirming calls the controller once, plays `milestone`, and lands on the Homeworld Site Deck.
 - **Journey:** after the existing Ceres reload, relaunch and replay the run to Ceres mastery; assert run 2 is at least 20% shorter at the two-hour cadence and shorter at the six-hour cadence, and that a reload keeps `relaunchCount` 1.
 
