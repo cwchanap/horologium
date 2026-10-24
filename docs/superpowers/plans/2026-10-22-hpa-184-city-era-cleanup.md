@@ -115,16 +115,20 @@ Keep:
 
 - short Horologium summary;
 - active ownership diagram (but **remove** its prose ownership recap beneath it, because `CLAUDE.md` is authoritative);
-- Run, test, and build;
-- Local agent commands.
+- Run, test, and build.
 
 Remove the detailed `State, economy, and persistence` and `Assets and resource identity` sections.
 
-Replace them with concise non-numeric product/reference copy:
+Replace them with concise non-numeric reference copy under a `References` heading:
 
-- Horologium uses authored planets and mine sites; players merge/deploy rigs, sell cargo, research technology, and unlock the next frontier.
 - `CLAUDE.md` is the authoritative architecture, save-contract, and economy reference.
 - `Audio sources and playback notes: [docs/audio-assets.md](docs/audio-assets.md).` Keep this live documentation link from the deleted section; it is currently the only README pointer to the audio source/target details.
+
+Also remove the `Local agent commands` section: it documents the
+`.opencode/command` → `.claude/commands` symlink, and neither path is
+Git-tracked, so the section points readers at files absent from a fresh clone.
+Do not restate the gameplay loop in the references section; the opening
+summary already carries it.
 
 Do not retain planet/site counts, rewards, storage windows, offline caps, or root-key inventories in README.
 
@@ -150,7 +154,9 @@ Implementation:
 
 - deleted **tracked** legacy building/resource/background assets, `scripts/`, and `lib/constants/assets_path.dart`;
 - deleted the ten explicitly listed stale docs;
+- deleted the stale `.github/README.md` GitHub-workflow guide;
 - edited `pubspec.yaml`, `CLAUDE.md`, and `README.md`;
+- corrected retained-doc references in `docs/audio-assets.md` (Ceres reward, both animated basins) and the retained HPA-642 decision spec (historical-reference wording);
 - ignored local source images and caches remain outside the Git diff.
 
 Unexpected and should stop the task:
