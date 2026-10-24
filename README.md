@@ -17,10 +17,8 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
                          -> Flutter Site Deck / Mine Site / Stellar Map
 ```
 
-## Gameplay and references
+## References
 
-Horologium uses authored planets and mine sites; players merge and deploy
-rigs, sell cargo, research technology, and unlock the next frontier.
 `CLAUDE.md` is the authoritative architecture, save-contract, and economy
 reference.
 
@@ -46,14 +44,3 @@ flutter build ios --simulator --debug
 Use `flutter run -d chrome` for a quick browser session. Focused mining tests
 are under `test/mining/`; the public fresh-to-final-frontier journey is
 `test/integration/merge_mining_journey_test.dart`.
-
-## Local agent commands
-
-`.opencode/command` (singular) is a repository-relative symlink to
-`.claude/commands` (plural). Inspect the command definitions in
-`.claude/commands`; if the symlink is missing, recreate it from the repository
-root with:
-
-```sh
-ln -s ../.claude/commands .opencode/command
-```

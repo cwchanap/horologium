@@ -122,7 +122,7 @@ Ownership and the ban on speculative processing layers are already authoritative
 
 The strict, unversioned save contract and clean-reset behavior for incompatible pre-release data are also authoritative in `CLAUDE.md`. A future persisted processing field is a breaking save-contract change unless future scoped work deliberately changes that policy; HPA-642 does not promise compatibility or introduce migration/versioning.
 
-`CLAUDE.md` now also marks the old city-era production-chain documents as historical reference only. Do not revive their `Building`/`Resources`/recipe/worker/city-tick architecture inside mining.
+The old city-era production-chain documents were removed in HPA-184 and remain in git history. Do not revive their `Building`/`Resources`/recipe/worker/city-tick architecture inside mining.
 
 ## Verification and closure
 

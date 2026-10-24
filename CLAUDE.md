@@ -56,7 +56,8 @@ boundary; there is no migration.
 Do not add a second state owner, direct widget/repository writes, a parallel
 mutation path, or a speculative processing/sink/currency layer.
 Do not revive the city-era `Building`/`Resources`/recipe/worker/city-tick
-architecture in mining; its docs were removed and remain in git history.
+architecture in mining; its docs were removed in `768d991` and remain in git
+history.
 
 ## State and save contract
 
