@@ -51,15 +51,19 @@ Every sale earns `amount × saleValuePerUnit × saleMultiplier(relaunchCount)`. 
 
 The bonus sits on sale value, not on rate or capacity, because a rate bonus would shrink HPA-401's two-hour storage window (storage holds `rate × window`), and a capacity bonus would only matter to players who are away longer than two hours. A sale bonus changes neither the window nor the offline numbers; it only makes every cash target arrive sooner.
 
-Sale value is computed today in seven places (`sellAllCargo`, and two each in `site_deck_view.dart`, `mine_site_view.dart`, and `mining_progression_views.dart`). They all move to one helper on `MiningContentRegistry`:
+Sale value is computed today in seven places (`sellAllCargo`, and two each in `site_deck_view.dart`, `mine_site_view.dart`, and `mining_progression_views.dart`). Consolidate the per-site multiplication on `MiningContentRegistry` and the four repeated aggregate totals on `MiningSave` (which already imports mining content):
 
 ```dart
+// MiningContentRegistry: unrounded value for one site.
 double cargoValue(MiningSiteId site, double amount, int relaunchCount);
+
+// MiningSave: floored sum for one planet, including relaunchCount.
+int saleValue(MiningContentRegistry content, MiningPlanetId planet);
 ```
 
-so the Sell button, the cargo gauge, the Site Deck card, the Stellar Map, and the actual sale cannot disagree.
+`sellAllCargo`, Site Deck, Mine Site, and Stellar Map use `state.saleValue(content, planet)` for their **planet-wide** sale values. Single-site cards use `content.cargoValue(id, amount, state.relaunchCount).floor()`. This keeps the existing contract: sum **unrounded** site values and floor **once** for an aggregate, even when several sites have fractional cargo. Do not sum the floored card labels. Test two fractional sites directly on `MiningSave.saleValue`, then compare controller revenue to that value before selling; do not add three redundant per-view fractional-rounding tests.
 
-**Rounding contract:** `cargoValue` returns an unrounded `double`. Each site's individual preview may floor its own amount, but the controller and every active-planet aggregate preview must sum unrounded site values and floor **once at the end**, as they do today. Do not sum separately floored card values: fractional cargo can make that differ from actual sale revenue. Test with non-integral amounts on at least two sites.
+A single `formatSaleMultiplier(int relaunchCount)` helper beside `formatMiningCash` formats the resulting multiplier on the controller message, goal, card, sheet, and status line. Keep up to two decimal places without rounding 1.75 to 1.8; display ×1.5 / ×1.75 / ×2 as appropriate. The number itself remains controlled by `relaunchSaleBonus`.
 
 ### 3. Relaunch is a controller action
 
@@ -78,24 +82,25 @@ The final planet's 30,000,000 mastery reward is unchanged and is paid again in e
 - **Next goal.** `MiningGoalKind.frontiersMastered` becomes `MiningGoalKind.relaunch`: title `Relaunch`, detail `Start again with sales ×<next multiplier>.`, target the Stellar Map. The old "keep upgrading Extraction and Logistics" step goes away, because a relaunch resets technology anyway.
 - **Stellar Map.** Below the planet cards, a Relaunch card appears once the final planet is mastered. `StellarMapView.isRelaunchUnlocked` is derived from mastery and controls visibility; `canRelaunch` additionally checks `!isBusy` and disables the button during a pending action instead of making the card disappear. It shows the next multiplier and a Relaunch button.
 - **Confirmation.** The button opens a sheet in the existing `MiningSheetFrame` that lists what resets (cash, technology, rigs, planets, cargo) and what stays (the relaunch count and the new multiplier), with Cancel and Relaunch. Relaunch is the only destructive action in the game, so it is the only one with a confirmation.
-- **After relaunch.** The shell plays the milestone cue only after the save succeeds, shows the controller's message in the usual snackbar, and returns to the Homeworld Site Deck. Cancel never invokes the controller; double confirmation is blocked by the shell's existing busy guard.
-- **Current bonus.** Once `relaunchCount > 0`, the Stellar Map header shows `RELAUNCH <n> · SALES ×<multiplier>`. Everywhere else the bonus is already visible in the numbers, since every projected and sold value goes through `cargoValue`.
+- **After relaunch.** The confirmation sheet closes and the shell awaits its existing `_runSheetAction` with the milestone sound. Its `onSuccess` is Mine-Site-local, so this action cannot use that callback for navigation. Compare `relaunchCount` before/after the awaited action; only if it increased, call `_showPrimarySurface(MiningNavigationDestination.siteDeck)`. This explicitly returns to Homeworld after persistence, reusing snackbar and sound handling. The extra navigation tap is lower priority than `milestone` and cannot interrupt it. Cancel never invokes the controller; the controller's serialized mutation gate rejects a second relaunch after the first reset.
+- **Current bonus.** Once `relaunchCount > 0`, display `RELAUNCH <n> · SALES ×<multiplier>` as the **first child of the Stellar Map scrolling column**, above the cards, rather than adding a second line to the absolutely positioned `_MapHeader` (which would require conditional offsets). All values use the shared formatter, and every projected and sold total uses `saleValue`.
 
 ### 5. Pacing
 
-Rates, storage, and prices are unchanged, so a run's cash income scales with the multiplier. The public-action journey measures it: after the existing Ceres mastery and reload, it relaunches and plays the whole run again with the same player and cadence, then compares run 2's Ceres mastery time with run 1's. The numbers go in the PR.
+Rates, storage, and prices are unchanged, so a run's cash income scales with the multiplier. The public-action journey is the pacing proof, but it must preserve the existing 30-hour offline-return assertion **before** relaunch: that check relies on the commissioned Ceres production state. After it, invoke `relaunch()` on the live `returned` controller, then use a fresh `JourneyPlayer(returned, clock, content)` for run 2. Do not continue on the older, stale controller.
 
-The comparison uses the whole run, not an early milestone, because the journey moves in whole visits: at the two-hour cadence run 1 already unlocks Lunar Frontier on its first visit (HPA-401's cadence log), so an early milestone cannot get any shorter.
+Extract the reusable Homeworld-to-final-planet actions into `_playRun`, returning `({Duration opening, Duration mars, Duration last})` relative to **that run's own start**. Keep the existing opening, Mars, and final-planet absolute pacing bands on **run 1 only**; applying their minimums to run 2 would reject the intended speedup. For run 2, assert only a relative improvement: at least 20% faster at two-hour visits and faster at six-hour visits. Compare complete runs rather than an early milestone (run 1 already unlocks Lunar on its first two-hour return).
 
-The 0.5 step is a starting point. If run 2 is not at least 20% shorter at the two-hour cadence, raise the step; if run 2 skips whole planets' worth of waiting, lower it. No other number changes.
+`JourneyPlayer._siteIncome` should use `cargoValue` instead of raw unit sale value so its income-per-visit diagnostics reflect the relaunch multiplier; this changes no production path. The 0.5 step is a starting point. Raise it if the two-hour speedup is under 20%. Record measured times in the PR; do **not** add an arbitrary lower duration bound for run 2 or a second pacing system. No other economy number changes.
 
 ## Touch points
 
 - `lib/mining/mining_state.dart`: `relaunchCount` on `MiningSave` (constructor, `initial`, `copyWith`, `toJson`, `==`, `hashCode`).
 - `lib/mining/mining_save_repository.dart`: the eighth root key and its decode.
-- `lib/mining/mining_content.dart`: `relaunchSaleBonus`, `saleMultiplier`, `finalPlanetId`, `cargoValue`.
-- `lib/mining/mining_controller.dart`: `relaunch()`; `sellAllCargo` uses `cargoValue`.
-- `lib/mining/site_deck_view.dart`, `lib/mining/mine_site_view.dart`, `lib/mining/mining_progression_views.dart`: `cargoValue`; `StellarMapView` gains `relaunchCount`, `isRelaunchUnlocked`, `canRelaunch`, and `nextSaleMultiplier` as derived fields.
+- `lib/mining/mining_content.dart`: `relaunchSaleBonus`, `saleMultiplier`, `finalPlanetId`, `cargoValue`, and `formatSaleMultiplier`.
+- `lib/mining/mining_state.dart`: also owns `saleValue(content, planet)`, the floored aggregate.
+- `lib/mining/mining_controller.dart`: `relaunch()`; `sellAllCargo` uses `state.saleValue`.
+- `lib/mining/site_deck_view.dart`, `lib/mining/mine_site_view.dart`, `lib/mining/mining_progression_views.dart`: single-site previews use `cargoValue` and planet totals use `state.saleValue`; `StellarMapView` gains `relaunchCount`, `isRelaunchUnlocked`, `canRelaunch`, and `nextSaleMultiplier` as derived fields.
 - `lib/mining/next_goal_view.dart`: the `relaunch` kind.
 - `lib/mining/presentation/stellar_map_screen.dart`: the Relaunch card and header line; a new `relaunch_sheet.dart` beside the other sheets.
 - `lib/mining/presentation/mining_shell.dart`: opens the sheet, calls `relaunch()`, plays the cue, navigates.
@@ -106,15 +111,15 @@ No new controller, repository, simulation, save key other than `relaunchCount`, 
 ## Testing
 
 - **State and repository:** initial state has `relaunchCount` 0; a save with `relaunchCount` 3 round-trips; a save without the key, with a negative value, or with a non-int clean-resets with the recovered flag.
-- **Content:** `saleMultiplier` is 1.0 / 1.5 / 2.0 for 0 / 1 / 2; `finalPlanetId` is Ceres; `cargoValue` matches `amount × saleValuePerUnit × multiplier`.
-- **Controller:** `relaunch()` fails before Ceres mastery with no save; on success the state equals `MiningSave.initial` at the clock time with `relaunchCount + 1`, it saves once, and a following sale pays ×1.5.
-- **Views:** Site Deck, Mine Site, and Stellar Map projected values include the multiplier; the next goal after the currently final planet's mastery is `relaunch` with the next multiplier; `isRelaunchUnlocked` is false until mastery and `canRelaunch` also becomes false during a pending action.
-- **Widgets:** the Relaunch card and sheet at 360×640 and 430×932 with no overflow; Cancel changes nothing; confirming calls the controller once, plays `milestone`, and lands on the Homeworld Site Deck.
-- **Journey:** after the existing Ceres reload, relaunch and replay the run to Ceres mastery; assert run 2 is at least 20% shorter at the two-hour cadence and shorter at the six-hour cadence, and that a reload keeps `relaunchCount` 1.
+- **Content/state:** `saleMultiplier` is 1.0 / 1.5 / 2.0 for 0 / 1 / 2; `finalPlanetId` is Ceres today; `formatSaleMultiplier` displays 1.75 precisely; `cargoValue` matches unit economics; `MiningSave.saleValue` floors a sum from two fractional sites only once.
+- **Controller:** `relaunch()` fails before final-planet mastery with no save; on success the state equals `MiningSave.initial` at the clock time with `relaunchCount + 1` and saves once; actual sale revenue equals pre-sale `state.saleValue`. Two concurrent `relaunch()` requests produce one success, one failure, and one write.
+- **Views:** Existing view tests verify the multiplier is visible; no separate per-view fractional rounding proofs. The next goal after final-planet mastery is `relaunch`; `isRelaunchUnlocked` persists while busy but `canRelaunch` is disabled.
+- **Widgets:** the Relaunch card and sheet work at 360×640 and 430×932 with no overflow; simple finder test for the scrolling status line, not an absolute-header font overlap test. Cancel changes nothing; success plays `milestone` and lands on Homeworld.
+- **Journey:** update the old goal expectation in Task 2; keep the 30-hour offline-return proof before relaunch in Task 4, drive run 2 from `returned`, assert run-1 absolute bands and run-2 relative speedup, and reload with `relaunchCount` 1.
 
 ## Risks
 
-- **Seven call sites.** Missing one `cargoValue` call makes a projected value disagree with the sale. The view tests compare each projection to the controller's sale for a relaunched state.
+- **Seven call sites.** Missing a per-site `cargoValue` or aggregate `MiningSave.saleValue` call makes a projection disagree with the sale. Verify the raw multiplier only inside `cargoValue`, a two-site fractional aggregate on `MiningSave`, and controller parity before selling; re-use existing view assertions instead of duplicating the rounding tests.
 - **Accidental relaunch.** The confirmation sheet is the guard; the action is unreachable before final mastery.
 - **Long late runs.** Every run still replays Homeworld from 100 cash. The journey's run-2 time tells us whether the early game feels short enough; if not, the fix is the bonus step, not a new system.
 
