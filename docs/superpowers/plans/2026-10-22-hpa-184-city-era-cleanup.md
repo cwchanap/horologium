@@ -56,7 +56,7 @@ rg -n "(building|resource|background)/|scripts/" \
   lib test pubspec.yaml .github README.md CLAUDE.md
 ```
 
-Expected: no matches to deleted paths.
+Expected: no matches to deleted paths. Two `background/resume` comment matches remain — in `test/game/audio_manager_test.dart` and `lib/mining/presentation/animated_mining_grid_visual_layer.dart` — referring to app lifecycle, not the removed `assets/images/background/` root.
 
 Reuse the existing mining-bundle proof immediately after the manifest and dead-file edit:
 

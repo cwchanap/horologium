@@ -162,7 +162,7 @@ rg -n "PARALLAX_TERRAIN_GUIDE|TERRAIN_ASSETS_GUIDE|TERRAIN_SYSTEM_SUMMARY|terrai
   lib test README.md CLAUDE.md pubspec.yaml .github
 ```
 
-After cleanup, both commands should return no active references to deleted paths.
+After cleanup, both commands should return no active references to deleted paths. The first command still matches two comments containing `background/resume` — `test/game/audio_manager_test.dart` and `lib/mining/presentation/animated_mining_grid_visual_layer.dart` — which refer to app lifecycle, not the deleted `assets/images/background/` root; those are expected.
 
 Historical mentions inside retained merged specs/plans are intentionally outside these checks.
 

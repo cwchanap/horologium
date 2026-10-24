@@ -48,9 +48,9 @@ The shell requests action effects after persistence succeeds. Coverage:
 | Successful cargo sale | sale |
 | Research and site unlock | upgrade |
 | Planet travel | travel |
-| First site commissioning (including planet mastery/Mars reward), planet unlock | milestone |
+| First site commissioning (including planet mastery/Ceres reward), planet unlock | milestone |
 | Rejected grid/dock action, failed action or save | reject |
-| Visible Landing Basin strike at 46% of its animation | mining |
+| Visible strike on an animated site (Landing Basin or Frozen Basin) at 46% of the shared impact timeline | mining |
 | Active-planet site crosses from below capacity to full during foreground play | cargoFull |
 
 Mining emits once per animated strike, even with multiple rigs. It stays silent
