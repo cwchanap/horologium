@@ -130,8 +130,11 @@ Keep:
 
 - the short product summary;
 - the active ownership diagram **without** the ownership prose below it, which duplicates `CLAUDE.md`;
-- Run, test, and build;
-- Local agent commands.
+- Run, test, and build.
+
+Remove the `Local agent commands` section: it documents the
+`.opencode/command` → `.claude/commands` symlink, and neither path is
+Git-tracked, so the section points readers at files absent from a fresh clone.
 
 Replace the detailed state/economy/persistence and asset/resource sections with two stable ideas:
 
