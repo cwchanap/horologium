@@ -18,6 +18,7 @@ class StellarMapScreen extends StatelessWidget {
     required this.content,
     required this.onUnlock,
     required this.onTravel,
+    required this.onRelaunch,
     this.onDestinationSelected,
     this.selectedDestination = MiningNavigationDestination.stellarMap,
     this.cash = 0,
@@ -30,6 +31,7 @@ class StellarMapScreen extends StatelessWidget {
   final MiningContentRegistry content;
   final ValueChanged<MiningPlanetId> onUnlock;
   final ValueChanged<MiningPlanetId> onTravel;
+  final VoidCallback onRelaunch;
   final ValueChanged<MiningNavigationDestination>? onDestinationSelected;
   final MiningNavigationDestination selectedDestination;
   final int cash;
@@ -56,6 +58,12 @@ class StellarMapScreen extends StatelessWidget {
                 .planet(definition.unlockRequiredMasteryPlanetId!)
                 .name,
           ),
+      if (view.isRelaunchUnlocked)
+        _RelaunchCard(view: view, onRelaunch: onRelaunch),
+    ];
+    final entries = <Widget>[
+      if (view.relaunchCount > 0) _RelaunchStatusLine(view: view),
+      ...cards,
     ];
     final pad = MediaQuery.paddingOf(context);
     return ColoredBox(
@@ -103,9 +111,9 @@ class StellarMapScreen extends StatelessWidget {
               key: const Key('stellar-map-scroll'),
               child: Column(
                 children: [
-                  for (var index = 0; index < cards.length; index++) ...[
-                    cards[index],
-                    if (index != cards.length - 1) const SizedBox(height: 11),
+                  for (var index = 0; index < entries.length; index++) ...[
+                    entries[index],
+                    if (index != entries.length - 1) const SizedBox(height: 11),
                   ],
                 ],
               ),
@@ -121,6 +129,118 @@ class StellarMapScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Current run status after at least one relaunch, first in the scroll.
+class _RelaunchStatusLine extends StatelessWidget {
+  const _RelaunchStatusLine({required this.view});
+
+  final StellarMapView view;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    key: const Key('stellar-map-relaunch-status'),
+    'RELAUNCH ${view.relaunchCount} · '
+    'SALES ${formatSaleMultiplier(view.relaunchCount)}',
+    style: const TextStyle(
+      color: MiningTheme.highlight,
+      fontSize: 12,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 1.2,
+    ),
+  );
+}
+
+class _RelaunchCard extends StatelessWidget {
+  const _RelaunchCard({required this.view, required this.onRelaunch});
+
+  final StellarMapView view;
+  final VoidCallback onRelaunch;
+
+  @override
+  Widget build(BuildContext context) {
+    final canRelaunch = view.canRelaunch;
+    return Semantics(
+      container: true,
+      label:
+          'Relaunch the run at ${formatSaleMultiplier(view.relaunchCount + 1)} '
+          'sales',
+      child: Container(
+        key: const Key('stellar-map-relaunch'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xF20A111A),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: MiningTheme.highlight.withAlpha(90)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.restart_alt_rounded,
+                  color: MiningTheme.highlight,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'RELAUNCH',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'SALES ${formatSaleMultiplier(view.relaunchCount + 1)}',
+                  style: const TextStyle(
+                    color: MiningTheme.highlight,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .8,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 48,
+              width: double.infinity,
+              child: ElevatedButton(
+                key: const Key('stellar-map-relaunch-action'),
+                onPressed: canRelaunch ? onRelaunch : null,
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  foregroundColor: MiningTheme.highlight,
+                  disabledForegroundColor: MiningTheme.mutedText,
+                  disabledBackgroundColor: const Color.fromRGBO(
+                    255,
+                    255,
+                    255,
+                    .05,
+                  ),
+                  side: BorderSide(
+                    color: canRelaunch
+                        ? MiningTheme.highlight.withAlpha(160)
+                        : const Color.fromRGBO(255, 255, 255, .14),
+                  ),
+                  shape: const StadiumBorder(),
+                ),
+                child: const Text('RELAUNCH'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
