@@ -71,7 +71,7 @@ A single `formatSaleMultiplier(double multiplier)` helper beside `formatMiningCa
 Future<MiningActionResult> relaunch();
 ```
 
-- It accrues first, like every action, then requires the final planet to be mastered: `content.isPlanetMastered(content.finalPlanetId, commissioned)`, where `finalPlanetId` is the last planet in authored order (`MiningPlanetId.values.last`). When HPA-262 adds Io Frontier, the gate moves to Io with no code change.
+- Unlike every other action it does **not** accrue first: mastery depends only on commissioned flags, which accrual never changes, and the reset discards the accrued state anyway. It gates on current state directly — `content.isPlanetMastered(content.finalPlanetId, _commissionedSiteIds(_state))` — where `finalPlanetId` is the last planet in authored order (`MiningPlanetId.values.last`). When HPA-262 adds Io Frontier, the gate moves to Io with no code change.
 - On failure it returns `Master <final planet name> first.` and changes nothing.
 - On success the next state is `MiningSave.initial(nowUtc: now, relaunchCount: previous + 1)`: 100 cash, Homeworld only, its two T1 starter rigs, Landing Basin unlocked, technology 0. Cargo on every planet is discarded, not sold. It persists once through the repository and returns `Relaunch <n> — sales ×<multiplier>.`.
 
