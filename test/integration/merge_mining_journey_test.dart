@@ -789,8 +789,8 @@ Future<void> _journey(
   expect(mastery.isSuccess, isTrue);
   expect(mastery.message, 'Ceres mastered — +30.00M cash.');
   expect(controller.state.cash, cashBeforeCeresMastery + 30000000);
-  expect(goal().kind, MiningGoalKind.frontiersMastered);
-  expect(goal().title, 'All frontiers mastered');
+  expect(goal().kind, MiningGoalKind.relaunch);
+  expect(goal().title, 'Relaunch');
   final toMastery = clock.now.difference(start);
   final ceresPhase = toMastery - toMarsMastery;
   debugPrint(

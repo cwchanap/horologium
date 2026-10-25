@@ -7,7 +7,7 @@ enum MiningGoalKind {
   researchSurveying,
   unlockPlanet,
   returnToFrontier,
-  frontiersMastered,
+  relaunch,
 }
 
 enum MiningGoalTargetKind { mineSite, technology, stellarMap, none }
@@ -181,24 +181,14 @@ class _GoalLadder {
     );
   }
 
-  MiningNextGoalView complete() {
-    const max = MiningContentRegistry.maxTechnologyLevel;
-    final technology = state.technology;
-    final tracksLeft = [
-      if (technology.extraction < max) 'Extraction',
-      if (technology.logistics < max) 'Logistics',
-    ];
-    return _plain(
-      kind: MiningGoalKind.frontiersMastered,
-      title: 'All frontiers mastered',
-      detail: tracksLeft.isEmpty
-          ? 'Every frontier is mastered.'
-          : 'Keep upgrading ${tracksLeft.join(' and ')}.',
-      target: tracksLeft.isEmpty
-          ? const MiningGoalTarget.none()
-          : const MiningGoalTarget.technology(),
-    );
-  }
+  MiningNextGoalView complete() => _plain(
+    kind: MiningGoalKind.relaunch,
+    title: 'Relaunch',
+    // formatSaleMultiplier includes the × sign.
+    detail:
+        'Start again with sales ${formatSaleMultiplier(state.relaunchCount + 1)}.',
+    target: const MiningGoalTarget.stellarMap(),
+  );
 
   MiningNextGoalView _commission(MiningSiteDefinition site) {
     final planetId = content.planetForSite(site.id);

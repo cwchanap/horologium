@@ -40,6 +40,7 @@ MiningSave _stateWith({
   MiningPlanetId? activePlanetId,
   Map<MiningPlanetId, Map<DockBayId, RigTier?>>? docks,
   Map<MiningSiteId, SiteProgress>? sites,
+  int? relaunchCount,
 }) {
   final initial = MiningSave.initial(nowUtc: _now);
   return initial.copyWith(
@@ -49,6 +50,7 @@ MiningSave _stateWith({
     activePlanetId: activePlanetId,
     docks: docks == null ? null : {...initial.docks, ...docks},
     sites: sites == null ? null : {...initial.sites, ...sites},
+    relaunchCount: relaunchCount,
   );
 }
 
@@ -370,46 +372,38 @@ void main() {
       );
     });
 
-    test('mastering every frontier names only the tracks left to upgrade', () {
-      const cases = [
-        (TechnologyLevels(surveying: 5), 'Extraction and Logistics'),
-        (TechnologyLevels(surveying: 5, logistics: 5), 'Extraction'),
-        (
-          TechnologyLevels(surveying: 5, extraction: 5, logistics: 2),
-          'Logistics',
-        ),
-      ];
-      for (final (technology, tracks) in cases) {
+    test(
+      'mastering every frontier points at a relaunch on the Stellar Map',
+      () {
         final goal = _goal(
           _stateWith(
-            technology: technology,
+            technology: const TechnologyLevels(surveying: 5),
             unlockedPlanetIds: MiningPlanetId.values.toSet(),
             sites: _commissionedSites(MiningSiteId.values),
           ),
         );
 
-        expect(goal.kind, MiningGoalKind.frontiersMastered);
-        expect(goal.title, 'All frontiers mastered');
-        expect(goal.detail, 'Keep upgrading $tracks.');
-        expect(goal.target, const MiningGoalTarget.technology());
-      }
-    });
+        expect(goal.kind, MiningGoalKind.relaunch);
+        expect(goal.title, 'Relaunch');
+        expect(goal.detail, 'Start again with sales ×1.5.');
+        expect(goal.target, const MiningGoalTarget.stellarMap());
+      },
+    );
 
-    test('mastering everything with maxed technology has no target', () {
+    test('after one relaunch the next run advertises doubled sales', () {
       final goal = _goal(
         _stateWith(
-          technology: const TechnologyLevels(
-            extraction: 5,
-            logistics: 5,
-            surveying: 5,
-          ),
+          relaunchCount: 1,
+          technology: const TechnologyLevels(surveying: 5),
           unlockedPlanetIds: MiningPlanetId.values.toSet(),
           sites: _commissionedSites(MiningSiteId.values),
         ),
       );
 
-      expect(goal.detail, 'Every frontier is mastered.');
-      expect(goal.target, const MiningGoalTarget.none());
+      expect(goal.kind, MiningGoalKind.relaunch);
+      expect(goal.title, 'Relaunch');
+      expect(goal.detail, 'Start again with sales ×2.');
+      expect(goal.target, const MiningGoalTarget.stellarMap());
     });
 
     test('an uncommissioned Surveying gate falls back to commissioning it', () {
