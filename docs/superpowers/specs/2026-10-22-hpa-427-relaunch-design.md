@@ -1,7 +1,7 @@
 # HPA-427 Relaunch Design
 
 - Date: 2026-10-22
-- Status: Proposed
+- Status: Implemented
 - Linear: [HPA-427](https://linear.app/cwchanap/issue/HPA-427/mining-endgame-relaunch-after-the-final-frontier-for-a-permanent-cash) — Relaunch after the final frontier for a permanent cash bonus
 - Original baseline: `main` at `15fd4c0`, after HPA-403 (Ceres Frontier) and HPA-200 (Ceres caverns)
 - Rechecked 2026-10-23 against `main` at `49d8a97` (HPA-184 cleanup landed; relevant mining ownership and sale paths unchanged). Rebase this PR before implementation.
