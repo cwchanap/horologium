@@ -66,7 +66,7 @@ history.
 and unversioned. Its root keys are exactly:
 
 ```text
-cash, lastAccruedAtUtc, technology, unlockedPlanetIds, activePlanetId, docks, sites
+cash, lastAccruedAtUtc, technology, unlockedPlanetIds, activePlanetId, docks, sites, relaunchCount
 ```
 
 `technology` has exactly `extraction`, `logistics`, and `surveying`. `sites` is
@@ -79,6 +79,8 @@ dock stores a `RigTier` or null.
 - Malformed, incompatible, and pre-release mining data clean-reset to a fresh
   initial state and set the recovered-load flag; there is no migration table or
   compatibility reader.
+- Relaunch replaces the save with a fresh initial state and keeps only
+  `relaunchCount`.
 - Valid saves clamp decoded cargo to capacity after applying saved Logistics.
 - Legacy preference keys are ignored and never interpreted as mining state.
 - Gameplay and lifecycle persistence goes through `MiningController` and
@@ -91,9 +93,15 @@ each of Homeworld, Lunar Frontier, Mars Frontier, and Ceres Frontier.
 Commissioning every site on a planet is its mastery condition. Homeworld
 mastery plus Surveying 3 unlocks Lunar Frontier; Lunar mastery plus Surveying 5
 unlocks Mars Frontier; Mars mastery plus Surveying 5 and 30,000,000 cash unlocks
-Ceres Frontier. Ceres mastery grants the game's single 30,000,000 cash reward;
-Mars grants none. Newly unlocked planets start with their authored starter dock
-bays and starter site.
+Ceres Frontier. Ceres mastery grants 30,000,000 cash once per run; Mars grants
+none. The reward stays on the final authored planet as content evolves (HPA-262
+moves it to Io), and mastering the final planet again after Relaunch pays the
+reward again. Mastering the final authored planet unlocks Relaunch; each
+relaunch adds +50% sale value through `MiningContentRegistry.cargoValue` for
+sites and `MiningSave.saleValue` for floored planet totals.
+`formatSaleMultiplier` is the display contract for the current run multiplier.
+Newly unlocked planets start with their authored starter dock bays and starter
+site.
 
 Rig tier and Extraction determine rate. Each site's `baseCapacity` is its base
 rate times `MiningContentRegistry.storageWindow` (2 hours), so storage holds
@@ -156,6 +164,7 @@ flutter build ios --simulator --debug
 The public-action journey is
 `test/integration/merge_mining_journey_test.dart`; it must initialize a fresh
 save and use only controller actions to merge, commission, sell, research,
-unlock, travel, reward, and reload through Ceres.
+unlock, travel, reward, and reload through the final authored planet, relaunch,
+and replay a faster second run.
 
 `AGENTS.md` is the repository-relative symlink to this guidance file.
