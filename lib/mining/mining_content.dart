@@ -81,6 +81,20 @@ String formatMiningCash(int amount) {
   return _groupThousands(amount);
 }
 
+/// Formats the sale multiplier after [relaunchCount] relaunches with up to
+/// two decimals, trimming trailing zeros (`×1.5`, `×1.75`, `×2`), so a tuned
+/// two-decimal multiplier never rounds to `×1.8`.
+String formatSaleMultiplier(int relaunchCount) =>
+    '×${_trimZeros(MiningContentRegistry.saleMultiplier(relaunchCount))}';
+
+String _trimZeros(double value) {
+  var text = value.toStringAsFixed(2);
+  if (text.contains('.')) {
+    text = text.replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+  }
+  return text;
+}
+
 /// Formats resource amounts: one truncated decimal below 1,000 (`90.0`),
 /// whole units with separators from 1,000 (`12,960`), then the cash rule's
 /// compact `M`/`B`.
@@ -239,6 +253,14 @@ class MiningContentRegistry {
   /// How long every site's storage holds at T1 with no technology: each
   /// site's `baseCapacity` is its base rate times this window.
   static const storageWindow = Duration(hours: 2);
+
+  /// Sale-value growth per relaunch: every relaunch adds this fraction to
+  /// the total sale multiplier.
+  static const relaunchSaleBonus = 0.5;
+
+  /// Total sale multiplier after [relaunchCount] relaunches.
+  static double saleMultiplier(int relaunchCount) =>
+      1 + relaunchSaleBonus * relaunchCount;
   static const rateMultipliers = <double>[1.0, 1.5, 2.25, 3.25, 4.5];
   static const capacityMultipliers = <double>[1.0, 1.5, 2.0, 3.0, 4.0];
   static const extractionRateMultipliers = <double>[
@@ -609,6 +631,14 @@ class MiningContentRegistry {
   MiningPlanetId planetForSite(MiningSiteId id) => planets.entries
       .singleWhere((entry) => entry.value.sites.any((site) => site.id == id))
       .key;
+
+  /// Last authored planet; mastering it enables Relaunch.
+  MiningPlanetId get finalPlanetId => MiningPlanetId.values.last;
+
+  /// Unrounded sale value of [amount] units stored at [site] under
+  /// [relaunchCount]. Callers floor aggregates once, not this value.
+  double cargoValue(MiningSiteId site, double amount, int relaunchCount) =>
+      amount * this.site(site).saleValuePerUnit * saleMultiplier(relaunchCount);
 
   double rigRateMultiplier(RigTier tier) => rateMultipliers[tier.index];
 

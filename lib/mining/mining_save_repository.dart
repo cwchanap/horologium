@@ -94,17 +94,25 @@ class MiningSaveRepository {
       'activePlanetId',
       'docks',
       'sites',
+      'relaunchCount',
     })) {
       throw const FormatException(
         'root keys must be exactly '
         'cash, lastAccruedAtUtc, technology, unlockedPlanetIds, '
-        'activePlanetId, docks, sites',
+        'activePlanetId, docks, sites, relaunchCount',
       );
     }
 
     final cash = raw['cash'];
     if (cash is! int || cash < 0) {
       throw const FormatException('cash must be a non-negative integer');
+    }
+
+    final relaunchCount = raw['relaunchCount'];
+    if (relaunchCount is! int || relaunchCount < 0) {
+      throw const FormatException(
+        'relaunchCount must be a non-negative integer',
+      );
     }
 
     final timestampRaw = raw['lastAccruedAtUtc'];
@@ -139,6 +147,7 @@ class MiningSaveRepository {
       activePlanetId: activePlanetId,
       docks: docks,
       sites: sites,
+      relaunchCount: relaunchCount,
     );
   }
 

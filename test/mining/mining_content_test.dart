@@ -57,6 +57,32 @@ void main() {
     }
   });
 
+  test('scales sale multiplier by one half per relaunch', () {
+    expect(MiningContentRegistry.saleMultiplier(0), 1.0);
+    expect(MiningContentRegistry.saleMultiplier(1), 1.5);
+    expect(MiningContentRegistry.saleMultiplier(2), 2.0);
+  });
+
+  test('final planet is Ceres Frontier', () {
+    expect(
+      MiningContentRegistry.stellarMining().finalPlanetId,
+      MiningPlanetId.ceresFrontier,
+    );
+  });
+
+  test('cargoValue applies the relaunch multiplier unrounded', () {
+    final content = MiningContentRegistry.stellarMining();
+
+    expect(content.cargoValue(MiningSiteId.landingBasin, 10, 0), 40.0);
+    expect(content.cargoValue(MiningSiteId.landingBasin, 10, 2), 80.0);
+  });
+
+  test('formats sale multiplier with up to two trimmed decimals', () {
+    expect(formatSaleMultiplier(0), '×1');
+    expect(formatSaleMultiplier(1), '×1.5');
+    expect(formatSaleMultiplier(2), '×2');
+  });
+
   test('keeps closed site, bay, and rig identities', () {
     expect(MiningSiteId.values, hasLength(12));
     expect(DockBayId.values.map((id) => id.name), ['b1', 'b2', 'b3', 'b4']);

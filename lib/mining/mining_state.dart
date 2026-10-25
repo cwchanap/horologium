@@ -142,6 +142,7 @@ class MiningSave {
     required this.activePlanetId,
     required Map<MiningPlanetId, Map<DockBayId, RigTier?>> docks,
     required Map<MiningSiteId, SiteProgress> sites,
+    required this.relaunchCount,
   }) : unlockedPlanetIds = Set.unmodifiable(unlockedPlanetIds),
        docks = _copyDocks(docks),
        sites = _copySites(sites);
@@ -153,8 +154,12 @@ class MiningSave {
   final MiningPlanetId activePlanetId;
   final Map<MiningPlanetId, Map<DockBayId, RigTier?>> docks;
   final Map<MiningSiteId, SiteProgress> sites;
+  final int relaunchCount;
 
-  factory MiningSave.initial({required DateTime nowUtc}) => MiningSave(
+  factory MiningSave.initial({
+    required DateTime nowUtc,
+    int relaunchCount = 0,
+  }) => MiningSave(
     cash: 100,
     lastAccruedAtUtc: nowUtc.toUtc(),
     technology: const TechnologyLevels(),
@@ -180,7 +185,23 @@ class MiningSave {
           rigPlacements: const [],
         ),
     },
+    relaunchCount: relaunchCount,
   );
+
+  /// Floored cash value of selling every stored cargo on [planet]: sums
+  /// unrounded per-site [MiningContentRegistry.cargoValue] over the planet's
+  /// authored sites, then floors once.
+  int saleValue(MiningContentRegistry content, MiningPlanetId planet) {
+    var total = 0.0;
+    for (final definition in content.planet(planet).sites) {
+      total += content.cargoValue(
+        definition.id,
+        sites[definition.id]!.storedAmount,
+        relaunchCount,
+      );
+    }
+    return total.floor();
+  }
 
   MiningSave copyWith({
     int? cash,
@@ -190,6 +211,7 @@ class MiningSave {
     MiningPlanetId? activePlanetId,
     Map<MiningPlanetId, Map<DockBayId, RigTier?>>? docks,
     Map<MiningSiteId, SiteProgress>? sites,
+    int? relaunchCount,
   }) => MiningSave(
     cash: cash ?? this.cash,
     lastAccruedAtUtc: lastAccruedAtUtc ?? this.lastAccruedAtUtc,
@@ -198,6 +220,7 @@ class MiningSave {
     activePlanetId: activePlanetId ?? this.activePlanetId,
     docks: docks ?? this.docks,
     sites: sites ?? this.sites,
+    relaunchCount: relaunchCount ?? this.relaunchCount,
   );
 
   Map<String, Object?> toJson() => {
@@ -218,6 +241,7 @@ class MiningSave {
     'sites': sites.map(
       (siteId, progress) => MapEntry(siteId.name, progress.toJson()),
     ),
+    'relaunchCount': relaunchCount,
   };
 
   @override
@@ -227,6 +251,7 @@ class MiningSave {
         lastAccruedAtUtc != other.lastAccruedAtUtc ||
         technology != other.technology ||
         activePlanetId != other.activePlanetId ||
+        relaunchCount != other.relaunchCount ||
         unlockedPlanetIds.length != other.unlockedPlanetIds.length ||
         docks.length != other.docks.length ||
         sites.length != other.sites.length) {
@@ -246,6 +271,7 @@ class MiningSave {
     lastAccruedAtUtc,
     technology,
     activePlanetId,
+    relaunchCount,
     Object.hashAllUnordered(unlockedPlanetIds),
     Object.hashAllUnordered(
       docks.entries.map(

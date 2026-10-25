@@ -127,6 +127,7 @@ void main() {
       activePlanetId: MiningPlanetId.homeworld,
       docks: docks,
       sites: sites,
+      relaunchCount: 0,
     );
 
     docks[MiningPlanetId.homeworld]![DockBayId.b1] = RigTier.t5;
@@ -195,6 +196,65 @@ void main() {
     expect(copy.rigPlacements, isEmpty);
   });
 
+  test('fresh state starts at relaunchCount 0', () {
+    final state = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 26, 12));
+
+    expect(state.relaunchCount, 0);
+  });
+
+  test('relaunchCount participates in copyWith, JSON, and equality', () {
+    final state = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 26, 12));
+    final relaunched = state.copyWith(relaunchCount: 2);
+
+    expect(relaunched.relaunchCount, 2);
+    expect(relaunched.toJson()['relaunchCount'], 2);
+    expect(relaunched, state.copyWith(relaunchCount: 2));
+    expect(relaunched, isNot(state));
+    expect(
+      state,
+      isNot(
+        MiningSave.initial(
+          nowUtc: DateTime.utc(2026, 8, 26, 12),
+          relaunchCount: 2,
+        ),
+      ),
+    );
+    expect(
+      MiningSave.initial(
+        nowUtc: DateTime.utc(2026, 8, 26, 12),
+        relaunchCount: 2,
+      ),
+      relaunched,
+    );
+  });
+
+  test('saleValue sums unrounded site values then floors once', () {
+    final content = MiningContentRegistry.stellarMining();
+    final now = DateTime.utc(2026, 8, 26, 12);
+    final base = MiningSave.initial(nowUtc: now);
+    // Landing Basin sells at 4/unit, Carbon Ridge at 3/unit. Fractional
+    // cargo keeps both per-site values unrounded: 0.375*4 = 1.5 and
+    // 0.25*3 = 0.75, whose sum floors to 2 — not the 1 that flooring each
+    // site first would give.
+    final state = base.copyWith(
+      sites: {
+        ...base.sites,
+        MiningSiteId.landingBasin: base.sites[MiningSiteId.landingBasin]!
+            .copyWith(unlocked: true, storedAmount: 0.375),
+        MiningSiteId.carbonRidge: base.sites[MiningSiteId.carbonRidge]!
+            .copyWith(unlocked: true, storedAmount: 0.25),
+      },
+    );
+
+    expect(state.saleValue(content, MiningPlanetId.homeworld), 2);
+    expect(
+      state
+          .copyWith(relaunchCount: 2)
+          .saleValue(content, MiningPlanetId.homeworld),
+      4,
+    );
+  });
+
   test('save JSON uses flat sites and enum-keyed docks', () {
     final state = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 26, 12));
 
@@ -206,7 +266,9 @@ void main() {
       'activePlanetId',
       'docks',
       'sites',
+      'relaunchCount',
     });
+    expect(state.toJson()['relaunchCount'], 0);
     expect(
       (state.toJson()['docks'] as Map<String, Object?>).keys,
       MiningPlanetId.values.map((id) => id.name),
