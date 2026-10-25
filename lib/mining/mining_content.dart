@@ -81,19 +81,11 @@ String formatMiningCash(int amount) {
   return _groupThousands(amount);
 }
 
-/// Formats the sale multiplier after [relaunchCount] relaunches with up to
-/// two decimals, trimming trailing zeros (`×1.5`, `×1.75`, `×2`), so a tuned
-/// two-decimal multiplier never rounds to `×1.8`.
-String formatSaleMultiplier(int relaunchCount) =>
-    '×${_trimZeros(MiningContentRegistry.saleMultiplier(relaunchCount))}';
-
-String _trimZeros(double value) {
-  var text = value.toStringAsFixed(2);
-  if (text.contains('.')) {
-    text = text.replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
-  }
-  return text;
-}
+/// Formats a sale [multiplier] with up to two decimals, trimming trailing
+/// zeros (`×1.5`, `×1.75`, `×2`), so a tuned two-decimal multiplier never
+/// rounds to `×1.8`.
+String formatSaleMultiplier(double multiplier) =>
+    '×${multiplier.toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '')}';
 
 /// Formats resource amounts: one truncated decimal below 1,000 (`90.0`),
 /// whole units with separators from 1,000 (`12,960`), then the cash rule's

@@ -328,8 +328,15 @@ class _MiningShellState extends State<MiningShell>
 
   /// Sheet confirm handler. The sheet dismisses itself first; only a
   /// successful relaunch (counter increase) navigates back to the deck.
+  /// A queued mutation would make _runSheetAction return silently, so the
+  /// busy case reports the wait here instead.
   Future<void> _confirmRelaunch() async {
     if (!_initialized) return;
+    if (_controller.isBusy) {
+      unawaited(_audioManager.playSound(GameSound.reject));
+      _showResult('Finishing previous action…');
+      return;
+    }
     final before = _controller.state.relaunchCount;
     await _runSheetAction(
       _controller.relaunch,

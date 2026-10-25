@@ -551,6 +551,67 @@ void main() {
   );
 
   testWidgets(
+    'relaunch confirm during a queued save reports busy, not silence',
+    (tester) async {
+      final clock = TestClock(_start);
+      final repository = DelayedMiningSaveRepository();
+      await repository.save(finalPlanetMasteredState(clock.now));
+      final effects = FakeBackgroundMusicPlayer();
+      final audio = AudioManager(
+        backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+        soundEffectPlayer: effects,
+      );
+      addTearDown(audio.dispose);
+      await pumpShell(
+        tester,
+        repository: repository,
+        clock: clock,
+        audioManager: audio,
+      );
+
+      await tester.tap(find.byKey(const Key('mining-nav-stellarMap')));
+      await tester.pump();
+      final action = find.byKey(const Key('stellar-map-relaunch-action'));
+      await tester.ensureVisible(action);
+      await tester.pump();
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('mining-relaunch-sheet')), findsOneWidget);
+
+      // A queued lifecycle-style checkpoint keeps the controller busy
+      // while the sheet is open; the confirm used to die silently there.
+      repository.delayNextSave = true;
+      final checkpoint = shellHandles(tester).controller.checkpoint();
+      await repository.saveStarted.future;
+      await tester.pump();
+
+      await tester.ensureVisible(find.byKey(const Key('relaunch-confirm')));
+      await tester.tap(find.byKey(const Key('relaunch-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('mining-relaunch-sheet')), findsNothing);
+      expect(find.text('Finishing previous action…'), findsOneWidget);
+      expect(
+        effects.playedAssets.where((path) => path == 'audio/reject.wav'),
+        hasLength(1),
+      );
+      expect(
+        effects.playedAssets.where((path) => path == 'audio/milestone.wav'),
+        isEmpty,
+      );
+
+      repository.allowSave.complete();
+      await checkpoint;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final state = shellHandles(tester).controller.state;
+      expect(state.relaunchCount, 0);
+      expect(state.activePlanetId, MiningPlanetId.values.last);
+    },
+  );
+
+  testWidgets(
     'travel clears the selected dock bay before the new planet view',
     (tester) async {
       final initial = MiningSave.initial(nowUtc: _start);
