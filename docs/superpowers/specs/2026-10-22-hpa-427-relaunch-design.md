@@ -63,7 +63,7 @@ int saleValue(MiningContentRegistry content, MiningPlanetId planet);
 
 `sellAllCargo`, Site Deck, Mine Site, and Stellar Map use `state.saleValue(content, planet)` for their **planet-wide** sale values. Single-site cards use `content.cargoValue(id, amount, state.relaunchCount).floor()`. This keeps the existing contract: sum **unrounded** site values and floor **once** for an aggregate, even when several sites have fractional cargo. Do not sum the floored card labels. Test two fractional sites directly on `MiningSave.saleValue`, then compare controller revenue to that value before selling; do not add three redundant per-view fractional-rounding tests.
 
-A single `formatSaleMultiplier(int relaunchCount)` helper beside `formatMiningCash` formats the resulting multiplier on the controller message, goal, card, sheet, and status line. Keep up to two decimal places without rounding 1.75 to 1.8; display ×1.5 / ×1.75 / ×2 as appropriate. The number itself remains controlled by `relaunchSaleBonus`.
+A single `formatSaleMultiplier(double multiplier)` helper beside `formatMiningCash` formats the resulting multiplier on the controller message, goal, card, sheet, and status line. Keep up to two decimal places without rounding 1.75 to 1.8; display ×1.5 / ×1.75 / ×2 as appropriate. The number itself remains controlled by `relaunchSaleBonus`.
 
 ### 3. Relaunch is a controller action
 

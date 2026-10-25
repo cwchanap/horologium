@@ -186,7 +186,8 @@ class _GoalLadder {
     title: 'Relaunch',
     // formatSaleMultiplier includes the × sign.
     detail:
-        'Start again with sales ${formatSaleMultiplier(state.relaunchCount + 1)}.',
+        'Start again with sales '
+        '${formatSaleMultiplier(MiningContentRegistry.saleMultiplier(state.relaunchCount + 1))}.',
     target: const MiningGoalTarget.stellarMap(),
   );
 

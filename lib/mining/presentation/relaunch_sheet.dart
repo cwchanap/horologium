@@ -42,7 +42,8 @@ class RelaunchSheet extends StatelessWidget {
           ], keep: true),
           const SizedBox(height: 16),
           Text(
-            'NEXT SALES ${formatSaleMultiplier(relaunchCount + 1)}',
+            'NEXT SALES '
+            '${formatSaleMultiplier(MiningContentRegistry.saleMultiplier(relaunchCount + 1))}',
             style: const TextStyle(
               color: MiningTheme.highlight,
               fontSize: 14,
@@ -61,7 +62,6 @@ class RelaunchSheet extends StatelessWidget {
                     minimumSize: const Size(48, 48),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     foregroundColor: Colors.white70,
-                    disabledForegroundColor: MiningTheme.mutedText,
                     side: const BorderSide(color: Colors.white24),
                     shape: const StadiumBorder(),
                     textStyle: const TextStyle(
@@ -84,13 +84,6 @@ class RelaunchSheet extends StatelessWidget {
                     minimumSize: const Size(48, 48),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     foregroundColor: MiningTheme.highlight,
-                    disabledForegroundColor: MiningTheme.mutedText,
-                    disabledBackgroundColor: const Color.fromRGBO(
-                      255,
-                      255,
-                      255,
-                      .05,
-                    ),
                     side: BorderSide(
                       color: MiningTheme.highlight.withAlpha(160),
                     ),

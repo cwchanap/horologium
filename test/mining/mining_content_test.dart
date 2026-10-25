@@ -78,9 +78,10 @@ void main() {
   });
 
   test('formats sale multiplier with up to two trimmed decimals', () {
-    expect(formatSaleMultiplier(0), '×1');
-    expect(formatSaleMultiplier(1), '×1.5');
-    expect(formatSaleMultiplier(2), '×2');
+    expect(formatSaleMultiplier(1.0), '×1');
+    expect(formatSaleMultiplier(1.5), '×1.5');
+    expect(formatSaleMultiplier(1.75), '×1.75');
+    expect(formatSaleMultiplier(2.0), '×2');
   });
 
   test('keeps closed site, bay, and rig identities', () {

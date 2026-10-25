@@ -42,7 +42,8 @@ class StellarMapScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visiblePlanetIds = view.planets.map((planet) => planet.id).toSet();
-    final cards = <Widget>[
+    final entries = <Widget>[
+      if (view.relaunchCount > 0) _RelaunchStatusLine(view: view),
       for (final planet in view.planets)
         _PlanetCard(
           view: planet,
@@ -60,10 +61,6 @@ class StellarMapScreen extends StatelessWidget {
           ),
       if (view.isRelaunchUnlocked)
         _RelaunchCard(view: view, onRelaunch: onRelaunch),
-    ];
-    final entries = <Widget>[
-      if (view.relaunchCount > 0) _RelaunchStatusLine(view: view),
-      ...cards,
     ];
     final pad = MediaQuery.paddingOf(context);
     return ColoredBox(
@@ -144,7 +141,8 @@ class _RelaunchStatusLine extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     key: const Key('stellar-map-relaunch-status'),
     'RELAUNCH ${view.relaunchCount} · '
-    'SALES ${formatSaleMultiplier(view.relaunchCount)}',
+    'SALES '
+    '${formatSaleMultiplier(MiningContentRegistry.saleMultiplier(view.relaunchCount))}',
     style: const TextStyle(
       color: MiningTheme.highlight,
       fontSize: 12,
@@ -166,7 +164,7 @@ class _RelaunchCard extends StatelessWidget {
     return Semantics(
       container: true,
       label:
-          'Relaunch the run at ${formatSaleMultiplier(view.relaunchCount + 1)} '
+          'Relaunch the run at ${formatSaleMultiplier(view.nextSaleMultiplier)} '
           'sales',
       child: Container(
         key: const Key('stellar-map-relaunch'),
@@ -202,7 +200,7 @@ class _RelaunchCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'SALES ${formatSaleMultiplier(view.relaunchCount + 1)}',
+                  'NEXT SALES ${formatSaleMultiplier(view.nextSaleMultiplier)}',
                   style: const TextStyle(
                     color: MiningTheme.highlight,
                     fontSize: 12,
