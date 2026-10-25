@@ -1057,6 +1057,53 @@ void main() {
         10,
       );
     });
+
+    test(
+      'sale revenue applies the relaunch multiplier from pre-sale state',
+      () async {
+        final seed = seededSave(
+          clock.now,
+          cash: 1000,
+          sites: sitesFor(
+            landing: site(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 0.375,
+              rigs: placements(n1: RigTier.t1),
+            ),
+            carbon: site(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 0.25,
+              rigs: siteRig(carbonCell, RigTier.t1),
+            ),
+          ),
+        ).copyWith(relaunchCount: 1);
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: seed,
+        );
+        // 0.375*4 + 0.25*3 = 2.25 unrounded, ×1.5 -> 3.375, floored once.
+        final expectedRevenue = controller.state.saleValue(
+          _content,
+          MiningPlanetId.homeworld,
+        );
+
+        final result = await controller.sellAllCargo();
+
+        expect(expectedRevenue, 3);
+        expect(result.revenue, expectedRevenue);
+        expect(controller.state.cash, 1000 + expectedRevenue);
+        expect(
+          controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+          0,
+        );
+        expect(
+          controller.state.sites[MiningSiteId.carbonRidge]!.storedAmount,
+          0,
+        );
+      },
+    );
   });
 
   group('mastery and save ordering', () {

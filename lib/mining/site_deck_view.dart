@@ -205,7 +205,6 @@ class SiteDeckView {
     var totalCargo = 0.0;
     var totalCapacity = 0.0;
     var totalRate = 0.0;
-    var projectedValue = 0.0;
 
     for (final definition in planet.sites) {
       final progress = state.sites[definition.id]!;
@@ -215,8 +214,9 @@ class SiteDeckView {
         progress: progress,
         technology: state.technology,
       );
-      final siteProjectedValue =
-          (progress.storedAmount * definition.saleValuePerUnit).floor();
+      final siteProjectedValue = content
+          .cargoValue(definition.id, progress.storedAmount, state.relaunchCount)
+          .floor();
       final unlockDisabledReason = isBusy
           ? 'Finishing previous action…'
           : _unlockDisabledReason(
@@ -229,7 +229,6 @@ class SiteDeckView {
       totalCargo += progress.storedAmount;
       totalCapacity += metrics.capacity;
       totalRate += metrics.rate;
-      projectedValue += progress.storedAmount * definition.saleValuePerUnit;
       cardList.add(
         MiningSiteCardView(
           id: definition.id,
@@ -266,7 +265,7 @@ class SiteDeckView {
       totalCargo: totalCargo,
       totalCapacity: totalCapacity,
       totalRate: totalRate,
-      projectedValue: projectedValue.floor(),
+      projectedValue: state.saleValue(content, state.activePlanetId),
       isBusy: isBusy,
     );
   }

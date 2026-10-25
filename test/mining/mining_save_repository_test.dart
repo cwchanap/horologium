@@ -74,6 +74,7 @@ MiningSave _progressedState(DateTime now) {
     activePlanetId: MiningPlanetId.lunarFrontier,
     docks: docks,
     sites: sites,
+    relaunchCount: 3,
   );
 }
 
@@ -217,6 +218,7 @@ void main() {
         'activePlanetId',
         'docks',
         'sites',
+        'relaunchCount',
       });
     });
 
@@ -470,6 +472,14 @@ void main() {
     final cases = <String, Map<String, Object?>>{
       'negative cash': _rawDocument(nowUtc: now)..['cash'] = -5,
       'non-int cash': _rawDocument(nowUtc: now)..['cash'] = 100.5,
+      'missing root field relaunchCount': _rawDocument(nowUtc: now)
+        ..remove('relaunchCount'),
+      'negative relaunchCount': _rawDocument(nowUtc: now)
+        ..['relaunchCount'] = -1,
+      'non-int relaunchCount': _rawDocument(nowUtc: now)
+        ..['relaunchCount'] = 1.5,
+      'string relaunchCount': _rawDocument(nowUtc: now)
+        ..['relaunchCount'] = '1',
       'missing root field lastAccruedAtUtc': _rawDocument(nowUtc: now)
         ..remove('lastAccruedAtUtc'),
       'malformed timestamp': _rawDocument(nowUtc: now)

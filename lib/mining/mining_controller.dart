@@ -519,7 +519,6 @@ class MiningController {
     final candidate = simulation.accrue(_state, _nowUtc().toUtc());
 
     var totalCargo = 0.0;
-    var grossValue = 0.0;
     final sold = <ResourceType, double>{};
     final sites = <MiningSiteId, SiteProgress>{...candidate.state.sites};
 
@@ -529,7 +528,6 @@ class MiningController {
       if (progress.storedAmount <= 0) continue;
 
       totalCargo += progress.storedAmount;
-      grossValue += progress.storedAmount * definition.saleValuePerUnit;
       sold.update(
         definition.resource,
         (value) => value + progress.storedAmount,
@@ -542,7 +540,10 @@ class MiningController {
       return const MiningSaleResult.failure('No cargo to sell.');
     }
 
-    final revenue = grossValue.floor();
+    final revenue = candidate.state.saleValue(
+      content,
+      candidate.state.activePlanetId,
+    );
     final next = candidate.state.copyWith(
       cash: candidate.state.cash + revenue,
       sites: sites,

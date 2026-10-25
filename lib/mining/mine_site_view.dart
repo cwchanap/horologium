@@ -200,13 +200,13 @@ class MineSiteView {
     final progress = state.sites[siteId]!;
     final active = planetId == state.activePlanetId;
     var activePlanetCargo = 0.0;
-    var activePlanetGrossSale = 0.0;
     for (final activeDefinition in content.planet(state.activePlanetId).sites) {
-      final activeProgress = state.sites[activeDefinition.id]!;
-      activePlanetCargo += activeProgress.storedAmount;
-      activePlanetGrossSale +=
-          activeProgress.storedAmount * activeDefinition.saleValuePerUnit;
+      activePlanetCargo += state.sites[activeDefinition.id]!.storedAmount;
     }
+    final activePlanetProjectedSale = state.saleValue(
+      content,
+      state.activePlanetId,
+    );
     final dock = state.docks[state.activePlanetId]!;
     final selectedRig = selectedBayId == null ? null : dock[selectedBayId];
     final hasEmptyDockBay = DockBayId.values.any((id) => dock[id] == null);
@@ -313,10 +313,12 @@ class MineSiteView {
       capacity: metrics.capacity,
       cargo: progress.storedAmount,
       projectedSale: active
-          ? (progress.storedAmount * definition.saleValuePerUnit).floor()
+          ? content
+                .cargoValue(siteId, progress.storedAmount, state.relaunchCount)
+                .floor()
           : 0,
       activePlanetCargo: activePlanetCargo,
-      activePlanetProjectedSale: activePlanetGrossSale.floor(),
+      activePlanetProjectedSale: activePlanetProjectedSale,
       isActivePlanet: active,
       selectedBayId: selectedBayId,
       selectedRig: selectedRig,

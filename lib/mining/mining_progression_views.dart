@@ -340,7 +340,6 @@ class StellarMapView {
     var cargo = 0.0;
     var capacity = 0.0;
     var rate = 0.0;
-    var projectedValue = 0.0;
     for (final site in definition.sites) {
       final progress = state.sites[site.id]!;
       final metrics = SiteMetrics.of(
@@ -359,14 +358,14 @@ class StellarMapView {
           cargo: progress.storedAmount,
           capacity: metrics.capacity,
           rate: metrics.rate,
-          projectedValue: (progress.storedAmount * site.saleValuePerUnit)
+          projectedValue: content
+              .cargoValue(site.id, progress.storedAmount, state.relaunchCount)
               .floor(),
         ),
       );
       cargo += progress.storedAmount;
       capacity += metrics.capacity;
       rate += metrics.rate;
-      projectedValue += progress.storedAmount * site.saleValuePerUnit;
     }
     final requirements = <StellarMapRequirementView>[];
     if (requiredMasteryPlanetId != null) {
@@ -417,7 +416,7 @@ class StellarMapView {
       cargo: cargo,
       capacity: capacity,
       rate: rate,
-      projectedValue: projectedValue.floor(),
+      projectedValue: state.saleValue(content, definition.id),
       siteIndicators: List<StellarMapSiteIndicatorView>.unmodifiable(
         indicators,
       ),
