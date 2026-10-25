@@ -553,6 +553,31 @@ class MiningController {
     return MiningSaleResult.success(revenue: revenue, sold: sold);
   });
 
+  /// Resets the run: cargo, technology, rigs, planets, and cash return to a
+  /// fresh initial state and only [MiningSave.relaunchCount] carries over.
+  Future<MiningActionResult> relaunch() => _enqueueMutation(() async {
+    final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+    if (!content.isPlanetMastered(
+      content.finalPlanetId,
+      _commissionedSiteIds(candidate.state),
+    )) {
+      return MiningActionResult.failure(
+        'Master ${content.planet(content.finalPlanetId).name} first.',
+      );
+    }
+    final next = MiningSave.initial(
+      nowUtc: _nowUtc().toUtc(),
+      relaunchCount: candidate.state.relaunchCount + 1,
+    );
+    await repository.save(next);
+    _state = next;
+    final n = next.relaunchCount;
+    // formatSaleMultiplier includes the × sign.
+    return MiningActionResult.success(
+      message: 'Relaunch $n — sales ${formatSaleMultiplier(n)}.',
+    );
+  });
+
   Future<void> checkpoint({bool accrue = true}) => _enqueueMutation(() async {
     final next = accrue
         ? simulation.accrue(_state, _nowUtc().toUtc()).state

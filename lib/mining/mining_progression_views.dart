@@ -279,9 +279,22 @@ class StellarMapPlanetView {
 }
 
 class StellarMapView {
-  const StellarMapView({required this.planets});
+  const StellarMapView({
+    required this.planets,
+    required this.relaunchCount,
+    required this.isRelaunchUnlocked,
+    required this.canRelaunch,
+    required this.nextSaleMultiplier,
+  });
 
   final List<StellarMapPlanetView> planets;
+
+  /// Derived read-model values for the Relaunch card, computed from the
+  /// display state; none of them are saved flags.
+  final int relaunchCount;
+  final bool isRelaunchUnlocked;
+  final bool canRelaunch;
+  final double nextSaleMultiplier;
 
   StellarMapPlanetView planet(MiningPlanetId id) =>
       planets.singleWhere((view) => view.id == id);
@@ -295,6 +308,10 @@ class StellarMapView {
     final commissionedSiteIds = state.sites.entries
         .where((entry) => entry.value.commissioned)
         .map((entry) => entry.key);
+    final isRelaunchUnlocked = content.isPlanetMastered(
+      content.finalPlanetId,
+      commissionedSiteIds,
+    );
 
     return StellarMapView(
       planets: List<StellarMapPlanetView>.unmodifiable([
@@ -308,6 +325,12 @@ class StellarMapView {
               isBusy: isBusy,
             ),
       ]),
+      relaunchCount: state.relaunchCount,
+      isRelaunchUnlocked: isRelaunchUnlocked,
+      canRelaunch: isRelaunchUnlocked && !isBusy,
+      nextSaleMultiplier: MiningContentRegistry.saleMultiplier(
+        state.relaunchCount + 1,
+      ),
     );
   }
 

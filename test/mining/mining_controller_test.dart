@@ -1258,4 +1258,139 @@ void main() {
       expect(await controller.resume(), isNull);
     });
   });
+
+  group('relaunch', () {
+    MiningSave finalPlanetMasteredState() => seededSave(
+      clock.now,
+      technology: const TechnologyLevels(surveying: 5),
+      unlockedPlanets: MiningPlanetId.values.toSet(),
+      activePlanet: MiningPlanetId.ceresFrontier,
+      sites: sitesFor(
+        landing: site(unlocked: true, commissioned: true),
+        carbon: site(unlocked: true, commissioned: true),
+        granite: site(unlocked: true, commissioned: true),
+        frozen: site(unlocked: true, commissioned: true),
+        titanium: site(unlocked: true, commissioned: true),
+        helium: site(unlocked: true, commissioned: true),
+        ochre: site(unlocked: true, commissioned: true),
+        silica: site(unlocked: true, commissioned: true),
+        cobalt: site(unlocked: true, commissioned: true),
+        nickel: site(unlocked: true, commissioned: true),
+        platinum: site(unlocked: true, commissioned: true),
+        iridium: site(unlocked: true, commissioned: true),
+      ),
+    );
+
+    test('fails before the final planet is mastered without saving', () async {
+      final repository = CountingMiningSaveRepository();
+      final controller = await controllerOver(
+        repository,
+        seed: seededSave(clock.now),
+      );
+
+      final result = await controller.relaunch();
+
+      expect(result.isSuccess, isFalse);
+      expect(
+        result.message,
+        'Master ${_content.planet(_content.finalPlanetId).name} first.',
+      );
+      expect(controller.state.relaunchCount, 0);
+      expect(repository.saveCount, 0);
+    });
+
+    test('after final mastery it restarts the run at count 1', () async {
+      final repository = CountingMiningSaveRepository();
+      final controller = await controllerOver(
+        repository,
+        seed: finalPlanetMasteredState(),
+      );
+
+      final result = await controller.relaunch();
+
+      expect(result.isSuccess, isTrue);
+      expect(result.message, 'Relaunch 1 — sales ×1.5.');
+      expect(
+        controller.state,
+        MiningSave.initial(nowUtc: clock(), relaunchCount: 1),
+      );
+      expect(repository.saveCount, 1);
+    });
+
+    test(
+      'two unawaited relaunches yield one success and one gate failure',
+      () async {
+        final repository = CountingMiningSaveRepository();
+        final controller = await controllerOver(
+          repository,
+          seed: finalPlanetMasteredState(),
+        );
+
+        final first = controller.relaunch();
+        final second = controller.relaunch();
+        final firstResult = await first;
+        final secondResult = await second;
+
+        expect(firstResult.isSuccess, isTrue);
+        expect(firstResult.message, 'Relaunch 1 — sales ×1.5.');
+        expect(secondResult.isSuccess, isFalse);
+        expect(
+          secondResult.message,
+          'Master ${_content.planet(_content.finalPlanetId).name} first.',
+        );
+        expect(controller.state.relaunchCount, 1);
+        expect(repository.saveCount, 1);
+      },
+    );
+
+    test(
+      're-mastering the final planet in run 2 pays again, then relaunches to 2',
+      () async {
+        final firstRun = await controllerOver(
+          CountingMiningSaveRepository(),
+          seed: finalPlanetMasteredState(),
+        );
+        expect((await firstRun.relaunch()).isSuccess, isTrue);
+
+        // Run 2 replays the near-mastery fixture carrying the persisted count.
+        final runTwo = await controllerOver(
+          CountingMiningSaveRepository(),
+          seed: seededSave(
+            clock.now,
+            cash: 50000,
+            technology: const TechnologyLevels(surveying: 5),
+            unlockedPlanets: MiningPlanetId.values.toSet(),
+            activePlanet: MiningPlanetId.ceresFrontier,
+            docks: docksFor(
+              ceres: dock(b1: RigTier.t1, b2: RigTier.t1),
+            ),
+            sites: sitesFor(
+              landing: site(unlocked: true, commissioned: true),
+              frozen: site(unlocked: true, commissioned: true),
+              ochre: site(unlocked: true, commissioned: true),
+              nickel: site(unlocked: true, commissioned: true),
+              platinum: site(unlocked: true, commissioned: true),
+              iridium: site(unlocked: true),
+            ),
+          ).copyWith(relaunchCount: 1),
+        );
+
+        final reward = await runTwo.deployRig(
+          DockBayId.b1,
+          MiningSiteId.iridiumSpire,
+          iridiumCell,
+        );
+        expect(reward.message, 'Ceres mastered — +30.00M cash.');
+        expect(runTwo.state.cash, 30050000);
+
+        final result = await runTwo.relaunch();
+        expect(result.isSuccess, isTrue);
+        expect(result.message, 'Relaunch 2 — sales ×2.');
+        expect(
+          runTwo.state,
+          MiningSave.initial(nowUtc: clock(), relaunchCount: 2),
+        );
+      },
+    );
+  });
 }

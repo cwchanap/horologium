@@ -486,5 +486,50 @@ void main() {
         ]);
       },
     );
+
+    test('relaunch reads derive from final-planet mastery and busy state', () {
+      MiningSave masteredSave({int relaunchCount = 0}) => stateWith(
+        now: now,
+        technology: const TechnologyLevels(surveying: 5),
+        unlockedPlanets: MiningPlanetId.values.toSet(),
+        sites: {
+          for (final id in MiningSiteId.values)
+            id: progress(unlocked: true, commissioned: true),
+        },
+      ).copyWith(relaunchCount: relaunchCount);
+
+      // The final planet one site short of mastery keeps relaunch locked.
+      final shortOneSite = StellarMapView.from(
+        state: masteredSave().copyWith(
+          sites: {
+            ...masteredSave().sites,
+            MiningSiteId.iridiumSpire: progress(unlocked: true),
+          },
+        ),
+        content: content,
+      );
+      expect(shortOneSite.isRelaunchUnlocked, isFalse);
+      expect(shortOneSite.canRelaunch, isFalse);
+
+      final mastered = StellarMapView.from(
+        state: masteredSave(),
+        content: content,
+      );
+      expect(mastered.isRelaunchUnlocked, isTrue);
+      expect(mastered.canRelaunch, isTrue);
+      expect(mastered.relaunchCount, 0);
+      expect(mastered.nextSaleMultiplier, 1.5);
+
+      // Busy keeps the unlock state but disables the action.
+      final busy = StellarMapView.from(
+        state: masteredSave(relaunchCount: 1),
+        content: content,
+        isBusy: true,
+      );
+      expect(busy.isRelaunchUnlocked, isTrue);
+      expect(busy.canRelaunch, isFalse);
+      expect(busy.relaunchCount, 1);
+      expect(busy.nextSaleMultiplier, 2.0);
+    });
   });
 }
