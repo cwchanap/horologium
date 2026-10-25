@@ -137,6 +137,7 @@ void main() {
           content: _content,
           onUnlock: (_) {},
           onTravel: (_) {},
+          onRelaunch: () {},
         ),
       );
 

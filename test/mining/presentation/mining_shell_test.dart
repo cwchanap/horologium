@@ -135,6 +135,27 @@ MiningSave homeworldMasteredState(
   );
 }
 
+/// Every authored site commissioned and planet unlocked, so the final
+/// planet is mastered and Relaunch is available.
+MiningSave finalPlanetMasteredState(DateTime now) {
+  final content = MiningContentRegistry.stellarMining();
+  final base = MiningSave.initial(nowUtc: now);
+  return base.copyWith(
+    cash: 1_000_000,
+    unlockedPlanetIds: {...MiningPlanetId.values},
+    activePlanetId: content.finalPlanetId,
+    sites: {
+      ...base.sites,
+      for (final planet in MiningPlanetId.values)
+        for (final site in content.planet(planet).sites)
+          site.id: base.sites[site.id]!.copyWith(
+            unlocked: true,
+            commissioned: true,
+          ),
+    },
+  );
+}
+
 Finder _inGoalStrip(Finder matching) => find.descendant(
   of: find.byKey(const Key('site-deck-next-goal')),
   matching: matching,
@@ -442,6 +463,90 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(controller.state.activePlanetId, MiningPlanetId.homeworld);
       expect(repository.saveCount, greaterThanOrEqualTo(3));
+    },
+  );
+
+  testWidgets(
+    'relaunch cancels cleanly and confirms through the one mutation path',
+    (tester) async {
+      final clock = TestClock(_start);
+      final repository = DelayedMiningSaveRepository();
+      await repository.save(finalPlanetMasteredState(clock.now));
+      final effects = FakeBackgroundMusicPlayer();
+      final audio = AudioManager(
+        backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+        soundEffectPlayer: effects,
+      );
+      addTearDown(audio.dispose);
+      await pumpShell(
+        tester,
+        repository: repository,
+        clock: clock,
+        audioManager: audio,
+      );
+
+      await tester.tap(find.byKey(const Key('mining-nav-stellarMap')));
+      await tester.pump();
+      final action = find.byKey(const Key('stellar-map-relaunch-action'));
+      await tester.ensureVisible(action);
+      await tester.pump();
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('mining-relaunch-sheet')), findsOneWidget);
+
+      // Cancel just dismisses; nothing mutates or navigates.
+      await tester.ensureVisible(find.byKey(const Key('relaunch-cancel')));
+      await tester.tap(find.byKey(const Key('relaunch-cancel')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('mining-relaunch-sheet')), findsNothing);
+      expect(find.byKey(const Key('stellar-map-screen')), findsOneWidget);
+      var state = shellHandles(tester).controller.state;
+      expect(state.cash, 1_000_000);
+      expect(state.relaunchCount, 0);
+      expect(state.activePlanetId, MiningPlanetId.values.last);
+      expect(
+        effects.playedAssets,
+        everyElement('audio/tap.wav'),
+        reason: 'cancelling plays no action sound',
+      );
+
+      // Confirm: dismiss, one save in flight, no celebration yet.
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      final savesBefore = repository.saveCount;
+      repository.delayNextSave = true;
+      await tester.ensureVisible(find.byKey(const Key('relaunch-confirm')));
+      await tester.tap(find.byKey(const Key('relaunch-confirm')));
+      await repository.saveStarted.future;
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('mining-relaunch-sheet')), findsNothing);
+      expect(repository.saveCount, savesBefore + 1);
+      expect(find.byKey(const Key('stellar-map-screen')), findsOneWidget);
+      expect(
+        effects.playedAssets.where((path) => path == 'audio/milestone.wav'),
+        isEmpty,
+        reason: 'milestone waits for successful persistence',
+      );
+
+      repository.allowSave.complete();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        effects.playedAssets.where((path) => path == 'audio/milestone.wav'),
+        hasLength(1),
+      );
+      expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+      state = shellHandles(tester).controller.state;
+      expect(state.cash, 100);
+      expect(state.relaunchCount, 1);
+      expect(state.activePlanetId, MiningPlanetId.homeworld);
+      expect(state.unlockedPlanetIds, {MiningPlanetId.homeworld});
+
+      final reloaded = await repository.load(nowUtc: clock.now);
+      expect(reloaded.state.relaunchCount, 1);
+      expect(reloaded.state.cash, 100);
     },
   );
 

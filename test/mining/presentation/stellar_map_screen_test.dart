@@ -40,11 +40,24 @@ MiningSave _stateWith({
   );
 }
 
+/// Every authored site commissioned, so the final planet is mastered and
+/// the Relaunch card is unlocked.
+MiningSave _masteredSave() => _stateWith(
+  unlockedPlanets: {...MiningPlanetId.values},
+  activePlanet: MiningPlanetId.values.last,
+  sites: {
+    for (final planet in MiningPlanetId.values)
+      for (final site in _content.planet(planet).sites)
+        site.id: _progress(unlocked: true, commissioned: true),
+  },
+);
+
 Future<void> _pumpMap(
   WidgetTester tester, {
   required StellarMapView view,
   ValueChanged<MiningPlanetId>? onUnlock,
   ValueChanged<MiningPlanetId>? onTravel,
+  VoidCallback? onRelaunch,
   ValueChanged<MiningNavigationDestination>? onDestinationSelected,
   Size viewport = const Size(360, 640),
 }) async {
@@ -64,6 +77,7 @@ Future<void> _pumpMap(
           content: _content,
           onUnlock: onUnlock ?? (_) {},
           onTravel: onTravel ?? (_) {},
+          onRelaunch: onRelaunch ?? () {},
           onDestinationSelected: onDestinationSelected ?? (_) {},
         ),
       ),
@@ -578,6 +592,7 @@ void main() {
             content: _content,
             onUnlock: (_) {},
             onTravel: (_) {},
+            onRelaunch: () {},
             onDestinationSelected: (_) {},
           ),
         ),
@@ -600,4 +615,99 @@ void main() {
       expect(nav.right, 874 - padRight);
     },
   );
+
+  testWidgets('fresh map shows no relaunch card or status line', (
+    tester,
+  ) async {
+    final view = StellarMapView.from(
+      state: MiningSave.initial(nowUtc: _start),
+      content: _content,
+    );
+    await _pumpMap(tester, view: view, viewport: const Size(402, 874));
+
+    expect(find.byKey(const Key('stellar-map-relaunch')), findsNothing);
+    expect(find.byKey(const Key('stellar-map-relaunch-status')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('final-planet mastery shows an enabled relaunch card', (
+    tester,
+  ) async {
+    final view = StellarMapView.from(state: _masteredSave(), content: _content);
+    var relaunchCalls = 0;
+    await _pumpMap(
+      tester,
+      view: view,
+      viewport: const Size(402, 874),
+      onRelaunch: () => relaunchCalls++,
+    );
+
+    final card = find.byKey(const Key('stellar-map-relaunch'));
+    expect(card, findsOneWidget);
+    final action = find.byKey(const Key('stellar-map-relaunch-action'));
+    expect(tester.widget<ElevatedButton>(action).onPressed, isNotNull);
+    await tester.ensureVisible(action);
+    await tester.tap(action);
+    expect(relaunchCalls, 1);
+    expect(find.byKey(const Key('stellar-map-relaunch-status')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('busy map keeps the relaunch card with a disabled action', (
+    tester,
+  ) async {
+    final view = StellarMapView.from(
+      state: _masteredSave(),
+      content: _content,
+      isBusy: true,
+    );
+    await _pumpMap(tester, view: view, viewport: const Size(402, 874));
+
+    expect(find.byKey(const Key('stellar-map-relaunch')), findsOneWidget);
+    final action = find.byKey(const Key('stellar-map-relaunch-action'));
+    expect(tester.widget<ElevatedButton>(action).onPressed, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('after a relaunch the status line leads the map scroll', (
+    tester,
+  ) async {
+    final view = StellarMapView.from(
+      state: MiningSave.initial(nowUtc: _start, relaunchCount: 1),
+      content: _content,
+    );
+    await _pumpMap(tester, view: view, viewport: const Size(402, 874));
+
+    final scroll = find.byKey(const Key('stellar-map-scroll'));
+    final status = find.descendant(
+      of: scroll,
+      matching: find.text('RELAUNCH 1 · SALES ×1.5'),
+    );
+    expect(status, findsOneWidget);
+    expect(
+      tester.getRect(status).top,
+      lessThan(
+        tester
+            .getRect(
+              find.byKey(const Key('mining-stellar-map-planet-homeworld')),
+            )
+            .top,
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final viewport in const [Size(360, 640), Size(430, 932)]) {
+    testWidgets('mastered map with the relaunch card fits '
+        '${viewport.width.toInt()}x${viewport.height.toInt()}', (tester) async {
+      final view = StellarMapView.from(
+        state: _masteredSave(),
+        content: _content,
+      );
+      await _pumpMap(tester, view: view, viewport: viewport);
+
+      expect(find.byKey(const Key('stellar-map-relaunch')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

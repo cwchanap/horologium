@@ -20,6 +20,7 @@ import 'package:horologium/mining/presentation/mining_settings_sheet.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/offline_return_sheet.dart';
+import 'package:horologium/mining/presentation/relaunch_sheet.dart';
 import 'package:horologium/mining/presentation/site_deck_screen.dart';
 import 'package:horologium/mining/presentation/stellar_map_screen.dart';
 import 'package:horologium/mining/presentation/technology_sheet.dart';
@@ -310,6 +311,33 @@ class _MiningShellState extends State<MiningShell>
       successMessage: 'Traveled to ${_content.planet(id).name}.',
       sound: GameSound.travel,
     );
+  }
+
+  void _openRelaunchSheet() {
+    if (!_initialized) return;
+    unawaited(_audioManager.playSound(GameSound.tap));
+    unawaited(
+      _showMiningSheet(
+        RelaunchSheet(
+          relaunchCount: _controller.state.relaunchCount,
+          onConfirm: _confirmRelaunch,
+        ),
+      ),
+    );
+  }
+
+  /// Sheet confirm handler. The sheet dismisses itself first; only a
+  /// successful relaunch (counter increase) navigates back to the deck.
+  Future<void> _confirmRelaunch() async {
+    if (!_initialized) return;
+    final before = _controller.state.relaunchCount;
+    await _runSheetAction(
+      _controller.relaunch,
+      successMessage: 'Relaunch complete.',
+      sound: GameSound.milestone,
+    );
+    if (!mounted || _controller.state.relaunchCount <= before) return;
+    _showPrimarySurface(MiningNavigationDestination.siteDeck);
   }
 
   void _unlockSite(MiningSiteId id) {
@@ -660,6 +688,7 @@ class _MiningShellState extends State<MiningShell>
           content: _content,
           onUnlock: _unlockPlanet,
           onTravel: _travelToPlanet,
+          onRelaunch: _openRelaunchSheet,
           onDestinationSelected: _handleNavigation,
         );
       } else if (siteId == null) {
