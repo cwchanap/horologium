@@ -1,64 +1,104 @@
 # HPA-178 — Storage-full alerts implementation plan
 
-- Status: Proposed (2026-10-25)
+- Status: Proposed; revised after PR #49 reviews (2026-10-26)
 - Ticket: https://linear.app/cwchanap/issue/HPA-178/mining-retention-notify-the-player-when-site-storage-fills-while-away
 - Design: [2026-10-25-hpa-178-storage-alerts-design.md](../specs/2026-10-25-hpa-178-storage-alerts-design.md)
-- Baseline: `main` as of 2026-10-25
-- Delivery: **one draft PR for planning and implementation**. Do not split the ticket into a planning PR plus implementation PR; commit implementation onto this same branch when the design is approved.
+- Baseline: current `main` at implementation start
+- Delivery: **one PR total for this ticket**: spec/plan now, code and tests committed to this same draft PR after review.
 
 ## Reuse survey
 
-| Existing seam | Action |
+| Existing code | Reuse rather than introduce |
 | --- | --- |
-| `SiteMetrics.of` / `MiningSiteCardView.timeToFull` | Reuse for exact same rate/capacity/rounding |
-| `MiningController.checkpoint` / `MiningShell.didChangeAppLifecycleState` | Reuse, but await checkpoint in notification workflow; preserve error handling and normal resume |
-| `MiningShell._runSheetAction` | Reuse success path to detect first commissioning |
-| `MiningSettingsSheet` / `MiningSheetFrame` | Add one styled switch; don't add a Settings subsystem |
-| `AudioManager` preference/testing pattern | Reuse small service ownership pattern, but notification prefs are independent |
-| Existing native Android/Flutter configuration | Minimal plugin-specific changes only |
+| `SiteMetrics.of` and `MiningSiteCardView.timeToFull` | Move their arithmetic into one `SiteMetrics.timeToFull(cargo)` method; card and projection both call it |
+| `MiningSave.lastAccruedAtUtc` | Anchor projected fill timestamp; no injected clock field |
+| `MiningController.checkpoint` | Await its existing queued mutation/persistence Future, then project from controller state |
+| `MiningShell.didChangeAppLifecycleState` | Check Flutter binding lifecycle after the await; no generation counter |
+| `MiningShell._runSheetAction` | Reuse existing commissioned transition for the first permission attempt |
+| `AudioManager` | Follow independent preferences and serialized platform-operation queue pattern |
+| `MiningSettingsSheet` | Existing switch styles; support derived from `StorageAlerts.supported` |
+| CI native build jobs | Android/web CI plus existing macOS iOS-simulator job; no new workflow |
 
-## Task 1 — Pure fill-time projection (tests first)
+## Task 1 — Pure projection and shared formula
 
-- Add `nextStorageFull(MiningContentRegistry, MiningSave, DateTime)` alongside `SiteMetrics` in `lib/mining/site_deck_view.dart`.
-- Iterate **unlocked** planets and authored sites; require commissioned site and positive deployed-rig rate/capacity; skip full sites.
-- Reuse card microsecond-ceiling formula and choose the earliest, with stable authored-order ties.
-- Add cases to `test/mining/site_deck_view_test.dart`: no producer, one site, locked/full/idle exclusions, earliest across planets, ties, and parity with `MiningSiteCardView.timeToFull`.
+**Production**
+
+- In `lib/mining/site_deck_view.dart`, move the microsecond-ceiling duration formula into `SiteMetrics.timeToFull(double cargo)`.
+- Make the existing `MiningSiteCardView.timeToFull` delegate to that method using its displayed fields and operational state.
+- Add `nextStorageFull(MiningContentRegistry content, MiningSave state)` beside SiteMetrics. Iterate `content.planets.entries` and authored site order like `MiningSimulation.accrue`; skip locked planet, non-commissioned/unlocked site, no deployed rigs, zero rate/full storage; compare fill timestamps anchored at `state.lastAccruedAtUtc.toUtc()` strictly (stable tie).
+- This function takes **no clock parameter** and does not accrue, mutate or persist. Shell calls it only after the queued checkpoint completes.
+
+**Tests**
+
+- Add focused projection cases in `test/mining/site_deck_view_test.dart`: none, one, two planets with different full times, locked/full/idle exclusions and authored ties.
+- Keep existing Site Deck `timeToFull` tests, add a null case for a **commissioned site with no rig**, and do not add a redundant dedicated parity test: both consumers use the same method.
 
 Gate: `flutter test test/mining/site_deck_view_test.dart`.
 
-## Task 2 — Small local notification adapter and settings preferences
+## Task 2 — Service, dependencies AND native configuration together
 
-- Add compatible pinned constraints for `flutter_local_notifications` and `timezone` in `pubspec.yaml`; run `flutter pub get` and commit `pubspec.lock`.
-- Add `lib/game/storage_alerts.dart`: one `StorageAlerts` facade and `StorageAlertPlatform` interface, with real Android/iOS adapter, no-op for web/desktop, and test-injected fake.
-- Adapter: lazy initialize, no permission request on initialize, one fixed notification ID, one channel, UTC `zonedSchedule` with **inexact** Android mode, platform default sound, cancel pending alert.
-- Facade: default on, persistent `notifications.storageFullEnabled` and `notifications.permissionAsked`; first permission request exactly once; off persists and cancels; no schedule when disabled.
-- Add `test/game/storage_alerts_test.dart` with `SharedPreferences.setMockInitialValues`, fake adapter call records, service recreation, replacement and cancellation cases.
+**Production**
 
-Gate: `flutter test test/game/storage_alerts_test.dart`.
+- In `pubspec.yaml`, add compatible versions of `flutter_local_notifications` and direct `timezone` dependency; resolve and commit `pubspec.lock`.
+- Add `lib/game/storage_alerts.dart` with `StorageAlerts`, a minimal three-method `StorageAlertPlatform` interface, one concrete Android/iOS plugin adapter and an injected fake for tests.
+- `StorageAlertPlatform.scheduleAt` accepts title, body and UTC time, **not an id**. The real adapter owns one fixed notification ID/channel; each schedule replaces the previous request. Serialize schedule/cancel through one Future chain so cancel cannot be overtaken by a pending plugin initialization/schedule.
+- Platform factory gives `null` on web/desktop, real plugin on Android/iOS. `StorageAlerts.supported` is `_platform != null`; unsupported methods are no-ops.
+- Service prefs: `notifications.storageFullEnabled` (true by default), `notifications.permissionAsked`. `setEnabled(false)` persists/cancels; no scheduling when disabled.
+- `requestPermissionOnce()` checks **enabled and supported** before prompting, and persists attempt once even if denied. Explicit `requestPermission()` on Settings-on always asks the platform again and returns `bool` for UI feedback.
+- Use `tz.TZDateTime.from(atUtc, tz.UTC)` for an inexact one-shot notification. Check the **selected** `timezone`/plugin versions with a focused UTC test: UTC is built in and a named-zone database should not be loaded unless the implementation genuinely needs it.
+- Supply site+planet title and `Sell its cargo to keep mining.` text.
+- Update Android app `build.gradle.kts` **in this task**: the selected plugin may need Java/Kotlin 17, desugaring, appropriate SDK and desugar library. Add `POST_NOTIFICATIONS` and plugin scheduled receiver to `AndroidManifest.xml` per pinned README; never request exact-alarm permission.
+- Verify iOS plugin registration and explicit notification permission support in this task, not after shell integration.
 
-## Task 3 — Shell lifecycle and first commission
+**Tests**
 
-- Add optional injected `StorageAlerts?` to `MiningShell` like `audioManager`; preserve its injected `nowUtc` closure as a field.
-- During shell initialization load alert prefs and cancel a stale alert only once the controller is initialized.
-- Replace the lifecycle fire-and-forget checkpoint path with a tiny async background scheduling method that **awaits the existing** `MiningController.checkpoint()` (best-effort, catch/log errors), then chooses the site from the latest controller snapshot.
-- Use a generation token to avoid `inactive`/ `paused` duplicate schedules and slow post-resume scheduling. On resume invalidate pending work, cancel and call existing `_resumeMining()`. Dispose must not cancel alert.
-- In the existing successful `_runSheetAction` deploy path, detect first commissioned site and request permission asynchronously; avoid permission prompts for failed actions or app launch.
-- Extend `pumpShell` injection in `test/mining/presentation/mining_shell_test.dart`; test initialization, first commission, pause earliest, pause null, resume cancel, pause→resume race, and no disposal cancellation.
+- `test/game/storage_alerts_test.dart` using fake platform and `SharedPreferences.setMockInitialValues`: enabled/defaults, persisted preferences, disabled-before-auto-prompt does not request permission, auto-prompt exactly once across service recreation, explicit re-request after denial, cancel-on-disable, one fixed-ID replacement semantics, serialized schedule/cancel, null-platform support and planet-aware message.
+- Test fake behavior, not arbitrary plugin internals. Add focused UTC construction test only if necessary for selected dependency version.
+
+**Gates for this task (plugin is linked as soon as dependency exists)**
+
+```sh
+flutter test test/game/storage_alerts_test.dart
+flutter build apk --debug
+flutter build web
+```
+
+Existing `macos-latest` CI must also compile `flutter build ios --simulator --debug` before proceeding. Do not let the plugin sit broken across Tasks 3–4.
+
+## Task 3 — Shell lifecycle and commissioning
+
+**Production**
+
+- `MiningShell` accepts an optional injected `StorageAlerts?` like `audioManager`, creates its default service once, and loads preferences on init. After controller initialization cancel old notifications.
+- Make the shell's private `_checkpoint({accrue})` return `Future<void>`, preserving catch/log behavior (it currently returns void). On dispose call `unawaited(_checkpoint(accrue: false))`; **never cancel the scheduled notification on dispose**.
+- In `didChangeAppLifecycleState`, leave the existing foreground timer and audio transitions. On `inactive` and `paused`, call `_checkpoint().whenComplete(_scheduleStorageAlert)`. In that callback, first check mounted/initialized and `WidgetsBinding.instance.lifecycleState` remains backgrounded, then derive from the post-checkpoint `_controller.state` and schedule/cancel.
+- On resume cancel via `StorageAlerts` serialized queue, keep `_resumeMining()` exactly as the existing offline-return path. Duplicate inactive→paused callbacks are harmless: the same ID/time gets replaced and operations remain ordered. No extra injected-clock field, generation token, timer, or simulation call.
+- Reuse the successful newly-`commissioned` transition already computed by `_runSheetAction` for milestone audio, calling `requestPermissionOnce()` (service handles disabled/no-support). Failed deploy and launch do not prompt.
+
+**Tests**
+
+- Extend `pumpShell` with `storageAlerts` injected fake in `test/mining/presentation/mining_shell_test.dart`.
+- Initialization cancels, first successful commission asks if enabled, disabled-before-commission does not prompt, idle/no-producing pause cancels, pause with production schedules earliest across unlocked planets, resume cancels.
+- Races: **slow checkpoint then resume → no late schedule**; `inactive`→`paused` → one effective pending alert (fixed ID); **in-flight sale then pause** → projection uses post-sale cargo; dispose → no cancellation.
 
 Gate: `flutter test test/mining/presentation/mining_shell_test.dart`.
 
-## Task 4 — Mobile Settings and native setup
+## Task 4 — One Settings switch and docs
 
-- Extend `MiningSettingsSheet` with `StorageAlerts` and injectable mobile-visibility flag. Add one NOTIFICATIONS group and switch `Key('mining-storage-alerts-switch')`, retaining existing styles/semantics. Ensure the added group does not overflow on a 360×640 portrait screen (scroll only if necessary).
-- Pass the service when shell opens Settings. Off persists/cancels; on enables and asks only when never prompted.
-- Extend `test/mining/presentation/mining_settings_sheet_test.dart`: flag hides/shows, updates preference, cancel-on-off, no overflow.
-- Configure `android/app/build.gradle.kts`: check pinned plugin requirements; current AGP 8.11.1 is already present, but Java/Kotlin 11 may need Java 17 + core-library desugaring, library dependency, and appropriate compile SDK.
-- Add manifest permission/receiver required for scheduled notifications; no exact alarm permission. Verify explicit authorization on iOS without adding push capabilities.
-- Document the single notification ownership rule in `CLAUDE.md`.
+**Production**
 
-Gates: focused presentation tests, `flutter build apk --debug`, `flutter build ios --simulator --debug` on appropriate CI, and `flutter build web`.
+- In `lib/mining/presentation/mining_settings_sheet.dart` accept `StorageAlerts`; add `NOTIFICATIONS` group and `Key('mining-storage-alerts-switch')` using the existing `SwitchListTile` convention. Show only when `storageAlerts.supported` (tests inject a fake platform; no extra visibility flag).
+- OFF calls `setEnabled(false)` and cancels. ON calls `setEnabled(true)` and then `requestPermission()` regardless of a previous automatic denial. If false, show one short `SnackBar`: `Notifications are off for Horologium in system settings.` No permission management page.
+- Pass the service from `MiningShell.openSettings()`, and keep the existing 360×640 bottom-sheet experience without overflow.
+- Update only `CLAUDE.md`: `StorageAlerts` owns `notifications.*`; the shell schedules after checkpoint and cancels on init/resume; mining logic never calls the plugin.
 
-## Task 5 — Repository verification and merge criteria
+**Tests**
+
+- Extend `test/mining/presentation/mining_settings_sheet_test.dart`: unsupported hidden, fake-platform supported visible, off cancels and persists, on requests again even if previously declined, denial feedback, and no overflow at 360×640.
+
+Gate: `flutter test test/mining/presentation/mining_settings_sheet_test.dart`.
+
+## Task 5 — Complete repository gates, on this PR
 
 ```sh
 dart format --output=none --set-exit-if-changed .
@@ -71,27 +111,21 @@ flutter build web
 flutter build ios --simulator --debug
 ```
 
-Run native builds on supported runners, not by assuming a web/widget test validates native registration. Optional manual mobile delivery check for UX; do not gate this hobby-project ticket on device-specific battery behavior.
+iOS simulator build must run on existing macOS CI; do not treat passing widget tests as native plugin validation. Optional real-device notification smoke test for UX, not merge blocking. Mark this design and plan implemented only after the code/CI gates actually pass.
 
-## Expected implementation changes on THIS PR
+## Expected changed paths (single PR)
 
 - `pubspec.yaml`, `pubspec.lock`
 - `lib/game/storage_alerts.dart` (new)
 - `lib/mining/site_deck_view.dart`
-- `lib/mining/presentation/mining_shell.dart`
-- `lib/mining/presentation/mining_settings_sheet.dart`
-- `android/app/build.gradle.kts`, `android/app/src/main/AndroidManifest.xml`, iOS plugin lockfile if changed
-- Tests for the service, projection, shell, and Settings
+- `lib/mining/presentation/mining_shell.dart`, `mining_settings_sheet.dart`
+- `android/app/build.gradle.kts`, `android/app/src/main/AndroidManifest.xml`; native generated/lockfiles only as needed
+- Tests for projection, service, shell and Settings
 - `CLAUDE.md`
-- This proposed design and plan, updated to implemented status after coding
+- These two design/plan documents
 
-## Must remain unchanged
+## Out of scope and implementation risks
 
-`MiningController` behavior/API, `MiningSimulation`, `MiningSave`, `MiningSaveRepository`, authored mining content, and all art/SFX. Do not build a push service, new scheduler framework, clock abstraction outside the existing shell, or additional tickets/PRs for technical layers.
+No changes to `MiningController` APIs, `MiningSimulation`, `MiningSave`, `MiningSaveRepository`, mining content, assets or sound. No push/Firebase/exact alarms, new background service or scheduler, OS-permission wizard, backward compatibility work, or extra tickets/PRs.
 
-## Practical risks to check during implementation
-
-1. **Checkpoint race:** the existing `_checkpoint()` returns void; merely chaining schedule after it does not await persistence. Test rapid pause/resume.
-2. **Native toolchain:** latest plugin README may require Java 17/desugaring; the app's current Android app module is Java 11. Validate exact pinned version against current Flutter/AGP, not memory.
-3. **Notification icon:** existing `@mipmap/ic_launcher` avoids new art but should be smoke-tested on Android release; prefer a valid existing drawable if available.
-4. **Permission semantics:** a user denial is not an error or a reason to reprompt automatically. Explain how to re-enable via OS settings if needed, without adding an in-app permission management flow.
+Risks to test: background/resume and checkpoint ordering; an active sale when app pauses; denied notification permission; Android plugin Java/desugaring compatibility; valid small icon. A single inexact notification may be delayed or dropped by mobile OS battery/notification settings, so don't gate merge on actual-device timing.
