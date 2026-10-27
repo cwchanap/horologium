@@ -365,8 +365,10 @@ void main() {
           MiningSiteId.landingBasin,
         );
 
-        // Each excluded carbonRidge shape would fill in 3200 s, before
-        // landingBasin's 7110 s, yet landingBasin wins every time.
+        // None of these carbonRidge shapes projects a fill instant: the
+        // first three never produce (locked, uncommissioned, no rigs) and
+        // the last is already at capacity, so landingBasin's 7110 s is the
+        // only projection and wins every time.
         final excludedCarbonRidge = [
           progress(
             unlocked: false,

@@ -307,6 +307,10 @@ Future<void> pumpShell(
         soundEffectPlayer: FakeBackgroundMusicPlayer(),
       );
   if (audioManager == null) addTearDown(audio.dispose);
+  // Default to a fake platform so shell tests never touch the real plugin
+  // channel, mirroring the fake-backed AudioManager default above.
+  final alerts =
+      storageAlerts ?? StorageAlerts(platform: _FakeStorageAlertPlatform());
   await tester.pumpWidget(
     MaterialApp(
       home: MediaQuery(
@@ -317,7 +321,7 @@ Future<void> pumpShell(
           repository: repository,
           nowUtc: testClock.call,
           audioManager: audio,
-          storageAlerts: storageAlerts,
+          storageAlerts: alerts,
         ),
       ),
     ),
@@ -362,7 +366,11 @@ void main() {
       });
       await tester.pumpWidget(
         MaterialApp(
-          home: MiningShell(nowUtc: () => _start, audioManager: audio),
+          home: MiningShell(
+            nowUtc: () => _start,
+            audioManager: audio,
+            storageAlerts: StorageAlerts(platform: _FakeStorageAlertPlatform()),
+          ),
         ),
       );
       for (var i = 0; i < 6; i++) {

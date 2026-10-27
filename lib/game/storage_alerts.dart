@@ -55,7 +55,6 @@ class PluginStorageAlertPlatform implements StorageAlertPlatform {
 
   @override
   Future<bool> requestPermission() async {
-    if (kIsWeb) return false;
     await _ensureInitialized();
     return switch (defaultTargetPlatform) {
       TargetPlatform.android =>
