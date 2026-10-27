@@ -275,7 +275,12 @@ class _MiningShellState extends State<MiningShell>
     unawaited(_audioManager.playSound(GameSound.tap));
     unawaited(_audioManager.maybeStartBgm());
     unawaited(
-      _showMiningSheet(MiningSettingsSheet(audioManager: _audioManager)),
+      _showMiningSheet(
+        MiningSettingsSheet(
+          audioManager: _audioManager,
+          storageAlerts: _storageAlerts,
+        ),
+      ),
     );
   }
 
