@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:horologium/game/audio_manager.dart';
+import 'package:horologium/game/storage_alerts.dart';
 import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -33,12 +34,14 @@ class MiningShell extends StatefulWidget {
     this.repository,
     this.nowUtc,
     this.audioManager,
+    this.storageAlerts,
   });
 
   final MiningContentRegistry? content;
   final MiningSaveRepository? repository;
   final DateTime Function()? nowUtc;
   final AudioManager? audioManager;
+  final StorageAlerts? storageAlerts;
 
   @override
   State<MiningShell> createState() => _MiningShellState();
@@ -60,6 +63,7 @@ class _MiningShellState extends State<MiningShell>
   late final MiningController _controller;
   late final AudioManager _audioManager;
   late final bool _createdAudioManager;
+  late final StorageAlerts _storageAlerts;
   late MiningSave _displayState;
   late final ValueNotifier<MiningSave> _displayNotifier;
   Timer? _refreshTimer;
@@ -77,6 +81,7 @@ class _MiningShellState extends State<MiningShell>
     super.initState();
     _createdAudioManager = widget.audioManager == null;
     _audioManager = widget.audioManager ?? AudioManager();
+    _storageAlerts = widget.storageAlerts ?? StorageAlerts();
     _content = widget.content ?? MiningContentRegistry.stellarMining();
     final nowUtc = widget.nowUtc ?? () => DateTime.now().toUtc();
     _controller = MiningController(
@@ -92,7 +97,12 @@ class _MiningShellState extends State<MiningShell>
 
   Future<void> _initialize() async {
     await _audioManager.loadPrefs();
+    await _storageAlerts.loadPrefs();
     await _controller.initialize();
+    // Any pending alert from a previous run is stale now: the player is in
+    // the foreground, and the next background transition re-projects from
+    // the loaded state.
+    unawaited(_storageAlerts.cancel());
     final pendingReturnSummary = _controller.takePendingReturnSummary();
     if (!mounted) return;
     _initialized = true;
@@ -574,6 +584,9 @@ class _MiningShellState extends State<MiningShell>
               entry.value.commissioned &&
               !before.sites[entry.key]!.commissioned,
         );
+        if (commissioned) {
+          unawaited(_storageAlerts.requestPermissionOnce());
+        }
         unawaited(
           _audioManager.playSound(commissioned ? GameSound.milestone : sound),
         );
@@ -621,11 +634,13 @@ class _MiningShellState extends State<MiningShell>
         _refreshTimer?.cancel();
         _refreshTimer = null;
         if (_initialized) {
-          _checkpoint();
+          unawaited(_checkpoint().whenComplete(_scheduleStorageAlert));
           _refreshPresentation(announceCargo: false);
         }
         break;
       case AppLifecycleState.resumed:
+        // The player is back: a pending storage-full alert is obsolete.
+        unawaited(_storageAlerts.cancel());
         unawaited(_resumeMining());
         break;
       default:
@@ -639,20 +654,42 @@ class _MiningShellState extends State<MiningShell>
     _refreshTimer?.cancel();
     _displayNotifier.dispose();
     WidgetsBinding.instance.removeObserver(this);
-    if (_initialized) _checkpoint(accrue: false);
+    // A background-scheduled alert must survive app termination.
+    if (_initialized) unawaited(_checkpoint(accrue: false));
     if (_createdAudioManager) unawaited(_audioManager.dispose());
     super.dispose();
   }
 
   /// Best-effort lifecycle checkpoint. The next load re-accrues if storage
   /// rejects this write.
-  void _checkpoint({bool accrue = true}) {
-    unawaited(
-      _controller.checkpoint(accrue: accrue).catchError((error, stackTrace) {
-        if (kDebugMode) {
-          debugPrint('Mining lifecycle checkpoint failed: $error\n$stackTrace');
-        }
-      }),
+  Future<void> _checkpoint({bool accrue = true}) {
+    return _controller.checkpoint(accrue: accrue).catchError((
+      error,
+      stackTrace,
+    ) {
+      if (kDebugMode) {
+        debugPrint('Mining lifecycle checkpoint failed: $error\n$stackTrace');
+      }
+    });
+  }
+
+  /// Projects the storage-full notification from the post-checkpoint state.
+  /// Runs only while still mounted, initialized, and backgrounded, so a slow
+  /// checkpoint losing the resume race never schedules a late alert.
+  Future<void> _scheduleStorageAlert() async {
+    if (!mounted || !_initialized) return;
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      return;
+    }
+    final next = nextStorageFull(_content, _controller.state);
+    if (next == null) {
+      await _storageAlerts.cancel();
+      return;
+    }
+    await _storageAlerts.schedule(
+      siteName: _content.site(next.site).name,
+      planetName: _content.planet(_content.planetForSite(next.site)).name,
+      atUtc: next.atUtc,
     );
   }
 
