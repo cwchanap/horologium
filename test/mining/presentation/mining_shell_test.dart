@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/audio_manager.dart';
+import 'package:horologium/game/storage_alerts.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
@@ -72,6 +73,42 @@ class TestClock {
   DateTime now;
 
   DateTime call() => now;
+}
+
+/// Storage-alert fake mirroring the style of test/game/storage_alerts_test.dart:
+/// one pending slot stands in for the adapter-owned fixed notification id,
+/// so every schedule replaces the previous pending request.
+class _FakeStorageAlertPlatform implements StorageAlertPlatform {
+  _FakeStorageAlertPlatform();
+  int requestPermissionCount = 0;
+  int scheduleCount = 0;
+  int cancelAllCount = 0;
+  String? scheduledTitle;
+  String? scheduledBody;
+  DateTime? scheduledAtUtc;
+
+  @override
+  Future<bool> requestPermission() async {
+    requestPermissionCount++;
+    return true;
+  }
+
+  @override
+  Future<void> scheduleAt({
+    required String title,
+    required String body,
+    required DateTime atUtc,
+  }) async {
+    scheduleCount++;
+    scheduledTitle = title;
+    scheduledBody = body;
+    scheduledAtUtc = atUtc;
+  }
+
+  @override
+  Future<void> cancelAll() async {
+    cancelAllCount++;
+  }
 }
 
 const _viewport = Size(360, 640);
@@ -214,11 +251,39 @@ final _carbonRidgeCell = deployableMiningCells(
   MiningContentRegistry.stellarMining().site(MiningSiteId.carbonRidge),
 ).first;
 
+/// Two producers across unlocked planets with a clear earliest fill:
+/// Landing Basin (Homeworld, full in 7200 s) and Frozen Basin (Lunar
+/// Frontier, full in 6600 s from 600 stored units at 1.00/s).
+MiningSave multiProducerState(DateTime now) {
+  final base = homeworldMasteredState(now, surveying: 3);
+  return base.copyWith(
+    unlockedPlanetIds: {MiningPlanetId.homeworld, MiningPlanetId.lunarFrontier},
+    sites: {
+      ...base.sites,
+      MiningSiteId.landingBasin: base.sites[MiningSiteId.landingBasin]!
+          .copyWith(
+            rigPlacements: [
+              MiningRigPlacement(tier: RigTier.t1, cell: landingRigCell),
+            ],
+          ),
+      MiningSiteId.frozenBasin: base.sites[MiningSiteId.frozenBasin]!.copyWith(
+        unlocked: true,
+        commissioned: true,
+        storedAmount: 600,
+        rigPlacements: [
+          MiningRigPlacement(tier: RigTier.t1, cell: frozenRigCell),
+        ],
+      ),
+    },
+  );
+}
+
 Future<void> pumpShell(
   WidgetTester tester, {
   MiningSaveRepository? repository,
   TestClock? clock,
   AudioManager? audioManager,
+  StorageAlerts? storageAlerts,
   bool disableAnimations = false,
   Key? shellKey,
   int pumpCycles = 6,
@@ -252,6 +317,7 @@ Future<void> pumpShell(
           repository: repository,
           nowUtc: testClock.call,
           audioManager: audio,
+          storageAlerts: storageAlerts,
         ),
       ),
     ),
@@ -2349,6 +2415,257 @@ void main() {
         findsOneWidget,
       );
       expect(shellHandles(tester).controller.state.cash, greaterThan(250));
+    });
+  });
+
+  group('storage-full alerts', () {
+    /// Commissions Landing Basin with a first rig deploy through the Mine
+    /// Site, the shell's only successful-commission path in a fresh save.
+    Future<void> commissionLandingBasin(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey<String>('b1')));
+      await tester.pump();
+      await tapGridCell(tester, landingRigCell);
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    testWidgets('initialization cancels stale alerts', (tester) async {
+      final platform = _FakeStorageAlertPlatform();
+      await pumpShell(tester, storageAlerts: StorageAlerts(platform: platform));
+
+      expect(platform.cancelAllCount, 1);
+      expect(platform.scheduleCount, 0);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'first commission requests permission when alerts are enabled',
+      (tester) async {
+        final platform = _FakeStorageAlertPlatform();
+        await pumpShell(
+          tester,
+          storageAlerts: StorageAlerts(platform: platform),
+        );
+
+        await commissionLandingBasin(tester);
+
+        expect(
+          shellHandles(
+            tester,
+          ).controller.state.sites[MiningSiteId.landingBasin]!.commissioned,
+          isTrue,
+        );
+        expect(platform.requestPermissionCount, 1);
+      },
+    );
+
+    testWidgets('disabled-before-commission never requests permission', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        'notifications.storageFullEnabled': false,
+      });
+      final platform = _FakeStorageAlertPlatform();
+      await pumpShell(tester, storageAlerts: StorageAlerts(platform: platform));
+
+      await commissionLandingBasin(tester);
+
+      expect(
+        shellHandles(
+          tester,
+        ).controller.state.sites[MiningSiteId.landingBasin]!.commissioned,
+        isTrue,
+      );
+      expect(platform.requestPermissionCount, 0);
+    });
+
+    testWidgets('pausing without a producing site cancels the pending alert', (
+      tester,
+    ) async {
+      final platform = _FakeStorageAlertPlatform();
+      await pumpShell(tester, storageAlerts: StorageAlerts(platform: platform));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      await tester.pump();
+
+      expect(platform.scheduleCount, 0);
+      // Initialization plus the no-producer projection.
+      expect(platform.cancelAllCount, 2);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+    });
+
+    testWidgets(
+      'pausing with production schedules the earliest unlocked-planet fill',
+      (tester) async {
+        final repository = CountingMiningSaveRepository();
+        await repository.save(multiProducerState(_start));
+        final platform = _FakeStorageAlertPlatform();
+        await pumpShell(
+          tester,
+          repository: repository,
+          storageAlerts: StorageAlerts(platform: platform),
+        );
+
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        await tester.pump();
+        await tester.pump();
+
+        // Frozen Basin (Lunar Frontier) fills in 6600 s, before Landing
+        // Basin (Homeworld) fills in 7200 s. The player is on Homeworld.
+        expect(platform.scheduleCount, 1);
+        expect(platform.cancelAllCount, 1);
+        expect(
+          platform.scheduledTitle,
+          'Frozen Basin on Lunar Frontier is full',
+        );
+        expect(platform.scheduledBody, 'Sell its cargo to keep mining.');
+        expect(
+          platform.scheduledAtUtc,
+          _start.add(const Duration(seconds: 6600)),
+        );
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+      },
+    );
+
+    testWidgets('resuming cancels the scheduled alert', (tester) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start));
+      final platform = _FakeStorageAlertPlatform();
+      await pumpShell(
+        tester,
+        repository: repository,
+        storageAlerts: StorageAlerts(platform: platform),
+      );
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      await tester.pump();
+      expect(platform.scheduleCount, 1);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump();
+
+      expect(platform.cancelAllCount, 2);
+      expect(platform.scheduleCount, 1);
+    });
+
+    testWidgets('a checkpoint finishing after resume schedules nothing late', (
+      tester,
+    ) async {
+      final repository = DelayedMiningSaveRepository();
+      await repository.save(deployedLandingState(_start));
+      final platform = _FakeStorageAlertPlatform();
+      await pumpShell(
+        tester,
+        repository: repository,
+        storageAlerts: StorageAlerts(platform: platform),
+      );
+
+      repository.delayNextSave = true;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await repository.saveStarted.future;
+      await tester.pump();
+
+      // The app is back before the paused checkpoint's save lands.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+
+      repository.allowSave.complete();
+      await tester.pump();
+      await tester.pump();
+
+      expect(platform.scheduleCount, 0);
+      expect(platform.cancelAllCount, 2);
+    });
+
+    testWidgets('inactive then paused keeps one effective pending alert', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start));
+      final platform = _FakeStorageAlertPlatform();
+      await pumpShell(
+        tester,
+        repository: repository,
+        storageAlerts: StorageAlerts(platform: platform),
+      );
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      await tester.pump();
+
+      // Both transitions replace the adapter's one fixed-ID slot with the
+      // same projected instant: one effective pending alert.
+      expect(platform.scheduleCount, 2);
+      expect(platform.scheduledTitle, 'Landing Basin on Homeworld is full');
+      expect(
+        platform.scheduledAtUtc,
+        _start.add(const Duration(seconds: 7200)),
+      );
+      expect(platform.cancelAllCount, 1);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+    });
+
+    testWidgets('an in-flight sale projects the alert from post-sale cargo', (
+      tester,
+    ) async {
+      final repository = DelayedMiningSaveRepository();
+      await repository.save(deployedLandingState(_start, cargo: 10));
+      final platform = _FakeStorageAlertPlatform();
+      await pumpShell(
+        tester,
+        repository: repository,
+        storageAlerts: StorageAlerts(platform: platform),
+      );
+
+      repository.delayNextSave = true;
+      await tester.tap(find.byKey(const Key('site-deck-sell')));
+      await repository.saveStarted.future;
+      await tester.pump();
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+
+      repository.allowSave.complete();
+      await tester.pump();
+      await tester.pump();
+
+      // Pre-sale cargo 10 projects full in 7180 s; the post-sale empty
+      // storage anchors the full 7200 s window.
+      expect(platform.scheduleCount, 1);
+      expect(
+        platform.scheduledAtUtc,
+        _start.add(const Duration(seconds: 7200)),
+      );
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+    });
+
+    testWidgets('disposing the shell never cancels a pending alert', (
+      tester,
+    ) async {
+      final platform = _FakeStorageAlertPlatform();
+      await pumpShell(tester, storageAlerts: StorageAlerts(platform: platform));
+      expect(platform.cancelAllCount, 1);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+
+      expect(platform.cancelAllCount, 1);
     });
   });
 }
