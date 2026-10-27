@@ -276,6 +276,147 @@ void main() {
       expect(card.isOperational, isTrue);
       expect(card.timeToFull, isNull);
     });
+
+    test('is null for a commissioned site with no rig', () {
+      expect(
+        landingBasin(progress(unlocked: true, commissioned: true)).timeToFull,
+        isNull,
+      );
+    });
+  });
+
+  group('nextStorageFull', () {
+    final anchor = DateTime.utc(2026, 8, 26, 12);
+
+    const t1 = [
+      MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+    ];
+
+    MiningSave save({
+      Set<MiningPlanetId> unlockedPlanets = const {MiningPlanetId.homeworld},
+      Map<MiningSiteId, SiteProgress> sites = const {},
+    }) => stateWith(
+      sites: sites,
+    ).copyWith(lastAccruedAtUtc: anchor, unlockedPlanetIds: unlockedPlanets);
+
+    SiteProgress producing(double storedAmount) => progress(
+      unlocked: true,
+      commissioned: true,
+      storedAmount: storedAmount,
+      rigs: t1,
+    );
+
+    test('returns null when no site is producing toward non-full storage', () {
+      // Fresh state: landingBasin is available, every other site locked.
+      expect(nextStorageFull(content, save()), isNull);
+      expect(
+        nextStorageFull(
+          content,
+          save(sites: {MiningSiteId.landingBasin: producing(3600)}),
+        ),
+        isNull,
+      );
+    });
+
+    test('projects a single producing site to its anchored fill instant', () {
+      final result = nextStorageFull(
+        content,
+        save(sites: {MiningSiteId.landingBasin: producing(45)}),
+      );
+
+      expect(result!.site, MiningSiteId.landingBasin);
+      // (3600 - 45) / 0.5 = 7110 s after the anchor.
+      expect(result.atUtc, anchor.add(const Duration(seconds: 7110)));
+    });
+
+    test('picks the earliest fill across two unlocked planets', () {
+      final result = nextStorageFull(
+        content,
+        save(
+          unlockedPlanets: const {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+          sites: {
+            MiningSiteId.landingBasin: producing(45), // fills in 7110 s
+            MiningSiteId.frozenBasin: producing(7150), // fills in 50 s
+          },
+        ),
+      );
+
+      expect(result!.site, MiningSiteId.frozenBasin);
+      expect(result.atUtc, anchor.add(const Duration(seconds: 50)));
+    });
+
+    test(
+      'skips locked planets and locked, available, idle, and full sites',
+      () {
+        // frozenBasin would fill first, but its planet is locked.
+        expect(
+          nextStorageFull(
+            content,
+            save(
+              sites: {
+                MiningSiteId.landingBasin: producing(45),
+                MiningSiteId.frozenBasin: producing(7150),
+              },
+            ),
+          )!.site,
+          MiningSiteId.landingBasin,
+        );
+
+        // Each excluded carbonRidge shape would fill in 3200 s, before
+        // landingBasin's 7110 s, yet landingBasin wins every time.
+        final excludedCarbonRidge = [
+          progress(
+            unlocked: false,
+            commissioned: true,
+            storedAmount: 3000,
+            rigs: t1,
+          ), // locked site
+          progress(
+            unlocked: true,
+            commissioned: false,
+            storedAmount: 3000,
+            rigs: t1,
+          ), // not commissioned
+          progress(unlocked: true, commissioned: true, rigs: t1), // no rigs
+          progress(
+            unlocked: true,
+            commissioned: true,
+            storedAmount: 5400,
+            rigs: t1,
+          ), // already full
+        ];
+        for (final carbonRidge in excludedCarbonRidge) {
+          final result = nextStorageFull(
+            content,
+            save(
+              sites: {
+                MiningSiteId.landingBasin: producing(45),
+                MiningSiteId.carbonRidge: carbonRidge,
+              },
+            ),
+          );
+          expect(result!.site, MiningSiteId.landingBasin);
+        }
+      },
+    );
+
+    test('keeps the authored-first site on a fill-time tie', () {
+      final result = nextStorageFull(
+        content,
+        save(
+          sites: {
+            MiningSiteId.landingBasin: producing(600), // 3000 / 0.5 = 6000 s
+            MiningSiteId.carbonRidge: producing(900), // 4500 / 0.75 = 6000 s
+          },
+        ),
+      );
+
+      expect(result!.site, MiningSiteId.landingBasin);
+      expect(result.atUtc, anchor.add(const Duration(seconds: 6000)));
+    });
   });
 
   group('MiningSaleAffordance', () {
