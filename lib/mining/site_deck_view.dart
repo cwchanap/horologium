@@ -43,15 +43,14 @@ class MiningSiteCardView {
   bool get isOperational => state == MiningSiteCardState.operational;
   bool get isCargoFull => isOperational && capacity > 0 && cargo >= capacity;
 
-  /// How long until storage is full at the current rate, or `null` when the
+  /// How long until this card's displayed storage fills, or `null` when the
   /// site is not producing or already full.
-  Duration? get timeToFull => !isOperational || rate <= 0 || cargo >= capacity
-      ? null
-      : Duration(
-          microseconds:
-              ((capacity - cargo) / rate * Duration.microsecondsPerSecond)
-                  .ceil(),
-        );
+  Duration? get timeToFull => SiteMetrics(
+    deployedRigs: deployedRigs,
+    capacity: capacity,
+    rate: rate,
+    cardState: state,
+  ).timeToFull(cargo);
   MiningSiteId? get requiredSite => definition.requiredSite;
   int get requiredSurveyingLevel => definition.requiredSurveyingLevel;
 }
@@ -113,6 +112,51 @@ class SiteMetrics {
       cardState: cardState,
     );
   }
+
+  /// How long until storage fills from [cargo] at the current rate, or
+  /// `null` unless the site is operational, producing, and not yet full.
+  Duration? timeToFull(double cargo) =>
+      cardState != MiningSiteCardState.operational ||
+          rate <= 0 ||
+          cargo >= capacity
+      ? null
+      : Duration(
+          microseconds:
+              ((capacity - cargo) / rate * Duration.microsecondsPerSecond)
+                  .ceil(),
+        );
+}
+
+/// Earliest projected storage-full instant across every unlocked planet, or
+/// `null` when no commissioned site is producing toward non-full storage.
+/// Pure projection anchored at [MiningSave.lastAccruedAtUtc]: no clock
+/// parameter, no accrual, mutation, or persistence. The shell calls this only
+/// after the queued lifecycle checkpoint completes.
+({MiningSiteId site, DateTime atUtc})? nextStorageFull(
+  MiningContentRegistry content,
+  MiningSave state,
+) {
+  final anchor = state.lastAccruedAtUtc.toUtc();
+  ({MiningSiteId site, DateTime atUtc})? next;
+  for (final entry in content.planets.entries) {
+    if (!state.unlockedPlanetIds.contains(entry.key)) continue;
+    for (final definition in content.planet(entry.key).sites) {
+      final progress = state.sites[definition.id]!;
+      final metrics = SiteMetrics.of(
+        content: content,
+        site: definition,
+        progress: progress,
+        technology: state.technology,
+      );
+      final timeToFull = metrics.timeToFull(progress.storedAmount);
+      if (timeToFull == null) continue;
+      final atUtc = anchor.add(timeToFull);
+      if (next == null || atUtc.isBefore(next.atUtc)) {
+        next = (site: definition.id, atUtc: atUtc);
+      }
+    }
+  }
+  return next;
 }
 
 class MiningSaleAffordance {
