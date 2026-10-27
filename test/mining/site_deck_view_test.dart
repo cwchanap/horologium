@@ -380,7 +380,11 @@ void main() {
             storedAmount: 3000,
             rigs: t1,
           ), // not commissioned
-          progress(unlocked: true, commissioned: true, rigs: t1), // no rigs
+          progress(
+            unlocked: true,
+            commissioned: true,
+            storedAmount: 3000,
+          ), // idle: no rigs
           progress(
             unlocked: true,
             commissioned: true,
