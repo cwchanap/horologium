@@ -356,11 +356,91 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(platform.requestPermissionCount, 1);
+      final sheet = find.byKey(const Key('mining-settings-sheet'));
       expect(
-        find.text('Notifications are off for Horologium in system settings.'),
+        find.descendant(
+          of: sheet,
+          matching: find.text(
+            'Notifications are off for Horologium in system settings.',
+          ),
+        ),
         findsOneWidget,
       );
+
+      // Toggling back off clears the inline feedback.
+      await tester.ensureVisible(toggle());
+      await tester.tap(toggle());
+      await tester.pump();
+      await tester.binding.idle();
+      expect(
+        find.text('Notifications are off for Horologium in system settings.'),
+        findsNothing,
+      );
     });
+
+    testWidgets(
+      'denied feedback stays inside the sheet through the real modal route',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(402, 874);
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+        final platform = _FakeStorageAlertPlatform(grants: false);
+        final alerts = StorageAlerts(platform: platform);
+        await alerts.loadPrefs();
+        final manager = _audioManager();
+        addTearDown(manager.dispose);
+        await manager.loadPrefs();
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => MiningSettingsSheet(
+                      audioManager: manager,
+                      storageAlerts: alerts,
+                    ),
+                  ),
+                  child: const Text('Open settings'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Open settings'));
+        await tester.pumpAndSettle();
+
+        await tester.ensureVisible(toggle());
+        await tester.tap(toggle()); // off: cancels without prompting
+        await tester.pump();
+        await tester.binding.idle();
+        expect(platform.requestPermissionCount, 0);
+
+        await tester.ensureVisible(toggle());
+        await tester.tap(toggle()); // on: denied by the platform
+        await tester.pump();
+        await tester.binding.idle();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(platform.requestPermissionCount, 1);
+        final sheet = find.byKey(const Key('mining-settings-sheet'));
+        expect(sheet, findsOneWidget);
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.text(
+              'Notifications are off for Horologium in system settings.',
+            ),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets('notifications group fits the 360x640 sheet without overflow', (
       tester,

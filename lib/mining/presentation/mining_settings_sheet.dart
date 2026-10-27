@@ -19,6 +19,10 @@ class MiningSettingsSheet extends StatefulWidget {
 }
 
 class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
+  // Whether the last explicit permission request was denied; rendered inline
+  // because a SnackBar on the root messenger draws under this modal sheet.
+  bool _storageAlertDenied = false;
+
   @override
   Widget build(BuildContext context) {
     final audio = widget.audioManager;
@@ -193,7 +197,7 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
             ],
           ),
           const SizedBox(height: 14),
-          if (alerts.supported)
+          if (alerts.supported) ...[
             _group(
               'settings-notifications-group',
               children: [
@@ -223,9 +227,18 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
                     },
                   ),
                 ),
+                if (_storageAlertDenied)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Notifications are off for Horologium in system settings.',
+                      style: TextStyle(color: Colors.white54, fontSize: 11),
+                    ),
+                  ),
               ],
             ),
-          const SizedBox(height: 14),
+            const SizedBox(height: 14),
+          ],
           _group(
             'settings-accessibility-group',
             children: [
@@ -287,15 +300,9 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
   Future<void> _setStorageAlerts(bool value) async {
     final alerts = widget.storageAlerts;
     await alerts.setEnabled(value);
-    if (!value || await alerts.requestPermission()) return;
+    final denied = value && !await alerts.requestPermission();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Notifications are off for Horologium in system settings.',
-        ),
-      ),
-    );
+    setState(() => _storageAlertDenied = denied);
   }
 
   Widget _group(
