@@ -1,13 +1,19 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:horologium/game/audio_manager.dart';
+import 'package:horologium/game/storage_alerts.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 
 class MiningSettingsSheet extends StatefulWidget {
-  const MiningSettingsSheet({super.key, required this.audioManager});
+  const MiningSettingsSheet({
+    super.key,
+    required this.audioManager,
+    required this.storageAlerts,
+  });
   final AudioManager audioManager;
+  final StorageAlerts storageAlerts;
   @override
   State<MiningSettingsSheet> createState() => _MiningSettingsSheetState();
 }
@@ -16,6 +22,7 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
   @override
   Widget build(BuildContext context) {
     final audio = widget.audioManager;
+    final alerts = widget.storageAlerts;
     return MiningSheetFrame(
       key: const Key('mining-settings-sheet'),
       title: 'Settings',
@@ -186,6 +193,39 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
             ],
           ),
           const SizedBox(height: 14),
+          if (alerts.supported)
+            _group(
+              'settings-notifications-group',
+              children: [
+                _section(Icons.notifications, 'NOTIFICATIONS'),
+                const SizedBox(height: 13),
+                Material(
+                  color: Colors.transparent,
+                  child: SwitchListTile(
+                    key: const Key('mining-storage-alerts-switch'),
+                    contentPadding: EdgeInsets.zero,
+                    thumbColor: const WidgetStatePropertyAll(
+                      MiningTheme.highlight,
+                    ),
+                    activeTrackColor: MiningTheme.accent.withAlpha(90),
+                    title: const Text(
+                      'Storage full alerts',
+                      style: TextStyle(
+                        fontFamily: 'Orbitron',
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
+                    ),
+                    value: alerts.enabled,
+                    onChanged: (value) {
+                      unawaited(_setStorageAlerts(value));
+                      setState(() {});
+                    },
+                  ),
+                ),
+              ],
+            ),
+          const SizedBox(height: 14),
           _group(
             'settings-accessibility-group',
             children: [
@@ -240,6 +280,20 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _setStorageAlerts(bool value) async {
+    final alerts = widget.storageAlerts;
+    await alerts.setEnabled(value);
+    if (!value || await alerts.requestPermission()) return;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Notifications are off for Horologium in system settings.',
+        ),
       ),
     );
   }
