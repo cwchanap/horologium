@@ -2807,5 +2807,95 @@ void main() {
         expect(platform.scheduleCount, 0);
       },
     );
+
+    testWidgets('finishing initialization in the background arms the alert', (
+      tester,
+    ) async {
+      final clock = TestClock(_start);
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start));
+      final audio = DelayedAudioPrefsManager(
+        backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+        soundEffectPlayer: FakeBackgroundMusicPlayer(),
+      );
+      addTearDown(audio.dispose);
+      final platform = FakeStorageAlertPlatform();
+      await pumpShell(
+        tester,
+        repository: repository,
+        clock: clock,
+        audioManager: audio,
+        storageAlerts: StorageAlerts(platform: platform),
+        pumpCycles: 1,
+      );
+      await audio.loadStarted.future;
+
+      // The pause lands before the shell is initialized, so the paused
+      // path ignores it and never checkpoints or schedules. Finishing
+      // the load while still backgrounded must take that path itself —
+      // no backgrounded lifecycle event can arrive to trigger it.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      audio.allowLoad.complete();
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+
+      expect(repository.saveCount, 2);
+      expect(platform.cancelAllCount, 1);
+      expect(platform.scheduleCount, 1);
+      expect(
+        platform.scheduledAtUtc,
+        _start.add(const Duration(seconds: 7200)),
+      );
+
+      // Resume behaves like any return from the background: the armed
+      // alert is cancelled and the foreground timer starts.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump();
+      expect(platform.cancelAllCount, 2);
+      expect(platform.scheduleCount, 1);
+    });
+
+    testWidgets(
+      'a disposed shell cannot rearm the alert after a shell reentry',
+      (tester) async {
+        final repository = DelayedMiningSaveRepository();
+        await repository.save(deployedLandingState(_start));
+        final firstPlatform = FakeStorageAlertPlatform();
+        await pumpShell(
+          tester,
+          repository: repository,
+          clock: TestClock(_start),
+          storageAlerts: StorageAlerts(platform: firstPlatform),
+        );
+        expect(firstPlatform.cancelAllCount, 1);
+
+        // Leaving mining stalls inside the dispose checkpoint's save...
+        repository.delayNextSave = true;
+        await tester.pumpWidget(const SizedBox.shrink());
+        await repository.saveStarted.future;
+
+        // ...while a reopened shell takes ownership and clears the pending
+        // alert from its own, unserialized StorageAlerts queue.
+        final secondPlatform = FakeStorageAlertPlatform();
+        await pumpShell(
+          tester,
+          repository: repository,
+          clock: TestClock(_start),
+          storageAlerts: StorageAlerts(platform: secondPlatform),
+        );
+
+        repository.allowSave.complete();
+        await tester.pump();
+        await tester.pump();
+
+        // The stale projection drops instead of rearming the shared
+        // notification id after the new shell's cancellation.
+        expect(firstPlatform.scheduleCount, 0);
+        expect(firstPlatform.cancelAllCount, 1);
+        expect(secondPlatform.cancelAllCount, 1);
+      },
+    );
   });
 }
