@@ -135,9 +135,12 @@ loads preferences, forwards gestures/lifecycle events, supplies Settings, and
 disposes it. Mining code must not create audio players independently.
 `StorageAlerts` owns the `notifications.storageFullEnabled` and
 `notifications.permissionAsked` preferences; neither belongs to the mining
-save. The shell schedules the storage-full alert after a lifecycle checkpoint
-and cancels it on initialization and resume; mining logic never calls the
-notification plugin directly.
+save. The shell schedules the storage-full alert after a lifecycle checkpoint —
+including when initialization itself finishes backgrounded — and cancels
+it on initialization and resume; the newest shell owns the single pending
+alert, so a superseded shell's late projection drops instead of rearming
+the shared notification id. Mining logic never calls the notification
+plugin directly.
 An animated site's visual reports its visible strike through `onMiningImpact`;
 the shell decides whether to play it. Cargo-full cues are foreground transitions,
 and commissioning/mastery cues follow successful persistence. Taps and mining

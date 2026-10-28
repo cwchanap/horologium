@@ -59,6 +59,12 @@ abstract class MiningShellHandles implements State<MiningShell> {
 class _MiningShellState extends State<MiningShell>
     with WidgetsBindingObserver
     implements MiningShellHandles {
+  /// The most recently created shell owns the single pending storage
+  /// alert. Shells run separate [StorageAlerts] queues, so a disposed
+  /// shell's in-flight projection must drop rather than rearm the shared
+  /// notification id after a reopened shell already cancelled it.
+  static _MiningShellState? _alertOwner;
+
   late final MiningContentRegistry _content;
   late final MiningController _controller;
   late final AudioManager _audioManager;
@@ -96,6 +102,7 @@ class _MiningShellState extends State<MiningShell>
     _displayState = MiningSave.initial(nowUtc: nowUtc());
     _displayNotifier = ValueNotifier<MiningSave>(_displayState);
     WidgetsBinding.instance.addObserver(this);
+    _alertOwner = this;
     unawaited(_initialize());
   }
 
@@ -114,9 +121,16 @@ class _MiningShellState extends State<MiningShell>
     _refreshPresentation(announceCargo: false);
     _scheduleRecoverySnackBar();
     // Initialization may have finished while the app is already in the
-    // background (the pause event is ignored until _initialized flips); the
-    // next resumed event starts the timer instead.
-    if (!_isBackgrounded()) _startRefreshTimer();
+    // background: the pause event was ignored until _initialized flipped,
+    // so the paused path never checkpointed or replaced the stale alert
+    // just cancelled above. Run that checkpoint/projection here instead of
+    // waiting for a backgrounded event that cannot come; _backgrounded
+    // stays false so resume still treats this as a silent return.
+    if (_isBackgrounded()) {
+      unawaited(_checkpoint().whenComplete(_scheduleStorageAlert));
+    } else {
+      _startRefreshTimer();
+    }
     if (pendingReturnSummary != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(_showOfflineReturn(pendingReturnSummary));
@@ -724,8 +738,13 @@ class _MiningShellState extends State<MiningShell>
 
   /// Arms or clears the single pending alert from the latest state. Callers
   /// decide whether the current lifecycle allows scheduling; dispose uses
-  /// this without a foreground guard so the alert survives the shell.
+  /// this without a foreground guard so the alert survives the shell. Only
+  /// the newest shell writes: a superseded shell's late projection cannot
+  /// serialize with the owner's queue, so it drops here instead of rearming
+  /// the shared notification id after the reopening shell already
+  /// cancelled it.
   Future<void> _projectStorageAlert() async {
+    if (!identical(_alertOwner, this)) return;
     final next = nextStorageFull(_content, _controller.state);
     if (next == null) {
       await _storageAlerts.cancel();
