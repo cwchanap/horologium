@@ -50,6 +50,23 @@ class _FakeStorageAlertPlatform implements StorageAlertPlatform {
   }
 }
 
+/// Platform fake whose permission request always fails, covering the
+/// service-level catch that turns platform errors into a denied answer.
+class _ThrowingStorageAlertPlatform implements StorageAlertPlatform {
+  @override
+  Future<bool> requestPermission() async => throw Exception('platform error');
+
+  @override
+  Future<void> scheduleAt({
+    required String title,
+    required String body,
+    required DateTime atUtc,
+  }) async {}
+
+  @override
+  Future<void> cancelAll() async {}
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -266,6 +283,23 @@ void main() {
       expect(platform.cancelAllCount, 1);
       await cancelled;
     });
+  });
+
+  group('StorageAlerts platform failures', () {
+    test(
+      'requestPermission survives a platform error and reports false',
+      () async {
+        final alerts = StorageAlerts(platform: _ThrowingStorageAlertPlatform());
+
+        final granted = await alerts.requestPermission();
+        await flush();
+
+        expect(granted, isFalse);
+        // The attempt is still recorded so the auto prompt never re-asks.
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getBool('notifications.permissionAsked'), isTrue);
+      },
+    );
   });
 
   group('StorageAlerts unsupported platform', () {

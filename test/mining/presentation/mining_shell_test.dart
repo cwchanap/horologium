@@ -32,6 +32,16 @@ class CountingMiningSaveRepository extends MiningSaveRepository {
   }
 }
 
+class FailingMiningSaveRepository extends MiningSaveRepository {
+  var failSaves = false;
+
+  @override
+  Future<void> save(MiningSave state) async {
+    if (failSaves) throw Exception('storage unavailable');
+    await super.save(state);
+  }
+}
+
 class DelayedMiningSaveRepository extends MiningSaveRepository {
   final saveStarted = Completer<void>();
   final allowSave = Completer<void>();
@@ -1907,6 +1917,27 @@ void main() {
       expect(find.textContaining('Gold'), findsWidgets);
     },
   );
+
+  testWidgets('a failing checkpoint save is swallowed and the shell works', (
+    tester,
+  ) async {
+    final clock = TestClock(_start);
+    final repository = FailingMiningSaveRepository();
+    await repository.save(deployedLandingState(_start));
+    await pumpShell(tester, repository: repository, clock: clock);
+
+    repository.failSaves = true;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+
+    // The best-effort checkpoint handler absorbs the storage failure: the
+    // lifecycle still completes, and resume accrues from the last good save.
+    clock.now = _start.add(const Duration(seconds: 6));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('offline-return-sheet')), findsOneWidget);
+  });
 
   testWidgets('lifecycle resume does not replay passive impacts', (
     tester,
