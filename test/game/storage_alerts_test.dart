@@ -281,6 +281,44 @@ void main() {
       expect(platform.cancelAllCount, 1);
       await cancelled;
     });
+
+    test(
+      'a cancel from another instance cannot overtake an in-flight schedule',
+      () async {
+        final eventLog = <String>[];
+        final firstPlatform = FakeStorageAlertPlatform(
+          eventLog: eventLog,
+          name: 'first',
+        )..scheduleGate = Completer<void>();
+        final secondPlatform = FakeStorageAlertPlatform(
+          eventLog: eventLog,
+          name: 'second',
+        );
+        final first = StorageAlerts(platform: firstPlatform);
+        final second = StorageAlerts(platform: secondPlatform);
+
+        final scheduled = first.schedule(
+          siteName: 'Landing Basin',
+          planetName: 'Homeworld',
+          atUtc: DateTime.utc(2026, 11, 1, 12, 30),
+        );
+        await flush();
+        expect(firstPlatform.scheduleCount, 1);
+
+        // Shells own separate services; the shared write chain still orders
+        // the reopened shell's cancel behind this in-flight schedule.
+        final cancelled = second.cancel();
+        await flush();
+        expect(secondPlatform.cancelAllCount, 0);
+
+        firstPlatform.scheduleGate!.complete();
+        await scheduled;
+        await cancelled;
+        await flush();
+        expect(secondPlatform.cancelAllCount, 1);
+        expect(eventLog, ['first schedule', 'second cancel']);
+      },
+    );
   });
 
   group('StorageAlerts platform failures', () {

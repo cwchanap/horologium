@@ -60,11 +60,11 @@ class _MiningShellState extends State<MiningShell>
     with WidgetsBindingObserver
     implements MiningShellHandles {
   /// The most recently created shell owns the single pending storage
-  /// alert. Shells run separate [StorageAlerts] queues, so a disposed
-  /// shell's in-flight write must drop rather than rearm the shared
-  /// notification id after a reopened shell already cancelled it. The
-  /// lease is checked both when a projection is requested and again when
-  /// the queued write runs ([StorageAlerts.ownsAlert]).
+  /// alert. The lease is checked both when a projection is requested and
+  /// again when the queued write runs ([StorageAlerts.ownsAlert]), so a
+  /// superseded shell's stale work drops while its surviving in-flight
+  /// writes stay ordered ahead of the newest owner's on the shared write
+  /// chain.
   static _MiningShellState? _alertOwner;
 
   late final MiningContentRegistry _content;
@@ -744,12 +744,13 @@ class _MiningShellState extends State<MiningShell>
   /// Arms or clears the single pending alert from the latest state. Callers
   /// decide whether the current lifecycle allows scheduling; dispose uses
   /// this without a foreground guard so the alert survives the shell. Only
-  /// the newest shell writes: a superseded shell's late projection cannot
-  /// serialize with the owner's queue, so it drops here instead of rearming
-  /// the shared notification id after the reopening shell already
-  /// cancelled it. A write enqueued while still the owner rechecks the
-  /// lease when it runs ([StorageAlerts.ownsAlert]), so a schedule held
-  /// behind a slow platform call cannot land after a reentry either.
+  /// the newest shell writes: a superseded shell's late projection drops
+  /// here instead of rearming the shared notification id after the
+  /// reopening shell already cancelled it. A write enqueued while still
+  /// the owner rechecks the lease when it runs ([StorageAlerts.ownsAlert]),
+  /// and every write serializes on the shared notification-id chain, so a
+  /// schedule already inside its platform call when ownership flips still
+  /// lands ahead of the new owner's cancel or fresh projection.
   Future<void> _projectStorageAlert() async {
     if (!identical(_alertOwner, this)) return;
     final next = nextStorageFull(_content, _controller.state);

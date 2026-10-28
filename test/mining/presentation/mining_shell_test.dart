@@ -2999,5 +2999,77 @@ void main() {
         expect(firstPlatform.scheduleCount, 0);
       },
     );
+
+    testWidgets(
+      'a reopened shell\'s cancel lands after an in-flight stale schedule',
+      (tester) async {
+        final repository = CountingMiningSaveRepository();
+        await repository.save(deployedLandingState(_start));
+        final eventLog = <String>[];
+        final firstPlatform = FakeStorageAlertPlatform(
+          eventLog: eventLog,
+          name: 'A',
+        );
+        await pumpShell(
+          tester,
+          repository: repository,
+          clock: TestClock(_start),
+          storageAlerts: StorageAlerts(platform: firstPlatform),
+        );
+        expect(firstPlatform.cancelAllCount, 1);
+
+        // The pause projection reaches the platform and stalls inside it —
+        // the same shape as scheduleAt awaiting plugin initialization.
+        firstPlatform.scheduleGate = Completer<void>();
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        await tester.pump();
+        await tester.pump();
+        await tester.pump();
+        expect(firstPlatform.scheduleCount, 1);
+
+        // The player returns, then leaves mining while the schedule is
+        // still in flight: the resumed cancel and the dispose projection
+        // queue on the first shell's own chain behind it.
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+        await tester.pump();
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        await tester.pump();
+
+        // Reopening claims ownership and asks for the stale-alert cancel
+        // from a separate StorageAlerts. On the shared write chain it must
+        // run after the in-flight schedule rather than overtake it.
+        final secondPlatform = FakeStorageAlertPlatform(
+          eventLog: eventLog,
+          name: 'B',
+        );
+        await pumpShell(
+          tester,
+          repository: repository,
+          clock: TestClock(_start),
+          storageAlerts: StorageAlerts(platform: secondPlatform),
+        );
+        expect(secondPlatform.cancelAllCount, 0);
+
+        firstPlatform.scheduleGate!.complete();
+        await tester.pump();
+        await tester.pump();
+        await tester.pump();
+        await tester.pump();
+
+        // The in-flight write lands first and the new owner's cancel
+        // follows, so the stale arm never lands last on the shared
+        // notification id; every stale write queued behind it drops on
+        // the lost lease.
+        expect(firstPlatform.scheduleCount, 1);
+        expect(firstPlatform.cancelAllCount, 1);
+        expect(secondPlatform.scheduleCount, 0);
+        expect(secondPlatform.cancelAllCount, 1);
+        expect(eventLog, ['A cancel', 'A schedule', 'B cancel']);
+      },
+    );
   });
 }

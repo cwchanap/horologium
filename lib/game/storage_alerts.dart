@@ -144,8 +144,9 @@ StorageAlertPlatform? _defaultPlatform() {
 /// Shell-owned service for the storage-full notification.
 ///
 /// Mirrors the [AudioManager] pattern: independent SharedPreferences keys and
-/// one serialized Future chain for platform operations, so a cancel can never
-/// overtake an in-flight initialization/schedule.
+/// serialized Future chains for platform operations. Every instance shares
+/// one write chain for the single OS notification id, so a reopened shell's
+/// cancel can never be overtaken by a superseded shell's in-flight schedule.
 class StorageAlerts {
   StorageAlerts({StorageAlertPlatform? platform})
     : _platform = platform ?? _defaultPlatform();
@@ -154,7 +155,21 @@ class StorageAlerts {
   static const String _permissionAskedKey = 'notifications.permissionAsked';
 
   final StorageAlertPlatform? _platform;
+
+  /// Instance chain for app-level calls. A write passes through here first
+  /// so it still waits behind this shell's own pending OS permission
+  /// prompt; a superseded prompt can only delay that shell's writes, never
+  /// the shared write chain below.
   final _opQueue = SerialTaskQueue(
+    (Object e) => debugPrint('Storage alert failed: $e'),
+  );
+
+  /// One write chain for the single OS notification id, shared by every
+  /// instance. Each shell owns a [StorageAlerts] with its own [_opQueue],
+  /// so without this a superseded shell's in-flight schedule lands after
+  /// the reopened shell's cancel and re-arms the stale alert — or its
+  /// in-flight cancel erases the newer shell's schedule.
+  static final _writeQueue = SerialTaskQueue(
     (Object e) => debugPrint('Storage alert failed: $e'),
   );
   bool _enabled = true;
@@ -164,9 +179,8 @@ class StorageAlerts {
   /// enqueued. The installing shell sets this to its alert-ownership check
   /// so work queued behind a slow call — an OS permission prompt can
   /// outlive the shell — drops instead of writing the shared notification
-  /// id after a newer shell claimed it on its own unserialized queue.
-  /// Permission requests are app-level rather than writes to that id, so
-  /// they stay unguarded.
+  /// id after a newer shell claimed it. Permission requests are app-level
+  /// rather than writes to that id, so they stay unguarded.
   bool Function()? ownsAlert;
 
   /// Whether the current platform can show notifications at all.
@@ -256,12 +270,18 @@ class StorageAlerts {
   }
 
   /// Runs [operation] in queue order and swallows its error for the caller;
-  /// the queue itself already logged it once. Work that loses ownership
-  /// while queued drops instead of writing the shared alert late.
+  /// each queue already logged it once. The instance hop keeps the write
+  /// behind this shell's pending permission request; the shared hop then
+  /// orders it behind every other shell's in-flight write, so the newest
+  /// owner's writes always land last. Work that loses ownership while
+  /// queued drops instead of writing the shared alert late.
   Future<void> _enqueue(Future<void> Function() operation) => _opQueue
       .enqueue(() async {
         if (!(ownsAlert?.call() ?? true)) return;
-        await operation();
+        await _writeQueue.enqueue(() async {
+          if (!(ownsAlert?.call() ?? true)) return;
+          await operation();
+        });
       })
       .then<void>((_) {}, onError: (_) {});
 }
