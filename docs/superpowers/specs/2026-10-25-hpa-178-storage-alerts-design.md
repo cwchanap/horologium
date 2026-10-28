@@ -105,3 +105,14 @@ Keep lifecycle sequencing inside a small private shell method; do not add anothe
 ## Non-goals and limits
 
 No server/push/Firebase, repeated/multiple notifications, exact alarms, background Dart timers, new game state, currency or persistence, migrations, UI permission wizard, custom art/SFX, or further tickets/PRs for technical layers. Android inexact scheduling or OS permission/battery restrictions can delay/suppress delivery; optional real-phone smoke test is not a merge gate.
+
+## Post-review revisions (PR #49 final review)
+
+- **`inactive` is not a background transition.** Real devices emit `hidden → inactive → resumed` on return, and system dialogs/the notification shade emit `inactive → resumed`. Checkpoint/schedule now runs only on the first `paused`/`hidden` per background trip (a `_backgrounded` flag); `inactive` leaves the foreground timer accruing and does nothing else. `resume()` always accrues, but the offline-return sheet only shows when the flag was set — a permission dialog or notification-tap return no longer steals or fabricates the away summary.
+- **Dispose arms the alert.** Leaving the mining surface is a background-equivalent handoff: the player may quit from the main menu, so `dispose` projects/schedules/cancels from the latest state after its non-accruing checkpoint (the earlier "never cancel on dispose" only covered termination mid-background).
+- **Init-in-background.** The one-second timer starts at the end of initialization only while the app is foregrounded; a pause during the async load is ignored and the next `resumed` starts it.
+- **Past fill instants clamp.** The adapter clamps a just-past `scheduledDate` to fire ~1s out instead of throwing; a checkpoint-anchored projection can land milliseconds in the past by the time the call lands, and dropping it silenced the only alert even when other sites filled later.
+- **Plugin init retries.** A failed `initialize` is not cached; the next platform call retries.
+- **Denial flips the switch OFF.** `requestPermission()` persists `enabled=false` (and cancels) on denial; an ON switch that can never deliver would claim coverage the OS refuses. Permission requests are serialized through the same op queue so overlapping OS requests cannot throw and misreport a denial, and the Settings switch disables itself while a request is in-flight.
+- **Monochrome small icon.** `@mipmap/ic_launcher` renders as a white square on Android 5+; `res/drawable/ic_notification.xml` (hex ring) is the configured small icon for initialization and the channel.
+- **Shared plumbing.** `SerialTaskQueue` (`lib/game/serial_task_queue.dart`) is the single serialized-op pattern now used by both `StorageAlerts` and `AudioManager`; the recording fake platform lives once in `test/support/fake_storage_alert_platform.dart`.

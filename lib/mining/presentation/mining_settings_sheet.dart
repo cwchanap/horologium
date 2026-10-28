@@ -22,6 +22,9 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
   // Whether the last explicit permission request was denied; rendered inline
   // because a SnackBar on the root messenger draws under this modal sheet.
   bool _storageAlertDenied = false;
+  // A toggle is in-flight while its permission request is unanswered; the
+  // switch is disabled meanwhile so overlapping OS requests cannot throw.
+  bool _storageAlertBusy = false;
 
   @override
   Widget build(BuildContext context) {
@@ -221,10 +224,11 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
                       ),
                     ),
                     value: alerts.enabled,
-                    onChanged: (value) {
-                      unawaited(_setStorageAlerts(value));
-                      setState(() {});
-                    },
+                    onChanged: _storageAlertBusy
+                        ? null
+                        : (value) {
+                            unawaited(_setStorageAlerts(value));
+                          },
                   ),
                 ),
                 if (_storageAlertDenied)
@@ -298,11 +302,18 @@ class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
   }
 
   Future<void> _setStorageAlerts(bool value) async {
+    setState(() {
+      _storageAlertBusy = true;
+      _storageAlertDenied = false;
+    });
     final alerts = widget.storageAlerts;
     await alerts.setEnabled(value);
     final denied = value && !await alerts.requestPermission();
     if (!mounted) return;
-    setState(() => _storageAlertDenied = denied);
+    setState(() {
+      _storageAlertBusy = false;
+      _storageAlertDenied = denied;
+    });
   }
 
   Widget _group(

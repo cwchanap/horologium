@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'background_music_player.dart';
+import 'serial_task_queue.dart';
 
 enum GameSound {
   mining,
@@ -35,7 +36,9 @@ class AudioManager {
 
   BackgroundMusicPlayer? _bgm;
   BackgroundMusicPlayer? _sfx;
-  Future<void>? _sfxQueue;
+  final _sfxQueue = SerialTaskQueue(
+    (Object e) => debugPrint('Sound effect failed: $e'),
+  );
   bool _sfxContextConfigured = false;
   int _sfxGeneration = 0;
   GameSound? _activeSound;
@@ -238,16 +241,10 @@ class AudioManager {
     });
   }
 
-  Future<void> _queueSound(Future<void> Function() operation) {
-    late final Future<void> command;
-    command = (_sfxQueue ?? Future<void>.value())
-        .then((_) => operation())
-        .catchError((Object e) => debugPrint('Sound effect failed: $e'))
-        .whenComplete(() {
-          if (identical(_sfxQueue, command)) _sfxQueue = null;
-        });
-    return _sfxQueue = command;
-  }
+  /// Runs [operation] in queue order and swallows its error for the caller;
+  /// the queue itself already logged it once.
+  Future<void> _queueSound(Future<void> Function() operation) =>
+      _sfxQueue.enqueue(operation).then<void>((_) {}, onError: (_) {});
 
   void _cancelSoundCompletion() {
     // Cancelling the event subscription stops delivery synchronously. Player

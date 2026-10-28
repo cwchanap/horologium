@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:horologium/game/serial_task_queue.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 
@@ -35,15 +36,20 @@ class PluginStorageAlertPlatform implements StorageAlertPlatform {
   static const String _channelName = 'Storage full';
   static const String _channelDescription =
       'Tells you when a mine site storage fills while you are away.';
+  // A colored launcher icon renders as a white square in the Android status
+  // bar; the small icon must be a monochrome drawable.
+  static const String _smallIcon = '@drawable/ic_notification';
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   Future<bool?>? _initialization;
 
-  Future<bool?> _ensureInitialized() {
-    return _initialization ??= _plugin.initialize(
+  Future<bool?> _ensureInitialized() async {
+    final pending = _initialization;
+    if (pending != null) return pending;
+    final attempt = _plugin.initialize(
       settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        android: AndroidInitializationSettings(_smallIcon),
         iOS: DarwinInitializationSettings(
           requestAlertPermission: false,
           requestBadgePermission: false,
@@ -51,6 +57,14 @@ class PluginStorageAlertPlatform implements StorageAlertPlatform {
         ),
       ),
     );
+    _initialization = attempt;
+    try {
+      return await attempt;
+    } catch (_) {
+      // A failed initialize is not cached: the next platform call retries.
+      if (identical(_initialization, attempt)) _initialization = null;
+      rethrow;
+    }
   }
 
   @override
@@ -82,6 +96,15 @@ class PluginStorageAlertPlatform implements StorageAlertPlatform {
     required DateTime atUtc,
   }) async {
     await _ensureInitialized();
+    final scheduledDate = tz.TZDateTime.from(atUtc, tz.UTC);
+    final now = tz.TZDateTime.now(tz.UTC);
+    // zonedSchedule requires a future instant; a projection anchored at the
+    // checkpoint write can land a few milliseconds in the past by the time
+    // the call lands. A just-past fill means the site is already full, so
+    // fire almost immediately instead of dropping the only alert.
+    final effectiveDate = scheduledDate.isAfter(now)
+        ? scheduledDate
+        : now.add(const Duration(seconds: 1));
     // The channel carries no custom sound; Android falls back to the default
     // notification sound and iOS keeps the default presentSound behavior.
     const details = NotificationDetails(
@@ -89,6 +112,7 @@ class PluginStorageAlertPlatform implements StorageAlertPlatform {
         _channelId,
         _channelName,
         channelDescription: _channelDescription,
+        icon: _smallIcon,
       ),
       iOS: DarwinNotificationDetails(),
     );
@@ -98,7 +122,7 @@ class PluginStorageAlertPlatform implements StorageAlertPlatform {
       body: body,
       // UTC is built into the timezone package; no named-zone database is
       // loaded and the plugin stores the absolute instant.
-      scheduledDate: tz.TZDateTime.from(atUtc, tz.UTC),
+      scheduledDate: effectiveDate,
       notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
     );
@@ -130,9 +154,11 @@ class StorageAlerts {
   static const String _permissionAskedKey = 'notifications.permissionAsked';
 
   final StorageAlertPlatform? _platform;
+  final _opQueue = SerialTaskQueue(
+    (Object e) => debugPrint('Storage alert failed: $e'),
+  );
   bool _enabled = true;
   bool _permissionAsked = false;
-  Future<void>? _opQueue;
 
   /// Whether the current platform can show notifications at all.
   bool get supported => _platform != null;
@@ -164,18 +190,26 @@ class StorageAlerts {
   }
 
   /// Explicit permission request (Settings turning alerts on). Always asks
-  /// the platform again; false means denied or unsupported.
+  /// the platform again; false means denied or unsupported. A denial also
+  /// flips the preference off: an ON switch that can never deliver would
+  /// claim coverage the OS will never show.
   Future<bool> requestPermission() async {
     final platform = _platform;
     if (platform == null) return false;
     _permissionAsked = true;
     unawaited(_savePrefs());
-    try {
-      return await platform.requestPermission();
-    } catch (e) {
-      debugPrint('Failed to request notification permission: $e');
-      return false;
-    }
+    // Serialized with scheduling: overlapping OS requests throw on Android
+    // and the second one would be misreported as a denial.
+    final granted = await _opQueue.enqueue(() async {
+      try {
+        return await platform.requestPermission();
+      } catch (e) {
+        debugPrint('Failed to request notification permission: $e');
+        return false;
+      }
+    });
+    if (!granted) await setEnabled(false);
+    return granted;
   }
 
   /// Schedules the single storage-full alert, replacing any previous one.
@@ -212,14 +246,8 @@ class StorageAlerts {
     }
   }
 
-  Future<void> _enqueue(Future<void> Function() operation) {
-    late final Future<void> command;
-    command = (_opQueue ?? Future<void>.value())
-        .then((_) => operation())
-        .catchError((Object e) => debugPrint('Storage alert failed: $e'))
-        .whenComplete(() {
-          if (identical(_opQueue, command)) _opQueue = null;
-        });
-    return _opQueue = command;
-  }
+  /// Runs [operation] in queue order and swallows its error for the caller;
+  /// the queue itself already logged it once.
+  Future<void> _enqueue(Future<void> Function() operation) =>
+      _opQueue.enqueue(operation).then<void>((_) {}, onError: (_) {});
 }
