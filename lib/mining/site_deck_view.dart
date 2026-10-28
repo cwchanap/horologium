@@ -7,13 +7,10 @@ class MiningSiteCardView {
   const MiningSiteCardView({
     required this.id,
     required this.definition,
-    required this.state,
+    required this.metrics,
     required this.isUnlocked,
     required this.isCommissioned,
-    required this.deployedRigs,
     required this.cargo,
-    required this.capacity,
-    required this.rate,
     required this.projectedValue,
     required this.canEnter,
     required this.canUnlock,
@@ -24,19 +21,21 @@ class MiningSiteCardView {
 
   final MiningSiteId id;
   final MiningSiteDefinition definition;
-  final MiningSiteCardState state;
+  final SiteMetrics metrics;
   final bool isUnlocked;
   final bool isCommissioned;
-  final List<RigTier> deployedRigs;
   final double cargo;
-  final double capacity;
-  final double rate;
   final int projectedValue;
   final bool canEnter;
   final bool canUnlock;
   final int unlockCost;
   final String? unlockDisabledReason;
   final bool isBusy;
+
+  MiningSiteCardState get state => metrics.cardState;
+  List<RigTier> get deployedRigs => metrics.deployedRigs;
+  double get capacity => metrics.capacity;
+  double get rate => metrics.rate;
 
   String get name => definition.name;
   String get cardAsset => definition.cardAsset;
@@ -45,12 +44,7 @@ class MiningSiteCardView {
 
   /// How long until this card's displayed storage fills, or `null` when the
   /// site is not producing or already full.
-  Duration? get timeToFull => SiteMetrics(
-    deployedRigs: deployedRigs,
-    capacity: capacity,
-    rate: rate,
-    cardState: state,
-  ).timeToFull(cargo);
+  Duration? get timeToFull => metrics.timeToFull(cargo);
   MiningSiteId? get requiredSite => definition.requiredSite;
   int get requiredSurveyingLevel => definition.requiredSurveyingLevel;
 }
@@ -140,7 +134,7 @@ class SiteMetrics {
   ({MiningSiteId site, DateTime atUtc})? next;
   for (final entry in content.planets.entries) {
     if (!state.unlockedPlanetIds.contains(entry.key)) continue;
-    for (final definition in content.planet(entry.key).sites) {
+    for (final definition in entry.value.sites) {
       final progress = state.sites[definition.id]!;
       final metrics = SiteMetrics.of(
         content: content,
@@ -277,13 +271,10 @@ class SiteDeckView {
         MiningSiteCardView(
           id: definition.id,
           definition: definition,
-          state: metrics.cardState,
+          metrics: metrics,
           isUnlocked: progress.unlocked,
           isCommissioned: progress.commissioned,
-          deployedRigs: List<RigTier>.unmodifiable(metrics.deployedRigs),
           cargo: progress.storedAmount,
-          capacity: metrics.capacity,
-          rate: metrics.rate,
           projectedValue: siteProjectedValue,
           canEnter: progress.unlocked,
           canUnlock:

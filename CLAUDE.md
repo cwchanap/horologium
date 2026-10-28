@@ -27,8 +27,9 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
   UTC window over every unlocked planet, applies technology and rig effects,
   fills site cargo to capacity, and reports per-planet production plus flat
   full-site IDs without reading Flutter or device state.
-- `MiningSaveRepository` exclusively owns SharedPreferences access, strict
-  decoding, current-save validation, and missing/invalid recovery.
+- `MiningSaveRepository` exclusively owns the mining-save SharedPreferences
+  key, strict decoding, current-save validation, and missing/invalid
+  recovery.
 - The active mining presentation is Flutter code: Site Deck, Mine Site, Fleet
   Dock, Stellar Map, Technology, Settings, and offline-return surfaces. There
   is no Flame runtime in this ownership path.

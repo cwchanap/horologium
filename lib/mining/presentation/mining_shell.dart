@@ -68,6 +68,10 @@ class _MiningShellState extends State<MiningShell>
   late final ValueNotifier<MiningSave> _displayNotifier;
   Timer? _refreshTimer;
   bool _initialized = false;
+  // Set by the first paused/hidden event and cleared on resume: the only
+  // reliable record that the app truly left the foreground, since a real
+  // device also emits inactive on its way back to resumed.
+  bool _backgrounded = false;
   bool _reducedMotion = false;
   bool _recoverySnackBarScheduled = false;
   DockBayId? _selectedBayId;
@@ -109,7 +113,10 @@ class _MiningShellState extends State<MiningShell>
     unawaited(_audioManager.playSound(GameSound.tap));
     _refreshPresentation(announceCargo: false);
     _scheduleRecoverySnackBar();
-    _startRefreshTimer();
+    // Initialization may have finished while the app is already in the
+    // background (the pause event is ignored until _initialized flips); the
+    // next resumed event starts the timer instead.
+    if (!_isBackgrounded()) _startRefreshTimer();
     if (pendingReturnSummary != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(_showOfflineReturn(pendingReturnSummary));
@@ -622,23 +629,38 @@ class _MiningShellState extends State<MiningShell>
     );
   }
 
-  Future<void> _resumeMining() async {
+  Future<void> _resumeMining({required bool wasBackgrounded}) async {
     if (!_initialized) return;
     final summary = await _controller.resume();
     if (!mounted) return;
     _refreshPresentation(announceCargo: false);
     _startRefreshTimer();
-    if (summary != null) await _showOfflineReturn(summary);
+    // A transient inactive → resumed (system dialog, notification shade)
+    // is not an "away" return: accrue silently without the return sheet.
+    if (wasBackgrounded && summary != null) {
+      await _showOfflineReturn(summary);
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.inactive:
+        // Transient focus loss: system dialogs, the notification shade,
+        // and the hidden → inactive → resumed path back from the
+        // background all report inactive. Checkpointing here would consume
+        // the away window before resume() can report it, so the foreground
+        // timer simply keeps accruing.
+        break;
       case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
         _refreshTimer?.cancel();
         _refreshTimer = null;
-        if (_initialized) {
+        // Android reports paused then hidden on one trip to the
+        // background; only the first backgrounded event checkpoints and
+        // schedules.
+        if (_initialized && !_backgrounded) {
+          _backgrounded = true;
           unawaited(_checkpoint().whenComplete(_scheduleStorageAlert));
           _refreshPresentation(announceCargo: false);
         }
@@ -646,7 +668,8 @@ class _MiningShellState extends State<MiningShell>
       case AppLifecycleState.resumed:
         // The player is back: a pending storage-full alert is obsolete.
         unawaited(_storageAlerts.cancel());
-        unawaited(_resumeMining());
+        unawaited(_resumeMining(wasBackgrounded: _backgrounded));
+        _backgrounded = false;
         break;
       default:
         break;
@@ -659,8 +682,13 @@ class _MiningShellState extends State<MiningShell>
     _refreshTimer?.cancel();
     _displayNotifier.dispose();
     WidgetsBinding.instance.removeObserver(this);
-    // A background-scheduled alert must survive app termination.
-    if (_initialized) unawaited(_checkpoint(accrue: false));
+    if (_initialized) {
+      // Leaving the mining surface hands the alert off: the player may
+      // quit the app from the main menu, so the projection is armed from
+      // the latest state rather than waiting for a background event that
+      // only the menu would see.
+      unawaited(_checkpoint(accrue: false).whenComplete(_projectStorageAlert));
+    }
     if (_createdAudioManager) unawaited(_audioManager.dispose());
     super.dispose();
   }
@@ -678,14 +706,26 @@ class _MiningShellState extends State<MiningShell>
     });
   }
 
+  /// Whether the app is currently in a backgrounded lifecycle state.
+  /// A null state (before the first event) is treated as foreground.
+  static bool _isBackgrounded() =>
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.paused ||
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.hidden ||
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.detached;
+
   /// Projects the storage-full notification from the post-checkpoint state.
   /// Runs only while still mounted, initialized, and backgrounded, so a slow
-  /// checkpoint losing the resume race never schedules a late alert.
+  /// checkpoint losing the resume race — or a transient inactive — never
+  /// schedules a late alert.
   Future<void> _scheduleStorageAlert() async {
-    if (!mounted || !_initialized) return;
-    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-      return;
-    }
+    if (!mounted || !_initialized || !_isBackgrounded()) return;
+    await _projectStorageAlert();
+  }
+
+  /// Arms or clears the single pending alert from the latest state. Callers
+  /// decide whether the current lifecycle allows scheduling; dispose uses
+  /// this without a foreground guard so the alert survives the shell.
+  Future<void> _projectStorageAlert() async {
     final next = nextStorageFull(_content, _controller.state);
     if (next == null) {
       await _storageAlerts.cancel();

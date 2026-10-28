@@ -6,49 +6,7 @@ import 'package:horologium/game/storage_alerts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 
-/// Test fake recording every platform call. Holds a single pending-request
-/// slot to mirror the adapter-owned fixed notification id: each schedule
-/// replaces the previous request.
-class _FakeStorageAlertPlatform implements StorageAlertPlatform {
-  _FakeStorageAlertPlatform({this.grants = true});
-
-  final bool grants;
-  int requestPermissionCount = 0;
-  int scheduleCount = 0;
-  int cancelAllCount = 0;
-  String? scheduledTitle;
-  String? scheduledBody;
-  DateTime? scheduledAtUtc;
-  Completer<void>? scheduleGate;
-  Completer<void>? cancelGate;
-
-  @override
-  Future<bool> requestPermission() async {
-    requestPermissionCount++;
-    return grants;
-  }
-
-  @override
-  Future<void> scheduleAt({
-    required String title,
-    required String body,
-    required DateTime atUtc,
-  }) async {
-    scheduleCount++;
-    scheduledTitle = title;
-    scheduledBody = body;
-    scheduledAtUtc = atUtc;
-    final gate = scheduleGate;
-    if (gate != null) await gate.future;
-  }
-
-  @override
-  Future<void> cancelAll() async {
-    cancelAllCount++;
-    final gate = cancelGate;
-    if (gate != null) await gate.future;
-  }
-}
+import '../support/fake_storage_alert_platform.dart';
 
 /// Platform fake whose permission request always fails, covering the
 /// service-level catch that turns platform errors into a denied answer.
@@ -80,7 +38,7 @@ void main() {
     test(
       'enabled defaults to true and supported follows the platform',
       () async {
-        final platform = _FakeStorageAlertPlatform();
+        final platform = FakeStorageAlertPlatform();
         final alerts = StorageAlerts(platform: platform);
 
         expect(alerts.supported, isTrue);
@@ -98,7 +56,7 @@ void main() {
         'notifications.storageFullEnabled': false,
         'notifications.permissionAsked': true,
       });
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       final alerts = StorageAlerts(platform: platform);
 
       await alerts.loadPrefs();
@@ -108,7 +66,7 @@ void main() {
     });
 
     test('setEnabled persists the preference', () async {
-      final alerts = StorageAlerts(platform: _FakeStorageAlertPlatform());
+      final alerts = StorageAlerts(platform: FakeStorageAlertPlatform());
 
       await alerts.setEnabled(false);
       await flush();
@@ -126,7 +84,7 @@ void main() {
 
   group('StorageAlerts.requestPermissionOnce', () {
     test('does not request when disabled before the auto prompt', () async {
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       final alerts = StorageAlerts(platform: platform)..loadPrefs();
 
       await alerts.setEnabled(false);
@@ -138,17 +96,20 @@ void main() {
     test(
       'asks exactly once across service recreation even when denied',
       () async {
-        final denied = _FakeStorageAlertPlatform(grants: false);
+        final denied = FakeStorageAlertPlatform(grants: false);
         final first = StorageAlerts(platform: denied);
         await first.loadPrefs();
 
         await first.requestPermissionOnce();
 
         expect(denied.requestPermissionCount, 1);
+        // A denied prompt flips the preference off: claiming enabled while
+        // the OS refuses delivery would lie to the player.
+        expect(first.enabled, isFalse);
         final prefs = await SharedPreferences.getInstance();
         expect(prefs.getBool('notifications.permissionAsked'), isTrue);
 
-        final fresh = _FakeStorageAlertPlatform();
+        final fresh = FakeStorageAlertPlatform();
         final second = StorageAlerts(platform: fresh);
         await second.loadPrefs();
         await second.requestPermissionOnce();
@@ -163,7 +124,7 @@ void main() {
     test(
       'explicit re-request after denial asks again and reports false',
       () async {
-        final platform = _FakeStorageAlertPlatform(grants: false);
+        final platform = FakeStorageAlertPlatform(grants: false);
         final alerts = StorageAlerts(platform: platform);
         await alerts.loadPrefs();
 
@@ -176,7 +137,7 @@ void main() {
     );
 
     test('returns true when granted', () async {
-      final platform = _FakeStorageAlertPlatform(grants: true);
+      final platform = FakeStorageAlertPlatform(grants: true);
       final alerts = StorageAlerts(platform: platform);
 
       final granted = await alerts.requestPermission();
@@ -184,11 +145,48 @@ void main() {
       expect(granted, isTrue);
       expect(platform.requestPermissionCount, 1);
     });
+
+    test('a denial turns the preference off, persists, and cancels', () async {
+      final platform = FakeStorageAlertPlatform(grants: false);
+      final alerts = StorageAlerts(platform: platform);
+      await alerts.loadPrefs();
+
+      final granted = await alerts.requestPermission();
+      await flush();
+
+      expect(granted, isFalse);
+      expect(alerts.enabled, isFalse);
+      expect(platform.cancelAllCount, 1);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('notifications.storageFullEnabled'), isFalse);
+      expect(prefs.getBool('notifications.permissionAsked'), isTrue);
+    });
+
+    test('permission requests are serialized behind the op queue', () async {
+      final platform = FakeStorageAlertPlatform()
+        ..permissionGate = Completer<void>();
+      final alerts = StorageAlerts(platform: platform);
+      await alerts.loadPrefs();
+
+      final first = alerts.requestPermission();
+      final second = alerts.requestPermission();
+      await flush();
+      // The second request cannot overlap the first: a concurrent pair on
+      // Android throws and would be misreported as a denial.
+      expect(platform.requestPermissionCount, 1);
+
+      platform.permissionGate!.complete();
+      await flush();
+      await first;
+      await second;
+      await flush();
+      expect(platform.requestPermissionCount, 2);
+    });
   });
 
   group('StorageAlerts schedule and cancel', () {
     test('cancel-on-disable clears the pending alert', () async {
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       final alerts = StorageAlerts(platform: platform);
       await alerts.loadPrefs();
 
@@ -204,7 +202,7 @@ void main() {
     });
 
     test('does not schedule when disabled', () async {
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       final alerts = StorageAlerts(platform: platform);
       await alerts.loadPrefs();
       await alerts.setEnabled(false);
@@ -219,7 +217,7 @@ void main() {
     });
 
     test('composes planet-aware title and body verbatim', () async {
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       final alerts = StorageAlerts(platform: platform);
       final atUtc = DateTime.utc(2026, 11, 1, 12, 30);
 
@@ -238,7 +236,7 @@ void main() {
     });
 
     test('each schedule replaces the single pending request', () async {
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       final alerts = StorageAlerts(platform: platform);
       final firstFill = DateTime.utc(2026, 11, 1, 12, 30);
       final secondFill = DateTime.utc(2026, 11, 1, 15, 45);
@@ -260,7 +258,7 @@ void main() {
     });
 
     test('cancel cannot overtake an in-flight schedule', () async {
-      final platform = _FakeStorageAlertPlatform()
+      final platform = FakeStorageAlertPlatform()
         ..scheduleGate = Completer<void>();
       final alerts = StorageAlerts(platform: platform);
       await alerts.loadPrefs();

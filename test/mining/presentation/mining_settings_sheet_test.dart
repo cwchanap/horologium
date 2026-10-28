@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,32 +9,7 @@ import 'package:horologium/mining/presentation/mining_settings_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/fake_background_music_player.dart';
-
-/// Storage-alert fake mirroring the style of test/game/storage_alerts_test.dart.
-class _FakeStorageAlertPlatform implements StorageAlertPlatform {
-  _FakeStorageAlertPlatform({this.grants = true});
-  bool grants;
-  int requestPermissionCount = 0;
-  int cancelAllCount = 0;
-
-  @override
-  Future<bool> requestPermission() async {
-    requestPermissionCount++;
-    return grants;
-  }
-
-  @override
-  Future<void> scheduleAt({
-    required String title,
-    required String body,
-    required DateTime atUtc,
-  }) async {}
-
-  @override
-  Future<void> cancelAll() async {
-    cancelAllCount++;
-  }
-}
+import '../../support/fake_storage_alert_platform.dart';
 
 /// Builds a service with no platform so `supported` is false. The test
 /// default target platform is Android, so support is overridden during
@@ -272,7 +249,7 @@ void main() {
     testWidgets('switch shows for a supported platform and defaults on', (
       tester,
     ) async {
-      final alerts = StorageAlerts(platform: _FakeStorageAlertPlatform());
+      final alerts = StorageAlerts(platform: FakeStorageAlertPlatform());
       await alerts.loadPrefs();
       await pumpSheet(tester, alerts);
 
@@ -285,7 +262,7 @@ void main() {
     });
 
     testWidgets('turning off cancels and persists', (tester) async {
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       final alerts = StorageAlerts(platform: platform);
       await alerts.loadPrefs();
       await pumpSheet(tester, alerts);
@@ -303,10 +280,29 @@ void main() {
       expect(tester.widget<SwitchListTile>(toggle()).value, isFalse);
     });
 
+    testWidgets('a denied auto prompt leaves the switch off', (tester) async {
+      final platform = FakeStorageAlertPlatform(grants: false);
+      final alerts = StorageAlerts(platform: platform);
+      await alerts.loadPrefs();
+      // The once-ever automatic attempt was already made and denied.
+      await alerts.requestPermissionOnce();
+      expect(platform.requestPermissionCount, 1);
+      expect(alerts.enabled, isFalse);
+      await pumpSheet(tester, alerts);
+
+      // An ON switch would claim coverage the OS denied; the sheet shows
+      // the honest off state.
+      expect(tester.widget<SwitchListTile>(toggle()).value, isFalse);
+      expect(
+        find.text('Notifications are off for Horologium in system settings.'),
+        findsNothing,
+      );
+    });
+
     testWidgets('turning on asks again after an earlier denial', (
       tester,
     ) async {
-      final platform = _FakeStorageAlertPlatform(grants: false);
+      final platform = FakeStorageAlertPlatform(grants: false);
       final alerts = StorageAlerts(platform: platform);
       await alerts.loadPrefs();
       // The once-ever automatic attempt was already made and denied.
@@ -314,20 +310,26 @@ void main() {
       expect(platform.requestPermissionCount, 1);
       await pumpSheet(tester, alerts);
 
-      // Off never prompts; on asks the platform again despite the recorded
-      // earlier denial.
+      // On asks the platform again despite the recorded earlier denial;
+      // a second denial flips the switch back off with inline feedback.
       await tester.ensureVisible(toggle());
       await tester.tap(toggle());
       await tester.pump();
       await tester.binding.idle();
-      expect(platform.requestPermissionCount, 1);
+      expect(platform.requestPermissionCount, 2);
+      expect(alerts.enabled, isFalse);
+      expect(tester.widget<SwitchListTile>(toggle()).value, isFalse);
+      expect(
+        find.text('Notifications are off for Horologium in system settings.'),
+        findsOneWidget,
+      );
 
       platform.grants = true;
       await tester.ensureVisible(toggle());
       await tester.tap(toggle());
       await tester.pump();
       await tester.binding.idle();
-      expect(platform.requestPermissionCount, 2);
+      expect(platform.requestPermissionCount, 3);
       expect(alerts.enabled, isTrue);
       expect(
         find.text('Notifications are off for Horologium in system settings.'),
@@ -338,7 +340,7 @@ void main() {
     testWidgets('a denied explicit request shows the system-settings message', (
       tester,
     ) async {
-      final platform = _FakeStorageAlertPlatform(grants: false);
+      final platform = FakeStorageAlertPlatform(grants: false);
       final alerts = StorageAlerts(platform: platform);
       await alerts.loadPrefs();
       await pumpSheet(tester, alerts);
@@ -356,6 +358,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(platform.requestPermissionCount, 1);
+      expect(tester.widget<SwitchListTile>(toggle()).value, isFalse);
       final sheet = find.byKey(const Key('mining-settings-sheet'));
       expect(
         find.descendant(
@@ -366,16 +369,39 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
 
-      // Toggling back off clears the inline feedback.
+    testWidgets('the switch disables itself while a request is in-flight', (
+      tester,
+    ) async {
+      final platform = FakeStorageAlertPlatform()
+        ..permissionGate = Completer<void>();
+      final alerts = StorageAlerts(platform: platform);
+      await alerts.loadPrefs();
+      await pumpSheet(tester, alerts);
+
       await tester.ensureVisible(toggle());
-      await tester.tap(toggle());
+      await tester.tap(toggle()); // off
       await tester.pump();
       await tester.binding.idle();
-      expect(
-        find.text('Notifications are off for Horologium in system settings.'),
-        findsNothing,
-      );
+
+      await tester.ensureVisible(toggle());
+      await tester.tap(toggle()); // on: permission request held open
+      await tester.pump();
+      expect(platform.requestPermissionCount, 1);
+      expect(tester.widget<SwitchListTile>(toggle()).onChanged, isNull);
+
+      // A rapid second tap while the OS request is pending is ignored, so
+      // overlapping requests can never throw and misreport a denial.
+      await tester.tap(toggle(), warnIfMissed: false);
+      await tester.pump();
+      expect(platform.requestPermissionCount, 1);
+
+      platform.permissionGate!.complete();
+      await tester.pump();
+      await tester.binding.idle();
+      expect(tester.widget<SwitchListTile>(toggle()).onChanged, isNotNull);
+      expect(alerts.enabled, isTrue);
     });
 
     testWidgets(
@@ -387,7 +413,7 @@ void main() {
           tester.view.resetPhysicalSize();
           tester.view.resetDevicePixelRatio();
         });
-        final platform = _FakeStorageAlertPlatform(grants: false);
+        final platform = FakeStorageAlertPlatform(grants: false);
         final alerts = StorageAlerts(platform: platform);
         await alerts.loadPrefs();
         final manager = _audioManager();
@@ -451,7 +477,7 @@ void main() {
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();
       });
-      final alerts = StorageAlerts(platform: _FakeStorageAlertPlatform());
+      final alerts = StorageAlerts(platform: FakeStorageAlertPlatform());
       await alerts.loadPrefs();
       await pumpSheet(tester, alerts);
 

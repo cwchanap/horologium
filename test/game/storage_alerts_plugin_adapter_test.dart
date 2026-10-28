@@ -47,11 +47,38 @@ void main() {
       [for (final call in calls) call.method],
       ['initialize', 'requestNotificationsPermission'],
     );
-    // Lazy initialization requests nothing but the launcher icon.
+    // Lazy initialization requests nothing but the monochrome drawable:
+    // a colored launcher icon renders as a white square on Android 5+.
     expect(calls[0].arguments, <String, Object>{
-      'defaultIcon': '@mipmap/ic_launcher',
+      'defaultIcon': '@drawable/ic_notification',
     });
   });
+
+  test(
+    'a failed initialization is not cached; the next call retries',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      AndroidFlutterLocalNotificationsPlugin.registerWith();
+      var attempts = 0;
+      responder = (call) {
+        if (call.method == 'initialize') {
+          attempts++;
+          if (attempts == 1) {
+            throw PlatformException(code: 'init-failed');
+          }
+        }
+        return true;
+      };
+      final platform = PluginStorageAlertPlatform();
+
+      await expectLater(platform.requestPermission(), throwsA(anything));
+      expect(await platform.requestPermission(), isTrue);
+      expect(
+        [for (final call in calls) call.method],
+        ['initialize', 'initialize', 'requestNotificationsPermission'],
+      );
+    },
+  );
 
   test('Android requestPermission reports false when the platform resolution '
       'yields no implementation', () async {
@@ -137,8 +164,44 @@ void main() {
       specifics['channelDescription'],
       'Tells you when a mine site storage fills while you are away.',
     );
+    expect(specifics['icon'], '@drawable/ic_notification');
     expect(specifics['scheduleMode'], 'inexactAllowWhileIdle');
   });
+
+  test(
+    'scheduleAt clamps a just-past fill time to fire almost immediately',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      AndroidFlutterLocalNotificationsPlugin.registerWith();
+      responder = (_) => true;
+      final platform = PluginStorageAlertPlatform();
+      // A checkpoint-anchored projection can land a few milliseconds in the
+      // past by the time the call lands; dropping it would silence the only
+      // alert even when other sites fill later.
+      final past = DateTime.now().toUtc().subtract(const Duration(seconds: 3));
+
+      await platform.scheduleAt(
+        title: 'Landing Basin on Homeworld is full',
+        body: 'Sell its cargo to keep mining.',
+        atUtc: past,
+      );
+
+      expect(
+        [for (final call in calls) call.method],
+        ['initialize', 'zonedSchedule'],
+      );
+      final schedule = calls[1].arguments as Map<Object?, Object?>;
+      final scheduled = DateTime.parse(
+        schedule['scheduledDateTimeISO8601'] as String,
+      );
+      expect(scheduled.isAfter(DateTime.now().toUtc()), isTrue);
+      expect(
+        scheduled.difference(DateTime.now().toUtc()) <
+            const Duration(seconds: 10),
+        isTrue,
+      );
+    },
+  );
 
   test('cancelAll clears the pending alert on the plugin channel', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;

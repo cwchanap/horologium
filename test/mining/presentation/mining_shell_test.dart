@@ -19,6 +19,7 @@ import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/fake_background_music_player.dart';
+import '../../support/fake_storage_alert_platform.dart';
 import '../../support/mining_grid_fixtures.dart';
 import '../../support/mining_visual_frames.dart';
 
@@ -83,42 +84,6 @@ class TestClock {
   DateTime now;
 
   DateTime call() => now;
-}
-
-/// Storage-alert fake mirroring the style of test/game/storage_alerts_test.dart:
-/// one pending slot stands in for the adapter-owned fixed notification id,
-/// so every schedule replaces the previous pending request.
-class _FakeStorageAlertPlatform implements StorageAlertPlatform {
-  _FakeStorageAlertPlatform();
-  int requestPermissionCount = 0;
-  int scheduleCount = 0;
-  int cancelAllCount = 0;
-  String? scheduledTitle;
-  String? scheduledBody;
-  DateTime? scheduledAtUtc;
-
-  @override
-  Future<bool> requestPermission() async {
-    requestPermissionCount++;
-    return true;
-  }
-
-  @override
-  Future<void> scheduleAt({
-    required String title,
-    required String body,
-    required DateTime atUtc,
-  }) async {
-    scheduleCount++;
-    scheduledTitle = title;
-    scheduledBody = body;
-    scheduledAtUtc = atUtc;
-  }
-
-  @override
-  Future<void> cancelAll() async {
-    cancelAllCount++;
-  }
 }
 
 const _viewport = Size(360, 640);
@@ -320,7 +285,7 @@ Future<void> pumpShell(
   // Default to a fake platform so shell tests never touch the real plugin
   // channel, mirroring the fake-backed AudioManager default above.
   final alerts =
-      storageAlerts ?? StorageAlerts(platform: _FakeStorageAlertPlatform());
+      storageAlerts ?? StorageAlerts(platform: FakeStorageAlertPlatform());
   await tester.pumpWidget(
     MaterialApp(
       home: MediaQuery(
@@ -379,7 +344,7 @@ void main() {
           home: MiningShell(
             nowUtc: () => _start,
             audioManager: audio,
-            storageAlerts: StorageAlerts(platform: _FakeStorageAlertPlatform()),
+            storageAlerts: StorageAlerts(platform: FakeStorageAlertPlatform()),
           ),
         ),
       );
@@ -1910,11 +1875,101 @@ void main() {
         2.0,
       );
 
+      // A real device reports inactive on its way back to resumed; it must
+      // not consume the away window before resume() can summarize it.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.byKey(const Key('offline-return-sheet')), findsOneWidget);
       expect(find.textContaining('Gold'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'inactive then resumed accrues silently with no checkpoint or sheet',
+    (tester) async {
+      final clock = TestClock(_start);
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingBasin(_start));
+      final platform = FakeStorageAlertPlatform();
+      await pumpShell(
+        tester,
+        repository: repository,
+        clock: clock,
+        storageAlerts: StorageAlerts(platform: platform),
+      );
+
+      // A system dialog or the notification shade only inactivates: no
+      // checkpoint, no alert projection, and the return sheet stays hidden
+      // even though the site kept producing.
+      clock.now = _start.add(const Duration(seconds: 6));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(repository.saveCount, 1);
+      expect(platform.scheduleCount, 0);
+      expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
+      expect(
+        shellHandles(
+          tester,
+        ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+        greaterThan(0),
+      );
+    },
+  );
+
+  testWidgets(
+    'backgrounding during initialization does not start the refresh timer',
+    (tester) async {
+      final clock = TestClock(_start);
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start));
+      final audio = DelayedAudioPrefsManager(
+        backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+        soundEffectPlayer: FakeBackgroundMusicPlayer(),
+      );
+      addTearDown(audio.dispose);
+      final platform = FakeStorageAlertPlatform();
+      await pumpShell(
+        tester,
+        repository: repository,
+        clock: clock,
+        audioManager: audio,
+        storageAlerts: StorageAlerts(platform: platform),
+        pumpCycles: 1,
+      );
+      await audio.loadStarted.future;
+
+      // The pause arrives before the shell is initialized, so it is
+      // ignored; initialization then completes while still backgrounded.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      audio.allowLoad.complete();
+      await tester.pump();
+      await tester.pump();
+
+      clock.now = _start.add(const Duration(seconds: 5));
+      await tester.pump(const Duration(seconds: 2));
+      expect(
+        shellHandles(
+          tester,
+        ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+        0.0,
+      );
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(
+        shellHandles(
+          tester,
+        ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+        greaterThan(0),
+      );
     },
   );
 
@@ -2470,7 +2525,7 @@ void main() {
     }
 
     testWidgets('initialization cancels stale alerts', (tester) async {
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       await pumpShell(tester, storageAlerts: StorageAlerts(platform: platform));
 
       expect(platform.cancelAllCount, 1);
@@ -2481,7 +2536,7 @@ void main() {
     testWidgets(
       'first commission requests permission when alerts are enabled',
       (tester) async {
-        final platform = _FakeStorageAlertPlatform();
+        final platform = FakeStorageAlertPlatform();
         await pumpShell(
           tester,
           storageAlerts: StorageAlerts(platform: platform),
@@ -2505,7 +2560,7 @@ void main() {
       SharedPreferences.setMockInitialValues({
         'notifications.storageFullEnabled': false,
       });
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       await pumpShell(tester, storageAlerts: StorageAlerts(platform: platform));
 
       await commissionLandingBasin(tester);
@@ -2522,7 +2577,7 @@ void main() {
     testWidgets('pausing without a producing site cancels the pending alert', (
       tester,
     ) async {
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       await pumpShell(tester, storageAlerts: StorageAlerts(platform: platform));
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
@@ -2542,7 +2597,7 @@ void main() {
       (tester) async {
         final repository = CountingMiningSaveRepository();
         await repository.save(multiProducerState(_start));
-        final platform = _FakeStorageAlertPlatform();
+        final platform = FakeStorageAlertPlatform();
         await pumpShell(
           tester,
           repository: repository,
@@ -2577,7 +2632,7 @@ void main() {
     testWidgets('resuming cancels the scheduled alert', (tester) async {
       final repository = CountingMiningSaveRepository();
       await repository.save(deployedLandingState(_start));
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       await pumpShell(
         tester,
         repository: repository,
@@ -2602,7 +2657,7 @@ void main() {
     ) async {
       final repository = DelayedMiningSaveRepository();
       await repository.save(deployedLandingState(_start));
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       await pumpShell(
         tester,
         repository: repository,
@@ -2626,34 +2681,47 @@ void main() {
       expect(platform.cancelAllCount, 2);
     });
 
-    testWidgets('inactive then paused keeps one effective pending alert', (
+    testWidgets('one trip to the background schedules a single alert', (
       tester,
     ) async {
       final repository = CountingMiningSaveRepository();
       await repository.save(deployedLandingState(_start));
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       await pumpShell(
         tester,
         repository: repository,
         storageAlerts: StorageAlerts(platform: platform),
       );
 
+      // Transient focus loss is not a background transition: no checkpoint,
+      // no projection.
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       await tester.pump();
+      expect(platform.scheduleCount, 0);
+      expect(repository.saveCount, 1);
+
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       await tester.pump();
       await tester.pump();
 
-      // Both transitions replace the adapter's one fixed-ID slot with the
-      // same projected instant: one effective pending alert.
-      expect(platform.scheduleCount, 2);
+      expect(platform.scheduleCount, 1);
       expect(platform.scheduledTitle, 'Landing Basin on Homeworld is full');
       expect(
         platform.scheduledAtUtc,
         _start.add(const Duration(seconds: 7200)),
       );
       expect(platform.cancelAllCount, 1);
+      expect(repository.saveCount, 2);
 
+      // Android reports paused then hidden on the same trip: the second
+      // backgrounded event must not checkpoint and schedule again.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      await tester.pump();
+      await tester.pump();
+      expect(platform.scheduleCount, 1);
+      expect(repository.saveCount, 2);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pump();
     });
@@ -2663,7 +2731,7 @@ void main() {
     ) async {
       final repository = DelayedMiningSaveRepository();
       await repository.save(deployedLandingState(_start, cargo: 10));
-      final platform = _FakeStorageAlertPlatform();
+      final platform = FakeStorageAlertPlatform();
       await pumpShell(
         tester,
         repository: repository,
@@ -2694,17 +2762,50 @@ void main() {
       await tester.pump();
     });
 
-    testWidgets('disposing the shell never cancels a pending alert', (
+    testWidgets('disposing the shell arms the alert from the latest state', (
       tester,
     ) async {
-      final platform = _FakeStorageAlertPlatform();
-      await pumpShell(tester, storageAlerts: StorageAlerts(platform: platform));
-      expect(platform.cancelAllCount, 1);
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start));
+      final platform = FakeStorageAlertPlatform();
+      await pumpShell(
+        tester,
+        repository: repository,
+        storageAlerts: StorageAlerts(platform: platform),
+      );
 
+      // Leaving the mining surface is a background-equivalent handoff:
+      // the player may quit the app from the main menu, so dispose arms
+      // the pending alert instead of abandoning it.
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
+      await tester.pump();
 
-      expect(platform.cancelAllCount, 1);
+      expect(platform.scheduleCount, 1);
+      expect(
+        platform.scheduledAtUtc,
+        _start.add(const Duration(seconds: 7200)),
+      );
     });
+
+    testWidgets(
+      'disposing the shell with nothing to fill clears the pending alert',
+      (tester) async {
+        final platform = FakeStorageAlertPlatform();
+        await pumpShell(
+          tester,
+          storageAlerts: StorageAlerts(platform: platform),
+        );
+        expect(platform.cancelAllCount, 1);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        await tester.pump();
+
+        // Initialization cancels; the no-producer dispose projection cancels.
+        expect(platform.cancelAllCount, 2);
+        expect(platform.scheduleCount, 0);
+      },
+    );
   });
 }
