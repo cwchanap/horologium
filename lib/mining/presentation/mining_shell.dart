@@ -61,8 +61,10 @@ class _MiningShellState extends State<MiningShell>
     implements MiningShellHandles {
   /// The most recently created shell owns the single pending storage
   /// alert. Shells run separate [StorageAlerts] queues, so a disposed
-  /// shell's in-flight projection must drop rather than rearm the shared
-  /// notification id after a reopened shell already cancelled it.
+  /// shell's in-flight write must drop rather than rearm the shared
+  /// notification id after a reopened shell already cancelled it. The
+  /// lease is checked both when a projection is requested and again when
+  /// the queued write runs ([StorageAlerts.ownsAlert]).
   static _MiningShellState? _alertOwner;
 
   late final MiningContentRegistry _content;
@@ -103,6 +105,7 @@ class _MiningShellState extends State<MiningShell>
     _displayNotifier = ValueNotifier<MiningSave>(_displayState);
     WidgetsBinding.instance.addObserver(this);
     _alertOwner = this;
+    _storageAlerts.ownsAlert = () => identical(_alertOwner, this);
     unawaited(_initialize());
   }
 
@@ -110,12 +113,14 @@ class _MiningShellState extends State<MiningShell>
     await _audioManager.loadPrefs();
     await _storageAlerts.loadPrefs();
     await _controller.initialize();
-    // Any pending alert from a previous run is stale now: the player is in
-    // the foreground, and the next background transition re-projects from
-    // the loaded state.
-    unawaited(_storageAlerts.cancel());
     final pendingReturnSummary = _controller.takePendingReturnSummary();
     if (!mounted) return;
+    // Any pending alert from a previous run is stale now: the player is in
+    // the foreground, and the next background transition re-projects from
+    // the loaded state. Only the owner clears it: a superseded shell
+    // finishing its load late must not cancel the alert the newer shell
+    // already armed.
+    if (identical(_alertOwner, this)) unawaited(_storageAlerts.cancel());
     _initialized = true;
     unawaited(_audioManager.playSound(GameSound.tap));
     _refreshPresentation(announceCargo: false);
@@ -742,7 +747,9 @@ class _MiningShellState extends State<MiningShell>
   /// the newest shell writes: a superseded shell's late projection cannot
   /// serialize with the owner's queue, so it drops here instead of rearming
   /// the shared notification id after the reopening shell already
-  /// cancelled it.
+  /// cancelled it. A write enqueued while still the owner rechecks the
+  /// lease when it runs ([StorageAlerts.ownsAlert]), so a schedule held
+  /// behind a slow platform call cannot land after a reentry either.
   Future<void> _projectStorageAlert() async {
     if (!identical(_alertOwner, this)) return;
     final next = nextStorageFull(_content, _controller.state);
