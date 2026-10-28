@@ -139,8 +139,10 @@ save. The shell schedules the storage-full alert after a lifecycle checkpoint â€
 including when initialization itself finishes backgrounded â€” and cancels
 it on initialization and resume; the newest shell owns the single pending
 alert, so a superseded shell's late projection drops instead of rearming
-the shared notification id. Mining logic never calls the notification
-plugin directly.
+the shared notification id. Writes to that id serialize on one shared
+`StorageAlerts` chain across shell instances, so a superseded in-flight
+write always lands ahead of the newest owner's cancel or fresh
+projection. Mining logic never calls the notification plugin directly.
 An animated site's visual reports its visible strike through `onMiningImpact`;
 the shell decides whether to play it. Cargo-full cues are foreground transitions,
 and commissioning/mastery cues follow successful persistence. Taps and mining
