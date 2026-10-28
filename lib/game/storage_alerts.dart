@@ -160,6 +160,15 @@ class StorageAlerts {
   bool _enabled = true;
   bool _permissionAsked = false;
 
+  /// Ownership lease evaluated when a queued write runs, not when it is
+  /// enqueued. The installing shell sets this to its alert-ownership check
+  /// so work queued behind a slow call — an OS permission prompt can
+  /// outlive the shell — drops instead of writing the shared notification
+  /// id after a newer shell claimed it on its own unserialized queue.
+  /// Permission requests are app-level rather than writes to that id, so
+  /// they stay unguarded.
+  bool Function()? ownsAlert;
+
   /// Whether the current platform can show notifications at all.
   bool get supported => _platform != null;
 
@@ -247,7 +256,12 @@ class StorageAlerts {
   }
 
   /// Runs [operation] in queue order and swallows its error for the caller;
-  /// the queue itself already logged it once.
-  Future<void> _enqueue(Future<void> Function() operation) =>
-      _opQueue.enqueue(operation).then<void>((_) {}, onError: (_) {});
+  /// the queue itself already logged it once. Work that loses ownership
+  /// while queued drops instead of writing the shared alert late.
+  Future<void> _enqueue(Future<void> Function() operation) => _opQueue
+      .enqueue(() async {
+        if (!(ownsAlert?.call() ?? true)) return;
+        await operation();
+      })
+      .then<void>((_) {}, onError: (_) {});
 }

@@ -2897,5 +2897,107 @@ void main() {
         expect(secondPlatform.cancelAllCount, 1);
       },
     );
+
+    testWidgets(
+      'a superseded shell finishing its load late cannot cancel the alert',
+      (tester) async {
+        final repository = CountingMiningSaveRepository();
+        await repository.save(deployedLandingState(_start));
+        final audio = DelayedAudioPrefsManager(
+          backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+          soundEffectPlayer: FakeBackgroundMusicPlayer(),
+        );
+        addTearDown(audio.dispose);
+        final firstPlatform = FakeStorageAlertPlatform();
+        await pumpShell(
+          tester,
+          repository: repository,
+          clock: TestClock(_start),
+          audioManager: audio,
+          storageAlerts: StorageAlerts(platform: firstPlatform),
+          pumpCycles: 1,
+        );
+        await audio.loadStarted.future;
+
+        // Leaving mining before initialization completes disposes the
+        // first shell; the reopened shell takes ownership and arms the
+        // shared alert from the same producing save.
+        await tester.pumpWidget(const SizedBox.shrink());
+        final secondPlatform = FakeStorageAlertPlatform();
+        await pumpShell(
+          tester,
+          repository: repository,
+          clock: TestClock(_start),
+          storageAlerts: StorageAlerts(platform: secondPlatform),
+        );
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        await tester.pump();
+        await tester.pump();
+        expect(secondPlatform.scheduleCount, 1);
+
+        // The first shell's delayed load now finishes. Its stale-alert
+        // cancellation is gated on mounted ownership, so the live shell's
+        // armed alert is the only write the shared id ever sees.
+        audio.allowLoad.complete();
+        await tester.pump();
+        await tester.pump();
+        await tester.pump();
+
+        expect(firstPlatform.cancelAllCount, 0);
+        expect(firstPlatform.scheduleCount, 0);
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+      },
+    );
+
+    testWidgets(
+      'a schedule queued behind a slow request drops after a shell reentry',
+      (tester) async {
+        final repository = CountingMiningSaveRepository();
+        await repository.save(deployedLandingState(_start));
+        final firstPlatform = FakeStorageAlertPlatform();
+        final firstAlerts = StorageAlerts(platform: firstPlatform);
+        await pumpShell(
+          tester,
+          repository: repository,
+          clock: TestClock(_start),
+          storageAlerts: firstAlerts,
+        );
+        expect(firstPlatform.cancelAllCount, 1);
+
+        // An OS permission prompt can outlive the shell: it holds the
+        // first queue open while the dispose projection enqueues its
+        // schedule behind it — still as the owner, since no shell has
+        // reopened yet.
+        firstPlatform.permissionGate = Completer<void>();
+        unawaited(firstAlerts.requestPermission());
+        await tester.pump();
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        await tester.pump();
+
+        // The reopened shell claims ownership and clears the shared id on
+        // its own unserialized queue before the queued schedule runs.
+        final secondPlatform = FakeStorageAlertPlatform();
+        await pumpShell(
+          tester,
+          repository: repository,
+          clock: TestClock(_start),
+          storageAlerts: StorageAlerts(platform: secondPlatform),
+        );
+        expect(secondPlatform.cancelAllCount, 1);
+
+        firstPlatform.permissionGate!.complete();
+        await tester.pump();
+        await tester.pump();
+
+        // The enqueued write rechecks ownership when it runs, so the
+        // stale schedule drops instead of rearming the shared alert.
+        expect(firstPlatform.scheduleCount, 0);
+      },
+    );
   });
 }
