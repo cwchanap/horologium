@@ -1,6 +1,6 @@
 # HPA-178 — Storage-full local notification: design
 
-- Status: Proposed; revised after PR #49 reviews (2026-10-26)
+- Status: Implemented (2026-10-28); all repository and CI gates green on PR #49. Previously: Proposed, revised after PR #49 reviews (2026-10-26)
 - Linear: https://linear.app/cwchanap/issue/HPA-178/mining-retention-notify-the-player-when-site-storage-fills-while-away
 - Prior planning PR (closed, not merged): https://github.com/cwchanap/horologium/pull/43
 - Delivery: this draft PR is the **single implementation PR** for HPA-178. Implementation follows review on this same branch.

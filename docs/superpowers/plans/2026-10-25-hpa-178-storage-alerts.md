@@ -1,6 +1,6 @@
 # HPA-178 — Storage-full alerts implementation plan
 
-- Status: Proposed; revised after PR #49 reviews (2026-10-26)
+- Status: Implemented (2026-10-28); all repository and CI gates green on PR #49. Previously: Proposed, revised after PR #49 reviews (2026-10-26)
 - Ticket: https://linear.app/cwchanap/issue/HPA-178/mining-retention-notify-the-player-when-site-storage-fills-while-away
 - Design: [2026-10-25-hpa-178-storage-alerts-design.md](../specs/2026-10-25-hpa-178-storage-alerts-design.md)
 - Baseline: current `main` at implementation start
