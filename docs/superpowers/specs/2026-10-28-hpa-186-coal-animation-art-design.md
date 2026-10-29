@@ -4,11 +4,11 @@
 - **Linear:** [HPA-186](https://linear.app/cwchanap/issue/HPA-186/mining-art-carbon-ridge-coal-animation-frames)
 - **Unblocks:** [HPA-266](https://linear.app/cwchanap/issue/HPA-266/mining-visuals-animate-carbon-ridge-as-the-third-animated-site)
 - **Baseline:** `main`, using the static `assets/images/mining/nodes/coal.png` plate and the existing gold / water-ice 15-frame families.
-- **Delivery:** One HPA-186 PR. Planning is recorded here as requested; the actual art generation belongs to this art-only ticket, not the HPA-266 Flutter ticket.
+- **Delivery (decided):** One HPA-186 PR containing **this design spec, the implementation plan, and 15 approved coal PNGs**. No runtime changes, scripts, tests, manifests or previews. HPA-266 owns Flutter wiring in its own ticket.
 
 ## Player outcome
 
-Carbon Ridge is the second Homeworld site and an early repeat destination after Relaunch. Its static coal deposit should have the same visual progression vocabulary as Landing Basin (gold) and Frozen Basin (water ice): four depletion plates, a subtle idle pulse, a short hit response, and an exhaust finish. This ticket supplies the **assets only**. HPA-266 will wire them into the existing Flutter visual layer later.
+Carbon Ridge is the second Homeworld site and an early repeat destination after Relaunch. Its static coal deposit should have the same visual progression vocabulary as Landing Basin (gold) and Frozen Basin (water ice): four depletion plates, a subtle idle pulse, a short hit response, and an exhaust finish. This ticket supplies **only art assets as its production output**, alongside the two planning documents. HPA-266 will wire them into the existing Flutter visual layer later.
 
 ## Existing implementation to reuse
 
