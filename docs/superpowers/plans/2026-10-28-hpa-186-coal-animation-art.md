@@ -5,7 +5,7 @@
 - **Design:** [Coal art spec](../specs/2026-10-28-hpa-186-coal-animation-art-design.md)
 - **Reference:** `assets/images/mining/nodes/coal.png`, matching the gold and water-ice deposit families.
 - **Downstream coding ticket:** [HPA-266](https://linear.app/cwchanap/issue/HPA-266/mining-visuals-animate-carbon-ridge-as-the-third-animated-site)
-- **PR policy:** This branch and draft PR are the **only PR for HPA-186**. Add approved sprites to it, not a separate art PR. No Flutter work here.
+- **PR policy (decided):** This branch and draft PR are the **only PR for HPA-186**. Keep the design spec and implementation plan in the final diff alongside the 15 approved PNGs. No separate art PR and no Flutter work here.
 
 ## Reuse and scope gate
 
@@ -92,7 +92,7 @@ Use any local image inspector to verify dimensions/mode; **do not add** a perman
 
 1. Produce a project-file contact sheet that shows all 15 frames, plus an idle/hit-loop GIF and a small in-game-style still. Do **not** add previews or drafts to the repository.
 2. Append the approved 15 PNGs to **this same draft PR**. Record the validation results and preview locations in the PR description.
-3. Get the owner's explicit visual sign-off. Keep the branch art-only apart from this request's design/plan documentation. The Linear ticket originally calls for a PNG-only final PR; if that literal diff rule is retained, move the planning text back to the issue and drop the two docs from this same PR before merge — **do not create a second PR**.
+3. Get the owner's explicit visual sign-off. **Keep both planning documents and the 15 approved PNGs in this same PR through merge.** The final diff is exactly the two planning docs plus the art assets; no Dart, tests, scripts, audio, asset-manifest changes or preview/draft files. This settles the original ticket's PNG-only wording in favor of the repository's spec/plan convention.
 4. Only after merge, start HPA-266 from up-to-date `main` for `MiningDepositFrames.coal`, the closed switch, tests and docs. HPA-266 must **not** generate or modify this art.
 
 ## Completion checklist
