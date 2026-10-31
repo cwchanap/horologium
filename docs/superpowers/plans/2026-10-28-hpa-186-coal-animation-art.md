@@ -86,9 +86,10 @@ shasum -a 256 assets/images/mining/nodes/node-coal-s4.png \
   assets/images/mining/nodes/node-coal-exhaust-04.png
 ```
 
-To measure bbox with a **throwaway local Pillow check** (do not commit it):
+To measure bbox with a **throwaway local Pillow check** (do not commit it), flood-fill the alpha > 16 silhouette and take the largest connected component's box — plain `getbbox()` covers every opaque pixel, so a detached chip would falsely move the reported top:
 
 ```python
+from collections import deque
 from pathlib import Path
 from PIL import Image
 
@@ -97,11 +98,31 @@ for path in [nodes / 'coal.png', *sorted(nodes.glob('node-coal-*.png'))]:
     with Image.open(path) as im:
         assert im.size == (512, 512) and im.mode == 'RGBA', path
         alpha = im.getchannel('A')
-        bbox = alpha.point(lambda value: 255 if value > 16 else 0).getbbox()
-        print(path.name, bbox)
+        whole = alpha.point(lambda value: 255 if value > 16 else 0).getbbox()
+        solid = [value > 16 for value in alpha.tobytes()]
+        seen, largest = bytearray(512 * 512), (0, None)
+        for start in range(512 * 512):
+            if not solid[start] or seen[start]:
+                continue
+            seen[start] = 1
+            queue = deque([start])
+            size, (l, t, r, b) = 0, (512, 512, 0, 0)
+            while queue:
+                i = queue.popleft()
+                size += 1
+                x, y = i % 512, i // 512
+                l, t, r, b = min(l, x), min(t, y), max(r, x + 1), max(b, y + 1)
+                for n in (i - 1, i + 1, i - 512, i + 512):
+                    if 0 <= n < 512 * 512 and not seen[n] and solid[n] and abs(n % 512 - x) <= 1:
+                        seen[n] = 1
+                        queue.append(n)
+            if size > largest[0]:
+                largest = size, (l, t, r, b)
+        tag = '' if largest[1] == whole else f' (whole-alpha {whole} includes detached debris)'
+        print(path.name, largest[1], tag)
 ```
 
-Check the resulting boxes against the remeasured S1 anchor; do not add a committed image-processing pipeline for one art family.
+Check the resulting component boxes against the remeasured S1 anchor; do not add a committed image-processing pipeline for one art family.
 
 ## Task 5 — Review, final PR and unblock HPA-266
 
