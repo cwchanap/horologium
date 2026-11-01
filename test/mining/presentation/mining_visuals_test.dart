@@ -82,15 +82,17 @@ void main() {
       for (var i = 1; i <= 3; i++) MiningDepositFrames.gold.hit(i),
       for (var i = 1; i <= 4; i++) MiningDepositFrames.gold.exhaust(i),
     ]);
-    expect(MiningDepositFrames.gold.all.toSet(), hasLength(15));
-    expect(MiningDepositFrames.waterIce.all.toSet(), hasLength(15));
+    for (final family in MiningDepositFrames.values) {
+      expect(family.all.toSet(), hasLength(15), reason: family.slug);
+    }
   });
 
-  test('animates Landing Basin and Frozen Basin through the closed switch', () {
+  test('animates the authored animated sites through the closed switch', () {
     for (final id in MiningSiteId.values) {
       expect(MiningVisuals.depositFramesFor(id), switch (id) {
         MiningSiteId.landingBasin => MiningDepositFrames.gold,
         MiningSiteId.frozenBasin => MiningDepositFrames.waterIce,
+        MiningSiteId.carbonRidge => MiningDepositFrames.coal,
         _ => isNull,
       }, reason: id.name);
     }
@@ -187,20 +189,27 @@ void main() {
     }
   }, skip: kIsWeb);
 
-  // Same host-only reason as above. The copied water-ice frames must stay
+  // Same host-only reason as above. The copied animated-site frames must stay
   // byte-identical to their sources so the stage and beat edges never pop.
-  testWidgets('water-ice copy frames match their source plates', (
-    tester,
-  ) async {
+  testWidgets('animated copy frames match their source plates', (tester) async {
     Future<List<int>> bytes(String path) async =>
         (await rootBundle.load(path)).buffer.asUint8List();
-    const frames = MiningDepositFrames.waterIce;
-    final source = await bytes(
-      content.site(MiningSiteId.frozenBasin).depositAsset,
-    );
-    expect(await bytes(frames.stage(1)), source);
-    expect(await bytes(frames.idle(1)), source);
-    expect(await bytes(frames.exhaust(1)), await bytes(frames.stage(3)));
-    expect(await bytes(frames.exhaust(4)), await bytes(frames.stage(4)));
+    for (final id in MiningSiteId.values) {
+      final frames = MiningVisuals.depositFramesFor(id);
+      if (frames == null) continue;
+      final source = await bytes(content.site(id).depositAsset);
+      expect(await bytes(frames.stage(1)), source, reason: '${id.name} s1');
+      expect(await bytes(frames.idle(1)), source, reason: '${id.name} idle-01');
+      expect(
+        await bytes(frames.exhaust(1)),
+        await bytes(frames.stage(3)),
+        reason: '${id.name} exhaust-01',
+      );
+      expect(
+        await bytes(frames.exhaust(4)),
+        await bytes(frames.stage(4)),
+        reason: '${id.name} exhaust-04',
+      );
+    }
   }, skip: kIsWeb);
 }

@@ -23,7 +23,7 @@ abstract final class MiningVisuals {
   static MiningDepositFrames? depositFramesFor(MiningSiteId id) => switch (id) {
     MiningSiteId.landingBasin => MiningDepositFrames.gold,
     MiningSiteId.frozenBasin => MiningDepositFrames.waterIce,
-    MiningSiteId.carbonRidge ||
+    MiningSiteId.carbonRidge => MiningDepositFrames.coal,
     MiningSiteId.graniteCrater ||
     MiningSiteId.titaniumHighlands ||
     MiningSiteId.heliumMare ||
@@ -49,7 +49,8 @@ abstract final class MiningVisuals {
 /// loop, a three-frame hit, and a four-frame exhaust beat.
 enum MiningDepositFrames {
   gold('gold'),
-  waterIce('water-ice');
+  waterIce('water-ice'),
+  coal('coal');
 
   const MiningDepositFrames(this.slug);
 

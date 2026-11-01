@@ -18,6 +18,7 @@ import '../../support/mining_visual_frames.dart';
 
 final _start = DateTime.utc(2026, 8, 26, 12);
 final _content = MiningContentRegistry.stellarMining();
+const _staticSite = MiningSiteId.graniteCrater;
 final _landingDefinition = _content.site(MiningSiteId.landingBasin);
 final _landingRigCells = deployableMiningCells(_landingDefinition);
 
@@ -258,23 +259,26 @@ void main() {
     },
   );
 
-  testWidgets('keeps non-gold sites on the static deposit and rig art', (
+  testWidgets('keeps non-animated sites on the static deposit and rig art', (
     tester,
   ) async {
     final initial = MiningSave.initial(nowUtc: _start);
     final state = initial.copyWith(
       sites: {
         ...initial.sites,
-        MiningSiteId.carbonRidge: _progress(
+        _staticSite: _progress(
           unlocked: true,
           commissioned: true,
-          rigs: const [
-            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(5, 1)),
+          rigs: [
+            MiningRigPlacement(
+              tier: RigTier.t1,
+              cell: firstPlayableCell(_content.site(_staticSite)),
+            ),
           ],
         ),
       },
     );
-    final view = _siteView(state, siteId: MiningSiteId.carbonRidge);
+    final view = _siteView(state, siteId: _staticSite);
     await _pumpMineSite(
       tester,
       impactSequence: 1,
@@ -282,10 +286,14 @@ void main() {
       dock: _dockView(state),
     );
 
-    expect(
-      find.byKey(const Key('landing-basin-grid-visual-layer')),
-      findsNothing,
-    );
+    for (final id in MiningSiteId.values) {
+      if (MiningVisuals.depositFramesFor(id) == null) continue;
+      expect(
+        find.byKey(Key('${MiningVisuals.siteKeyPrefix(id)}-grid-visual-layer')),
+        findsNothing,
+        reason: id.name,
+      );
+    }
     expect(
       find.byKey(const Key('static-mining-grid-visual-layer')),
       findsOneWidget,

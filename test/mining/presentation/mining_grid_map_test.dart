@@ -6,9 +6,11 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_grid_map.dart';
+import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 final _content = MiningContentRegistry.stellarMining();
 final _start = DateTime.utc(2026, 8, 26, 12);
+const _staticSite = MiningSiteId.graniteCrater;
 
 MineSiteView _view(
   MiningSiteId siteId, {
@@ -104,7 +106,7 @@ void main() {
   testWidgets('renders exactly 100 resource images on a static site', (
     tester,
   ) async {
-    final view = _view(MiningSiteId.carbonRidge);
+    final view = _view(_staticSite);
     await _pumpMap(tester, view, (_) {});
 
     expect(view.deposits.length, 100);
@@ -121,11 +123,11 @@ void main() {
   testWidgets('dims unsurveyed resources, keeps surveyed art full', (
     tester,
   ) async {
-    final view = _view(MiningSiteId.carbonRidge);
+    final view = _view(_staticSite);
     await _pumpMap(tester, view, (_) {});
 
-    // Carbon Ridge progression levels are 0,1,2,3: at Surveying 0 the level-0
-    // resource is surveyed and the rest of the field is locked.
+    // Granite Crater progression levels are 0,1,2,3: at Surveying 0 the
+    // level-0 resource is surveyed and the rest of the field is locked.
     Key depositNodeKey(MineSiteDepositView deposit) => Key(
       'static-deposit-${deposit.definition.x}-'
       '${deposit.definition.y}-${deposit.definition.size}',
@@ -152,40 +154,51 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('hosts the Frozen Basin animated layer and no static layer', (
+  testWidgets('hosts each keyed animated layer and no static layer', (
     tester,
   ) async {
-    await _pumpMap(tester, _view(MiningSiteId.frozenBasin), (_) {});
+    for (final id in MiningSiteId.values) {
+      if (MiningVisuals.depositFramesFor(id) == null) continue;
+      await _pumpMap(tester, _view(id), (_) {});
 
-    expect(
-      find.byKey(const Key('frozen-basin-grid-visual-layer')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('static-mining-grid-visual-layer')),
-      findsNothing,
-    );
-    expect(tester.takeException(), isNull);
+      expect(
+        find.byKey(Key('${MiningVisuals.siteKeyPrefix(id)}-grid-visual-layer')),
+        findsOneWidget,
+        reason: id.name,
+      );
+      expect(
+        find.byKey(const Key('static-mining-grid-visual-layer')),
+        findsNothing,
+        reason: id.name,
+      );
+      expect(tester.takeException(), isNull, reason: id.name);
+    }
   });
 
   testWidgets('hosts the static object layer for non-animated sites', (
     tester,
   ) async {
     final taps = <MiningGridCell>[];
-    await _pumpMap(tester, _view(MiningSiteId.carbonRidge), taps.add);
+    final view = _view(_staticSite);
+    await _pumpMap(tester, view, taps.add);
 
     expect(
       find.byKey(const Key('static-mining-grid-visual-layer')),
       findsOneWidget,
     );
-    for (final key in [
-      'landing-basin-grid-visual-layer',
-      'frozen-basin-grid-visual-layer',
-      'carbon-ridge-grid-visual-layer',
-    ]) {
-      expect(find.byKey(Key(key)), findsNothing);
+    for (final id in MiningSiteId.values) {
+      if (MiningVisuals.depositFramesFor(id) == null) continue;
+      expect(
+        find.byKey(Key('${MiningVisuals.siteKeyPrefix(id)}-grid-visual-layer')),
+        findsNothing,
+        reason: id.name,
+      );
     }
-    expect(find.byKey(const Key('mining-deposit-1-1-2')), findsOneWidget);
+    final first = view.deposits.first.definition;
+    expect(
+      find.byKey(Key('mining-deposit-${first.x}-${first.y}-${first.size}')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -201,7 +214,7 @@ void main() {
   testWidgets('tiles the cavern background instead of stretching it', (
     tester,
   ) async {
-    final view = _view(MiningSiteId.carbonRidge);
+    final view = _view(_staticSite);
     await _pumpMap(tester, view, (_) {});
 
     final background = tester.widget<Image>(
