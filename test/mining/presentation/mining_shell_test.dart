@@ -226,6 +226,24 @@ final _carbonRidgeCell = deployableMiningCells(
   MiningContentRegistry.stellarMining().site(MiningSiteId.carbonRidge),
 ).first;
 
+/// Homeworld active, Carbon Ridge unlocked and commissioned, with one T1 rig
+/// mining from [_carbonRidgeCell].
+MiningSave deployedCarbonRidgeState(DateTime now) {
+  final base = MiningSave.initial(nowUtc: now);
+  return base.copyWith(
+    sites: {
+      ...base.sites,
+      MiningSiteId.carbonRidge: base.sites[MiningSiteId.carbonRidge]!.copyWith(
+        unlocked: true,
+        commissioned: true,
+        rigPlacements: [
+          MiningRigPlacement(tier: RigTier.t1, cell: _carbonRidgeCell),
+        ],
+      ),
+    },
+  );
+}
+
 /// Two producers across unlocked planets with a clear earliest fill:
 /// Landing Basin (Homeworld, full in 7200 s) and Frozen Basin (Lunar
 /// Frontier, full in 6600 s from 600 stored units at 1.00/s).
@@ -2071,7 +2089,7 @@ void main() {
     ]);
   }, skip: kIsWeb);
 
-  group('Frozen Basin impacts', () {
+  group('animated site impacts', () {
     int impactSequence(WidgetTester tester) => tester
         .widget<MineSiteScreen>(find.byType(MineSiteScreen))
         .impactSequence;
@@ -2081,39 +2099,54 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('passive production strikes once and plays the mining cue', (
-      tester,
-    ) async {
-      final clock = TestClock(_start);
-      final repository = CountingMiningSaveRepository();
-      await repository.save(deployedFrozenBasinState(clock.now));
-      final effects = FakeBackgroundMusicPlayer();
-      final audio = AudioManager(
-        backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
-        soundEffectPlayer: effects,
-      );
-      addTearDown(audio.dispose);
-      await warmDepositFrames(tester, MiningDepositFrames.waterIce);
-      await pumpShell(
-        tester,
-        repository: repository,
-        clock: clock,
-        audioManager: audio,
-      );
-      await openFrozenBasin(tester);
+    for (final (siteId, saveBuilder)
+        in <(MiningSiteId, MiningSave Function(DateTime))>[
+          (MiningSiteId.frozenBasin, deployedFrozenBasinState),
+          (MiningSiteId.carbonRidge, deployedCarbonRidgeState),
+        ]) {
+      testWidgets(
+        'passive ${siteId.name} production strikes once and plays the mining '
+        'cue',
+        (tester) async {
+          final clock = TestClock(_start);
+          final repository = CountingMiningSaveRepository();
+          await repository.save(saveBuilder(clock.now));
+          final effects = FakeBackgroundMusicPlayer();
+          final audio = AudioManager(
+            backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+            soundEffectPlayer: effects,
+          );
+          addTearDown(audio.dispose);
+          await warmDepositFrames(
+            tester,
+            MiningVisuals.depositFramesFor(siteId)!,
+          );
+          await pumpShell(
+            tester,
+            repository: repository,
+            clock: clock,
+            audioManager: audio,
+          );
+          final enter = find.byKey(Key('site-card-${siteId.name}-enter'));
+          await tester.ensureVisible(enter);
+          await tester.tap(enter);
+          await tester.pump();
 
-      final before = impactSequence(tester);
-      await pumpMiningTick(tester, clock);
-      expect(impactSequence(tester) - before, 1);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+          final before = impactSequence(tester);
+          await pumpMiningTick(tester, clock);
+          expect(impactSequence(tester) - before, 1);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 500));
 
-      expect(effects.playedAssets, [
-        'audio/tap.wav',
-        'audio/tap.wav',
-        'audio/mining.wav',
-      ]);
-    }, skip: kIsWeb);
+          expect(effects.playedAssets, [
+            'audio/tap.wav',
+            'audio/tap.wav',
+            'audio/mining.wav',
+          ]);
+        },
+        skip: kIsWeb,
+      );
+    }
 
     testWidgets('closed Frozen Basin production emits no impact', (
       tester,
