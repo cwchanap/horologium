@@ -1,7 +1,7 @@
 # HPA-266 Carbon Ridge Animated Mining Site Design
 
 - Date: 2026-10-22; revalidated 2026-10-31
-- Status: Proposed
+- Status: Implemented
 - Linear: [HPA-266](https://linear.app/cwchanap/issue/HPA-266/mining-visuals-animate-carbon-ridge-as-the-third-animated-site) — Animate Carbon Ridge as the third animated site
 - Baseline: `main` at `f0578fb` (after merged [PR #50](https://github.com/cwchanap/horologium/pull/50))
 - Dependency satisfied: [HPA-186](https://linear.app/cwchanap/issue/HPA-186/mining-art-carbon-ridge-coal-animation-frames) — 15 approved coal frames merged via [PR #50](https://github.com/cwchanap/horologium/pull/50)

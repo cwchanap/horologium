@@ -35,7 +35,7 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
   is no Flame runtime in this ownership path.
 
 - `MiningNextGoalView` is a stateless Site Deck read model derived from the display state; the strip only navigates through existing shell paths and never mutates, persists, or adds tutorial state.
-- Landing Basin and Frozen Basin are the authored animated mining sites, selected by the closed `MiningVisuals.depositFramesFor` switch. Their transient shell-owned `impactSequence` presents passive one-second deterministic production; animation is not an economy clock.
+- A non-null `MiningVisuals.depositFramesFor` result identifies an approved animated mining site; other sites use the static layer. An animated site's transient shell-owned `impactSequence` presents passive one-second deterministic production; animation is not an economy clock.
 - `MiningController`, `MiningSimulation`, `MineSiteView`, and `_displayState` remain authoritative. User-initiated mutations may publish their accrued state immediately and do not fabricate mining impacts.
 - Animated-site robot/deposit animation never calls the controller or persists animation/variant state. Cold-load/resume production is never replayed as historical strikes.
 - Animated-site resource HP and strike-damage labels are transient visual-layer state driven by the existing valid-contact latch; they never feed persistence or production.
