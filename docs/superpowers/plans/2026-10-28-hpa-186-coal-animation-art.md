@@ -11,7 +11,7 @@
 
 | Existing part | Decision |
 | --- | --- |
-| `assets/images/mining/nodes/coal.png` | **REUSE** as the **only authoritative S1 plate** and canonical camera/footprint. Recheck its SHA-256 and bbox locally before editing. Re-encoded losslessly at delivery so the whole family shares one export profile; pixels unchanged. |
+| `assets/images/mining/nodes/coal.png` | **REUSE** as the **only authoritative S1 plate** and canonical camera/footprint. Recheck its SHA-256 and bbox locally before editing. Finished once at delivery: an intentional tiny alpha cleanup (detached stray-alpha px outside the deposit zeroed) plus re-encode onto the family's single export profile, done **before** S1/idle-01 are byte-copied from it so all three stay byte-identical. |
 | HPA-404 water-ice frame workflow / PR #39 | **REUSE** the reference-edit → owner review → remaining frames → copied endpoints → preview pattern |
 | `MiningDepositFrames` file naming and 15-frame sequence | **REUSE**; don't modify the enum until HPA-266 |
 | `AnimatedMiningGridVisualLayer`, Mine Site and shell | **LEAVE UNCHANGED**; HPA-266 owns the two-line wiring and tests |
@@ -53,9 +53,9 @@ Check the 4 px alpha > 16 bbox tolerance on stage/idle/exhaust left/right/bottom
 
 **Gate:** Exactly 11 **generated** images approved as a coherent sequence.
 
-## Task 4 — Make four exact copies and validate the full set
+## Task 4 — Finish canonical sources, make four exact copies, and validate the full set
 
-Copy bytes, do not re-render or re-encode:
+Finish every copy source **before** copying: the canonical `coal.png` stray-alpha cleanup and single-profile export re-encode must already be done (likewise any touch-up to S3/S4), so `coal.png`, S1 and idle 01 end up byte-identical. Then copy bytes, do not re-render or re-encode:
 
 ```sh
 cd assets/images/mining/nodes
@@ -71,7 +71,7 @@ Validate locally (no validation scripts committed):
 2. Each image decodes as a **512×512 RGBA PNG**, with transparent outside pixels. A baked checkerboard **fails review and must be re-edited**, not flood-filled or recolored.
 3. SHA-256 byte equality for `coal.png` ↔ S1 ↔ idle-01, S3 ↔ exhaust-01, and S4 ↔ exhaust-04.
 4. Generate a **15-row alpha > 16 bounding-box table** (left/top/right/bottom). Anchor to the remeasured S1 bbox (review observed `(28, 26, 486, 486)`). For stage/idle/exhaust, left/right/bottom must each be within **4 px** of S1; top may recede but must never rise more than 4 px above the previous frame in the stage or exhaust order (measured on the largest connected silhouette component, so airborne chips do not register). For hits, left may extend for chips/soot, but right/bottom remain within tolerance and a transparent overlay must prove the stationary rock base aligns. Re-edit any failures. Paste the table into the PR description.
-5. Compare superimposed stages and idle/hit/exhaust transitions to catch visual jitter, verify **plate-drawing continuity** across consecutive depletion/exhaust frames (one shared rock drawing, not just silhouette), confirm each idle frame's apparent brightness stays inside the family envelope, and inspect all frames on light and dark backgrounds for halos, transparency damage, illegible soot, or baked checkerboard. Normalize export metadata so the family shares one pipeline profile; `coal.png` is re-encoded once, losslessly, for the same reason.
+5. Compare superimposed stages and idle/hit/exhaust transitions to catch visual jitter, verify **plate-drawing continuity** across consecutive depletion/exhaust frames (one shared rock drawing, not just silhouette), confirm each idle frame's apparent brightness stays inside the family envelope, and inspect all frames on light and dark backgrounds for halos, transparency damage, illegible soot, or baked checkerboard. Normalize export metadata so the family shares one pipeline profile; the canonical `coal.png` stray-alpha cleanup and re-encode already ran **before** this task's byte copies, so S1/idle-01 match it exactly.
 
 Helpful read-only spot checks:
 
@@ -133,7 +133,7 @@ Check the resulting component boxes against the remeasured S1 anchor; do not add
    flutter test test/mining/presentation/mining_visuals_test.dart --plain-name 'every mining visual resolves with its authored dimensions'
    ```
 
-   **Do not claim the entire test file is green:** its existing closed-switch test still expects Carbon Ridge to be static until HPA-266 updates that assertion. Ensure the temporary Dart edits are the only local source changes before restoring exactly `lib/mining/presentation/mining_visuals.dart` (e.g. `git restore -- lib/mining/presentation/mining_visuals.dart` on a clean source checkout). Do **not** run a broad `git checkout lib/` that could discard unrelated work. Verify the final changed-file list has only the two planning docs and 15 PNGs.
+   **Do not claim the entire test file is green:** its existing closed-switch test still expects Carbon Ridge to be static until HPA-266 updates that assertion. Ensure the temporary Dart edits are the only local source changes before restoring exactly `lib/mining/presentation/mining_visuals.dart` (e.g. `git restore -- lib/mining/presentation/mining_visuals.dart` on a clean source checkout). Do **not** run a broad `git checkout lib/` that could discard unrelated work. Verify the final changed-file list has only the two planning docs and 16 PNG paths — the 15 frames plus the disclosed canonical `coal.png` cleanup/re-encode.
 3. Append the approved 15 PNGs to **this same PR**. Record SHA-256 copy checks, the **15-row bbox table**, focused test results, and contact-sheet/GIF/real-renderer screenshot locations in the PR description; don't commit previews, local scripts, or temporary Dart edits.
 4. Get the owner's explicit visual sign-off. **Keep both planning documents and the 15 approved PNGs in this same PR through merge**; the final diff contains no Dart, tests, scripts, audio, asset-manifest changes or draft art.
 5. Only after merge, start HPA-266 from up-to-date `main` for the permanent `MiningDepositFrames.coal` and closed-switch case, tests and docs. **Generalize** `mining_visuals_test.dart`'s current water-ice-only byte-copy check across all animated `MiningSiteId.values.where((id) => MiningVisuals.depositFramesFor(id) != null)` using `content.site(id).depositAsset` as the S1 source; likewise replace the two hard-coded family `hasLength(15)` assertions with a loop over `MiningDepositFrames.values`. HPA-266 must **not** generate or modify this art.

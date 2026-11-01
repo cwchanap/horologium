@@ -29,7 +29,7 @@ All files go directly under `assets/images/mining/nodes/`. Each must be a **512�
 | Exhaust (4) | `node-coal-exhaust-01.png` to `node-coal-exhaust-04.png` | Exhaust 01 copies S3 exactly, exhaust 04 copies S4 exactly. Frames 02–03 progressively crumble the remaining coal into S4 on the same plate drawing — exhaust 02 must visibly remove a real share of S3's remaining coal, not pass through unchanged. |
 
 **11 generated/edit frames:** S2–S4 (3), idle 02–04 (3), hit 01–03 (3), exhaust 02–03 (2).
-**4 copied frames:** S1 and idle 01 from `coal.png`; exhaust 01 from S3; exhaust 04 from S4. Total: **15 PNGs**. `coal.png` itself is re-encoded once, losslessly, at delivery so the whole family shares one export profile; its pixels do not change and it stays the authoritative S1 plate.
+**4 copied frames:** S1 and idle 01 from `coal.png`; exhaust 01 from S3; exhaust 04 from S4. Total: **15 PNGs**. `coal.png` itself is finished once at delivery — an intentional tiny alpha cleanup zeroes detached stray-alpha pixels outside the deposit (51 px), then it is re-encoded onto the family's single export profile — and it stays the authoritative S1 plate. The S1/idle-01 copies run after that finish, so the final `coal.png`, S1 and idle 01 are byte-identical to each other.
 
 ## Art direction and invariants
 
@@ -48,7 +48,7 @@ All files go directly under `assets/images/mining/nodes/`. Each must be a **512�
 1. Approve the first batch **S2, S3, S4 and Hit 01** against the original coal plate before generating the rest.
 2. Review a 15-frame contact sheet at actual in-game scale, an idle/hit loop GIF, and a **screenshot from the actual Carbon Ridge Flutter renderer** with the new assets temporarily wired in locally. Store drafts, reference plates, and previews in the project files, **not** in the game repository.
 3. Confirm all 15 names, 512×512 dimensions, RGBA format, transparent edges, the recorded 15-frame bbox table and tolerance, visually stable rock base, the four byte-identical copy relationships, plate-drawing continuity across consecutive stage/exhaust frames, and a single export-metadata profile across the family.
-4. Verify no additional PNGs beyond the 15 frames plus the disclosed lossless `coal.png` re-encode, and no scripts, test changes, runtime changes, or asset-manifest edits are in the art implementation diff.
+4. Verify no additional PNGs beyond the 15 frames plus the disclosed canonical `coal.png` cleanup and re-encode, and no scripts, test changes, runtime changes, or asset-manifest edits are in the art implementation diff.
 5. Obtain explicit owner approval on this PR; only then merge. HPA-266 begins implementation once these files are on `main`.
 
 ## Risks and mitigations
