@@ -226,8 +226,6 @@ final _carbonRidgeCell = deployableMiningCells(
   MiningContentRegistry.stellarMining().site(MiningSiteId.carbonRidge),
 ).first;
 
-/// Homeworld active, Carbon Ridge unlocked and commissioned, with one T1 rig
-/// mining from [_carbonRidgeCell].
 MiningSave deployedCarbonRidgeState(DateTime now) {
   final base = MiningSave.initial(nowUtc: now);
   return base.copyWith(

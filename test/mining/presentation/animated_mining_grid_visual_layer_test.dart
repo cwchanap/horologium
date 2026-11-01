@@ -222,6 +222,21 @@ Transform _robotArmTransform(WidgetTester tester, MiningGridCell cell) =>
       find.byKey(Key('landing-basin-robot-arm-transform-${cell.x}-${cell.y}')),
     );
 
+final _frozen = _content.site(MiningSiteId.frozenBasin);
+
+/// Frozen Basin's first progression resources need Surveying 3.
+const _frozenSurveying = 3;
+
+/// First legal Frozen Basin cell at Surveying 3 and the resource it mines.
+final _frozenCell = deployableMiningCells(
+  _frozen,
+  surveyingLevel: _frozenSurveying,
+).first;
+final _frozenDeposit = uniqueAdjacentDeposit(
+  deposits: _frozen.deposits,
+  cell: _frozenCell,
+)!;
+
 MineSiteView _animatedSiteView(MiningSiteId siteId, {double progress = 0}) {
   final site = _content.site(siteId);
   final placements = [
@@ -972,13 +987,12 @@ void main() {
   )) {
     group(_content.site(siteId).name, () {
       final site = _content.site(siteId);
-      // First legal cell at the site's first progression Surveying level and
-      // the resource it mines.
-      final cell = firstPlayableCell(site);
-      final deposit = uniqueAdjacentDeposit(
-        deposits: site.deposits,
-        cell: cell,
-      )!;
+      final cell = siteId == MiningSiteId.frozenBasin
+          ? _frozenCell
+          : firstPlayableCell(site);
+      final deposit = siteId == MiningSiteId.frozenBasin
+          ? _frozenDeposit
+          : uniqueAdjacentDeposit(deposits: site.deposits, cell: cell)!;
       final frames = MiningVisuals.depositFramesFor(siteId)!;
       final prefix = MiningVisuals.siteKeyPrefix(siteId);
 
