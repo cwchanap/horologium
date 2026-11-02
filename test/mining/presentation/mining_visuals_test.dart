@@ -8,9 +8,13 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
+import '../../support/mining_visual_frames.dart';
+
 Future<ui.Image> _decodeAsset(String path) async {
   final bytes = await rootBundle.load(path);
-  final codec = await ui.instantiateImageCodec(bytes.buffer.asUint8List());
+  final codec = await ui.instantiateImageCodec(
+    bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
+  );
   final frame = await codec.getNextFrame();
   final image = frame.image;
   codec.dispose();
@@ -192,11 +196,13 @@ void main() {
   // Same host-only reason as above. The copied animated-site frames must stay
   // byte-identical to their sources so the stage and beat edges never pop.
   testWidgets('animated copy frames match their source plates', (tester) async {
-    Future<List<int>> bytes(String path) async =>
-        (await rootBundle.load(path)).buffer.asUint8List();
-    for (final id in MiningSiteId.values) {
-      final frames = MiningVisuals.depositFramesFor(id);
-      if (frames == null) continue;
+    Future<List<int>> bytes(String path) async {
+      final data = await rootBundle.load(path);
+      return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    }
+
+    for (final id in animatedMiningSiteIds) {
+      final frames = MiningVisuals.depositFramesFor(id)!;
       final source = await bytes(content.site(id).depositAsset);
       expect(await bytes(frames.stage(1)), source, reason: '${id.name} s1');
       expect(await bytes(frames.idle(1)), source, reason: '${id.name} idle-01');

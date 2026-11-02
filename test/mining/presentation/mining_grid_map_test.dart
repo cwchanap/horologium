@@ -8,9 +8,10 @@ import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_grid_map.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
+import '../../support/mining_visual_frames.dart';
+
 final _content = MiningContentRegistry.stellarMining();
 final _start = DateTime.utc(2026, 8, 26, 12);
-const _staticSite = MiningSiteId.graniteCrater;
 
 MineSiteView _view(
   MiningSiteId siteId, {
@@ -60,6 +61,10 @@ Future<void> _pumpMap(
 }
 
 void main() {
+  test('the shared static fixture site is not animated', () {
+    expect(MiningVisuals.depositFramesFor(staticMiningSiteId), isNull);
+  });
+
   testWidgets(
     'maps taps through the transform and hosts one Landing object layer',
     (tester) async {
@@ -106,7 +111,7 @@ void main() {
   testWidgets('renders exactly 100 resource images on a static site', (
     tester,
   ) async {
-    final view = _view(_staticSite);
+    final view = _view(staticMiningSiteId);
     await _pumpMap(tester, view, (_) {});
 
     expect(view.deposits.length, 100);
@@ -123,7 +128,7 @@ void main() {
   testWidgets('dims unsurveyed resources, keeps surveyed art full', (
     tester,
   ) async {
-    final view = _view(_staticSite);
+    final view = _view(staticMiningSiteId);
     await _pumpMap(tester, view, (_) {});
 
     // Granite Crater progression levels are 0,1,2,3: at Surveying 0 the
@@ -157,8 +162,16 @@ void main() {
   testWidgets('hosts each keyed animated layer and no static layer', (
     tester,
   ) async {
-    for (final id in MiningSiteId.values) {
-      if (MiningVisuals.depositFramesFor(id) == null) continue;
+    // The loop below derives expected keys with the same siteKeyPrefix
+    // production uses, so it cannot catch a prefix regression. This literal
+    // key pins the contract.
+    await _pumpMap(tester, _view(MiningSiteId.carbonRidge), (_) {});
+    expect(
+      find.byKey(const Key('carbon-ridge-grid-visual-layer')),
+      findsOneWidget,
+    );
+
+    for (final id in animatedMiningSiteIds) {
       await _pumpMap(tester, _view(id), (_) {});
 
       expect(
@@ -179,26 +192,23 @@ void main() {
     tester,
   ) async {
     final taps = <MiningGridCell>[];
-    final view = _view(_staticSite);
+    final view = _view(staticMiningSiteId);
     await _pumpMap(tester, view, taps.add);
 
     expect(
       find.byKey(const Key('static-mining-grid-visual-layer')),
       findsOneWidget,
     );
-    for (final id in MiningSiteId.values) {
-      if (MiningVisuals.depositFramesFor(id) == null) continue;
+    for (final id in animatedMiningSiteIds) {
       expect(
         find.byKey(Key('${MiningVisuals.siteKeyPrefix(id)}-grid-visual-layer')),
         findsNothing,
         reason: id.name,
       );
     }
-    final first = view.deposits.first.definition;
-    expect(
-      find.byKey(Key('mining-deposit-${first.x}-${first.y}-${first.size}')),
-      findsOneWidget,
-    );
+    // Granite Crater's first generated deposit is a 2x2 at (1,2); a literal
+    // key keeps this overlay check able to fail.
+    expect(find.byKey(const Key('mining-deposit-1-2-2')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -214,7 +224,7 @@ void main() {
   testWidgets('tiles the cavern background instead of stretching it', (
     tester,
   ) async {
-    final view = _view(_staticSite);
+    final view = _view(staticMiningSiteId);
     await _pumpMap(tester, view, (_) {});
 
     final background = tester.widget<Image>(

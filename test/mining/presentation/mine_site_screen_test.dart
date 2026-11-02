@@ -18,7 +18,6 @@ import '../../support/mining_visual_frames.dart';
 
 final _start = DateTime.utc(2026, 8, 26, 12);
 final _content = MiningContentRegistry.stellarMining();
-const _staticSite = MiningSiteId.graniteCrater;
 final _landingDefinition = _content.site(MiningSiteId.landingBasin);
 final _landingRigCells = deployableMiningCells(_landingDefinition);
 
@@ -266,19 +265,19 @@ void main() {
     final state = initial.copyWith(
       sites: {
         ...initial.sites,
-        _staticSite: _progress(
+        staticMiningSiteId: _progress(
           unlocked: true,
           commissioned: true,
           rigs: [
             MiningRigPlacement(
               tier: RigTier.t1,
-              cell: firstPlayableCell(_content.site(_staticSite)),
+              cell: firstPlayableCell(_content.site(staticMiningSiteId)),
             ),
           ],
         ),
       },
     );
-    final view = _siteView(state, siteId: _staticSite);
+    final view = _siteView(state, siteId: staticMiningSiteId);
     await _pumpMineSite(
       tester,
       impactSequence: 1,
@@ -286,8 +285,7 @@ void main() {
       dock: _dockView(state),
     );
 
-    for (final id in MiningSiteId.values) {
-      if (MiningVisuals.depositFramesFor(id) == null) continue;
+    for (final id in animatedMiningSiteIds) {
       expect(
         find.byKey(Key('${MiningVisuals.siteKeyPrefix(id)}-grid-visual-layer')),
         findsNothing,

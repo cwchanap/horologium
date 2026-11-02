@@ -321,6 +321,7 @@ class _AnimatedMiningGridVisualLayerState
             height: depositVisualSize(deposit.definition.size),
             fit: BoxFit.contain,
             gaplessPlayback: true,
+            errorBuilder: (context, error, stackTrace) => const SizedBox(),
             // Mined art stays full; surveyed-but-unmined dims; unsurveyed
             // dims further so locked resources read differently from
             // surveyed peers without floating lock badges.
@@ -518,6 +519,7 @@ class _AnimatedMiningGridVisualLayerState
                 MiningVisuals.miningRobotBodyAsset(rig.placement.tier),
                 width: cell + 12,
                 height: cell + 12,
+                errorBuilder: (context, error, stackTrace) => const SizedBox(),
               ),
             ),
             Transform.rotate(
@@ -528,6 +530,7 @@ class _AnimatedMiningGridVisualLayerState
                 MiningVisuals.miningRobotArmAsset(rig.placement.tier),
                 width: cell + 12,
                 height: cell + 12,
+                errorBuilder: (context, error, stackTrace) => const SizedBox(),
               ),
             ),
           ],
