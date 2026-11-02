@@ -222,8 +222,9 @@ Transform _robotArmTransform(WidgetTester tester, MiningGridCell cell) =>
       find.byKey(Key('landing-basin-robot-arm-transform-${cell.x}-${cell.y}')),
     );
 
-/// Frozen Basin's first progression resources need Surveying 3.
-/// First legal Frozen Basin cell at Surveying 3 and the resource it mines.
+/// A commissioned view of [siteId] at [progress] with one T1 rig on the
+/// site's first legal cell at its first playable Surveying level (the first
+/// progression resource's requirement).
 MineSiteView _animatedSiteView(MiningSiteId siteId, {double progress = 0}) {
   final site = _content.site(siteId);
   final placements = [
@@ -967,11 +968,7 @@ void main() {
     }, skip: kIsWeb);
   });
 
-  for (final siteId in MiningSiteId.values.where(
-    (id) =>
-        id != MiningSiteId.landingBasin &&
-        MiningVisuals.depositFramesFor(id) != null,
-  )) {
+  for (final siteId in animatedMiningSiteIds) {
     group(_content.site(siteId).name, () {
       final site = _content.site(siteId);
       final cell = firstPlayableCell(site);

@@ -2054,39 +2054,6 @@ void main() {
     );
   });
 
-  testWidgets('a visible Landing Basin strike plays the mining cue', (
-    tester,
-  ) async {
-    final clock = TestClock(_start);
-    final repository = CountingMiningSaveRepository();
-    await repository.save(deployedLandingBasin(clock.now));
-    final effects = FakeBackgroundMusicPlayer();
-    final audio = AudioManager(
-      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
-      soundEffectPlayer: effects,
-    );
-    addTearDown(audio.dispose);
-    await warmDepositFrames(tester, MiningDepositFrames.gold);
-    await pumpShell(
-      tester,
-      repository: repository,
-      clock: clock,
-      audioManager: audio,
-    );
-    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
-    await tester.pump();
-
-    await pumpMiningTick(tester, clock);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-
-    expect(effects.playedAssets, [
-      'audio/tap.wav',
-      'audio/tap.wav',
-      'audio/mining.wav',
-    ]);
-  }, skip: kIsWeb);
-
   group('animated site impacts', () {
     int impactSequence(WidgetTester tester) => tester
         .widget<MineSiteScreen>(find.byType(MineSiteScreen))
@@ -2097,18 +2064,25 @@ void main() {
       await tester.pump();
     }
 
-    for (final (siteId, saveBuilder)
-        in <(MiningSiteId, MiningSave Function(DateTime))>[
-          (MiningSiteId.frozenBasin, deployedFrozenBasinState),
-          (MiningSiteId.carbonRidge, deployedCarbonRidgeState),
-        ]) {
+    /// The deployed save builder per animated site. A closed switch keeps
+    /// this loud: a newly animated site without a builder throws instead of
+    /// silently losing strike and sound coverage.
+    MiningSave Function(DateTime) deployedSaveFor(MiningSiteId siteId) =>
+        switch (siteId) {
+          MiningSiteId.landingBasin => deployedLandingBasin,
+          MiningSiteId.frozenBasin => deployedFrozenBasinState,
+          MiningSiteId.carbonRidge => deployedCarbonRidgeState,
+          _ => throw StateError('no deployed save builder for ${siteId.name}'),
+        };
+
+    for (final siteId in animatedMiningSiteIds) {
       testWidgets(
         'passive ${siteId.name} production strikes once and plays the mining '
         'cue',
         (tester) async {
           final clock = TestClock(_start);
           final repository = CountingMiningSaveRepository();
-          await repository.save(saveBuilder(clock.now));
+          await repository.save(deployedSaveFor(siteId)(clock.now));
           final effects = FakeBackgroundMusicPlayer();
           final audio = AudioManager(
             backgroundMusicPlayer: FakeBackgroundMusicPlayer(),

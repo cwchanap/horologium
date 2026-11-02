@@ -9,7 +9,7 @@
 
 ## Problem
 
-Landing Basin and Frozen Basin animate; the other ten sites are still. Carbon Ridge is the second site every player opens, a few minutes into the game, and every relaunch (HPA-427) replays it. Right after the opening site comes alive, the next one goes still.
+Landing Basin and Frozen Basin animated; the other ten sites were still. Carbon Ridge is the second site every player opens, a few minutes into the game, and every relaunch (HPA-427) replays it. Right after the opening site came alive, the next one went still.
 
 ## Goal
 
@@ -56,7 +56,7 @@ The coal family is **already on `main`** from HPA-186: 15 `node-coal-…` PNGs, 
 - **Mine Site:** Move the existing static-deposit/rig test to Granite Crater, rename it from 'non-gold' to 'non-animated', and derive the T1 rig's legal perimeter cell with `firstPlayableCell(_content.site(_staticSite))` instead of reusing Carbon Ridge's hard-coded `(5,1)` cell. Check absence of animated keys using the switch-derived site list.
 - **Shell:** Turn only the existing Frozen Basin *successful foreground strike + `audio/mining.wav`* test into a two-row test table (Frozen Basin and Carbon Ridge). Supply a per-site save builder so Lunar Frontier is active for Frozen Basin and Homeworld for Carbon Ridge. The existing closed/unrigged/full/resume checks already exercise the shared shell gates; do not clone those negative tests.
 - **Documentation:** `CLAUDE.md` and `docs/audio-assets.md` reference the non-null `MiningVisuals.depositFramesFor` source of truth rather than hard-coded site lists.
-- **Goldens:** Keep `visual_parity_golden_test` unchanged; it renders Landing Basin only. The spec stays `Proposed` until production and test changes actually pass; mark it `Implemented` only then.
+- **Goldens:** Keep `visual_parity_golden_test` unchanged; it renders Landing Basin only. The spec moved to `Implemented` once production and test changes passed.
 
 ## Risks
 
@@ -67,4 +67,4 @@ The coal family is **already on `main`** from HPA-186: 15 `node-coal-…` PNGs, 
 
 ## Assets
 
-None generated or modified here. The 15 coal frames were merged in HPA-186 / PR #50. A single existing draft PR [#44](https://github.com/cwchanap/horologium/pull/44) will carry this refreshed design, plan, and later runtime/test changes; no second PR for HPA-266.
+None generated or modified here. The 15 coal frames were merged in HPA-186 / PR #50. PR [#44](https://github.com/cwchanap/horologium/pull/44) carries this design, plan, and the runtime/test changes; no second PR for HPA-266.

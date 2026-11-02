@@ -6,7 +6,7 @@
 
 ## Delivery rule
 
-One ticket = **one PR**. [Draft PR #44](https://github.com/cwchanap/horologium/pull/44) is **open**; it was refreshed on `main` at `f0578fb` after HPA-186's art merged in [PR #50](https://github.com/cwchanap/horologium/pull/50). This document and the design spec are the planning changes; implementation and validation belong on **the same PR**, after review. If `main` advances, update the branch before coding. No second planning/implementation PR, no new art or SFX.
+One ticket = **one PR**. [PR #44](https://github.com/cwchanap/horologium/pull/44) is **open** and carries this plan, the design spec, and the implementation; it was refreshed on `main` at `f0578fb` after HPA-186's art merged in [PR #50](https://github.com/cwchanap/horologium/pull/50). No second planning/implementation PR, no new art or SFX.
 
 The 2026-10-31 plan review identified unnecessary per-site test duplication and a geometry-sensitive static fixture. The revised test plan below reuses the existing animated-site suites and derives site-specific facts from their actual definitions.
 
@@ -36,7 +36,7 @@ flutter test test/mining/presentation
 
 - `CLAUDE.md`: replace the hard-coded animated-site name list with an invariant: "A non-null `MiningVisuals.depositFramesFor` result identifies an approved animated mining site; other sites use the static layer."
 - `docs/audio-assets.md`: replace the hard-coded site list with "Visible strike on an animated site (as selected by `MiningVisuals.depositFramesFor`) at 46% of the shared impact timeline."
-- Leave the design `Status: Proposed` while this PR is docs-only; change to `Status: Implemented` **after** its implementation and required tests pass.
+- The design spec moved from `Status: Proposed` to `Status: Implemented` once its implementation and required tests passed.
 
 ```sh
 dart format --output=none --set-exit-if-changed .
@@ -51,12 +51,12 @@ flutter build ios --simulator --debug
 
 ## Expected changed paths
 
-Planning (updated on the existing open draft PR #44, based on current `main`):
+Planning (on PR #44, based on `main` at `f0578fb`):
 
 - `docs/superpowers/specs/2026-10-22-hpa-266-carbon-ridge-animation-design.md`
 - `docs/superpowers/plans/2026-10-22-hpa-266-carbon-ridge-animation.md`
 
-Implementation (same PR, after review):
+Implementation (same PR):
 
 - `lib/mining/presentation/mining_visuals.dart`
 - `test/mining/presentation/mining_visuals_test.dart`, `animated_mining_grid_visual_layer_test.dart`, `mining_grid_map_test.dart`, `mine_site_screen_test.dart`, `mining_shell_test.dart`
