@@ -697,6 +697,35 @@ void main() {
     skip: kIsWeb,
   );
 
+  // A settled-but-failed precache frees the latch, so a later impact retries
+  // the family inside its defer window instead of staying dropped until the
+  // site is reopened. The bundle fails the initial attempt, the first impact
+  // defers/retries/drops, the family warms out of band, and the next impact's
+  // retry resolves from the cache so that live pending impact fires — the
+  // earlier dropped impact is already discarded and never replays.
+  testWidgets('a failed precache retries on a later impact', (tester) async {
+    final bundle = _FlakyMiningArtBundle();
+    await _pumpLayer(tester, impactSequence: 0, assetBundle: bundle);
+    await tester.pump();
+
+    await _pumpLayer(tester, impactSequence: 1, assetBundle: bundle);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(_hpText(tester), '80/80');
+
+    bundle.failMining = false;
+    await tester.runAsync(() async {
+      final context = tester.element(
+        find.byType(AnimatedMiningGridVisualLayer),
+      );
+      for (final path in MiningDepositFrames.gold.all) {
+        await precacheImage(AssetImage(path), context);
+      }
+    });
+    await _pumpLayer(tester, impactSequence: 2, assetBundle: bundle);
+    await tester.pump(const Duration(milliseconds: 470));
+    expect(_hpText(tester), '70/80');
+  }, skip: kIsWeb);
+
   testWidgets(
     'reduced motion keeps the static stage and rig transforms fixed',
     (tester) async {
@@ -1184,6 +1213,20 @@ class _MissingMiningArtBundle extends CachingAssetBundle {
   @override
   Future<ByteData> load(String key) async {
     if (key.startsWith('assets/images/mining/')) {
+      throw FlutterError('Missing $key');
+    }
+    return rootBundle.load(key);
+  }
+}
+
+/// Mining image paths miss only while [failMining] holds, so a test can fail
+/// a precache attempt and then let a retry resolve the real art.
+class _FlakyMiningArtBundle extends CachingAssetBundle {
+  bool failMining = true;
+
+  @override
+  Future<ByteData> load(String key) async {
+    if (failMining && key.startsWith('assets/images/mining/')) {
       throw FlutterError('Missing $key');
     }
     return rootBundle.load(key);

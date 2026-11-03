@@ -95,6 +95,11 @@ class _AnimatedMiningGridVisualLayerState
   static const Duration _firstImpactDeferBudget = Duration(milliseconds: 200);
 
   int? _exhaustImpactSequence;
+
+  /// True while a precache attempt is in flight or has resolved ready. An
+  /// attempt that settles failed flips this back so a later dependency
+  /// change or deferred impact retries the family instead of leaving the
+  /// layer quiet until the site is reopened.
   bool _framesPrecached = false;
   bool _framesReady = false;
   int? _pendingImpactSequence;
@@ -185,13 +190,11 @@ class _AnimatedMiningGridVisualLayerState
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_framesPrecached) {
-      _framesPrecached = true;
-      _precacheFrames();
-    }
+    if (!_framesPrecached) _precacheFrames();
   }
 
   void _precacheFrames() {
+    _framesPrecached = true;
     final paths = widget.frames.all;
     final configuration = createLocalImageConfiguration(context);
     final providers = [for (final path in paths) AssetImage(path)];
@@ -219,7 +222,15 @@ class _AnimatedMiningGridVisualLayerState
     ]);
     unawaited(
       future.then((_) {
-        if (!mounted || _framesReady || failed) return;
+        if (!mounted || _framesReady) return;
+        if (failed) {
+          // Free the latch so a later dependency change or deferred impact
+          // retries the family: a transient failure does not disable the
+          // layer for the rest of the State's lifetime. Readiness stays
+          // false either way, so unresolved art still never fires.
+          _framesPrecached = false;
+          return;
+        }
         _framesReady = true;
         _flushPendingImpact();
       }),
@@ -273,6 +284,11 @@ class _AnimatedMiningGridVisualLayerState
       _exhaustImpactSequence = null;
       _impactController.value = 1;
     });
+    // A previous attempt that settled failed freed its latch: retry the
+    // family while this impact waits out its defer budget. A fast success
+    // flushes only this live pending sequence; impacts already dropped by
+    // the timer above stay dropped and never replay.
+    if (!_framesPrecached) _precacheFrames();
   }
 
   void _flushPendingImpact() {
