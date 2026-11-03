@@ -161,13 +161,31 @@ Future<void> _pumpLayer(
   await tester.pump();
 }
 
-/// Gives an in-flight decode attempt real event turns to resolve, deliver its
-/// error or frame, and run the layer's eviction/latch callbacks. Decode work
-/// never completes under fake-async pumps, so each corrupt attempt must drain
-/// here before the next step.
-Future<void> _drainDecodes(WidgetTester tester) => tester.runAsync(
-  () => Future<void>.delayed(const Duration(milliseconds: 200)),
-);
+/// Lets the layer's in-flight decode attempt actually settle before the next
+/// step: each frame path resolves to the same completer the attempt is
+/// driving, so precaching it here returns only after the codec delivered its
+/// error or frame, and the trailing event turn lets the layer's Future.wait
+/// continuation run its eviction/latch callbacks. A corrupt attempt still
+/// settles, just with a failure; the provider is evicted like the layer's own
+/// onError so the drain never leaves a failed completer pending for the
+/// retry. Decode work never completes under fake-async pumps, so each attempt
+/// must drain here before the bundle flips or HP is asserted.
+Future<void> _drainDecodes(WidgetTester tester) async {
+  final context = tester.element(find.byType(AnimatedMiningGridVisualLayer));
+  await tester.runAsync(() async {
+    for (final path in MiningDepositFrames.gold.all) {
+      final provider = AssetImage(path);
+      await precacheImage(
+        provider,
+        context,
+        onError: (error, stackTrace) {
+          provider.evict(configuration: createLocalImageConfiguration(context));
+        },
+      );
+    }
+    await Future<void>.delayed(Duration.zero);
+  });
+}
 
 Animation<double>? _depositOpacity(
   WidgetTester tester, [
