@@ -105,6 +105,19 @@ class _AnimatedMiningGridVisualLayerState
   int? _pendingImpactSequence;
   bool _pendingExhaust = false;
 
+  /// Counts settled-failed precache attempts the family has recovered from.
+  /// Keys every deposit frame [Image]: a mounted Image stays subscribed to
+  /// its failed completer because [Image.didUpdateWidget] re-resolves only
+  /// on provider inequality, and a rebuilt [AssetImage] of the same path is
+  /// value-equal, so recovery must hand each frame widget a new key to make
+  /// it subscribe to the valid completer.
+  int _frameEpoch = 0;
+
+  /// Whether the latest precache attempt settled failed. Gates
+  /// [_frameEpoch]: only a recovery remounts the frame widgets; the common
+  /// cold-decode settle leaves already-healthy Images on their streams.
+  bool _frameFamilyFailed = false;
+
   /// Single contact latch for the current impact timeline: opened by a real
   /// impact, closed by the first valid strike tick. Gates both the visible HP
   /// application and the SFX callback so one strike resolves exactly once.
@@ -204,8 +217,7 @@ class _AnimatedMiningGridVisualLayerState
     // [precacheImage] may not resolve during [tester.pump]; in production it
     // skips a redundant async round-trip when the cache is already warm.
     if (providers.every((p) => _isImageReady(p, configuration))) {
-      _framesReady = true;
-      _flushPendingImpact();
+      _markFramesReady();
       return;
     }
     // A missing or undecodable frame is not a stall: the family's
@@ -235,10 +247,10 @@ class _AnimatedMiningGridVisualLayerState
           // layer for the rest of the State's lifetime. Readiness stays
           // false either way, so unresolved art still never fires.
           _framesPrecached = false;
+          _frameFamilyFailed = true;
           return;
         }
-        _framesReady = true;
-        _flushPendingImpact();
+        _markFramesReady();
       }),
     );
   }
@@ -297,6 +309,22 @@ class _AnimatedMiningGridVisualLayerState
     if (!_framesPrecached) _precacheFrames();
   }
 
+  /// Marks the family decoded and replays a live pending impact. When the
+  /// family is recovering from a settled-failed attempt, also remounts the
+  /// frame Images under a new epoch key so they subscribe to the valid
+  /// completer — a same-provider rebuild would keep each mounted Image on
+  /// its errored stream (and its errorBuilder) indefinitely. The setState
+  /// rebuild covers the static AnimatedBuilder.child subtree, which never
+  /// recomposes on animation ticks.
+  void _markFramesReady() {
+    _framesReady = true;
+    if (_frameFamilyFailed) {
+      _frameFamilyFailed = false;
+      setState(() => _frameEpoch++);
+    }
+    _flushPendingImpact();
+  }
+
   void _flushPendingImpact() {
     final pending = _pendingImpactSequence;
     if (pending == null) return;
@@ -348,6 +376,7 @@ class _AnimatedMiningGridVisualLayerState
           alignment: Alignment.center,
           child: Image.asset(
             _depositAsset(deposit, t),
+            key: ValueKey('frame-$_frameEpoch'),
             width: depositVisualSize(deposit.definition.size),
             height: depositVisualSize(deposit.definition.size),
             fit: BoxFit.contain,
