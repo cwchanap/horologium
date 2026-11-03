@@ -778,6 +778,51 @@ void main() {
     skip: kIsWeb,
   );
 
+  // A mounted Image never leaves its errorBuilder on a plain rebuild:
+  // Image.didUpdateWidget re-resolves only on provider inequality and a
+  // rebuilt AssetImage of the same path is value-equal, so the recovered
+  // family must remount its frame widgets under the epoch key. Corrupt the
+  // family, let every deposit render its empty fallback, then serve valid
+  // bytes: after the retry settles, both the mined deposit (animated
+  // subtree) and an unmined one (the static AnimatedBuilder.child) draw real
+  // art again.
+  testWidgets(
+    'a recovered frame family remounts deposits out of the error fallback',
+    (tester) async {
+      final bundle = _CorruptMiningArtBundle();
+      await _pumpLayer(tester, impactSequence: 0, assetBundle: bundle);
+      await _drainDecodes(tester);
+      await tester.pump();
+
+      Finder rawImageIn(Key depositKey) => find.descendant(
+        of: find.byKey(depositKey),
+        matching: find.byType(RawImage),
+      );
+      Finder fallbackIn(Key depositKey) => find.descendant(
+        of: find.byKey(depositKey),
+        matching: find.byType(SizedBox),
+      );
+      expect(fallbackIn(_depositKey(_minedDeposit)), findsOneWidget);
+      expect(fallbackIn(_depositKey(_unminedDeposit)), findsOneWidget);
+      expect(rawImageIn(_depositKey(_minedDeposit)), findsNothing);
+      expect(rawImageIn(_depositKey(_unminedDeposit)), findsNothing);
+
+      bundle.corruptMining = false;
+      await _pumpLayer(tester, impactSequence: 1, assetBundle: bundle);
+      await _drainDecodes(tester);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 470));
+      expect(_hpText(tester), '70/80');
+      for (final deposit in [_minedDeposit, _unminedDeposit]) {
+        final rawImage = rawImageIn(_depositKey(deposit));
+        expect(rawImage, findsOneWidget, reason: '$deposit');
+        expect(tester.widget<RawImage>(rawImage).image, isNotNull);
+        expect(fallbackIn(_depositKey(deposit)), findsNothing);
+      }
+    },
+    skip: kIsWeb,
+  );
+
   testWidgets(
     'reduced motion keeps the static stage and rig transforms fixed',
     (tester) async {
