@@ -210,14 +210,20 @@ class _AnimatedMiningGridVisualLayerState
     }
     // A missing or undecodable frame is not a stall: the family's
     // errorBuilder fallbacks render while readiness stays false so impacts
-    // keep deferring instead of firing against unresolved art.
+    // keep deferring instead of firing against unresolved art. A decode
+    // failure leaves the provider's failed completer pending in the image
+    // cache, so evict it with the same configuration or every retry would
+    // resolve the same errored stream instead of reloading.
     var failed = false;
     final future = Future.wait([
       for (final p in providers)
         precacheImage(
           p,
           context,
-          onError: (Object _, StackTrace? _) => failed = true,
+          onError: (Object _, StackTrace? _) {
+            failed = true;
+            unawaited(p.evict(configuration: configuration));
+          },
         ),
     ]);
     unawaited(
