@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -131,6 +132,7 @@ Future<void> _pumpLayer(
   VoidCallback? onMiningImpact,
   bool reducedMotion = false,
   List<(RigTier, MiningGridCell)> rigs = const [],
+  AssetBundle? assetBundle,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(430, 932);
@@ -138,24 +140,24 @@ Future<void> _pumpLayer(
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
   });
-  await tester.pumpWidget(
-    MaterialApp(
-      home: AnimatedMiningGridVisualLayer(
-        view: _view(
-          rigTier: rigTier,
-          cell: cell,
-          withRig: withRig,
-          progress: progress,
-          rigs: rigs,
-        ),
-        frames: MiningDepositFrames.gold,
-        impactSequence: impactSequence,
-        onMiningImpact: onMiningImpact,
-        reducedMotion: reducedMotion,
-        cellSize: 56,
-      ),
+  Widget home = AnimatedMiningGridVisualLayer(
+    view: _view(
+      rigTier: rigTier,
+      cell: cell,
+      withRig: withRig,
+      progress: progress,
+      rigs: rigs,
     ),
+    frames: MiningDepositFrames.gold,
+    impactSequence: impactSequence,
+    onMiningImpact: onMiningImpact,
+    reducedMotion: reducedMotion,
+    cellSize: 56,
   );
+  if (assetBundle != null) {
+    home = DefaultAssetBundle(bundle: assetBundle, child: home);
+  }
+  await tester.pumpWidget(MaterialApp(home: home));
   await tester.pump();
 }
 
@@ -648,6 +650,53 @@ void main() {
     },
   );
 
+  // Missing art degrades to the errorBuilder's empty box per image — the
+  // grid keeps its deposits and rigs laid out and nothing reports an error.
+  testWidgets(
+    'renders empty fallbacks when deposit and robot art cannot load',
+    (tester) async {
+      await _pumpLayer(
+        tester,
+        reducedMotion: true,
+        assetBundle: _MissingMiningArtBundle(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(
+        find.descendant(
+          of: find.byKey(_depositKey(_minedDeposit)),
+          matching: find.byType(SizedBox),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(_depositKey(_unminedDeposit)),
+          matching: find.byType(SizedBox),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(Key('landing-basin-robot-body-transform-2-3')),
+          matching: find.byType(SizedBox),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(Key('landing-basin-robot-arm-transform-2-3')),
+          matching: find.byType(SizedBox),
+        ),
+        findsOneWidget,
+      );
+    },
+    // A failing asset bundle needs the VM image path; web loads images by
+    // URL and never asks the bundle.
+    skip: kIsWeb,
+  );
+
   testWidgets(
     'reduced motion keeps the static stage and rig transforms fixed',
     (tester) async {
@@ -1126,5 +1175,17 @@ void main() {
         expect(arm(), equals(rest));
       });
     });
+  }
+}
+
+/// Every mining image path misses, so each animated-layer [Image.asset]
+/// resolves through its errorBuilder instead of decoded art.
+class _MissingMiningArtBundle extends CachingAssetBundle {
+  @override
+  Future<ByteData> load(String key) async {
+    if (key.startsWith('assets/images/mining/')) {
+      throw FlutterError('Missing $key');
+    }
+    return rootBundle.load(key);
   }
 }
