@@ -19,14 +19,13 @@
 
 Do not introduce an art registry, additional renderer, new Dart code, tests, SFX or scripts. Only the two planning files and seven PNGs should be changed in the final diff. Store raw generators' outputs and review previews outside git.
 
-## Task 1 — Inspect references and lock the art brief
+## Task 1 — Measure reference art (no separate approval gate)
 
-1. Check out this PR's branch on the art-capable environment. Inspect Mars planet, cobalt cavern and cobalt node visually **side by side**, including their camera/scale, background colors, edges and in-game usage. Verify image sizes and channel modes locally.
-2. Confirm the HPA-262 names are still `io_frontier`, `sulfur`, `cinnabar` and `osmium`. If content names need to change, settle that before generation; do not create aliases.
-3. Lock the seven outputs and sizes from the design. Note especially that **Mars is 640×640 RGBA** and the planet-size target is *not* Ceres' 512×512; caverns target **800×1200 RGB** and nodes **512×512 RGBA**.
-4. Prefer reference-guided generation/editing using those images directly. The existing HPA-87 issue suggests the owner's Mac remote-control/Codex workflow; use it if available. No new image-generation infrastructure is part of this PR.
+1. Check out this PR's branch in an art-capable environment. Inspect Mars planet, cobalt cavern and cobalt node side by side, measuring their sizes/modes and alpha >16 bounding boxes or cavern edge-wrap (first/last rows and columns). Compare against the ranges in the design; these are the existing visual contracts, not a new renderer.
+2. The HPA-262 names and the seven output paths are already agreed in the ticket and this draft PR: `io_frontier`, `sulfur`, `cinnabar`, `osmium`. Do not create aliases. If the ticket changes names, align them before rendering.
+3. **Edit the existing reference art by default:** Mars planet → Io globe; cobalt cavern → three Io caverns; cobalt node → three Io nodes. Preserve camera, edge wrap, composition and footprint. Resort to fresh generation only when edits cannot achieve the material. The existing owner-Mac/Codex art workflow can be reused without adding tools to the repo.
 
-**Gate:** owner accepts the visual brief and exact filenames. No code change.
+No redundant Task 1 owner-approval gate; this plan review already approves the brief. The pilot and full-set art reviews remain separate.
 
 ## Task 2 — Generate a three-image style pilot
 
@@ -36,7 +35,7 @@ Generate and present (off-repository previews):
 - `assets/images/mining/caverns/sulfur.png` — 800×1200 opaque Sulfur Flats floor / edge walls, matched to cobalt's camera.
 - `assets/images/mining/nodes/sulfur.png` — a single bright yellow sulfur deposit, 512×512 RGBA with cobalt's footprint.
 
-Compare the trio against the actual family references: they should share one warm palette, the cavern should tile without looking like many tiny rooms, and the transparent deposit should be readable over its cavern at mobile scale. Reject/re-edit mismatched perspective, transparency checkerboard, overly cluttered floor, illegible highlights or sprite clipping. Obtain a quick owner direction check before generating the other four (avoids seven inconsistent outputs).
+Use reference-guided **edits**, not independent redraws by default. Compare the trio against the shipped families (especially gold, iron and silica as palette neighbours): sulfur needs steam/crystal habit/charcoal basalt to differ from gold. Ensure sulfur mineral reads on side walls in the y≈400–800 source band used by the center-cropped Site Deck card. Preview the node at **22, 30, 80, 120 and 168 px**, and the planet at **34 px**; inspect the cavern in the actual card crop and as native-size repeated tiles. Reject/re-edit mismatched perspective, baked checkerboard, cluttered floor, weak edge wrap, illegible highlights or clipped sprites. Obtain a quick owner pilot direction check before generating the other four (avoids seven inconsistent outputs).
 
 **Gate:** the pilot anchors the planet style, cavern composition, deposit geometry and alpha quality.
 
@@ -49,17 +48,17 @@ Using the approved pilot *and the original family references*, generate:
 - `assets/images/mining/nodes/cinnabar.png` — single red crystal cluster on transparent ground with the same size/anchor as sulfur.
 - `assets/images/mining/nodes/osmium.png` — single blue-grey metal deposit on transparent ground with the same size/anchor as sulfur.
 
-Preserve the **identical cavern camera and deposit footprint** across sites. A different palette/material is desired; a different visual system is not. No animated variants. Work with temporary local assets until accepted; commit only final output PNGs.
+Preserve the **identical cavern camera, card-visible middle-band minerals and deposit footprint** across sites. Compare red Cinnabar against existing `iron_ore.png` and the orange `silica.png`; compare sulfur against existing `gold.png`. Make the dark Osmium scene readable at the Site Deck's **0.48 locked opacity**. A different palette/material is desired; a different visual system is not. No animated variants. Work with temporary local assets until accepted; commit only final output PNGs.
 
 **Gate:** all seven final images visually coherent, with a labeled contact sheet and side-by-side family comparison outside the repository.
 
-## Task 4 — Local asset checks and real-size previews
+## Task 4 — Local asset checks and render-path previews
 
-Run a throwaway local check (do not commit this script) with Pillow:
+Run this **throwaway** local Pillow check (do not commit the script). The alpha >16 bbox ranges follow the shipped families, and the cavern edge threshold follows the existing edge-wrap measurements, rather than introducing new production checks:
 
 ```python
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageChops, ImageStat
 
 base = Path("assets/images/mining")
 expected = {
@@ -71,29 +70,51 @@ expected = {
     "nodes/cinnabar.png": ((512, 512), "RGBA"),
     "nodes/osmium.png": ((512, 512), "RGBA"),
 }
+# (left, top, right, bottom), Pillow right/bottom exclusive.
+node_envelope = ((40, 61), (4, 19), (454, 475), (495, 509))
+planet_envelope = ((17, 26), (13, 25), (614, 624), (607, 620))
+
+def seam(a, b):
+    return sum(ImageStat.Stat(ImageChops.difference(a, b)).mean) / 3
+
 for relative, (size, mode) in expected.items():
     with Image.open(base / relative) as image:
         assert image.format == "PNG", relative
         assert image.size == size and image.mode == mode, relative
         if mode == "RGBA":
-            assert image.getpixel((0, 0))[3] == 0, relative
-print("Seven Io PNG files have the intended sizes/modes.")
+            bbox = image.getchannel("A").point(
+                lambda a: 255 if a > 16 else 0
+            ).getbbox()
+            assert bbox is not None, relative
+            envelope = planet_envelope if relative.startswith("planets/") else node_envelope
+            assert all(lo <= value <= hi for value, (lo, hi) in zip(bbox, envelope)), (relative, bbox)
+            print(relative, "alpha>16 bbox", bbox)
+        else:
+            w, h = image.size
+            left = image.crop((0, 0, 1, h))
+            right = image.crop((w - 1, 0, w, h))
+            top = image.crop((0, 0, w, 1))
+            bottom = image.crop((0, h - 1, w, h))
+            assert seam(left, right) <= 12, (relative, "horizontal wrap")
+            assert seam(top, bottom) <= 12, (relative, "vertical wrap")
+print("Seven Io PNGs passed size, mode, footprint and edge-wrap checks.")
 ```
 
-Then manually verify:
+Then verify visually, using the **actual Flutter render dimensions** from `mining_grid_map.dart`, `site_deck_screen.dart` and `stellar_map_screen.dart`:
 
-1. Genuine transparent surrounds on planet/nodes against both white and dark UI backgrounds; no black or checkerboard squares or edge halos. If normalization is needed, limit it to **edge-connected checkerboard background** and inspect the preserved sprite; otherwise re-edit.
-2. Cavern renders are fully opaque, their center is not overfilled, and an **800×1200 repeated-tile preview** does not form checkerboard seams or dozens of miniature rooms.
-3. Compare node-on-cavern composites and each asset at approximate game display size. Distinct yellow / crimson / blue-grey mineral identities, no unreadable dark-on-dark osmium.
-4. Create a seven-image contact sheet and at least one repeat preview per cavern. Keep contact sheet, intermediate generations, and composites in project files or review attachments, **not** in the source tree.
-5. Confirm only seven expected **production** images were added; no pre-existing reference PNG was overwritten.
+1. For planet and nodes, confirm true alpha over white and dark UI backgrounds, no jagged edge halos, baked checkerboard or destroyed mineral highlights. **Reject/re-edit** the planet and osmium node rather than applying checkerboard normalization. For any other eligible image with unavoidable edge-connected cleanup, record the changed-pixel mask/count in the PR and rerun the alpha bbox check; do not flood-fill checkerboard-colored mineral pixels.
+2. Repeat each opaque cavern at **native 800×1200** within a 2800×2800 sample, to expose x=800/1600/2400 and y=1200/2400 seams. Check a clear central mining floor and the numerical edge-wrap threshold alongside the tiled image.
+3. Use the same `BoxFit.cover` center crop and actual landscape card widths at **360×640 and 430×932** with card art height **128, 148 or 196 px** as applicable. Preview each cavern at both **1.0 and 0.48 opacity**, including the dark card gradient; check the y≈400–800 middle-band left/right mineral cues are still visible. The precise crop depends on the measured card ratio; do not hard-code y=400–800 as the crop calculation.
+4. Preview each matching node over its cavern at **22 px** (Site Deck chip), **30 px** (Stellar Map, also at **0.45 locked opacity**) and **80/120/168 px** (Mine Site 1×1/2×2/3×3; also at **0.62 unsurveyed opacity**). Preview the Io planet at **34 px** in its deck-header context. Look for node margins causing undersized deposits and dark-on-dark osmium disappearing.
+5. Prepare a labeled seven-output contact sheet **alongside all 12 existing caverns and their 12 static nodes** as palette comparators; inspect sulfur vs gold, cinnabar vs iron, and orange silica. Keep contact sheet, intermediate generations, composites and the temporary check script in project files/review attachments, **not** the repository.
+6. Confirm exactly seven new **production** PNGs, with no pre-existing reference overwritten and no Dart, tests, manifests, scripts or build changes.
 
-The existing `mining_visuals_test.dart` bundle test covers only wired content, **not these seven unreferenced Io files**. As an optional packaging smoke test, run `flutter build web` and inspect the generated web asset directory for all seven files. Leave the repository's normal CI gates green. Do not add a test or wire Io just to validate assets in HPA-87.
+The existing `mining_visuals_test.dart` bundle test checks only **wired content**, not these seven unreferenced Io files; HPA-262 handles the actual load proof after wiring. **Do not run an optional `flutter build web` packaging smoke test**: `pubspec.yaml` already bundles the asset directories, and that build adds no Io-specific evidence. Existing repository CI should remain green. Do not add a test or wire Io just to validate assets in HPA-87.
 
 ## Task 5 — Same-PR review, merge and handoff
 
 1. Commit the seven approved PNG files to **this draft PR**. Keep the design spec and plan alongside them; there is no second art PR.
-2. Update the PR body with the image contact sheet/preview references, seven-file dimension check, any repairs performed, and a note that Dart/test/manifest/build configuration is unchanged.
+2. Update the PR body with the seven-file dimensions/modes, alpha bboxes and cavern seam measurements, actual-size crop/opacity preview links, palette comparisons, any changed-pixel mask/count for permitted repairs, and a note that Dart/test/manifest/build configuration is unchanged.
 3. Get **explicit owner approval of the complete asset set on the PR**. Until then, leave the PR in draft and HPA-87 in Todo/In Progress.
 4. After merging, mark HPA-87 Done and begin HPA-262 from current `main`. HPA-262 separately adds `MiningPlanetId.ioFrontier`, site/resource enums and content, view/tests/journey updates, and handles its already-described Ceres→Io completion reward changes.
 
