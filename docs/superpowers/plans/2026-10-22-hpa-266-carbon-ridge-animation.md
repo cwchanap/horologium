@@ -59,6 +59,7 @@ Planning (on PR #44, based on `main` at `f0578fb`):
 Implementation (same PR):
 
 - `lib/mining/presentation/mining_visuals.dart`
+- `lib/mining/presentation/animated_mining_grid_visual_layer.dart` — the generic shared-layer fix anticipated above: `errorBuilder` empty-box fallbacks on the deposit and robot images plus an `onError`/`failed` guard in `_precacheFrames`, so missing or undecodable art degrades visually while impacts keep deferring; covered by the layer tests
 - `test/mining/presentation/mining_visuals_test.dart`, `animated_mining_grid_visual_layer_test.dart`, `mining_grid_map_test.dart`, `mine_site_screen_test.dart`, `mining_shell_test.dart`
 - `CLAUDE.md`, `docs/audio-assets.md`
 
