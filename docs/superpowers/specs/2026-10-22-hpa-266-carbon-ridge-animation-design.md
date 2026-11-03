@@ -20,7 +20,7 @@ Carbon Ridge plays the same live mining loop as the two animated sites: robot st
 This work does not:
 
 - change `MiningController`, `MiningSimulation`, `MiningSaveRepository`, `MiningSave`, `MineSiteView`, or any economy value;
-- change the shared animated layer, its timing, thresholds, HP, damage, or reduced-motion rules;
+- change the shared animated layer's timing, thresholds, HP, damage, or reduced-motion behavior;
 - add a visual registry or a per-site special case;
 - generate art (the coal frames are HPA-186) or add a new SFX.
 
@@ -45,6 +45,8 @@ static MiningDepositFrames? depositFramesFor(MiningSiteId id) => switch (id) {
 ```
 
 Everything else follows from the switch: `MiningGridMap` mounts `AnimatedMiningGridVisualLayer` with `carbon-ridge-…` keys, the shell's `_miningImpactSequence` and `mining` sound gate already ask `depositFramesFor`, and the layer precaches only the open site's family.
+
+Alongside the two-line mapping, this PR also hardens `AnimatedMiningGridVisualLayer` generically — the same for every animated site. The deposit and robot `Image.asset` widgets gain `errorBuilder` empty-box fallbacks, and `_precacheFrames` flags the family `failed` through `precacheImage`'s `onError`, so a missing or undecodable frame never flips `_framesReady` or releases a deferred impact against unresolved art. The shared layer's timing, thresholds, HP, damage, and reduced-motion behavior are untouched, and the layer tests cover these failure paths.
 
 The coal family is **already on `main`** from HPA-186: 15 `node-coal-…` PNGs, 512×512 RGBA, locked to `nodes/coal.png`'s camera. PR #50 verified byte-identical source relationships: `coal.png` = S1 = idle-01, S3 = exhaust-01, and S4 = exhaust-04. Consume these assets unchanged; no additional artwork, manifests, or sound files.
 
