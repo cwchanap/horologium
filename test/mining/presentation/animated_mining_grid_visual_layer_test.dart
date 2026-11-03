@@ -161,6 +161,14 @@ Future<void> _pumpLayer(
   await tester.pump();
 }
 
+/// Gives an in-flight decode attempt real event turns to resolve, deliver its
+/// error or frame, and run the layer's eviction/latch callbacks. Decode work
+/// never completes under fake-async pumps, so each corrupt attempt must drain
+/// here before the next step.
+Future<void> _drainDecodes(WidgetTester tester) => tester.runAsync(
+  () => Future<void>.delayed(const Duration(milliseconds: 200)),
+);
+
 Animation<double>? _depositOpacity(
   WidgetTester tester, [
   MiningDepositDefinition? deposit,
@@ -726,6 +734,32 @@ void main() {
     expect(_hpText(tester), '70/80');
   }, skip: kIsWeb);
 
+  // A missing asset self-evicts through AssetBundleImageProvider, but a
+  // decode failure does not: the corrupt bytes leave the provider's failed
+  // completer pending in the image cache, so an unguarded retry resolves the
+  // same errored stream and never reloads. The layer evicts each failed
+  // provider before freeing its latch, so once the art goes valid the retry
+  // really decodes it and fires the live pending impact.
+  testWidgets(
+    'a decode failure evicts the failed provider so a retry loads valid bytes',
+    (tester) async {
+      final bundle = _CorruptMiningArtBundle();
+      await _pumpLayer(tester, impactSequence: 0, assetBundle: bundle);
+      await _drainDecodes(tester);
+
+      bundle.corruptMining = false;
+      await _pumpLayer(tester, impactSequence: 1, assetBundle: bundle);
+      await _drainDecodes(tester);
+      // The deferred impact's controller forward lands inside the real-async
+      // settle, so its ticker starts counting on this pump; the next pump
+      // carries it through contact.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 470));
+      expect(_hpText(tester), '70/80');
+    },
+    skip: kIsWeb,
+  );
+
   testWidgets(
     'reduced motion keeps the static stage and rig transforms fixed',
     (tester) async {
@@ -1228,6 +1262,23 @@ class _FlakyMiningArtBundle extends CachingAssetBundle {
   Future<ByteData> load(String key) async {
     if (failMining && key.startsWith('assets/images/mining/')) {
       throw FlutterError('Missing $key');
+    }
+    return rootBundle.load(key);
+  }
+}
+
+/// Mining image paths serve undecodable bytes only while [corruptMining]
+/// holds. Unlike a missing asset, a decode failure does not self-evict the
+/// provider from the image cache, so it covers the evict-on-error retry path.
+class _CorruptMiningArtBundle extends CachingAssetBundle {
+  bool corruptMining = true;
+
+  @override
+  Future<ByteData> load(String key) async {
+    if (corruptMining && key.startsWith('assets/images/mining/')) {
+      return ByteData.sublistView(
+        Uint8List.fromList(const [0, 1, 2, 3, 4, 5, 6, 7]),
+      );
     }
     return rootBundle.load(key);
   }
