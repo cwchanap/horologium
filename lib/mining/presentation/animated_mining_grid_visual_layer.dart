@@ -205,12 +205,21 @@ class _AnimatedMiningGridVisualLayerState
       _flushPendingImpact();
       return;
     }
+    // A missing or undecodable frame is not a stall: the family's
+    // errorBuilder fallbacks render while readiness stays false so impacts
+    // keep deferring instead of firing against unresolved art.
+    var failed = false;
     final future = Future.wait([
-      for (final p in providers) precacheImage(p, context),
+      for (final p in providers)
+        precacheImage(
+          p,
+          context,
+          onError: (Object _, StackTrace? _) => failed = true,
+        ),
     ]);
     unawaited(
       future.then((_) {
-        if (!mounted || _framesReady) return;
+        if (!mounted || _framesReady || failed) return;
         _framesReady = true;
         _flushPendingImpact();
       }),
