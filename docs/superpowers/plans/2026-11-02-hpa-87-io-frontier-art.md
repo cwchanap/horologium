@@ -109,7 +109,7 @@ Then verify visually, using the **actual Flutter render dimensions** from `minin
 5. Prepare a labeled seven-output contact sheet **alongside all 12 existing caverns and their 12 static nodes** as palette comparators; inspect sulfur vs gold, cinnabar vs iron, and orange silica. Keep contact sheet, intermediate generations, composites and the temporary check script in project files/review attachments, **not** the repository.
 6. Confirm exactly seven new **production** PNGs, with no pre-existing reference overwritten and no Dart, tests, manifests, scripts or build changes.
 
-The existing `mining_visuals_test.dart` bundle test checks only **wired content**, not these seven unreferenced Io files; HPA-262 handles the actual load proof after wiring. **Do not run an optional `flutter build web` packaging smoke test**: `pubspec.yaml` already bundles the asset directories, and that build adds no Io-specific evidence. Existing repository CI should remain green. Do not add a test or wire Io just to validate assets in HPA-87.
+The existing `mining_visuals_test.dart` bundle test checks only **wired content**, not these seven unreferenced Io files; HPA-262 handles the actual load proof after wiring. The repository verification gates still apply unchanged, including `flutter build web`; only an additional Io-specific packaging smoke test is unnecessary, since `pubspec.yaml` already bundles the asset directories and that extra build adds no Io-specific evidence. Existing repository CI should remain green. Do not add a test or wire Io just to validate assets in HPA-87.
 
 ## Task 5 — Same-PR review, merge and handoff
 
