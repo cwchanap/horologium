@@ -1,6 +1,6 @@
 # HPA-87 — Io Frontier art: design specification
 
-- **Status:** Proposed for review (2026-11-02); art is not generated in the planning commit.
+- **Status:** Art delivered — awaiting owner full-set approval; HPA-262 integration deferred (spec proposed 2026-11-02).
 - **Linear:** https://linear.app/cwchanap/issue/HPA-87/mining-art-io-frontier-planet-cavern-and-node-art
 - **Unblocks:** https://linear.app/cwchanap/issue/HPA-262/mining-content-ship-io-frontier-as-the-fifth-planet-after-ceres
 - **Delivery:** One HPA-87 draft PR, with this spec and its implementation plan first, then seven approved PNGs in **the same PR**. The seven PNGs are the only production assets. No Dart, tests, manifests, scripts or preview files committed.
