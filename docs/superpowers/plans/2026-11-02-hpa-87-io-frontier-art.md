@@ -1,6 +1,6 @@
 # HPA-87 — Io Frontier art implementation plan
 
-- **Status:** Proposed (2026-11-02); no art has been produced by the planning commit.
+- **Status:** Art delivered — awaiting owner full-set approval; HPA-262 integration deferred (plan proposed 2026-11-02).
 - **Ticket:** https://linear.app/cwchanap/issue/HPA-87/mining-art-io-frontier-planet-cavern-and-node-art
 - **Design:** [Io Frontier art design](../specs/2026-11-02-hpa-87-io-frontier-art-design.md)
 - **Unblocks:** https://linear.app/cwchanap/issue/HPA-262/mining-content-ship-io-frontier-as-the-fifth-planet-after-ceres
