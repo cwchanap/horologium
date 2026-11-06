@@ -565,6 +565,21 @@ void main() {
             'rigPlacements': <Object?>[],
           },
         },
+      'locked Io has a docked rig': _rawDocument(nowUtc: now)
+        ..['docks'] = {
+          ...(_rawDocument(nowUtc: now)['docks']! as Map<String, Object?>),
+          'ioFrontier': {'b1': 't1', 'b2': null, 'b3': null, 'b4': null},
+        },
+      'locked Io has an unlocked site': _rawDocument(nowUtc: now)
+        ..['sites'] = {
+          ...(_rawDocument(nowUtc: now)['sites']! as Map<String, Object?>),
+          'sulfurFlats': {
+            'unlocked': true,
+            'commissioned': false,
+            'storedAmount': 0,
+            'rigPlacements': <Object?>[],
+          },
+        },
       'locked planet has non-pristine site': _rawDocument(nowUtc: now)
         ..['sites'] = {
           ...(_rawDocument(nowUtc: now)['sites']! as Map<String, Object?>),

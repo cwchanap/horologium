@@ -278,6 +278,78 @@ void main() {
     });
   }
 
+  for (final size in const [Size(360, 640), Size(430, 932)]) {
+    testWidgets('lists an Io section with its silhouettes at '
+        '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      const summary = OfflineProductionSummary(
+        elapsedAway: Duration(hours: 2),
+        elapsedUsed: Duration(hours: 2),
+        produced: {
+          ResourceType.sulfur: 4320.0,
+          ResourceType.cinnabar: 3240.0,
+          ResourceType.osmium: 12.5,
+        },
+        productionByPlanet: {
+          MiningPlanetId.ioFrontier: {
+            ResourceType.sulfur: 4320.0,
+            ResourceType.cinnabar: 3240.0,
+            ResourceType.osmium: 12.5,
+          },
+        },
+        fullSites: {MiningSiteId.sulfurFlats},
+        wasOfflineCapped: false,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: OfflineReturnSheet(
+              summary: summary,
+              content: MiningContentRegistry.stellarMining(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final io = find.byKey(const Key('offline-return-planet-ioFrontier'));
+      expect(io, findsOneWidget);
+      for (final (resource, name, amount) in const [
+        (ResourceType.sulfur, 'Sulfur', '+4,320'),
+        (ResourceType.cinnabar, 'Cinnabar', '+3,240'),
+        (ResourceType.osmium, 'Osmium', '+12.5'),
+      ]) {
+        expect(
+          find.descendant(of: io, matching: find.text(name)),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: io, matching: find.text(amount)),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: io,
+            matching: find.byKey(Key('offline-resource-${resource.name}')),
+          ),
+          findsOneWidget,
+        );
+      }
+      expect(
+        find.descendant(of: io, matching: find.textContaining('Sulfur Flats')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('shows the full time away and the capped duration', (
     tester,
   ) async {

@@ -97,6 +97,9 @@ void main() {
         MiningSiteId.landingBasin => MiningDepositFrames.gold,
         MiningSiteId.frozenBasin => MiningDepositFrames.waterIce,
         MiningSiteId.carbonRidge => MiningDepositFrames.coal,
+        MiningSiteId.sulfurFlats ||
+        MiningSiteId.cinnabarVents ||
+        MiningSiteId.osmiumCaldera => isNull,
         _ => isNull,
       }, reason: id.name);
     }

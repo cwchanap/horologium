@@ -152,13 +152,12 @@ Map<MiningPlanetId, Map<DockBayId, RigTier?>> docksFor({
   Map<DockBayId, RigTier?>? lunar,
   Map<DockBayId, RigTier?>? mars,
   Map<DockBayId, RigTier?>? ceres,
-  Map<DockBayId, RigTier?>? io,
 }) => {
-  MiningPlanetId.homeworld: homeworld ?? dock(),
-  MiningPlanetId.lunarFrontier: lunar ?? dock(),
-  MiningPlanetId.marsFrontier: mars ?? dock(),
-  MiningPlanetId.ceresFrontier: ceres ?? dock(),
-  MiningPlanetId.ioFrontier: io ?? dock(),
+  for (final id in MiningPlanetId.values) id: dock(),
+  if (homeworld != null) MiningPlanetId.homeworld: homeworld,
+  if (lunar != null) MiningPlanetId.lunarFrontier: lunar,
+  if (mars != null) MiningPlanetId.marsFrontier: mars,
+  if (ceres != null) MiningPlanetId.ceresFrontier: ceres,
 };
 
 Map<MiningSiteId, SiteProgress> sitesFor({
@@ -1017,11 +1016,8 @@ void main() {
         seed: seededSave(
           clock.now,
           cash: 1000,
-          technology: const TechnologyLevels(surveying: 3),
-          unlockedPlanets: {
-            MiningPlanetId.homeworld,
-            MiningPlanetId.lunarFrontier,
-          },
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanets: MiningPlanetId.values.toSet(),
           activePlanet: MiningPlanetId.homeworld,
           sites: sitesFor(
             landing: site(
@@ -1048,6 +1044,17 @@ void main() {
               storedAmount: 10,
               rigs: siteRig(frozenCell, RigTier.t1),
             ),
+            ochre: site(unlocked: true),
+            nickel: site(unlocked: true),
+            sulfur: site(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 42,
+              rigs: siteRig(
+                firstPerimeterCell(MiningSiteId.sulfurFlats),
+                RigTier.t1,
+              ),
+            ),
           ),
         ),
       );
@@ -1064,6 +1071,10 @@ void main() {
       expect(
         controller.state.sites[MiningSiteId.frozenBasin]!.storedAmount,
         10,
+      );
+      expect(
+        controller.state.sites[MiningSiteId.sulfurFlats]!.storedAmount,
+        42,
       );
     });
 
@@ -1116,51 +1127,68 @@ void main() {
   });
 
   group('mastery and save ordering', () {
-    test('final Mars commission masters Mars without a reward', () async {
-      final controller = await controllerOver(
-        MiningSaveRepository(),
-        seed: seededSave(
-          clock.now,
-          cash: 50000,
-          technology: const TechnologyLevels(surveying: 5),
-          unlockedPlanets: {
-            MiningPlanetId.homeworld,
-            MiningPlanetId.lunarFrontier,
-            MiningPlanetId.marsFrontier,
-          },
-          activePlanet: MiningPlanetId.marsFrontier,
-          docks: docksFor(
-            mars: dock(b1: RigTier.t1, b2: RigTier.t1),
+    test(
+      'final Mars and Ceres commissions master the planet without a reward',
+      () async {
+        for (final (planet, lastSite, cell) in [
+          (MiningPlanetId.marsFrontier, MiningSiteId.cobaltChasm, cobaltCell),
+          (
+            MiningPlanetId.ceresFrontier,
+            MiningSiteId.iridiumSpire,
+            iridiumCell,
           ),
-          sites: sitesFor(
-            landing: site(unlocked: true),
-            frozen: site(unlocked: true),
-            ochre: site(unlocked: true, commissioned: true),
-            silica: site(unlocked: true, commissioned: true),
-            cobalt: site(unlocked: true),
-          ),
-        ),
-      );
+        ]) {
+          final planetDefinition = _content.planet(planet);
+          final priorPlanets = MiningPlanetId.values.take(planet.index + 1);
+          final controller = await controllerOver(
+            MiningSaveRepository(),
+            seed: seededSave(
+              clock.now,
+              cash: 50000,
+              technology: const TechnologyLevels(surveying: 5),
+              unlockedPlanets: priorPlanets.toSet(),
+              activePlanet: planet,
+              docks: {
+                ...docksFor(),
+                planet: dock(b1: RigTier.t1, b2: RigTier.t1),
+              },
+              sites: {
+                ...sitesFor(),
+                for (final id in priorPlanets.map(
+                  (id) => _content.planet(id).sites.first.id,
+                ))
+                  id: site(unlocked: true),
+                for (final definition in planetDefinition.sites.take(
+                  planetDefinition.sites.length - 1,
+                ))
+                  definition.id: site(unlocked: true, commissioned: true),
+                lastSite: site(unlocked: true),
+              },
+            ),
+          );
 
-      final result = await controller.deployRig(
-        DockBayId.b1,
-        MiningSiteId.cobaltChasm,
-        cobaltCell,
-      );
+          final result = await controller.deployRig(
+            DockBayId.b1,
+            lastSite,
+            cell,
+          );
 
-      expect(result.isSuccess, isTrue);
-      expect(result.message, isNull);
-      expect(controller.state.cash, 50000);
-      expect(
-        _content.isPlanetMastered(
-          MiningPlanetId.marsFrontier,
-          controller.state.sites.entries
-              .where((entry) => entry.value.commissioned)
-              .map((entry) => entry.key),
-        ),
-        isTrue,
-      );
-    });
+          expect(result.isSuccess, isTrue, reason: planet.name);
+          expect(result.message, isNull, reason: planet.name);
+          expect(controller.state.cash, 50000, reason: planet.name);
+          expect(
+            _content.isPlanetMastered(
+              planet,
+              controller.state.sites.entries
+                  .where((entry) => entry.value.commissioned)
+                  .map((entry) => entry.key),
+            ),
+            isTrue,
+            reason: planet.name,
+          );
+        }
+      },
+    );
 
     test(
       'final first Io commission pays exactly once across recall and redeploy',
@@ -1176,9 +1204,10 @@ void main() {
             technology: const TechnologyLevels(surveying: 5),
             unlockedPlanets: MiningPlanetId.values.toSet(),
             activePlanet: MiningPlanetId.ioFrontier,
-            docks: docksFor(
-              io: dock(b1: RigTier.t1, b2: RigTier.t1),
-            ),
+            docks: {
+              ...docksFor(),
+              MiningPlanetId.ioFrontier: dock(b1: RigTier.t1, b2: RigTier.t1),
+            },
             sites: sitesFor(
               landing: site(unlocked: true),
               frozen: site(unlocked: true),
@@ -1371,9 +1400,10 @@ void main() {
             technology: const TechnologyLevels(surveying: 5),
             unlockedPlanets: MiningPlanetId.values.toSet(),
             activePlanet: MiningPlanetId.ioFrontier,
-            docks: docksFor(
-              io: dock(b1: RigTier.t1, b2: RigTier.t1),
-            ),
+            docks: {
+              ...docksFor(),
+              MiningPlanetId.ioFrontier: dock(b1: RigTier.t1, b2: RigTier.t1),
+            },
             sites: sitesFor(
               landing: site(unlocked: true, commissioned: true),
               frozen: site(unlocked: true, commissioned: true),

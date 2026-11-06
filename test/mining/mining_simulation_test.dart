@@ -244,48 +244,65 @@ void main() {
     },
   );
 
-  test('one window accrues every unlocked planet and fills Ceres storage', () {
-    final base = threePlanetState(start);
-    MiningRigPlacement t1(MiningSiteId id) =>
-        MiningRigPlacement(tier: RigTier.t1, cell: _firstCell(id));
-    final state = base.copyWith(
-      unlockedPlanetIds: MiningPlanetId.values.toSet(),
-      activePlanetId: MiningPlanetId.ceresFrontier,
-      sites: {
-        ...base.sites,
-        MiningSiteId.nickelShoals: progress(
-          rigs: [t1(MiningSiteId.nickelShoals)],
-        ),
-        MiningSiteId.platinumRift: progress(
-          storedAmount: 3238,
-          rigs: [t1(MiningSiteId.platinumRift)],
-        ),
-      },
-    );
-    final result = simulation.accrue(
-      state,
-      start.add(const Duration(seconds: 10)),
-    );
+  test(
+    'one window accrues all five unlocked planets and fills Ceres storage',
+    () {
+      final base = threePlanetState(start);
+      MiningRigPlacement t1(MiningSiteId id) =>
+          MiningRigPlacement(tier: RigTier.t1, cell: _firstCell(id));
+      final state = base.copyWith(
+        unlockedPlanetIds: MiningPlanetId.values.toSet(),
+        activePlanetId: MiningPlanetId.ceresFrontier,
+        sites: {
+          ...base.sites,
+          MiningSiteId.nickelShoals: progress(
+            rigs: [t1(MiningSiteId.nickelShoals)],
+          ),
+          MiningSiteId.platinumRift: progress(
+            storedAmount: 3238,
+            rigs: [t1(MiningSiteId.platinumRift)],
+          ),
+          MiningSiteId.sulfurFlats: progress(
+            rigs: [t1(MiningSiteId.sulfurFlats)],
+          ),
+        },
+      );
+      final result = simulation.accrue(
+        state,
+        start.add(const Duration(seconds: 10)),
+      );
 
-    expect(
-      result.state.sites[MiningSiteId.landingBasin]!.storedAmount,
-      closeTo(5, 0.0001),
-    );
-    expect(
-      result.state.sites[MiningSiteId.ochreBasin]!.storedAmount,
-      closeTo(7.5, 0.0001),
-    );
-    expect(
-      result.state.sites[MiningSiteId.nickelShoals]!.storedAmount,
-      closeTo(6, 0.0001),
-    );
-    expect(result.state.sites[MiningSiteId.platinumRift]!.storedAmount, 3240);
-    expect(result.summary.fullSites, {MiningSiteId.platinumRift});
-    expect(result.summary.productionByPlanet[MiningPlanetId.ceresFrontier], {
-      ResourceType.nickelOre: closeTo(6, 0.0001),
-      ResourceType.platinum: closeTo(2, 0.0001),
-    });
-  });
+      expect(
+        result.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+        closeTo(5, 0.0001),
+      );
+      expect(
+        result.state.sites[MiningSiteId.ochreBasin]!.storedAmount,
+        closeTo(7.5, 0.0001),
+      );
+      expect(
+        result.state.sites[MiningSiteId.nickelShoals]!.storedAmount,
+        closeTo(6, 0.0001),
+      );
+      expect(result.state.sites[MiningSiteId.platinumRift]!.storedAmount, 3240);
+      expect(
+        result.state.sites[MiningSiteId.sulfurFlats]!.storedAmount,
+        closeTo(6, 0.0001),
+      );
+      expect(result.summary.fullSites, {MiningSiteId.platinumRift});
+      expect(
+        result.summary.productionByPlanet.keys.toSet(),
+        MiningPlanetId.values.toSet(),
+      );
+      expect(result.summary.productionByPlanet[MiningPlanetId.ceresFrontier], {
+        ResourceType.nickelOre: closeTo(6, 0.0001),
+        ResourceType.platinum: closeTo(2, 0.0001),
+      });
+      expect(result.summary.productionByPlanet[MiningPlanetId.ioFrontier], {
+        ResourceType.sulfur: closeTo(6, 0.0001),
+      });
+    },
+  );
 
   test('a locked Ceres produces nothing', () {
     final base = threePlanetState(start);
