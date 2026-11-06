@@ -340,7 +340,10 @@ void main() {
 
       expect(goal.kind, MiningGoalKind.unlockPlanet);
       expect(goal.title, 'Unlock Io Frontier');
-      expect(goal.cashCost, 90000000);
+      expect(
+        goal.cashCost,
+        _content.planet(MiningPlanetId.ioFrontier).unlockCashCost,
+      );
       expect(goal.cashLabel, '1.00M / 90.00M');
       expect(goal.target, const MiningGoalTarget.stellarMap());
     });
