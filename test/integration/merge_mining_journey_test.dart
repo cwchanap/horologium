@@ -354,16 +354,26 @@ void main() {
     },
   );
 
-  for (final (cadence, marsMinimum, marsMaximum, ceresMinimum, ceresMaximum)
+  for (final (
+        cadence,
+        marsMinimum,
+        marsMaximum,
+        ceresMinimum,
+        ceresMaximum,
+        ioMinimum,
+        ioMaximum,
+      )
       in const [
         // A return every storage window: about a day of returns to Mars,
-        // about two to Ceres.
+        // about two to Ceres, about three and a half to Io.
         (
           Duration(hours: 2),
           Duration(hours: 24),
           Duration(hours: 60),
           Duration(hours: 40),
           Duration(hours: 90),
+          Duration(days: 3),
+          Duration(days: 6),
         ),
         // Four visits a day: storage caps between visits.
         (
@@ -372,18 +382,23 @@ void main() {
           Duration(days: 4),
           Duration(days: 4),
           Duration(days: 8),
+          Duration(days: 7),
+          Duration(days: 14),
         ),
       ]) {
     test(
       'fresh public actions master Mars at ${cadence.inHours}h visits within '
       '${marsMinimum.inHours}-${marsMaximum.inHours}h, Ceres within '
-      '${ceresMinimum.inHours}-${ceresMaximum.inHours}h, and reload the save',
+      '${ceresMinimum.inHours}-${ceresMaximum.inHours}h, Io within '
+      '${ioMinimum.inHours}-${ioMaximum.inHours}h, and reload the save',
       () => _journey(
         cadence,
         marsMinimum: marsMinimum,
         marsMaximum: marsMaximum,
         ceresMinimum: ceresMinimum,
         ceresMaximum: ceresMaximum,
+        ioMinimum: ioMinimum,
+        ioMaximum: ioMaximum,
       ),
     );
   }
@@ -420,13 +435,154 @@ Future<void> _commission(JourneyPlayer player, MiningSiteId site) async {
   expect(player.controller.state.sites[site]!.commissioned, isTrue);
 }
 
+/// Plays one frontier planet through public actions, from just after the
+/// previous planet's mastery through this planet's: earns and pays the
+/// unlock, merges the starter T1 bays into the first site, then earns,
+/// unlocks, and commissions each later site in authored order. Reads
+/// planet and site definitions for every price. Returns this planet's
+/// mastery time since [runStart]; the logged phase spans the whole wait
+/// since [previousMastery], including the cash grind before the unlock.
+Future<Duration> _playFrontier(
+  JourneyPlayer player,
+  MiningPlanetId planetId, {
+  required DateTime runStart,
+  required Duration previousMastery,
+}) async {
+  final controller = player.controller;
+  final content = player.content;
+  final planet = content.planet(planetId);
+  final tag = planet.name.split(' ').first;
+  final previousTag = content
+      .planet(MiningPlanetId.values[planetId.index - 1])
+      .name
+      .split(' ')
+      .first;
+
+  await player.earnUntil(
+    cashAtLeast: planet.unlockCashCost,
+    phase: '$previousTag mastery before $tag unlock',
+  );
+  _expectGoal(
+    player,
+    MiningGoalKind.unlockPlanet,
+    'Unlock ${planet.name}',
+    '$previousTag mastery',
+  );
+  await expectAction(
+    'unlock ${planet.name}',
+    controller.unlockPlanet(planetId),
+  );
+  expect(controller.state.activePlanetId, planetId);
+  expect(controller.state.docks[planetId], {
+    DockBayId.b1: RigTier.t1,
+    DockBayId.b2: RigTier.t1,
+    DockBayId.b3: null,
+    DockBayId.b4: null,
+  });
+  expect(controller.state.sites[planet.sites.first.id]!.unlocked, isTrue);
+
+  await expectAction(
+    'merge the fresh $tag rigs',
+    controller.mergeDockRigs(DockBayId.b1, DockBayId.b2),
+  );
+  await expectAction(
+    'commission ${planet.sites.first.name}',
+    controller.deployRig(
+      DockBayId.b2,
+      planet.sites.first.id,
+      journeyCell[planet.sites.first.id]!,
+    ),
+  );
+  debugPrint(
+    'SEQUENCE $tag merge t1+t1->t2; deploy ${planet.sites.first.name}',
+  );
+
+  var cashBeforeMastery = controller.state.cash;
+  for (final site in planet.sites.skip(1)) {
+    await player.earnUntil(
+      cashAtLeast: site.unlockCost + planet.rigSpawnCost,
+      phase: '$tag before ${site.name}',
+    );
+    await expectAction('unlock ${site.name}', controller.unlockSite(site.id));
+    final spawn = await controller.spawnRig();
+    expect(spawn.isSuccess, isTrue, reason: 'spawn: ${spawn.message}');
+    if (site == planet.sites.last) {
+      _expectGoal(
+        player,
+        MiningGoalKind.commissionSite,
+        'Commission ${site.name}',
+        'final $tag site',
+      );
+      expect(
+        _goal(player).detail,
+        planet.masteryRewardCash > 0
+            ? 'Last ${planet.name} site: mastery pays '
+                  '+${formatMiningCash(planet.masteryRewardCash)} cash.'
+            : 'Deploy a rig beside a resource.',
+      );
+      cashBeforeMastery = controller.state.cash;
+    }
+    final deploy = await controller.deployRig(
+      spawn.dockBayId!,
+      site.id,
+      journeyCell[site.id]!,
+    );
+    expect(deploy.isSuccess, isTrue);
+    if (site == planet.sites.last) {
+      expect(
+        deploy.message,
+        planet.masteryRewardCash > 0
+            ? '$tag mastered — '
+                  '+${formatMiningCash(planet.masteryRewardCash)} cash.'
+            : isNull,
+      );
+      expect(
+        controller.state.cash,
+        cashBeforeMastery + planet.masteryRewardCash,
+      );
+    }
+    expect(controller.state.sites[site.id]!.commissioned, isTrue);
+  }
+  expect(
+    content.isPlanetMastered(
+      planetId,
+      MiningSiteId.values.where(
+        (id) => controller.state.sites[id]!.commissioned,
+      ),
+    ),
+    isTrue,
+  );
+
+  if (planetId == content.finalPlanetId) {
+    _expectGoal(player, MiningGoalKind.relaunch, 'Relaunch', '$tag mastery');
+  } else {
+    _expectGoal(
+      player,
+      MiningGoalKind.unlockPlanet,
+      'Unlock '
+          '${content.planet(MiningPlanetId.values[planetId.index + 1]).name}',
+      '$tag mastery',
+    );
+  }
+
+  final mastery = player.clock.now.difference(runStart);
+  final phase = mastery - previousMastery;
+  debugPrint(
+    'MASTERY planet=$tag step=${player.step.inHours}h elapsed='
+    '${(mastery.inMinutes / 60).toStringAsFixed(1)}h '
+    '${tag.toLowerCase()}Phase=${(phase.inMinutes / 60).toStringAsFixed(1)}h '
+    'visits=${player.visits} reward=${planet.masteryRewardCash} '
+    'cash=$cashBeforeMastery->${controller.state.cash} '
+    'tech=${controller.state.technology.toJson()}',
+  );
+  return mastery;
+}
+
 /// One full run: fresh Homeworld through final-planet mastery via public
 /// actions, ending with the mastered-state recall/redeploy check. The
 /// returned timings are measured from this run's own start.
-Future<({Duration opening, Duration mars, Duration last})> _playRun(
-  JourneyPlayer player,
-  Duration cadence,
-) async {
+Future<({Duration opening, Duration mars, Duration ceres, Duration io})>
+_playRun(JourneyPlayer player, Duration cadence) async {
   final controller = player.controller;
   final content = player.content;
   final runStart = player.clock.now;
@@ -607,209 +763,69 @@ Future<({Duration opening, Duration mars, Duration last})> _playRun(
     isTrue,
   );
 
-  await player.earnUntil(
-    cashAtLeast: 16000000,
-    phase: 'Lunar mastery before Mars unlock',
-  );
-  _expectGoal(
+  final mars = await _playFrontier(
     player,
-    MiningGoalKind.unlockPlanet,
-    'Unlock Mars Frontier',
-    'Lunar mastery',
+    MiningPlanetId.marsFrontier,
+    runStart: runStart,
+    previousMastery: Duration.zero,
   );
-  await expectAction(
-    'unlock Mars Frontier',
-    controller.unlockPlanet(MiningPlanetId.marsFrontier),
-  );
-  expect(controller.state.activePlanetId, MiningPlanetId.marsFrontier);
-  expect(controller.state.docks[MiningPlanetId.marsFrontier], {
-    DockBayId.b1: RigTier.t1,
-    DockBayId.b2: RigTier.t1,
-    DockBayId.b3: null,
-    DockBayId.b4: null,
-  });
-  expect(controller.state.sites[MiningSiteId.ochreBasin]!.unlocked, isTrue);
-
-  await expectAction(
-    'merge the fresh Mars rigs',
-    controller.mergeDockRigs(DockBayId.b1, DockBayId.b2),
-  );
-  await expectAction(
-    'commission Ochre Basin',
-    controller.deployRig(
-      DockBayId.b2,
-      MiningSiteId.ochreBasin,
-      journeyCell[MiningSiteId.ochreBasin]!,
-    ),
-  );
-  debugPrint('SEQUENCE Mars merge t1+t1->t2; deploy Ochre Basin');
-
-  await player.earnUntil(
-    cashAtLeast: 14000000,
-    phase: 'Mars before Silica Dunes',
-  );
-  await expectAction(
-    'unlock Silica Dunes',
-    controller.unlockSite(MiningSiteId.silicaDunes),
-  );
-  await _commission(player, MiningSiteId.silicaDunes);
-
-  await player.earnUntil(
-    cashAtLeast: 29000000,
-    phase: 'Mars before Cobalt Chasm',
-  );
-  await expectAction(
-    'unlock Cobalt Chasm',
-    controller.unlockSite(MiningSiteId.cobaltChasm),
-  );
-  final cobaltSpawn = await controller.spawnRig();
-  expect(cobaltSpawn.isSuccess, isTrue);
-  _expectGoal(
+  final ceres = await _playFrontier(
     player,
-    MiningGoalKind.commissionSite,
-    'Commission Cobalt Chasm',
-    'final Mars site',
+    MiningPlanetId.ceresFrontier,
+    runStart: runStart,
+    previousMastery: mars,
   );
-  expect(_goal(player).detail, 'Deploy a rig beside a resource.');
-  final cashBeforeMarsMastery = controller.state.cash;
-  final marsMastery = await controller.deployRig(
-    cobaltSpawn.dockBayId!,
-    MiningSiteId.cobaltChasm,
-    journeyCell[MiningSiteId.cobaltChasm]!,
-  );
-  expect(marsMastery.isSuccess, isTrue);
-  expect(marsMastery.message, isNull);
-  expect(controller.state.cash, cashBeforeMarsMastery);
+
+  // Ceres is no longer the final planet: Relaunch stays locked until the
+  // final planet is mastered, both as a read model and as an action.
   expect(
-    content.isPlanetMastered(
-      MiningPlanetId.marsFrontier,
-      MiningSiteId.values.where(
-        (id) => controller.state.sites[id]!.commissioned,
-      ),
-    ),
-    isTrue,
+    StellarMapView.from(
+      state: controller.state,
+      content: content,
+    ).isRelaunchUnlocked,
+    isFalse,
   );
-  _expectGoal(
+  final relaunchesBefore = controller.state.relaunchCount;
+  final prematureRelaunch = await controller.relaunch();
+  expect(prematureRelaunch.isSuccess, isFalse);
+  expect(controller.state.relaunchCount, relaunchesBefore);
+
+  final io = await _playFrontier(
     player,
-    MiningGoalKind.unlockPlanet,
-    'Unlock Ceres Frontier',
-    'Mars mastery',
-  );
-  final toMarsMastery = player.clock.now.difference(runStart);
-  debugPrint(
-    'MASTERY planet=Mars step=${cadence.inHours}h elapsed='
-    '${(toMarsMastery.inMinutes / 60).toStringAsFixed(1)}h '
-    'visits=${player.visits} cash=${controller.state.cash} '
-    'tech=${controller.state.technology.toJson()}',
+    MiningPlanetId.ioFrontier,
+    runStart: runStart,
+    previousMastery: ceres,
   );
 
-  await player.earnUntil(
-    cashAtLeast: 30000000,
-    phase: 'Mars mastery before Ceres unlock',
-  );
-  await expectAction(
-    'unlock Ceres Frontier',
-    controller.unlockPlanet(MiningPlanetId.ceresFrontier),
-  );
-  expect(controller.state.activePlanetId, MiningPlanetId.ceresFrontier);
-  expect(controller.state.docks[MiningPlanetId.ceresFrontier], {
-    DockBayId.b1: RigTier.t1,
-    DockBayId.b2: RigTier.t1,
-    DockBayId.b3: null,
-    DockBayId.b4: null,
-  });
-  expect(controller.state.sites[MiningSiteId.nickelShoals]!.unlocked, isTrue);
-  _expectGoal(
-    player,
-    MiningGoalKind.commissionSite,
-    'Commission Nickel Shoals',
-    'Ceres unlock',
-  );
-
-  await expectAction(
-    'merge the fresh Ceres rigs',
-    controller.mergeDockRigs(DockBayId.b1, DockBayId.b2),
-  );
-  await expectAction(
-    'commission Nickel Shoals',
-    controller.deployRig(
-      DockBayId.b2,
-      MiningSiteId.nickelShoals,
-      journeyCell[MiningSiteId.nickelShoals]!,
-    ),
-  );
-  debugPrint('SEQUENCE Ceres merge t1+t1->t2; deploy Nickel Shoals');
-
-  await player.earnUntil(
-    cashAtLeast: 25500000,
-    phase: 'Ceres before Platinum Rift',
-  );
-  await expectAction(
-    'unlock Platinum Rift',
-    controller.unlockSite(MiningSiteId.platinumRift),
-  );
-  await _commission(player, MiningSiteId.platinumRift);
-
-  await player.earnUntil(
-    cashAtLeast: 52500000,
-    phase: 'Ceres before Iridium Spire',
-  );
-  await expectAction(
-    'unlock Iridium Spire',
-    controller.unlockSite(MiningSiteId.iridiumSpire),
-  );
-  final iridiumSpawn = await controller.spawnRig();
-  expect(iridiumSpawn.isSuccess, isTrue);
-  _expectGoal(
-    player,
-    MiningGoalKind.commissionSite,
-    'Commission Iridium Spire',
-    'final Ceres site',
-  );
-  expect(_goal(player).detail, contains('+30.00M'));
-  final cashBeforeCeresMastery = controller.state.cash;
-  final mastery = await controller.deployRig(
-    iridiumSpawn.dockBayId!,
-    MiningSiteId.iridiumSpire,
-    journeyCell[MiningSiteId.iridiumSpire]!,
-  );
-  expect(mastery.isSuccess, isTrue);
-  expect(mastery.message, 'Ceres mastered — +30.00M cash.');
-  expect(controller.state.cash, cashBeforeCeresMastery + 30000000);
-  expect(_goal(player).kind, MiningGoalKind.relaunch);
-  expect(_goal(player).title, 'Relaunch');
-  final toMastery = player.clock.now.difference(runStart);
-  final ceresPhase = toMastery - toMarsMastery;
-  debugPrint(
-    'MASTERY planet=Ceres step=${cadence.inHours}h elapsed='
-    '${(toMastery.inMinutes / 60).toStringAsFixed(1)}h '
-    'ceresPhase=${(ceresPhase.inMinutes / 60).toStringAsFixed(1)}h '
-    'visits=${player.visits} reward=30000000 '
-    'cash=$cashBeforeCeresMastery->${controller.state.cash} '
-    'tech=${controller.state.technology.toJson()}',
-  );
   for (final siteId in MiningSiteId.values) {
     expect(controller.state.sites[siteId]!.commissioned, isTrue);
   }
 
-  final cashAfterFirstMastery = controller.state.cash;
+  // The final planet's mastery reward pays once: recall and redeploy the
+  // last-site rig without another mastery message or cash delta.
+  final finalPlanet = content.planet(content.finalPlanetId);
+  final finalSite = finalPlanet.sites.last;
+  final cashAfterMastery = controller.state.cash;
+  final docksBeforeRecall = controller.state.docks[finalPlanet.id]!;
   await expectAction(
-    'recall the mastered Iridium Spire rig',
-    controller.recallRig(
-      MiningSiteId.iridiumSpire,
-      journeyCell[MiningSiteId.iridiumSpire]!,
-    ),
+    'recall the mastered ${finalSite.name} rig',
+    controller.recallRig(finalSite.id, journeyCell[finalSite.id]!),
+  );
+  final recalledBay = DockBayId.values.firstWhere(
+    (bay) =>
+        docksBeforeRecall[bay] == null &&
+        controller.state.docks[finalPlanet.id]![bay] != null,
   );
   final redeploy = await controller.deployRig(
-    iridiumSpawn.dockBayId!,
-    MiningSiteId.iridiumSpire,
-    journeyCell[MiningSiteId.iridiumSpire]!,
+    recalledBay,
+    finalSite.id,
+    journeyCell[finalSite.id]!,
   );
   expect(redeploy.isSuccess, isTrue);
   expect(redeploy.message, isNull);
-  expect(controller.state.cash, cashAfterFirstMastery);
+  expect(controller.state.cash, cashAfterMastery);
 
-  return (opening: opening, mars: toMarsMastery, last: toMastery);
+  return (opening: opening, mars: mars, ceres: ceres, io: io);
 }
 
 Future<void> _journey(
@@ -818,6 +834,8 @@ Future<void> _journey(
   required Duration marsMaximum,
   required Duration ceresMinimum,
   required Duration ceresMaximum,
+  required Duration ioMinimum,
+  required Duration ioMaximum,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final clock = TestClock(DateTime.utc(2026, 8, 27, 12));
@@ -855,8 +873,10 @@ Future<void> _journey(
   expect(run1.opening, lessThanOrEqualTo(const Duration(minutes: 20)));
   expect(run1.mars, greaterThanOrEqualTo(marsMinimum));
   expect(run1.mars, lessThanOrEqualTo(marsMaximum));
-  expect(run1.last, greaterThanOrEqualTo(ceresMinimum));
-  expect(run1.last, lessThanOrEqualTo(ceresMaximum));
+  expect(run1.ceres, greaterThanOrEqualTo(ceresMinimum));
+  expect(run1.ceres, lessThanOrEqualTo(ceresMaximum));
+  expect(run1.io, greaterThanOrEqualTo(ioMinimum));
+  expect(run1.io, lessThanOrEqualTo(ioMaximum));
 
   final beforeReload = controller.state;
   final reloaded = MiningController(
@@ -869,7 +889,7 @@ Future<void> _journey(
   expect(reloaded.state.cash, beforeReload.cash);
   expect(reloaded.state.technology, beforeReload.technology);
   expect(reloaded.state.unlockedPlanetIds, MiningPlanetId.values.toSet());
-  expect(reloaded.state.activePlanetId, MiningPlanetId.ceresFrontier);
+  expect(reloaded.state.activePlanetId, MiningPlanetId.ioFrontier);
   for (final planetId in MiningPlanetId.values) {
     expect(reloaded.state.docks[planetId], beforeReload.docks[planetId]);
   }
@@ -879,7 +899,7 @@ Future<void> _journey(
   debugPrint(
     'RELOAD active=${reloaded.state.activePlanetId.name} '
     'surveying=${reloaded.state.technology.surveying} '
-    'ceresCash=${reloaded.state.cash} ceresSites=3/3',
+    'ioCash=${reloaded.state.cash} ioSites=3/3',
   );
 
   // A 30-hour absence accrues exactly the 24-hour safety cap.
@@ -906,20 +926,20 @@ Future<void> _journey(
   expect(returned.state.relaunchCount, 1);
   final run2 = await _playRun(run2Player, cadence);
   debugPrint(
-    'RELAUNCH run=2 mastery=${(run2.last.inMinutes / 60).toStringAsFixed(1)}h '
-    'run1=${(run1.last.inMinutes / 60).toStringAsFixed(1)}h '
+    'RELAUNCH run=2 mastery=${(run2.io.inMinutes / 60).toStringAsFixed(1)}h '
+    'run1=${(run1.io.inMinutes / 60).toStringAsFixed(1)}h '
     'finalPlanet=${content.planet(content.finalPlanetId).name}',
   );
   if (cadence == const Duration(hours: 2)) {
     expect(
-      run2.last,
-      lessThanOrEqualTo(run1.last * 0.8),
+      run2.io,
+      lessThanOrEqualTo(run1.io * 0.8),
       reason: 'relaunch run 2 at ${cadence.inHours}h cadence',
     );
   } else {
     expect(
-      run2.last,
-      lessThan(run1.last),
+      run2.io,
+      lessThan(run1.io),
       reason: 'relaunch run 2 at ${cadence.inHours}h cadence',
     );
   }

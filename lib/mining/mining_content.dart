@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_grid.dart';
 
-enum MiningPlanetId { homeworld, lunarFrontier, marsFrontier, ceresFrontier }
+enum MiningPlanetId {
+  homeworld,
+  lunarFrontier,
+  marsFrontier,
+  ceresFrontier,
+  ioFrontier,
+}
 
 enum MiningSiteId {
   landingBasin,
@@ -17,6 +23,9 @@ enum MiningSiteId {
   nickelShoals,
   platinumRift,
   iridiumSpire,
+  sulfurFlats,
+  cinnabarVents,
+  osmiumCaldera,
 }
 
 enum DockBayId { b1, b2, b3, b4 }
@@ -135,6 +144,9 @@ const _surveyingProgressionLevels = <MiningSiteId, List<int>>{
   MiningSiteId.nickelShoals: [5, 5, 5, 5],
   MiningSiteId.platinumRift: [5, 5, 5, 5],
   MiningSiteId.iridiumSpire: [5, 5, 5, 5],
+  MiningSiteId.sulfurFlats: [5, 5, 5, 5],
+  MiningSiteId.cinnabarVents: [5, 5, 5, 5],
+  MiningSiteId.osmiumCaldera: [5, 5, 5, 5],
 };
 
 Map<MiningDepositDefinition, Set<MiningGridCell>> _perimeterCellsByDeposit({
@@ -334,6 +346,21 @@ class MiningContentRegistry {
       icon: Icons.flare,
       name: 'Iridium',
       color: Colors.purpleAccent,
+    ),
+    ResourceType.sulfur: ResourceSilhouette(
+      icon: Icons.volcano,
+      name: 'Sulfur',
+      color: Colors.yellowAccent,
+    ),
+    ResourceType.cinnabar: ResourceSilhouette(
+      icon: Icons.opacity,
+      name: 'Cinnabar',
+      color: Colors.redAccent,
+    ),
+    ResourceType.osmium: ResourceSilhouette(
+      icon: Icons.view_in_ar,
+      name: 'Osmium',
+      color: Color(0xFF9FB4C7),
     ),
   };
 
@@ -547,7 +574,7 @@ class MiningContentRegistry {
       unlockRequiredMasteryPlanetId: MiningPlanetId.marsFrontier,
       unlockRequiredSurveyingLevel: 5,
       unlockCashCost: 30000000,
-      masteryRewardCash: 30000000,
+      masteryRewardCash: 0,
       rigSpawnCost: 7500000,
       planetAsset: 'assets/images/mining/planets/ceres_frontier.png',
       sites: [
@@ -609,6 +636,75 @@ class MiningContentRegistry {
           facilityName: 'Iridium Lance',
           discoveryText:
               "the ice volcano's flank hides the belt's richest iridium.",
+        ),
+      ],
+    ),
+    MiningPlanetId.ioFrontier: MiningPlanetDefinition(
+      id: MiningPlanetId.ioFrontier,
+      name: 'Io Frontier',
+      unlockRequiredMasteryPlanetId: MiningPlanetId.ceresFrontier,
+      unlockRequiredSurveyingLevel: 5,
+      unlockCashCost: 90000000,
+      masteryRewardCash: 90000000,
+      rigSpawnCost: 22500000,
+      planetAsset: 'assets/images/mining/planets/io_frontier.png',
+      sites: [
+        MiningSiteDefinition(
+          id: MiningSiteId.sulfurFlats,
+          name: 'Sulfur Flats',
+          resource: ResourceType.sulfur,
+          unlockCost: 0,
+          requiredSite: null,
+          requiredSurveyingLevel: 5,
+          baseRatePerSecond: 0.60,
+          baseCapacity: 4320,
+          saleValuePerUnit: 300,
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.sulfurFlats),
+          cavernAsset: 'assets/images/mining/caverns/sulfur.png',
+          depositAsset: 'assets/images/mining/nodes/sulfur.png',
+          cardAsset: 'assets/images/mining/caverns/sulfur.png',
+          facilityName: 'Sulfur Skimmer',
+          discoveryText: 'a yellow sulfur crust steams over a warm floor.',
+        ),
+        MiningSiteDefinition(
+          id: MiningSiteId.cinnabarVents,
+          name: 'Cinnabar Vents',
+          resource: ResourceType.cinnabar,
+          unlockCost: 55000000,
+          requiredSite: MiningSiteId.sulfurFlats,
+          requiredSurveyingLevel: 5,
+          baseRatePerSecond: 0.45,
+          baseCapacity: 3240,
+          saleValuePerUnit: 550,
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.cinnabarVents),
+          cavernAsset: 'assets/images/mining/caverns/cinnabar.png',
+          depositAsset: 'assets/images/mining/nodes/cinnabar.png',
+          cardAsset: 'assets/images/mining/caverns/cinnabar.png',
+          facilityName: 'Cinnabar Bore',
+          discoveryText: 'red cinnabar veins wrap the cooled lava channels.',
+        ),
+        MiningSiteDefinition(
+          id: MiningSiteId.osmiumCaldera,
+          name: 'Osmium Caldera',
+          resource: ResourceType.osmium,
+          unlockCost: 135000000,
+          requiredSite: MiningSiteId.cinnabarVents,
+          requiredSurveyingLevel: 5,
+          baseRatePerSecond: 0.30,
+          baseCapacity: 2160,
+          saleValuePerUnit: 1050,
+          gridWidth: _denseGridWidth,
+          gridHeight: _denseGridHeight,
+          deposits: _denseResourceField(MiningSiteId.osmiumCaldera),
+          cavernAsset: 'assets/images/mining/caverns/osmium.png',
+          depositAsset: 'assets/images/mining/nodes/osmium.png',
+          cardAsset: 'assets/images/mining/caverns/osmium.png',
+          facilityName: 'Osmium Drill',
+          discoveryText: "the caldera floor hides the system's densest metal.",
         ),
       ],
     ),

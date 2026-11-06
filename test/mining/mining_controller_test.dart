@@ -104,6 +104,7 @@ final carbonCell = firstPerimeterCell(MiningSiteId.carbonRidge);
 final graniteCell = firstPerimeterCell(MiningSiteId.graniteCrater);
 final cobaltCell = firstPerimeterCell(MiningSiteId.cobaltChasm);
 final iridiumCell = firstPerimeterCell(MiningSiteId.iridiumSpire);
+final osmiumCell = firstPerimeterCell(MiningSiteId.osmiumCaldera);
 
 List<MiningRigPlacement> siteRig(MiningGridCell cell, RigTier tier) => [
   MiningRigPlacement(tier: tier, cell: cell),
@@ -151,11 +152,13 @@ Map<MiningPlanetId, Map<DockBayId, RigTier?>> docksFor({
   Map<DockBayId, RigTier?>? lunar,
   Map<DockBayId, RigTier?>? mars,
   Map<DockBayId, RigTier?>? ceres,
+  Map<DockBayId, RigTier?>? io,
 }) => {
   MiningPlanetId.homeworld: homeworld ?? dock(),
   MiningPlanetId.lunarFrontier: lunar ?? dock(),
   MiningPlanetId.marsFrontier: mars ?? dock(),
   MiningPlanetId.ceresFrontier: ceres ?? dock(),
+  MiningPlanetId.ioFrontier: io ?? dock(),
 };
 
 Map<MiningSiteId, SiteProgress> sitesFor({
@@ -171,6 +174,9 @@ Map<MiningSiteId, SiteProgress> sitesFor({
   SiteProgress? nickel,
   SiteProgress? platinum,
   SiteProgress? iridium,
+  SiteProgress? sulfur,
+  SiteProgress? cinnabar,
+  SiteProgress? osmium,
 }) {
   final base = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 18, 12)).sites;
   return {
@@ -187,6 +193,9 @@ Map<MiningSiteId, SiteProgress> sitesFor({
     if (nickel != null) MiningSiteId.nickelShoals: nickel,
     if (platinum != null) MiningSiteId.platinumRift: platinum,
     if (iridium != null) MiningSiteId.iridiumSpire: iridium,
+    if (sulfur != null) MiningSiteId.sulfurFlats: sulfur,
+    if (cinnabar != null) MiningSiteId.cinnabarVents: cinnabar,
+    if (osmium != null) MiningSiteId.osmiumCaldera: osmium,
   };
 }
 
@@ -1154,8 +1163,11 @@ void main() {
     });
 
     test(
-      'final first Ceres commission pays exactly once across recall and redeploy',
+      'final first Io commission pays exactly once across recall and redeploy',
       () async {
+        final reward = _content
+            .planet(MiningPlanetId.ioFrontier)
+            .masteryRewardCash;
         final controller = await controllerOver(
           MiningSaveRepository(),
           seed: seededSave(
@@ -1163,42 +1175,46 @@ void main() {
             cash: 50000,
             technology: const TechnologyLevels(surveying: 5),
             unlockedPlanets: MiningPlanetId.values.toSet(),
-            activePlanet: MiningPlanetId.ceresFrontier,
+            activePlanet: MiningPlanetId.ioFrontier,
             docks: docksFor(
-              ceres: dock(b1: RigTier.t1, b2: RigTier.t1),
+              io: dock(b1: RigTier.t1, b2: RigTier.t1),
             ),
             sites: sitesFor(
               landing: site(unlocked: true),
               frozen: site(unlocked: true),
               ochre: site(unlocked: true),
-              nickel: site(unlocked: true, commissioned: true),
-              platinum: site(unlocked: true, commissioned: true),
-              iridium: site(unlocked: true),
+              nickel: site(unlocked: true),
+              sulfur: site(unlocked: true, commissioned: true),
+              cinnabar: site(unlocked: true, commissioned: true),
+              osmium: site(unlocked: true),
             ),
           ),
         );
 
         final first = await controller.deployRig(
           DockBayId.b1,
-          MiningSiteId.iridiumSpire,
-          iridiumCell,
+          MiningSiteId.osmiumCaldera,
+          osmiumCell,
         );
-        expect(first.message, 'Ceres mastered — +30.00M cash.');
-        expect(controller.state.cash, 30050000);
+        expect(
+          first.message,
+          'Io mastered — +${formatMiningCash(reward)} cash.',
+        );
+        expect(controller.state.cash, 50000 + reward);
 
         final recall = await controller.recallRig(
-          MiningSiteId.iridiumSpire,
-          iridiumCell,
+          MiningSiteId.osmiumCaldera,
+          osmiumCell,
         );
         expect(recall.isSuccess, isTrue);
         final redeploy = await controller.deployRig(
           DockBayId.b1,
-          MiningSiteId.iridiumSpire,
-          iridiumCell,
+          MiningSiteId.osmiumCaldera,
+          osmiumCell,
         );
         expect(redeploy.isSuccess, isTrue);
         expect(redeploy.message, isNull);
-        expect(controller.state.cash, 30050000);
+        expect(controller.state.cash, 50000 + reward);
       },
     );
 
@@ -1264,21 +1280,12 @@ void main() {
       clock.now,
       technology: const TechnologyLevels(surveying: 5),
       unlockedPlanets: MiningPlanetId.values.toSet(),
-      activePlanet: MiningPlanetId.ceresFrontier,
-      sites: sitesFor(
-        landing: site(unlocked: true, commissioned: true),
-        carbon: site(unlocked: true, commissioned: true),
-        granite: site(unlocked: true, commissioned: true),
-        frozen: site(unlocked: true, commissioned: true),
-        titanium: site(unlocked: true, commissioned: true),
-        helium: site(unlocked: true, commissioned: true),
-        ochre: site(unlocked: true, commissioned: true),
-        silica: site(unlocked: true, commissioned: true),
-        cobalt: site(unlocked: true, commissioned: true),
-        nickel: site(unlocked: true, commissioned: true),
-        platinum: site(unlocked: true, commissioned: true),
-        iridium: site(unlocked: true, commissioned: true),
-      ),
+      activePlanet: MiningPlanetId.values.last,
+      sites: {
+        for (final planetId in MiningPlanetId.values)
+          for (final definition in _content.planet(planetId).sites)
+            definition.id: site(unlocked: true, commissioned: true),
+      },
     );
 
     test('fails before the final planet is mastered without saving', () async {
@@ -1353,6 +1360,9 @@ void main() {
         expect((await firstRun.relaunch()).isSuccess, isTrue);
 
         // Run 2 replays the near-mastery fixture carrying the persisted count.
+        final rewardCash = _content
+            .planet(MiningPlanetId.ioFrontier)
+            .masteryRewardCash;
         final runTwo = await controllerOver(
           CountingMiningSaveRepository(),
           seed: seededSave(
@@ -1360,28 +1370,32 @@ void main() {
             cash: 50000,
             technology: const TechnologyLevels(surveying: 5),
             unlockedPlanets: MiningPlanetId.values.toSet(),
-            activePlanet: MiningPlanetId.ceresFrontier,
+            activePlanet: MiningPlanetId.ioFrontier,
             docks: docksFor(
-              ceres: dock(b1: RigTier.t1, b2: RigTier.t1),
+              io: dock(b1: RigTier.t1, b2: RigTier.t1),
             ),
             sites: sitesFor(
               landing: site(unlocked: true, commissioned: true),
               frozen: site(unlocked: true, commissioned: true),
               ochre: site(unlocked: true, commissioned: true),
               nickel: site(unlocked: true, commissioned: true),
-              platinum: site(unlocked: true, commissioned: true),
-              iridium: site(unlocked: true),
+              sulfur: site(unlocked: true, commissioned: true),
+              cinnabar: site(unlocked: true, commissioned: true),
+              osmium: site(unlocked: true),
             ),
           ).copyWith(relaunchCount: 1),
         );
 
         final reward = await runTwo.deployRig(
           DockBayId.b1,
-          MiningSiteId.iridiumSpire,
-          iridiumCell,
+          MiningSiteId.osmiumCaldera,
+          osmiumCell,
         );
-        expect(reward.message, 'Ceres mastered — +30.00M cash.');
-        expect(runTwo.state.cash, 30050000);
+        expect(
+          reward.message,
+          'Io mastered — +${formatMiningCash(rewardCash)} cash.',
+        );
+        expect(runTwo.state.cash, 50000 + rewardCash);
 
         final result = await runTwo.relaunch();
         expect(result.isSuccess, isTrue);

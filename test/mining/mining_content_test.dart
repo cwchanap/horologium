@@ -63,10 +63,10 @@ void main() {
     expect(MiningContentRegistry.saleMultiplier(2), 2.0);
   });
 
-  test('final planet is Ceres Frontier', () {
+  test('final planet is Io Frontier', () {
     expect(
       MiningContentRegistry.stellarMining().finalPlanetId,
-      MiningPlanetId.ceresFrontier,
+      MiningPlanetId.ioFrontier,
     );
   });
 
@@ -85,7 +85,7 @@ void main() {
   });
 
   test('keeps closed site, bay, and rig identities', () {
-    expect(MiningSiteId.values, hasLength(12));
+    expect(MiningSiteId.values, hasLength(15));
     expect(DockBayId.values.map((id) => id.name), ['b1', 'b2', 'b3', 'b4']);
     expect(RigTier.values.map((tier) => tier.name), [
       't1',
@@ -115,12 +115,14 @@ void main() {
       MiningPlanetId.lunarFrontier,
       MiningPlanetId.marsFrontier,
       MiningPlanetId.ceresFrontier,
+      MiningPlanetId.ioFrontier,
     ]);
     expect(content.planets.keys, [
       MiningPlanetId.homeworld,
       MiningPlanetId.lunarFrontier,
       MiningPlanetId.marsFrontier,
       MiningPlanetId.ceresFrontier,
+      MiningPlanetId.ioFrontier,
     ]);
     expect(content.planet(MiningPlanetId.homeworld).sites.map((s) => s.id), [
       MiningSiteId.landingBasin,
@@ -148,6 +150,11 @@ void main() {
         MiningSiteId.iridiumSpire,
       ],
     );
+    expect(content.planet(MiningPlanetId.ioFrontier).sites.map((s) => s.id), [
+      MiningSiteId.sulfurFlats,
+      MiningSiteId.cinnabarVents,
+      MiningSiteId.osmiumCaldera,
+    ]);
   });
 
   test('freezes all site economy and progression availability values', () {
@@ -274,6 +281,36 @@ void main() {
         'sale': 350,
         'deposits': [5, 5, 5, 5],
       },
+      MiningSiteId.sulfurFlats: {
+        'resource': ResourceType.sulfur,
+        'requiredSite': null,
+        'surveying': 5,
+        'unlock': 0,
+        'rate': 0.60,
+        'capacity': 4320,
+        'sale': 300,
+        'deposits': [5, 5, 5, 5],
+      },
+      MiningSiteId.cinnabarVents: {
+        'resource': ResourceType.cinnabar,
+        'requiredSite': MiningSiteId.sulfurFlats,
+        'surveying': 5,
+        'unlock': 55000000,
+        'rate': 0.45,
+        'capacity': 3240,
+        'sale': 550,
+        'deposits': [5, 5, 5, 5],
+      },
+      MiningSiteId.osmiumCaldera: {
+        'resource': ResourceType.osmium,
+        'requiredSite': MiningSiteId.cinnabarVents,
+        'surveying': 5,
+        'unlock': 135000000,
+        'rate': 0.30,
+        'capacity': 2160,
+        'sale': 1050,
+        'deposits': [5, 5, 5, 5],
+      },
     };
 
     expect(expected.keys, MiningSiteId.values);
@@ -298,7 +335,7 @@ void main() {
     }
   });
 
-  test('freezes technology, offline, planet, and Ceres reward metadata', () {
+  test('freezes technology, offline, planet, and reward metadata', () {
     final content = MiningContentRegistry.stellarMining();
 
     expect(MiningContentRegistry.technologyCosts, [
@@ -363,17 +400,26 @@ void main() {
     expect(ceres.unlockRequiredMasteryPlanetId, MiningPlanetId.marsFrontier);
     expect(ceres.unlockRequiredSurveyingLevel, 5);
     expect(ceres.unlockCashCost, 30000000);
-    expect(ceres.masteryRewardCash, 30000000);
+    expect(ceres.masteryRewardCash, 0);
     expect(
       ceres.planetAsset,
       'assets/images/mining/planets/ceres_frontier.png',
     );
 
+    final io = content.planet(MiningPlanetId.ioFrontier);
+    expect(io.name, 'Io Frontier');
+    expect(io.rigSpawnCost, 22500000);
+    expect(io.unlockRequiredMasteryPlanetId, MiningPlanetId.ceresFrontier);
+    expect(io.unlockRequiredSurveyingLevel, 5);
+    expect(io.unlockCashCost, 90000000);
+    expect(io.masteryRewardCash, io.unlockCashCost);
+    expect(io.planetAsset, 'assets/images/mining/planets/io_frontier.png');
+
     expect(
       content.planets.values
           .where((planet) => planet.masteryRewardCash > 0)
           .map((planet) => planet.id),
-      [MiningPlanetId.ceresFrontier],
+      [MiningPlanetId.ioFrontier],
       reason: 'the game grants exactly one completion reward',
     );
     for (final planet in content.planets.values) {
@@ -403,7 +449,7 @@ void main() {
     expect(ochre.cardAsset, 'assets/images/mining/caverns/iron_ore.png');
   });
 
-  test('authors Ceres facility copy and asset paths', () {
+  test('authors frontier facility copy and asset paths', () {
     final content = MiningContentRegistry.stellarMining();
     final expected = {
       MiningSiteId.nickelShoals: (
@@ -423,6 +469,24 @@ void main() {
         'Iridium Lance',
         "the ice volcano's flank hides the belt's richest iridium.",
         'iridium',
+      ),
+      MiningSiteId.sulfurFlats: (
+        'Sulfur Flats',
+        'Sulfur Skimmer',
+        'a yellow sulfur crust steams over a warm floor.',
+        'sulfur',
+      ),
+      MiningSiteId.cinnabarVents: (
+        'Cinnabar Vents',
+        'Cinnabar Bore',
+        'red cinnabar veins wrap the cooled lava channels.',
+        'cinnabar',
+      ),
+      MiningSiteId.osmiumCaldera: (
+        'Osmium Caldera',
+        'Osmium Drill',
+        "the caldera floor hides the system's densest metal.",
+        'osmium',
       ),
     };
 
@@ -515,9 +579,22 @@ void main() {
       MiningSiteId.platinumRift,
       MiningSiteId.iridiumSpire,
     };
+    const io = {
+      MiningSiteId.sulfurFlats,
+      MiningSiteId.cinnabarVents,
+      MiningSiteId.osmiumCaldera,
+    };
     expect(
       content.isPlanetMastered(MiningPlanetId.ceresFrontier, ceres),
       isTrue,
+    );
+    expect(content.isPlanetMastered(MiningPlanetId.ioFrontier, io), isTrue);
+    expect(
+      content.isPlanetMastered(
+        MiningPlanetId.ioFrontier,
+        {...io}..remove(MiningSiteId.osmiumCaldera),
+      ),
+      isFalse,
     );
     expect(
       content.isPlanetMastered(
@@ -568,7 +645,22 @@ void main() {
       (iridium.icon, iridium.name, iridium.color),
       (Icons.flare, 'Iridium', Colors.purpleAccent),
     );
-    expect(silhouettes.values.map((s) => s.icon).toSet(), hasLength(12));
+    final sulfur = silhouettes[ResourceType.sulfur]!;
+    final cinnabar = silhouettes[ResourceType.cinnabar]!;
+    final osmium = silhouettes[ResourceType.osmium]!;
+    expect(
+      (sulfur.icon, sulfur.name, sulfur.color),
+      (Icons.volcano, 'Sulfur', Colors.yellowAccent),
+    );
+    expect(
+      (cinnabar.icon, cinnabar.name, cinnabar.color),
+      (Icons.opacity, 'Cinnabar', Colors.redAccent),
+    );
+    expect(
+      (osmium.icon, osmium.name, osmium.color),
+      (Icons.view_in_ar, 'Osmium', const Color(0xFF9FB4C7)),
+    );
+    expect(silhouettes.values.map((s) => s.icon).toSet(), hasLength(15));
   });
 
   test('caches the generated stellar mining registry', () {
@@ -687,6 +779,9 @@ void main() {
       MiningSiteId.nickelShoals: [0, 0, 0, 0, 0, 4],
       MiningSiteId.platinumRift: [0, 0, 0, 0, 0, 4],
       MiningSiteId.iridiumSpire: [0, 0, 0, 0, 0, 4],
+      MiningSiteId.sulfurFlats: [0, 0, 0, 0, 0, 4],
+      MiningSiteId.cinnabarVents: [0, 0, 0, 0, 0, 4],
+      MiningSiteId.osmiumCaldera: [0, 0, 0, 0, 0, 4],
     };
 
     for (final entry in expectedBySite.entries) {

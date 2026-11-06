@@ -93,6 +93,9 @@ void main() {
       MiningSiteId.nickelShoals,
       MiningSiteId.platinumRift,
       MiningSiteId.iridiumSpire,
+      MiningSiteId.sulfurFlats,
+      MiningSiteId.cinnabarVents,
+      MiningSiteId.osmiumCaldera,
     ]) {
       final progress = state.sites[id]!;
       expect(progress.unlocked, isFalse);

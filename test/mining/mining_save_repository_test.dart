@@ -153,7 +153,7 @@ void main() {
       expect(loaded.wasMissing, isFalse);
     });
 
-    test('round-trips a four-planet save with Ceres progress', () async {
+    test('round-trips a five-planet save with frontier progress', () async {
       final repository = MiningSaveRepository();
       final initial = MiningSave.initial(nowUtc: now);
       final nickel = _content.site(MiningSiteId.nickelShoals);
@@ -189,6 +189,8 @@ void main() {
                   ),
                 ],
               ),
+          MiningSiteId.sulfurFlats: initial.sites[MiningSiteId.sulfurFlats]!
+              .copyWith(unlocked: true),
         },
       );
 
@@ -197,8 +199,8 @@ void main() {
 
       expect(loaded.recoveredFromInvalidSave, isFalse);
       expect(loaded.state, expected);
-      expect(loaded.state.sites, hasLength(12));
-      expect(loaded.state.docks, hasLength(4));
+      expect(loaded.state.sites, hasLength(15));
+      expect(loaded.state.docks, hasLength(5));
     });
 
     test('current save root has exactly the current keys', () async {
@@ -523,7 +525,7 @@ void main() {
           ...(_rawDocument(nowUtc: now)['docks']! as Map<String, Object?>),
           'lunarFrontier': {'b1': 't1', 'b2': null, 'b3': null, 'b4': null},
         },
-      'pre-Ceres nine-site save': _rawDocument(nowUtc: now)
+      'pre-Io twelve-site save': _rawDocument(nowUtc: now)
         ..['docks'] = {
           ...(_rawDocument(nowUtc: now)['docks']! as Map<String, Object?>),
         }
@@ -531,14 +533,14 @@ void main() {
           ...(_rawDocument(nowUtc: now)['sites']! as Map<String, Object?>),
         }
         ..update('docks', (docks) {
-          (docks! as Map<String, Object?>).remove('ceresFrontier');
+          (docks! as Map<String, Object?>).remove('ioFrontier');
           return docks;
         })
         ..update('sites', (sites) {
           (sites! as Map<String, Object?>)
-            ..remove('nickelShoals')
-            ..remove('platinumRift')
-            ..remove('iridiumSpire');
+            ..remove('sulfurFlats')
+            ..remove('cinnabarVents')
+            ..remove('osmiumCaldera');
           return sites;
         }),
       'Ceres unlocked without Mars': _rawDocument(nowUtc: now)
