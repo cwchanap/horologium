@@ -559,6 +559,11 @@ Future<Duration> _playFrontier(
   }
 
   final mastery = player.clock.now.difference(runStart);
+  expect(
+    previousMastery,
+    greaterThan(Duration.zero),
+    reason: '$tag phase starts at the previous planet mastery, not run start',
+  );
   final phase = mastery - previousMastery;
   debugPrint(
     'MASTERY planet=$tag step=${player.step.inHours}h elapsed='
@@ -756,11 +761,12 @@ _playRun(JourneyPlayer player, Duration cadence) async {
     isTrue,
   );
 
+  final lunar = player.clock.now.difference(runStart);
   final mars = await _playFrontier(
     player,
     MiningPlanetId.marsFrontier,
     runStart: runStart,
-    previousMastery: Duration.zero,
+    previousMastery: lunar,
   );
   final ceres = await _playFrontier(
     player,
@@ -866,6 +872,19 @@ Future<void> _journey(
   expect(run1.ceres, lessThanOrEqualTo(ceresMaximum));
   expect(run1.io, greaterThanOrEqualTo(ioMinimum));
   expect(run1.io, lessThanOrEqualTo(ioMaximum));
+
+  final ceresPhase = run1.ceres - run1.mars;
+  final ioPhase = run1.io - run1.ceres;
+  final ioToCeresPhase = ioPhase.inMicroseconds / ceresPhase.inMicroseconds;
+  expect(
+    ioToCeresPhase,
+    greaterThanOrEqualTo(1.2),
+    reason:
+        'run 1 Io phase ${(ioPhase.inMinutes / 60).toStringAsFixed(1)}h vs '
+        'Ceres phase ${(ceresPhase.inMinutes / 60).toStringAsFixed(1)}h at '
+        '${cadence.inHours}h cadence',
+  );
+  expect(ioToCeresPhase, lessThanOrEqualTo(2.0));
 
   final beforeReload = controller.state;
   final reloaded = MiningController(

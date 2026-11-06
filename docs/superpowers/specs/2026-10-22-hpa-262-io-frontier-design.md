@@ -113,12 +113,12 @@ Run 2 sped up relative to run 1: Io mastery **60.0 h vs 86.0 h = 69.8% ≤ 80%**
 Selected final `MASTERY` / `CADENCE` / `RELAUNCH` log lines (phases are previous-planet mastery → this-planet mastery):
 
 ```text
-MASTERY planet=Mars step=2h elapsed=28.1h marsPhase=28.1h visits=17 reward=0 cash=6346801->6346801 tech={extraction: 5, logistics: 5, surveying: 5}
+MASTERY planet=Mars step=2h elapsed=28.1h marsPhase=22.0h visits=17 reward=0 cash=6346801->6346801 tech={extraction: 5, logistics: 5, surveying: 5}
 MASTERY planet=Ceres step=2h elapsed=50.0h ceresPhase=22.0h visits=28 reward=0 cash=5935678->5935678 tech={extraction: 5, logistics: 5, surveying: 5}
 CADENCE step=120m phase=Ceres mastery before Io unlock elapsed=14.0h visits=7 cash=95057032 bought=Iridium Spire +T1,Iridium Spire +T1
 MASTERY planet=Io step=2h elapsed=86.0h ioPhase=36.0h visits=46 reward=90000000 cash=7716303->97716303 tech={extraction: 5, logistics: 5, surveying: 5}
 RELAUNCH run=2 mastery=60.0h run1=86.0h finalPlanet=Io Frontier
-MASTERY planet=Mars step=6h elapsed=78.0h marsPhase=78.0h visits=16 reward=0 cash=5332905->5332905 tech={extraction: 0, logistics: 5, surveying: 5}
+MASTERY planet=Mars step=6h elapsed=78.0h marsPhase=60.0h visits=16 reward=0 cash=5332905->5332905 tech={extraction: 0, logistics: 5, surveying: 5}
 MASTERY planet=Ceres step=6h elapsed=144.1h ceresPhase=66.0h visits=27 reward=0 cash=4921785->4921785 tech={extraction: 0, logistics: 5, surveying: 5}
 CADENCE step=360m phase=Ceres mastery before Io unlock elapsed=42.0h visits=7 cash=94043145 bought=Iridium Spire +T1,Iridium Spire +T1
 MASTERY planet=Io step=6h elapsed=252.1h ioPhase=108.0h visits=45 reward=90000000 cash=6702425->96702425 tech={extraction: 0, logistics: 5, surveying: 5}
