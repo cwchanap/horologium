@@ -346,10 +346,13 @@ void main() {
         isFalse,
       );
 
+      final ioUnlockCost = content
+          .planet(MiningPlanetId.ioFrontier)
+          .unlockCashCost;
       final ceres = StellarMapView.from(
         state: stateWith(
           now: now,
-          cash: 90000000,
+          cash: ioUnlockCost,
           technology: const TechnologyLevels(surveying: 5),
           unlockedPlanets: {
             MiningPlanetId.homeworld,
@@ -379,7 +382,7 @@ void main() {
       expect(io.hasRequiredMastery, isTrue);
       expect(io.requiredSurveyingLevel, 5);
       expect(io.hasSurveying, isTrue);
-      expect(io.unlockCashCost, 90000000);
+      expect(io.unlockCashCost, ioUnlockCost);
       expect(io.hasCash, isTrue);
       expect(io.siteTotal, 3);
       expect(io.canUnlock, isTrue);

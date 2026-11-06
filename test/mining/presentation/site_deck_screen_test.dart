@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
@@ -8,6 +10,7 @@ import 'package:horologium/mining/next_goal_view.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
+import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:horologium/mining/presentation/site_deck_screen.dart';
 import 'package:horologium/mining/site_deck_view.dart';
 
@@ -101,6 +104,7 @@ Future<void> _pumpDeck(
   Size size = const Size(360, 640),
   double textScale = 1,
   double paddingTop = 0,
+  AssetBundle? assetBundle,
   VoidCallback? onSellCargo,
   ValueChanged<MiningSiteId>? onEnterSite,
   ValueChanged<MiningSiteId>? onUnlockSite,
@@ -116,18 +120,22 @@ Future<void> _pumpDeck(
     tester.view.resetDevicePixelRatio();
     tester.view.resetPadding();
   });
+  Widget home = SiteDeckScreen(
+    view: view,
+    onEnterSite: onEnterSite ?? (_) {},
+    onUnlockSite: onUnlockSite ?? (_) {},
+    onSellCargo: onSellCargo ?? () {},
+    onDestinationSelected: onDestinationSelected ?? (_) {},
+    nextGoal: nextGoal,
+    onGoalSelected: onGoalSelected,
+  );
+  if (assetBundle != null) {
+    home = DefaultAssetBundle(bundle: assetBundle, child: home);
+  }
   await tester.pumpWidget(
     MaterialApp(
       theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
-      home: SiteDeckScreen(
-        view: view,
-        onEnterSite: onEnterSite ?? (_) {},
-        onUnlockSite: onUnlockSite ?? (_) {},
-        onSellCargo: onSellCargo ?? () {},
-        onDestinationSelected: onDestinationSelected ?? (_) {},
-        nextGoal: nextGoal,
-        onGoalSelected: onGoalSelected,
-      ),
+      home: home,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(
           context,
@@ -137,6 +145,14 @@ Future<void> _pumpDeck(
     ),
   );
   await tester.pump();
+}
+
+class _MissingCargoIconBundle extends CachingAssetBundle {
+  @override
+  Future<ByteData> load(String key) async {
+    if (key == MiningVisuals.cargoIcon) throw FlutterError('Missing $key');
+    return rootBundle.load(key);
+  }
 }
 
 void main() {
@@ -402,6 +418,45 @@ void main() {
         findsOneWidget,
       );
     });
+  }
+
+  for (final size in const [Size(360, 640), Size(430, 932)]) {
+    testWidgets('Io deck falls back to the cargo icon when its asset misses '
+        'at ${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+      final state = _stateWith(
+        cash: 90_000_000,
+        unlockedPlanetIds: MiningPlanetId.values.toSet(),
+        activePlanetId: MiningPlanetId.ioFrontier,
+        sites: {
+          MiningSiteId.frozenBasin: _progress(unlocked: true),
+          MiningSiteId.ochreBasin: _progress(unlocked: true),
+          MiningSiteId.nickelShoals: _progress(unlocked: true),
+          MiningSiteId.sulfurFlats: _progress(
+            unlocked: true,
+            commissioned: true,
+            storedAmount: 1200,
+            rigs: [
+              MiningRigPlacement(
+                tier: RigTier.t1,
+                cell: firstPlayableCell(
+                  _content.site(MiningSiteId.sulfurFlats),
+                ),
+              ),
+            ],
+          ),
+        },
+      );
+      await _pumpDeck(
+        tester,
+        view: _deckView(state),
+        size: size,
+        assetBundle: _MissingCargoIconBundle(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byIcon(Icons.inventory_2_rounded), findsNWidgets(2));
+    }, skip: kIsWeb);
   }
 
   testWidgets('keeps site art dominant and exposes visual HUD gauges', (

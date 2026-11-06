@@ -505,7 +505,7 @@ void main() {
         '${viewport.width.toInt()}x${viewport.height.toInt()}', (tester) async {
       final view = StellarMapView.from(
         state: _stateWith(
-          cash: 90000000,
+          cash: _content.planet(MiningPlanetId.ioFrontier).unlockCashCost,
           technology: const TechnologyLevels(surveying: 5),
           unlockedPlanets: {
             MiningPlanetId.homeworld,

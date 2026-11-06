@@ -337,7 +337,9 @@ void main() {
         expect(
           find.descendant(
             of: io,
-            matching: find.byKey(Key('offline-resource-${resource.name}')),
+            matching: find.byIcon(
+              MiningContentRegistry.resourceSilhouettes[resource]!.icon,
+            ),
           ),
           findsOneWidget,
         );
