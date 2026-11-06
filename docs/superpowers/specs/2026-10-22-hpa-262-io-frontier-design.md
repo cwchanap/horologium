@@ -1,7 +1,7 @@
 # HPA-262 Io Frontier Content Pack Design
 
 - Date: 2026-10-22
-- Status: Implemented (2026-11-05); all repository gates green on PR #45. Previously: Proposed, revised after PR #45 review (2026-11-04)
+- Status: Implemented (2026-11-05); all repository gates passed locally. Previously: Proposed, revised after PR #45 review (2026-11-04)
 - Linear: [HPA-262](https://linear.app/cwchanap/issue/HPA-262/mining-content-ship-io-frontier-as-the-fifth-planet-after-ceres) — Ship Io Frontier as the fifth planet after Ceres
 - Baseline: current `main` after [HPA-427 / PR #48](https://github.com/cwchanap/horologium/pull/48) (Relaunch) and [HPA-87 / PR #51](https://github.com/cwchanap/horologium/pull/51) (all seven Io images)
 - Asset dependency: [HPA-87](https://linear.app/cwchanap/issue/HPA-87/mining-art-io-frontier-planet-cavern-and-node-art) — complete; no art work in HPA-262
