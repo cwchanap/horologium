@@ -65,19 +65,23 @@ void main() {
     expect(state.sites[MiningSiteId.landingBasin]!.commissioned, isFalse);
     expect(state.sites[MiningSiteId.landingBasin]!.storedAmount, 0);
     expect(state.sites[MiningSiteId.landingBasin]!.rigPlacements, isEmpty);
-    expect(
-      state.docks[MiningPlanetId.ceresFrontier]!.values,
-      everyElement(isNull),
-    );
+    for (final planet in [
+      MiningPlanetId.ceresFrontier,
+      MiningPlanetId.ioFrontier,
+    ]) {
+      expect(state.docks[planet]!.values, everyElement(isNull));
+    }
   });
 
   test('fresh state has exact bay keys on every planet and empty sites', () {
     final state = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 26, 12));
 
+    expect(state.docks, hasLength(5));
     expect(state.docks.keys.toSet(), MiningPlanetId.values.toSet());
     for (final bays in state.docks.values) {
       expect(bays.keys.toSet(), DockBayId.values.toSet());
     }
+    expect(state.sites, hasLength(15));
     expect(state.sites.keys.toSet(), MiningSiteId.values.toSet());
     for (final progress in state.sites.values) {
       expect(progress.rigPlacements, isEmpty);

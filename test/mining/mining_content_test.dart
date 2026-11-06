@@ -155,6 +155,16 @@ void main() {
       MiningSiteId.cinnabarVents,
       MiningSiteId.osmiumCaldera,
     ]);
+
+    final siteIds = [
+      for (final planet in content.planets.values)
+        for (final site in planet.sites) site.id,
+    ];
+    expect(siteIds.toSet(), hasLength(15));
+    expect({
+      for (final planet in content.planets.values)
+        for (final site in planet.sites) site.resource,
+    }, ResourceType.values.toSet());
   });
 
   test('freezes all site economy and progression availability values', () {

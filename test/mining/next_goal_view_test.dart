@@ -317,6 +317,34 @@ void main() {
       expect(goal.target, const MiningGoalTarget.stellarMap());
     });
 
+    test('Ceres mastery points at the Io unlock', () {
+      final goal = _goal(
+        _stateWith(
+          cash: 1_000_000,
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanetIds: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+            MiningPlanetId.marsFrontier,
+            MiningPlanetId.ceresFrontier,
+          },
+          activePlanetId: MiningPlanetId.ceresFrontier,
+          sites: {
+            ..._commissionedSites(_homeworldSites),
+            ..._commissionedSites(_lunarSites),
+            ..._commissionedSites(_marsSites),
+            ..._commissionedSites(_ceresSites),
+          },
+        ),
+      );
+
+      expect(goal.kind, MiningGoalKind.unlockPlanet);
+      expect(goal.title, 'Unlock Io Frontier');
+      expect(goal.cashCost, 90000000);
+      expect(goal.cashLabel, '1.00M / 90.00M');
+      expect(goal.target, const MiningGoalTarget.stellarMap());
+    });
+
     test('the Ceres ladder walks its sites in order', () {
       MiningNextGoalView ceresGoal(Map<MiningSiteId, SiteProgress> ceres) =>
           _goal(
@@ -348,6 +376,40 @@ void main() {
           MiningSiteId.platinumRift: _commissioned(),
         }).title,
         'Unlock Iridium Spire',
+      );
+    });
+
+    test('the Io ladder walks its sites in order', () {
+      MiningNextGoalView ioGoal(Map<MiningSiteId, SiteProgress> io) => _goal(
+        _stateWith(
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanetIds: MiningPlanetId.values.toSet(),
+          activePlanetId: MiningPlanetId.ioFrontier,
+          docks: {MiningPlanetId.ioFrontier: _dock(RigTier.t1)},
+          sites: {
+            ..._commissionedSites(_homeworldSites),
+            ..._commissionedSites(_lunarSites),
+            ..._commissionedSites(_marsSites),
+            ..._commissionedSites(_ceresSites),
+            ...io,
+          },
+        ),
+      );
+
+      expect(
+        ioGoal({MiningSiteId.sulfurFlats: _progress(unlocked: true)}).title,
+        'Commission Sulfur Flats',
+      );
+      expect(
+        ioGoal({MiningSiteId.sulfurFlats: _commissioned()}).title,
+        'Unlock Cinnabar Vents',
+      );
+      expect(
+        ioGoal({
+          MiningSiteId.sulfurFlats: _commissioned(),
+          MiningSiteId.cinnabarVents: _commissioned(),
+        }).title,
+        'Unlock Osmium Caldera',
       );
     });
 

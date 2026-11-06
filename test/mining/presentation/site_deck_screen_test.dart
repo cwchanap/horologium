@@ -354,6 +354,56 @@ void main() {
     });
   }
 
+  for (final size in const [Size(360, 640), Size(430, 932)]) {
+    testWidgets('renders an Io deck with its planet art at '
+        '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+      final state = _stateWith(
+        cash: 90_000_000,
+        unlockedPlanetIds: MiningPlanetId.values.toSet(),
+        activePlanetId: MiningPlanetId.ioFrontier,
+        sites: {
+          MiningSiteId.frozenBasin: _progress(unlocked: true),
+          MiningSiteId.ochreBasin: _progress(unlocked: true),
+          MiningSiteId.nickelShoals: _progress(unlocked: true),
+          MiningSiteId.sulfurFlats: _progress(
+            unlocked: true,
+            commissioned: true,
+            storedAmount: 1200,
+            rigs: [
+              MiningRigPlacement(
+                tier: RigTier.t1,
+                cell: firstPlayableCell(
+                  _content.site(MiningSiteId.sulfurFlats),
+                ),
+              ),
+            ],
+          ),
+        },
+      );
+      await _pumpDeck(tester, view: _deckView(state), size: size);
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('IO FRONTIER'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Image &&
+              widget.image is AssetImage &&
+              (widget.image as AssetImage).assetName ==
+                  'assets/images/mining/planets/io_frontier.png',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('site-card-sulfurFlats')), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(
+          RegExp(r'Cinnabar Vents.*locked', caseSensitive: false),
+        ),
+        findsOneWidget,
+      );
+    });
+  }
+
   testWidgets('keeps site art dominant and exposes visual HUD gauges', (
     tester,
   ) async {

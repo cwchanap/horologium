@@ -480,6 +480,92 @@ void main() {
     });
   }
 
+  testWidgets('fresh map teases Io behind Ceres', (tester) async {
+    final view = StellarMapView.from(
+      state: MiningSave.initial(nowUtc: _start),
+      content: _content,
+    );
+    await _pumpMap(tester, view: view);
+
+    final io = find.byKey(const Key('mining-stellar-map-teaser-ioFrontier'));
+    expect(io, findsOneWidget);
+    expect(
+      find.descendant(of: io, matching: find.text('UNLOCK CERES FIRST')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('mining-stellar-map-planet-ioFrontier')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final viewport in const [Size(360, 640), Size(430, 932)]) {
+    testWidgets('Ceres mastery shows a ready Io card with compact cash at '
+        '${viewport.width.toInt()}x${viewport.height.toInt()}', (tester) async {
+      final view = StellarMapView.from(
+        state: _stateWith(
+          cash: 90000000,
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+            MiningPlanetId.marsFrontier,
+            MiningPlanetId.ceresFrontier,
+          },
+          activePlanet: MiningPlanetId.ceresFrontier,
+          sites: {
+            for (final planet in const [
+              MiningPlanetId.homeworld,
+              MiningPlanetId.lunarFrontier,
+              MiningPlanetId.marsFrontier,
+              MiningPlanetId.ceresFrontier,
+            ])
+              for (final site in _content.planet(planet).sites)
+                site.id: _progress(unlocked: true, commissioned: true),
+          },
+        ),
+        content: _content,
+      );
+      MiningPlanetId? unlocked;
+      await _pumpMap(
+        tester,
+        view: view,
+        viewport: viewport,
+        onUnlock: (id) => unlocked = id,
+      );
+
+      final io = find.byKey(const Key('mining-stellar-map-planet-ioFrontier'));
+      expect(io, findsOneWidget);
+      expect(
+        find.descendant(of: io, matching: find.text('Io Frontier')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: io, matching: find.text('90.00M')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: io, matching: find.text('UNLOCK FOR 90.00M CASH')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('90000000'), findsNothing);
+      expect(
+        find.byKey(const Key('mining-stellar-map-teaser-ioFrontier')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+
+      final unlock = find.byKey(
+        const Key('mining-stellar-map-unlock-ioFrontier'),
+      );
+      await tester.ensureVisible(unlock);
+      await tester.pump();
+      await tester.tap(unlock);
+      expect(unlocked, MiningPlanetId.ioFrontier);
+    });
+  }
+
   testWidgets('critical map controls fit both phone sizes at text scale 1.3', (
     tester,
   ) async {

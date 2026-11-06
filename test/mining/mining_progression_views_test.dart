@@ -329,6 +329,72 @@ void main() {
       expect(ceres.canUnlock, isTrue);
     });
 
+    test('Io stays hidden until Ceres is unlocked, then shows its gates', () {
+      final mars = StellarMapView.from(
+        state: stateWith(
+          now: now,
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+            MiningPlanetId.marsFrontier,
+          },
+        ),
+        content: content,
+      );
+      expect(
+        mars.planets.any((planet) => planet.id == MiningPlanetId.ioFrontier),
+        isFalse,
+      );
+
+      final ceres = StellarMapView.from(
+        state: stateWith(
+          now: now,
+          cash: 90000000,
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+            MiningPlanetId.marsFrontier,
+            MiningPlanetId.ceresFrontier,
+          },
+          sites: {
+            ...commissionedSites(MiningPlanetId.homeworld),
+            ...commissionedSites(MiningPlanetId.lunarFrontier),
+            ...commissionedSites(MiningPlanetId.marsFrontier),
+            ...commissionedSites(MiningPlanetId.ceresFrontier),
+          },
+        ),
+        content: content,
+      );
+      expect(ceres.planets.map((planet) => planet.id), [
+        MiningPlanetId.homeworld,
+        MiningPlanetId.lunarFrontier,
+        MiningPlanetId.marsFrontier,
+        MiningPlanetId.ceresFrontier,
+        MiningPlanetId.ioFrontier,
+      ]);
+      final io = ceres.planet(MiningPlanetId.ioFrontier);
+      expect(io.isUnlocked, isFalse);
+      expect(io.requiredMasteryPlanetId, MiningPlanetId.ceresFrontier);
+      expect(io.hasRequiredMastery, isTrue);
+      expect(io.requiredSurveyingLevel, 5);
+      expect(io.hasSurveying, isTrue);
+      expect(io.unlockCashCost, 90000000);
+      expect(io.hasCash, isTrue);
+      expect(io.siteTotal, 3);
+      expect(io.canUnlock, isTrue);
+      expect(io.requirements.map((requirement) => requirement.label), [
+        'Ceres Frontier sites 3/3',
+        'Surveying 5',
+        '90.00M cash',
+      ]);
+      expect(io.requirements.map((requirement) => requirement.isSatisfied), [
+        true,
+        true,
+        true,
+      ]);
+    });
+
     test('each planet reports commissioned progress from its own sites', () {
       final view = StellarMapView.from(
         state: stateWith(
