@@ -94,8 +94,8 @@ flutter build ios --simulator --debug
 
 ## Expected changes (same PR #45)
 
-**Planning only today:** this design document and `docs/superpowers/specs/2026-10-22-hpa-262-io-frontier-design.md`.
+**Planning phase (docs-only commits, historical):** this plan and `docs/superpowers/specs/2026-10-22-hpa-262-io-frontier-design.md`.
 
-**Implementation after plan review:** `lib/game/resources/resource_type.dart`, `lib/mining/mining_content.dart`, `lib/mining/presentation/offline_return_sheet.dart`, `lib/mining/presentation/mining_visuals.dart`, existing matching tests under `test/resources/`, `test/mining/`, `test/integration/merge_mining_journey_test.dart`, and `CLAUDE.md`.
+**Implementation (landed on this branch):** `lib/game/resources/resource_type.dart`, `lib/mining/mining_content.dart`, `lib/mining/presentation/offline_return_sheet.dart`, `lib/mining/presentation/mining_visuals.dart`, existing matching tests under `test/resources/`, `test/mining/`, `test/integration/merge_mining_journey_test.dart`, and `CLAUDE.md`.
 
-Io's seven images already exist on `main` via HPA-87 / PR #51 and **must not appear in this PR's diff**. This review commit changes documentation only; Flutter tests/builds have **not** been executed as part of addressing the review.
+Io's seven images already exist on `main` via HPA-87 / PR #51 and **must not appear in this PR's diff**. The docs-only review commits ran no Flutter tests or builds; the implementation that followed passed all repository gates locally — see the spec's `Status: Implemented (2026-11-05)` line.
