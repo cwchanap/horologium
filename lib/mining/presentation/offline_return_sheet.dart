@@ -453,7 +453,10 @@ class OfflineReturnSheet extends StatelessWidget {
       ResourceType.cobaltOre ||
       ResourceType.nickelOre ||
       ResourceType.platinum ||
-      ResourceType.iridium => null,
+      ResourceType.iridium ||
+      ResourceType.sulfur ||
+      ResourceType.cinnabar ||
+      ResourceType.osmium => null,
     };
     return SizedBox(
       key: Key('offline-resource-${resource.name}'),

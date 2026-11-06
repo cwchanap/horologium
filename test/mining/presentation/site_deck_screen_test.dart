@@ -58,11 +58,11 @@ MiningNextGoalView _goalFor(MiningSave state) => MiningNextGoalView.from(
   sellableValue: _deckView(state).projectedValue,
 );
 
-/// The longest authored strip copy: Ceres's last site names its reward.
+/// The longest authored strip copy: Io's last site names its reward.
 const _longGoal = MiningNextGoalView(
   kind: MiningGoalKind.commissionSite,
   title: 'Commission Titanium Highlands',
-  detail: 'Last Ceres Frontier site: mastery pays +30.00M cash.',
+  detail: 'Last Io Frontier site: mastery pays +90.00M cash.',
   target: MiningGoalTarget.mineSite(MiningSiteId.titaniumHighlands),
   cash: 12_000,
   cashCost: 25_000,

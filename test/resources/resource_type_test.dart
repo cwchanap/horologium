@@ -18,6 +18,9 @@ void main() {
         ResourceType.nickelOre,
         ResourceType.platinum,
         ResourceType.iridium,
+        ResourceType.sulfur,
+        ResourceType.cinnabar,
+        ResourceType.osmium,
       ]),
     );
   });
@@ -35,5 +38,8 @@ void main() {
     expect(ResourceType.nickelOre.name, 'nickelOre');
     expect(ResourceType.platinum.name, 'platinum');
     expect(ResourceType.iridium.name, 'iridium');
+    expect(ResourceType.sulfur.name, 'sulfur');
+    expect(ResourceType.cinnabar.name, 'cinnabar');
+    expect(ResourceType.osmium.name, 'osmium');
   });
 }

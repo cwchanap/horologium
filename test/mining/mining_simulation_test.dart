@@ -244,7 +244,7 @@ void main() {
     },
   );
 
-  test('one window accrues all four planets and fills Ceres storage', () {
+  test('one window accrues every unlocked planet and fills Ceres storage', () {
     final base = threePlanetState(start);
     MiningRigPlacement t1(MiningSiteId id) =>
         MiningRigPlacement(tier: RigTier.t1, cell: _firstCell(id));

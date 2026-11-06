@@ -224,7 +224,7 @@ void main() {
         );
         expect(
           ceres.track(TechnologyTrack.surveying).currentEffect,
-          '12 of 12 sites revealable',
+          '15 of 15 sites revealable',
         );
       },
     );
@@ -313,7 +313,12 @@ void main() {
         ),
         content: content,
       );
-      expect(mars.planets.map((planet) => planet.id), MiningPlanetId.values);
+      expect(mars.planets.map((planet) => planet.id), [
+        MiningPlanetId.homeworld,
+        MiningPlanetId.lunarFrontier,
+        MiningPlanetId.marsFrontier,
+        MiningPlanetId.ceresFrontier,
+      ]);
       final ceres = mars.planet(MiningPlanetId.ceresFrontier);
       expect(ceres.isUnlocked, isFalse);
       expect(ceres.requiredMasteryPlanetId, MiningPlanetId.marsFrontier);
@@ -503,7 +508,7 @@ void main() {
         state: masteredSave().copyWith(
           sites: {
             ...masteredSave().sites,
-            MiningSiteId.iridiumSpire: progress(unlocked: true),
+            MiningSiteId.osmiumCaldera: progress(unlocked: true),
           },
         ),
         content: content,

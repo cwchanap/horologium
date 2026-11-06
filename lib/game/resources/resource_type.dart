@@ -11,4 +11,7 @@ enum ResourceType {
   nickelOre,
   platinum,
   iridium,
+  sulfur,
+  cinnabar,
+  osmium,
 }

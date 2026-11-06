@@ -32,7 +32,10 @@ abstract final class MiningVisuals {
     MiningSiteId.cobaltChasm ||
     MiningSiteId.nickelShoals ||
     MiningSiteId.platinumRift ||
-    MiningSiteId.iridiumSpire => null,
+    MiningSiteId.iridiumSpire ||
+    MiningSiteId.sulfurFlats ||
+    MiningSiteId.cinnabarVents ||
+    MiningSiteId.osmiumCaldera => null,
   };
 
   static const cashIcon = 'assets/images/mining/icons/cash.png';

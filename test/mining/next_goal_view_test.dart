@@ -32,6 +32,10 @@ final _marsSites = _content
     .planet(MiningPlanetId.marsFrontier)
     .sites
     .map((site) => site.id);
+final _ceresSites = _content
+    .planet(MiningPlanetId.ceresFrontier)
+    .sites
+    .map((site) => site.id);
 
 MiningSave _stateWith({
   int? cash,
@@ -347,7 +351,7 @@ void main() {
       );
     });
 
-    test('the last Ceres site names the completion reward', () {
+    test('the last Ceres site no longer names a reward', () {
       final goal = _goal(
         _stateWith(
           technology: const TechnologyLevels(surveying: 5),
@@ -366,10 +370,30 @@ void main() {
       );
 
       expect(goal.title, 'Commission Iridium Spire');
-      expect(
-        goal.detail,
-        'Last Ceres Frontier site: mastery pays +30.00M cash.',
+      expect(goal.detail, 'Deploy a rig beside a resource.');
+    });
+
+    test('the last Io site names the completion reward', () {
+      final goal = _goal(
+        _stateWith(
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanetIds: MiningPlanetId.values.toSet(),
+          activePlanetId: MiningPlanetId.ioFrontier,
+          docks: {MiningPlanetId.ioFrontier: _dock(RigTier.t1)},
+          sites: {
+            ..._commissionedSites(_homeworldSites),
+            ..._commissionedSites(_lunarSites),
+            ..._commissionedSites(_marsSites),
+            ..._commissionedSites(_ceresSites),
+            MiningSiteId.sulfurFlats: _commissioned(),
+            MiningSiteId.cinnabarVents: _commissioned(),
+            MiningSiteId.osmiumCaldera: _progress(unlocked: true),
+          },
+        ),
       );
+
+      expect(goal.title, 'Commission Osmium Caldera');
+      expect(goal.detail, 'Last Io Frontier site: mastery pays +90.00M cash.');
     });
 
     test(
