@@ -445,21 +445,22 @@ Future<Duration> _playFrontier(
   final content = player.content;
   final planet = content.planet(planetId);
   final tag = planet.name.split(' ').first;
-  final previousTag = content
-      .planet(MiningPlanetId.values[planetId.index - 1])
-      .name
-      .split(' ')
-      .first;
+  final previousPlanetId = planet.unlockRequiredMasteryPlanetId;
+  final previousTag = previousPlanetId != null
+      ? content.planet(previousPlanetId).name.split(' ').first
+      : null;
 
   await player.earnUntil(
     cashAtLeast: planet.unlockCashCost,
-    phase: '$previousTag mastery before $tag unlock',
+    phase: previousTag != null
+        ? '$previousTag mastery before $tag unlock'
+        : 'Grind before $tag unlock',
   );
   _expectGoal(
     player,
     MiningGoalKind.unlockPlanet,
     'Unlock ${planet.name}',
-    '$previousTag mastery',
+    previousTag != null ? '$previousTag mastery' : '$tag unlock',
   );
   await expectAction(
     'unlock ${planet.name}',
@@ -473,6 +474,12 @@ Future<Duration> _playFrontier(
     DockBayId.b4: null,
   });
   expect(controller.state.sites[planet.sites.first.id]!.unlocked, isTrue);
+  _expectGoal(
+    player,
+    MiningGoalKind.commissionSite,
+    'Commission ${planet.sites.first.name}',
+    '$tag unlock',
+  );
 
   await expectAction(
     'merge the fresh $tag rigs',
@@ -546,23 +553,28 @@ Future<Duration> _playFrontier(
     isTrue,
   );
 
-  if (planetId == content.finalPlanetId) {
+  final nextPlanet = content.planets.values
+      .cast<MiningPlanetDefinition?>()
+      .firstWhere(
+        (candidate) => candidate?.unlockRequiredMasteryPlanetId == planetId,
+        orElse: () => null,
+      );
+  if (nextPlanet == null) {
     _expectGoal(player, MiningGoalKind.relaunch, 'Relaunch', '$tag mastery');
   } else {
     _expectGoal(
       player,
       MiningGoalKind.unlockPlanet,
-      'Unlock '
-          '${content.planet(MiningPlanetId.values[planetId.index + 1]).name}',
+      'Unlock ${nextPlanet.name}',
       '$tag mastery',
     );
   }
 
   final mastery = player.clock.now.difference(runStart);
   expect(
-    previousMastery,
-    greaterThan(Duration.zero),
-    reason: '$tag phase starts at the previous planet mastery, not run start',
+    mastery,
+    greaterThan(previousMastery),
+    reason: '$tag mastery must advance past ${previousTag ?? 'run start'}',
   );
   final phase = mastery - previousMastery;
   debugPrint(
@@ -884,7 +896,14 @@ Future<void> _journey(
         'Ceres phase ${(ceresPhase.inMinutes / 60).toStringAsFixed(1)}h at '
         '${cadence.inHours}h cadence',
   );
-  expect(ioToCeresPhase, lessThanOrEqualTo(2.0));
+  expect(
+    ioToCeresPhase,
+    lessThanOrEqualTo(2.0),
+    reason:
+        'run 1 Io phase ${(ioPhase.inMinutes / 60).toStringAsFixed(1)}h vs '
+        'Ceres phase ${(ceresPhase.inMinutes / 60).toStringAsFixed(1)}h at '
+        '${cadence.inHours}h cadence',
+  );
 
   final beforeReload = controller.state;
   final reloaded = MiningController(

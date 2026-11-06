@@ -130,6 +130,7 @@ String _groupThousands(int amount) => amount.toString().replaceAllMapped(
 
 const _denseGridWidth = 50;
 const _denseGridHeight = 50;
+const _ioUnlockCashCost = 90000000;
 
 const _surveyingProgressionLevels = <MiningSiteId, List<int>>{
   MiningSiteId.landingBasin: [0, 0, 1, 2],
@@ -644,8 +645,8 @@ class MiningContentRegistry {
       name: 'Io Frontier',
       unlockRequiredMasteryPlanetId: MiningPlanetId.ceresFrontier,
       unlockRequiredSurveyingLevel: 5,
-      unlockCashCost: 90000000,
-      masteryRewardCash: 90000000,
+      unlockCashCost: _ioUnlockCashCost,
+      masteryRewardCash: _ioUnlockCashCost,
       rigSpawnCost: 22500000,
       planetAsset: 'assets/images/mining/planets/io_frontier.png',
       sites: [

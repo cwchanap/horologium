@@ -1139,7 +1139,14 @@ void main() {
           ),
         ]) {
           final planetDefinition = _content.planet(planet);
-          final priorPlanets = MiningPlanetId.values.take(planet.index + 1);
+          final priorPlanets = <MiningPlanetId>[];
+          for (
+            MiningPlanetId? current = planet;
+            current != null;
+            current = _content.planet(current).unlockRequiredMasteryPlanetId
+          ) {
+            priorPlanets.insert(0, current);
+          }
           final controller = await controllerOver(
             MiningSaveRepository(),
             seed: seededSave(

@@ -289,7 +289,16 @@ class _PlanetProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Image.asset(view.planetAsset, width: 34, height: 34),
+      Image.asset(
+        view.planetAsset,
+        width: 34,
+        height: 34,
+        errorBuilder: (context, error, stackTrace) => const SizedBox(
+          width: 34,
+          height: 34,
+          child: Icon(Icons.public_rounded, color: Colors.white24, size: 24),
+        ),
+      ),
       const SizedBox(width: 9),
       Expanded(
         child: Column(
@@ -390,6 +399,8 @@ class _PrototypeSiteCard extends StatelessWidget {
                   key: Key('site-card-${card.id.name}-art'),
                   fit: BoxFit.cover,
                   opacity: locked ? const AlwaysStoppedAnimation(.48) : null,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const SizedBox(),
                 ),
                 DecoratedBox(
                   decoration: BoxDecoration(
@@ -598,7 +609,16 @@ class _AvailableSiteMetrics extends StatelessWidget {
       const SizedBox(width: 8),
       Container(width: 1, height: 13, color: Colors.white24),
       const SizedBox(width: 8),
-      Image.asset(MiningVisuals.cargoIcon, width: 16, height: 16),
+      Image.asset(
+        MiningVisuals.cargoIcon,
+        width: 16,
+        height: 16,
+        errorBuilder: (context, error, stackTrace) => const Icon(
+          Icons.inventory_2_rounded,
+          color: Colors.white54,
+          size: 16,
+        ),
+      ),
       const SizedBox(width: 8),
       const Text('0', style: TextStyle(color: Colors.white54, fontSize: 12)),
     ],

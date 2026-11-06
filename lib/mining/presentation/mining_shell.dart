@@ -609,7 +609,8 @@ class _MiningShellState extends State<MiningShell>
       _refreshPresentation();
       if (result.isSuccess) {
         unawaited(HapticFeedback.lightImpact());
-        // First commissioning also covers planet mastery and the Mars reward.
+        // First commissioning also covers planet mastery and the Io completion
+        // reward.
         final commissioned = _controller.state.sites.entries.any(
           (entry) =>
               entry.value.commissioned &&
