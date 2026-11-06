@@ -435,13 +435,6 @@ Future<void> _commission(JourneyPlayer player, MiningSiteId site) async {
   expect(player.controller.state.sites[site]!.commissioned, isTrue);
 }
 
-/// Plays one frontier planet through public actions, from just after the
-/// previous planet's mastery through this planet's: earns and pays the
-/// unlock, merges the starter T1 bays into the first site, then earns,
-/// unlocks, and commissions each later site in authored order. Reads
-/// planet and site definitions for every price. Returns this planet's
-/// mastery time since [runStart]; the logged phase spans the whole wait
-/// since [previousMastery], including the cash grind before the unlock.
 Future<Duration> _playFrontier(
   JourneyPlayer player,
   MiningPlanetId planetId, {
@@ -776,8 +769,6 @@ _playRun(JourneyPlayer player, Duration cadence) async {
     previousMastery: mars,
   );
 
-  // Ceres is no longer the final planet: Relaunch stays locked until the
-  // final planet is mastered, both as a read model and as an action.
   expect(
     StellarMapView.from(
       state: controller.state,
@@ -801,8 +792,6 @@ _playRun(JourneyPlayer player, Duration cadence) async {
     expect(controller.state.sites[siteId]!.commissioned, isTrue);
   }
 
-  // The final planet's mastery reward pays once: recall and redeploy the
-  // last-site rig without another mastery message or cash delta.
   final finalPlanet = content.planet(content.finalPlanetId);
   final finalSite = finalPlanet.sites.last;
   final cashAfterMastery = controller.state.cash;
