@@ -132,5 +132,5 @@ Everything else should work from existing content-driven seams. The two exhausti
 ## Risks
 
 - **Pacing is unverified.** The proposed amounts are not a model run; the journey must measure before literal values are asserted broadly in tests, so one tuning pass does not cause repeated rewrites.
-- **Stale exhaustive assertions and fixtures.** Tests listing twelve sites or resources and a Ceres-only `finalPlanetMasteredState()` fixture will break. Fix the failing existing assertions as part of the first green test pass, then pin tuned Io content in focused tests. Avoid a duplicate Io unlock guard-order test.
+- **Stale exhaustive assertions and fixtures.** Task 1 only fixes journey-local expectations needed to measure and tune the economy; existing unit/widget assertions that still assume twelve sites or Ceres as final are deliberately handled in **Task 2**, after Io values are finalized. Make `finalPlanetMasteredState()` and `docksFor()` enum-derived there (the latter currently returns a hard-coded four-planet map); keep one generic Ceres unlock guard-order test rather than adding a duplicate for Io.
 - **Relaunch baseline.** HPA-427 is already on `main`; a first-run-only Io journey would leave the second-run acceptance unverified.
