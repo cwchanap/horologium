@@ -44,8 +44,9 @@ class MiningGoalTarget {
 }
 
 /// Stateless projection of the one next progression step, walked along the
-/// authored Homeworld -> Lunar Frontier -> Mars Frontier order in the same
-/// guard order as [MiningController]'s unlock, research, and planet actions.
+/// authored Homeworld -> Lunar Frontier -> Mars Frontier -> Ceres Frontier ->
+/// Io Frontier order in the same guard order as [MiningController]'s unlock,
+/// research, and planet actions.
 class MiningNextGoalView {
   const MiningNextGoalView({
     required this.kind,

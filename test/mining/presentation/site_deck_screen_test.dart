@@ -147,10 +147,16 @@ Future<void> _pumpDeck(
   await tester.pump();
 }
 
-class _MissingCargoIconBundle extends CachingAssetBundle {
+class _MissingIoDeckArtBundle extends CachingAssetBundle {
   @override
   Future<ByteData> load(String key) async {
-    if (key == MiningVisuals.cargoIcon) throw FlutterError('Missing $key');
+    if (key == MiningVisuals.cargoIcon ||
+        key == 'assets/images/mining/planets/io_frontier.png' ||
+        key == 'assets/images/mining/caverns/sulfur.png' ||
+        key == 'assets/images/mining/caverns/cinnabar.png' ||
+        key == 'assets/images/mining/caverns/osmium.png') {
+      throw FlutterError('Missing $key');
+    }
     return rootBundle.load(key);
   }
 }
@@ -421,42 +427,47 @@ void main() {
   }
 
   for (final size in const [Size(360, 640), Size(430, 932)]) {
-    testWidgets('Io deck falls back to the cargo icon when its asset misses '
-        'at ${size.width.toInt()}x${size.height.toInt()}', (tester) async {
-      final state = _stateWith(
-        cash: 90_000_000,
-        unlockedPlanetIds: MiningPlanetId.values.toSet(),
-        activePlanetId: MiningPlanetId.ioFrontier,
-        sites: {
-          MiningSiteId.frozenBasin: _progress(unlocked: true),
-          MiningSiteId.ochreBasin: _progress(unlocked: true),
-          MiningSiteId.nickelShoals: _progress(unlocked: true),
-          MiningSiteId.sulfurFlats: _progress(
-            unlocked: true,
-            commissioned: true,
-            storedAmount: 1200,
-            rigs: [
-              MiningRigPlacement(
-                tier: RigTier.t1,
-                cell: firstPlayableCell(
-                  _content.site(MiningSiteId.sulfurFlats),
+    testWidgets(
+      'Io deck falls back when its planet, card, or cargo assets miss '
+      'at ${size.width.toInt()}x${size.height.toInt()}',
+      (tester) async {
+        final state = _stateWith(
+          cash: 90_000_000,
+          unlockedPlanetIds: MiningPlanetId.values.toSet(),
+          activePlanetId: MiningPlanetId.ioFrontier,
+          sites: {
+            MiningSiteId.frozenBasin: _progress(unlocked: true),
+            MiningSiteId.ochreBasin: _progress(unlocked: true),
+            MiningSiteId.nickelShoals: _progress(unlocked: true),
+            MiningSiteId.sulfurFlats: _progress(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 1200,
+              rigs: [
+                MiningRigPlacement(
+                  tier: RigTier.t1,
+                  cell: firstPlayableCell(
+                    _content.site(MiningSiteId.sulfurFlats),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        },
-      );
-      await _pumpDeck(
-        tester,
-        view: _deckView(state),
-        size: size,
-        assetBundle: _MissingCargoIconBundle(),
-      );
-      await tester.pumpAndSettle();
+              ],
+            ),
+          },
+        );
+        await _pumpDeck(
+          tester,
+          view: _deckView(state),
+          size: size,
+          assetBundle: _MissingIoDeckArtBundle(),
+        );
+        await tester.pumpAndSettle();
 
-      expect(tester.takeException(), isNull);
-      expect(find.byIcon(Icons.inventory_2_rounded), findsNWidgets(2));
-    }, skip: kIsWeb);
+        expect(tester.takeException(), isNull);
+        expect(find.byIcon(Icons.public_rounded), findsOneWidget);
+        expect(find.byIcon(Icons.inventory_2_rounded), findsNWidgets(2));
+      },
+      skip: kIsWeb,
+    );
   }
 
   testWidgets('keeps site art dominant and exposes visual HUD gauges', (
