@@ -1,6 +1,6 @@
 # HPA-814 — First-session polish: implementation plan
 
-- Status: Proposed; **planning only** on this draft PR (2026-11-07)
+- Status: Implemented (2026-11-08)
 - Linear: https://linear.app/cwchanap/issue/HPA-814/first-session-polish-reachable-rig-cells-clearer-hints-quieter-return
 - Design: [2026-11-07-hpa-814-first-session-polish-design.md](../specs/2026-11-07-hpa-814-first-session-polish-design.md)
 - Baseline: `main` @ `5bc1afe6a52d92b97828a3ea8276cc9a5170a8c4`
