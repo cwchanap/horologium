@@ -58,7 +58,11 @@ TechnologySheetView _view() => const TechnologySheetView(
   ],
 );
 
-Future<void> _pumpSheet(WidgetTester tester, Size viewport) async {
+Future<void> _pumpSheet(
+  WidgetTester tester,
+  Size viewport, {
+  TechnologyTrack? initialTrack,
+}) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = viewport;
   addTearDown(() {
@@ -69,7 +73,11 @@ Future<void> _pumpSheet(WidgetTester tester, Size viewport) async {
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
-        body: TechnologySheet(view: _view(), onPurchase: (_) {}),
+        body: TechnologySheet(
+          view: _view(),
+          onPurchase: (_) {},
+          initialTrack: initialTrack,
+        ),
       ),
     ),
   );
@@ -237,6 +245,13 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(purchases, [TechnologyTrack.extraction]);
+    // A successful purchase keeps the sheet open for another upgrade; the
+    // player, not the button, dismisses it.
+    expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Close Technology'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('mining-technology-sheet')), findsNothing);
 
     // Gated and max-level tracks stay inert.
     await openSheet();
@@ -317,6 +332,98 @@ void main() {
     // and never asks the bundle.
     skip: kIsWeb,
   );
+
+  testWidgets('initialTrack selects its track once', (tester) async {
+    await _pumpSheet(
+      tester,
+      const Size(360, 640),
+      initialTrack: TechnologyTrack.surveying,
+    );
+
+    expect(
+      find.byKey(const Key('mining-technology-buy-surveying')),
+      findsOneWidget,
+    );
+    expect(find.text('9 of 9 sites revealable'), findsOneWidget);
+    expect(
+      find.byKey(const Key('mining-technology-buy-extraction')),
+      findsNothing,
+    );
+
+    // Selection is user-controlled afterwards.
+    await tester.tap(find.byKey(const Key('technology-track-logistics')));
+    await tester.pump();
+    expect(find.text('Commission Landing Basin'), findsOneWidget);
+  });
+
+  testWidgets('keeps its selected track when the view updates live', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 640);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final live = ValueNotifier<TechnologySheetView>(_view());
+    addTearDown(live.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ValueListenableBuilder<TechnologySheetView>(
+            valueListenable: live,
+            builder: (context, view, _) =>
+                TechnologySheet(view: view, onPurchase: (_) {}),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('technology-track-logistics')));
+    await tester.pump();
+    expect(find.text('Commission Landing Basin'), findsOneWidget);
+
+    // The shell reprojects the view after a purchase: same widget position,
+    // new track data, retained selection.
+    live.value = TechnologySheetView(
+      tracks: [
+        _view().tracks.first,
+        const TechnologyTrackView(
+          track: TechnologyTrack.logistics,
+          name: 'Logistics',
+          level: 1,
+          currentEffect: 'Storage ×1.15 · fills in 2h 18m at T1',
+          nextEffect: 'Storage ×1.30 · fills in 2h 35m at T1',
+          cost: 700,
+          gateSiteName: 'Carbon Ridge',
+          isGateSatisfied: true,
+          isAffordable: true,
+          isMaxLevel: false,
+          disabledReason: null,
+        ),
+        _view().tracks.last,
+      ],
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const Key('mining-technology-buy-logistics')),
+      findsOneWidget,
+    );
+    expect(find.text('Storage ×1.15 · fills in 2h 18m at T1'), findsOneWidget);
+    expect(
+      find.text('Next: Storage ×1.30 · fills in 2h 35m at T1'),
+      findsOneWidget,
+    );
+    expect(find.text('Carbon Ridge'), findsOneWidget);
+    expect(
+      find.byKey(const Key('mining-technology-buy-extraction')),
+      findsNothing,
+    );
+    expect(find.text('×1.00'), findsNothing);
+  });
 
   testWidgets('a 750,000 cost fits the landscape button at text scale 1.3', (
     tester,

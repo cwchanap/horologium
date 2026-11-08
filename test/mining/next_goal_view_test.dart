@@ -208,7 +208,10 @@ void main() {
       expect(goal.title, 'Research Surveying 4');
       expect(goal.detail, 'Needed for Titanium Highlands.');
       expect(goal.cashCost, 300000);
-      expect(goal.target, const MiningGoalTarget.technology());
+      expect(
+        goal.target,
+        const MiningGoalTarget.technology(TechnologyTrack.surveying),
+      );
     });
 
     test('a Surveying-gated planet asks for research first', () {
@@ -550,13 +553,35 @@ void main() {
         isNot(const MiningGoalTarget.mineSite(MiningSiteId.carbonRidge)),
       );
       expect(
-        const MiningGoalTarget.technology(),
+        const MiningGoalTarget.technology(TechnologyTrack.surveying),
         isNot(const MiningGoalTarget.stellarMap()),
       );
-      expect(basin.toString(), 'MiningGoalTarget(mineSite, landingBasin)');
+      expect(
+        basin.toString(),
+        'MiningGoalTarget(mineSite, landingBasin, null)',
+      );
       expect(
         const MiningGoalTarget.none().toString(),
-        'MiningGoalTarget(none, null)',
+        'MiningGoalTarget(none, null, null)',
+      );
+    });
+
+    test('technology targets compare by track', () {
+      const surveying = MiningGoalTarget.technology(TechnologyTrack.surveying);
+      const sameSurveying = MiningGoalTarget.technology(
+        TechnologyTrack.surveying,
+      );
+
+      expect(sameSurveying, surveying);
+      expect(sameSurveying.hashCode, surveying.hashCode);
+      expect(surveying.track, TechnologyTrack.surveying);
+      expect(
+        surveying,
+        isNot(const MiningGoalTarget.technology(TechnologyTrack.extraction)),
+      );
+      expect(
+        surveying.toString(),
+        'MiningGoalTarget(technology, null, surveying)',
       );
     });
   });

@@ -12,17 +12,20 @@ class TechnologySheet extends StatefulWidget {
     required this.view,
     required this.onPurchase,
     this.onSelectionChanged,
+    this.initialTrack,
   });
   final TechnologySheetView view;
   final ValueChanged<TechnologyTrack> onPurchase;
   final VoidCallback? onSelectionChanged;
+  final TechnologyTrack? initialTrack;
 
   @override
   State<TechnologySheet> createState() => _TechnologySheetState();
 }
 
 class _TechnologySheetState extends State<TechnologySheet> {
-  TechnologyTrack _selected = TechnologyTrack.extraction;
+  late TechnologyTrack _selected =
+      widget.initialTrack ?? TechnologyTrack.extraction;
 
   void _selectTrack(TechnologyTrack track) {
     if (_selected == track) return;
@@ -356,11 +359,7 @@ class _TechnologySheetState extends State<TechnologySheet> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       onPressed: track.canPurchase
-          ? () {
-              final navigator = Navigator.of(context);
-              if (navigator.canPop()) navigator.pop();
-              widget.onPurchase(track.track);
-            }
+          ? () => widget.onPurchase(track.track)
           : null,
       child: track.isMaxLevel
           ? const Text('Max Level')
