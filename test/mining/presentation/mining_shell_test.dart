@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/audio_manager.dart';
 import 'package:horologium/game/storage_alerts.dart';
 import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/mining_controller.dart';
 import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
@@ -2094,6 +2095,28 @@ void main() {
         ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
         greaterThan(0),
       );
+
+      final accrued = shellHandles(
+        tester,
+      ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount;
+      expect(repository.saveCount, 1);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(repository.saveCount, 2);
+
+      final reloaded = MiningController(
+        content: MiningContentRegistry.stellarMining(),
+        repository: repository,
+        nowUtc: clock.call,
+      );
+      await reloaded.initialize();
+      expect(
+        reloaded.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+        accrued,
+      );
     },
   );
 
@@ -2135,6 +2158,28 @@ void main() {
           tester,
         ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
         greaterThan(0),
+      );
+
+      final accrued = shellHandles(
+        tester,
+      ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount;
+      expect(repository.saveCount, 2);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(repository.saveCount, 3);
+
+      final reloaded = MiningController(
+        content: MiningContentRegistry.stellarMining(),
+        repository: repository,
+        nowUtc: clock.call,
+      );
+      await reloaded.initialize();
+      expect(
+        reloaded.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+        accrued,
       );
     },
   );
@@ -2687,6 +2732,19 @@ void main() {
           find.text('Next: Surveys 3 new Homeworld deposits'),
           findsOneWidget,
         );
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.bySemanticsLabel(
+              RegExp(r'^Surveying level 1, next'),
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: buySurveying, matching: find.text('300')),
+          findsOneWidget,
+        );
 
         await tester.tap(buySurveying);
         await tester.pump(const Duration(milliseconds: 300));
@@ -2696,6 +2754,28 @@ void main() {
         expect(find.text('Surveys 3 new Homeworld deposits'), findsOneWidget);
         expect(
           find.text('Next: Surveys 99 new Homeworld deposits'),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.bySemanticsLabel(
+              RegExp(r'^Surveying level 1, owned'),
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.bySemanticsLabel(
+              RegExp(r'^Surveying level 2, next'),
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: buySurveying, matching: find.text('700')),
           findsOneWidget,
         );
         expect(shellHandles(tester).controller.state.technology.surveying, 1);
@@ -2712,6 +2792,28 @@ void main() {
             'Next: Surveys 194 new Homeworld deposits · '
             'Needed for Lunar Frontier',
           ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.bySemanticsLabel(
+              RegExp(r'^Surveying level 2, owned'),
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.bySemanticsLabel(
+              RegExp(r'^Surveying level 3, next'),
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: buySurveying, matching: find.text('1,500')),
           findsOneWidget,
         );
         expect(find.text('Need 1,500 cash.'), findsOneWidget);
