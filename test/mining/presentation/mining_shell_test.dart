@@ -478,6 +478,7 @@ void main() {
     final repository = CountingMiningSaveRepository();
     await repository.save(
       base.copyWith(
+        technology: const TechnologyLevels(surveying: 3),
         unlockedPlanetIds: {
           MiningPlanetId.homeworld,
           MiningPlanetId.lunarFrontier,
@@ -485,7 +486,14 @@ void main() {
         sites: {
           ...base.sites,
           MiningSiteId.frozenBasin: base.sites[MiningSiteId.frozenBasin]!
-              .copyWith(unlocked: true, storedAmount: 600),
+              .copyWith(
+                unlocked: true,
+                commissioned: true,
+                storedAmount: 600,
+                rigPlacements: [
+                  MiningRigPlacement(tier: RigTier.t1, cell: frozenRigCell),
+                ],
+              ),
         },
       ),
     );
@@ -493,6 +501,16 @@ void main() {
 
     shellHandles(tester).openTechnology();
     await tester.pump();
+
+    // The Lunar cargo must survive loading for the active-planet
+    // assertions to detect a gauge that sums across planets: an
+    // uncommissioned or rigless site would clamp to zero on decode.
+    expect(
+      shellHandles(
+        tester,
+      ).controller.state.sites[MiningSiteId.frozenBasin]!.storedAmount,
+      600,
+    );
 
     final gauge = tester.widget<MiningCargoGauge>(
       find.descendant(

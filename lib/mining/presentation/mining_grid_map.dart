@@ -130,9 +130,17 @@ class _MiningGridMapState extends State<MiningGridMap> {
     return null;
   }
 
+  /// One camera axis: clamps [desired] into the pan interval, or centers
+  /// the child when the bounds are reversed because the viewport is larger
+  /// than the grid (a wide web window or zoomed-out browser).
+  double _axisTranslation(double desired, double lower, double upper) =>
+      lower > upper
+      ? (lower + upper) / 2
+      : desired.clamp(lower, upper).toDouble();
+
   /// The 1.0x transform placed once, before the first InteractiveViewer
   /// build: [focus] lands on the unoccluded viewport's center unless the
-  /// scale-aware pan bounds clamp it closer.
+  /// scale-aware pan bounds clamp it closer or center the axis.
   Matrix4 _initialCamera(Size viewport, Offset focus) {
     final insets = widget.viewportInsets;
     final margin = insets / miningGridMinScale + miningGridOverlayMargin;
@@ -143,12 +151,16 @@ class _MiningGridMapState extends State<MiningGridMap> {
       insets.left + (viewport.width - insets.horizontal) / 2,
       insets.top + (viewport.height - insets.vertical) / 2,
     );
-    final tx = (center.dx - focus.dx)
-        .clamp(viewport.width - childWidth - margin.right, margin.left)
-        .toDouble();
-    final ty = (center.dy - focus.dy)
-        .clamp(viewport.height - childHeight - margin.bottom, margin.top)
-        .toDouble();
+    final tx = _axisTranslation(
+      center.dx - focus.dx,
+      viewport.width - childWidth - margin.right,
+      margin.left,
+    );
+    final ty = _axisTranslation(
+      center.dy - focus.dy,
+      viewport.height - childHeight - margin.bottom,
+      margin.top,
+    );
     return Matrix4.translationValues(tx, ty, 0);
   }
 
