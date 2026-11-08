@@ -17,6 +17,7 @@ MiningSave stateWith({
   int? cash,
   TechnologyLevels? technology,
   Set<MiningPlanetId>? unlockedPlanets,
+  MiningPlanetId? activePlanetId,
   Map<MiningSiteId, SiteProgress>? sites,
 }) {
   var base = MiningSave.initial(nowUtc: now);
@@ -26,6 +27,7 @@ MiningSave stateWith({
   return base.copyWith(
     cash: cash,
     technology: technology,
+    activePlanetId: activePlanetId,
     sites: sites == null ? null : {...base.sites, ...sites},
   );
 }
@@ -170,64 +172,117 @@ void main() {
     });
 
     test(
-      'surveying effect counts unlockable sites on currently unlocked planets',
+      'surveying effect explains what each level adds on the active planet',
       () {
         final view = TechnologySheetView.from(
           state: stateWith(now: now),
           content: content,
         );
+        final surveying = view.track(TechnologyTrack.surveying);
         expect(
-          view.track(TechnologyTrack.surveying).currentEffect,
-          '3 of 3 sites revealable',
+          surveying.currentEffect,
+          'Reveals Carbon Ridge · Reveals Granite Crater · '
+          'Surveys 4 new Homeworld deposits',
+        );
+        expect(surveying.nextEffect, 'Surveys 3 new Homeworld deposits');
+      },
+    );
+
+    test('surveying effect names the frontier a level unlocks', () {
+      final view = TechnologySheetView.from(
+        state: stateWith(
+          now: now,
+          technology: const TechnologyLevels(surveying: 2),
+        ),
+        content: content,
+      );
+      final surveying = view.track(TechnologyTrack.surveying);
+      expect(surveying.currentEffect, 'Surveys 99 new Homeworld deposits');
+      expect(
+        surveying.nextEffect,
+        'Surveys 194 new Homeworld deposits · Needed for Lunar Frontier',
+      );
+    });
+
+    test(
+      'surveying effect follows the active planet and skips unlocked work',
+      () {
+        final lunar = stateWith(
+          now: now,
+          technology: const TechnologyLevels(surveying: 3),
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+          activePlanetId: MiningPlanetId.lunarFrontier,
+        );
+        final surveying = TechnologySheetView.from(
+          state: lunar,
+          content: content,
+        ).track(TechnologyTrack.surveying);
+        // Lunar Frontier is already unlocked, so its Surveying requirement
+        // is not restated.
+        expect(
+          surveying.currentEffect,
+          'Reveals Frozen Basin · Surveys 2 new Lunar Frontier deposits',
+        );
+        expect(
+          surveying.nextEffect,
+          'Reveals Titanium Highlands · Surveys 3 new Lunar Frontier deposits',
         );
 
-        final advanced = TechnologySheetView.from(
-          state: stateWith(
-            now: now,
-            technology: const TechnologyLevels(surveying: 3),
-            unlockedPlanets: {
-              MiningPlanetId.homeworld,
-              MiningPlanetId.lunarFrontier,
+        // An already-unlocked site is not revealed again either.
+        final siteUnlocked = TechnologySheetView.from(
+          state: lunar.copyWith(
+            sites: {
+              ...lunar.sites,
+              MiningSiteId.frozenBasin: progress(unlocked: true),
             },
           ),
           content: content,
-        );
+        ).track(TechnologyTrack.surveying);
         expect(
-          advanced.track(TechnologyTrack.surveying).currentEffect,
-          '4 of 6 sites revealable',
-        );
-
-        final mars = TechnologySheetView.from(
-          state: stateWith(
-            now: now,
-            technology: const TechnologyLevels(surveying: 5),
-            unlockedPlanets: {
-              MiningPlanetId.homeworld,
-              MiningPlanetId.lunarFrontier,
-              MiningPlanetId.marsFrontier,
-            },
-          ),
-          content: content,
-        );
-        expect(
-          mars.track(TechnologyTrack.surveying).currentEffect,
-          '9 of 9 sites revealable',
-        );
-
-        final ceres = TechnologySheetView.from(
-          state: stateWith(
-            now: now,
-            technology: const TechnologyLevels(surveying: 5),
-            unlockedPlanets: MiningPlanetId.values.toSet(),
-          ),
-          content: content,
-        );
-        expect(
-          ceres.track(TechnologyTrack.surveying).currentEffect,
-          '15 of 15 sites revealable',
+          siteUnlocked.currentEffect,
+          'Surveys 2 new Lunar Frontier deposits',
         );
       },
     );
+
+    test('surveying effect admits when a level adds nothing on the planet', () {
+      // Surveying 4 adds no Homeworld deposit or site, and the still-locked
+      // Lunar Frontier asks for 3, not 4.
+      final view = TechnologySheetView.from(
+        state: stateWith(
+          now: now,
+          technology: const TechnologyLevels(surveying: 3),
+        ),
+        content: content,
+      );
+      expect(
+        view.track(TechnologyTrack.surveying).nextEffect,
+        'No new Homeworld deposits',
+      );
+    });
+
+    test('surveying effect still describes the max level', () {
+      final view = TechnologySheetView.from(
+        state: stateWith(
+          now: now,
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanets: MiningPlanetId.values.toSet(),
+          activePlanetId: MiningPlanetId.ioFrontier,
+          sites: {
+            for (final id in MiningSiteId.values)
+              id: progress(unlocked: true, commissioned: true),
+          },
+        ),
+        content: content,
+      );
+      final surveying = view.track(TechnologyTrack.surveying);
+      expect(surveying.isMaxLevel, isTrue);
+      expect(surveying.nextEffect, isNull);
+      expect(surveying.currentEffect, 'Surveys 300 new Io Frontier deposits');
+    });
   });
 
   group('StellarMapView', () {

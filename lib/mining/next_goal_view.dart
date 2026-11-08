@@ -16,31 +16,39 @@ enum MiningGoalTargetKind { mineSite, technology, stellarMap, none }
 /// never names a mutation.
 class MiningGoalTarget {
   const MiningGoalTarget.mineSite(MiningSiteId this.siteId)
-    : kind = MiningGoalTargetKind.mineSite;
-  const MiningGoalTarget.technology()
+    : kind = MiningGoalTargetKind.mineSite,
+      track = null;
+  const MiningGoalTarget.technology(TechnologyTrack this.track)
     : kind = MiningGoalTargetKind.technology,
       siteId = null;
   const MiningGoalTarget.stellarMap()
     : kind = MiningGoalTargetKind.stellarMap,
-      siteId = null;
+      siteId = null,
+      track = null;
   const MiningGoalTarget.none()
     : kind = MiningGoalTargetKind.none,
-      siteId = null;
+      siteId = null,
+      track = null;
 
   final MiningGoalTargetKind kind;
   final MiningSiteId? siteId;
+  final TechnologyTrack? track;
 
   bool get isNavigable => kind != MiningGoalTargetKind.none;
 
   @override
   bool operator ==(Object other) =>
-      other is MiningGoalTarget && kind == other.kind && siteId == other.siteId;
+      other is MiningGoalTarget &&
+      kind == other.kind &&
+      siteId == other.siteId &&
+      track == other.track;
 
   @override
-  int get hashCode => Object.hash(kind, siteId);
+  int get hashCode => Object.hash(kind, siteId, track);
 
   @override
-  String toString() => 'MiningGoalTarget(${kind.name}, ${siteId?.name})';
+  String toString() =>
+      'MiningGoalTarget(${kind.name}, ${siteId?.name}, ${track?.name})';
 }
 
 /// Stateless projection of the one next progression step, walked along the
@@ -239,7 +247,7 @@ class _GoalLadder {
       cost: MiningContentRegistry.technologyCosts[level],
       defaultDetail: 'Needed for $neededFor.',
       readyDetail: 'Ready in Technology.',
-      target: const MiningGoalTarget.technology(),
+      target: const MiningGoalTarget.technology(TechnologyTrack.surveying),
     );
   }
 

@@ -53,7 +53,7 @@ abstract class MiningShellHandles implements State<MiningShell> {
   AudioManager get audioManager;
   bool get reducedMotion;
   void openSettings();
-  void openTechnology();
+  void openTechnology({TechnologyTrack? initialTrack});
 }
 
 class _MiningShellState extends State<MiningShell>
@@ -234,7 +234,7 @@ class _MiningShellState extends State<MiningShell>
 
   Future<void> _showOfflineReturn(OfflineProductionSummary summary) {
     return _showMiningSheet(
-      OfflineReturnSheet(
+      (_) => OfflineReturnSheet(
         summary: summary,
         content: _content,
         cash: _displayState.cash,
@@ -242,7 +242,9 @@ class _MiningShellState extends State<MiningShell>
     );
   }
 
-  Future<void> _showMiningSheet(Widget sheet) async {
+  Future<void> _showMiningSheet(
+    Widget Function(MiningSave state) sheetBuilder,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -250,6 +252,7 @@ class _MiningShellState extends State<MiningShell>
       barrierColor: Colors.black26,
       constraints: const BoxConstraints(maxWidth: double.infinity),
       builder: (sheetContext) {
+        final sheet = sheetBuilder(_displayState);
         if (sheet is! TechnologySheet && sheet is! MiningSettingsSheet) {
           return sheet;
         }
@@ -286,7 +289,7 @@ class _MiningShellState extends State<MiningShell>
                 Navigator.of(sheetContext).pop();
                 _handleNavigation(next);
               },
-              child: sheet,
+              child: sheetBuilder(state),
             );
           },
         );
@@ -302,7 +305,7 @@ class _MiningShellState extends State<MiningShell>
     unawaited(_audioManager.maybeStartBgm());
     unawaited(
       _showMiningSheet(
-        MiningSettingsSheet(
+        (_) => MiningSettingsSheet(
           audioManager: _audioManager,
           storageAlerts: _storageAlerts,
         ),
@@ -311,17 +314,15 @@ class _MiningShellState extends State<MiningShell>
   }
 
   @override
-  void openTechnology() {
+  void openTechnology({TechnologyTrack? initialTrack}) {
     if (!_initialized) return;
     unawaited(_audioManager.playSound(GameSound.tap));
     unawaited(_audioManager.maybeStartBgm());
     unawaited(
       _showMiningSheet(
-        TechnologySheet(
-          view: TechnologySheetView.from(
-            state: _controller.state,
-            content: _content,
-          ),
+        (state) => TechnologySheet(
+          view: TechnologySheetView.from(state: state, content: _content),
+          initialTrack: initialTrack,
           onPurchase: _purchaseTechnology,
           onSelectionChanged: () =>
               unawaited(_audioManager.playSound(GameSound.tap)),
@@ -359,7 +360,7 @@ class _MiningShellState extends State<MiningShell>
     unawaited(_audioManager.playSound(GameSound.tap));
     unawaited(
       _showMiningSheet(
-        RelaunchSheet(
+        (_) => RelaunchSheet(
           relaunchCount: _controller.state.relaunchCount,
           onConfirm: _confirmRelaunch,
         ),
@@ -458,7 +459,7 @@ class _MiningShellState extends State<MiningShell>
       case MiningGoalTargetKind.mineSite:
         _enterSite(target.siteId!);
       case MiningGoalTargetKind.technology:
-        openTechnology();
+        openTechnology(initialTrack: target.track);
       case MiningGoalTargetKind.stellarMap:
         _handleNavigation(MiningNavigationDestination.stellarMap);
       case MiningGoalTargetKind.none:

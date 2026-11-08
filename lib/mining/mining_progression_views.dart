@@ -15,8 +15,6 @@ class TechnologyTrackView {
     required this.isAffordable,
     required this.isMaxLevel,
     required this.disabledReason,
-    this.depositAvailability,
-    this.nextDepositAvailability,
   });
 
   final TechnologyTrack track;
@@ -30,12 +28,8 @@ class TechnologyTrackView {
   final bool isAffordable;
   final bool isMaxLevel;
   final String? disabledReason;
-  final String? depositAvailability;
-  final String? nextDepositAvailability;
 
   bool get canPurchase => !isMaxLevel && isGateSatisfied && isAffordable;
-
-  String? get surveyingDepositAvailability => depositAvailability;
 }
 
 class TechnologySheetView {
@@ -77,10 +71,6 @@ class TechnologySheetView {
         isAffordable: true,
         isMaxLevel: true,
         disabledReason: 'Technology is at max level.',
-        depositAvailability: track == TechnologyTrack.surveying
-            ? _depositAvailability(state, content, level)
-            : null,
-        nextDepositAvailability: null,
       );
     }
 
@@ -104,12 +94,6 @@ class TechnologySheetView {
           ? 'Commission the ${content.site(gateSite).name} site first.'
           : !affordable
           ? 'Need ${formatMiningCash(cost)} cash.'
-          : null,
-      depositAvailability: track == TechnologyTrack.surveying
-          ? _depositAvailability(state, content, level)
-          : null,
-      nextDepositAvailability: track == TechnologyTrack.surveying
-          ? _depositAvailability(state, content, level + 1)
           : null,
     );
   }
@@ -142,35 +126,35 @@ class TechnologySheetView {
         return 'Storage ×${storage.toStringAsFixed(2)}'
             ' · fills in ${formatMiningDuration(window)} at T1';
       case TechnologyTrack.surveying:
-        final unlockedPlanets = content.planets.values.where(
-          (planet) => state.unlockedPlanetIds.contains(planet.id),
-        );
-        final total = unlockedPlanets.expand((planet) => planet.sites).length;
-        final revealable = unlockedPlanets
-            .expand((planet) => planet.sites)
-            .where((site) => site.requiredSurveyingLevel <= level)
+        final planet = content.planet(state.activePlanetId);
+        final newSites = <String>[
+          for (final site in planet.sites)
+            if (site.requiredSurveyingLevel == level &&
+                state.sites[site.id]?.unlocked != true)
+              site.name,
+        ];
+        final newDeposits = planet.sites
+            .expand((site) => site.deposits)
+            .where((deposit) => deposit.requiredSurveyingLevel == level)
             .length;
-        return '$revealable of $total sites revealable';
-    }
-  }
-
-  static String _depositAvailability(
-    MiningSave state,
-    MiningContentRegistry content,
-    int level,
-  ) {
-    var available = 0;
-    var total = 0;
-    for (final planet in content.planets.values) {
-      if (!state.unlockedPlanetIds.contains(planet.id)) continue;
-      for (final site in planet.sites) {
-        for (final deposit in site.deposits) {
-          total++;
-          if (deposit.requiredSurveyingLevel <= level) available++;
+        MiningPlanetDefinition? frontier;
+        for (final candidate in content.planets.values) {
+          if (!state.unlockedPlanetIds.contains(candidate.id) &&
+              candidate.unlockRequiredSurveyingLevel == level) {
+            frontier = candidate;
+            break;
+          }
         }
-      }
+        return [
+          for (final name in newSites) 'Reveals $name',
+          if (newDeposits > 0)
+            'Surveys $newDeposits new ${planet.name} '
+                '${newDeposits == 1 ? 'deposit' : 'deposits'}',
+          if (frontier != null) 'Needed for ${frontier.name}',
+          if (newSites.isEmpty && newDeposits == 0 && frontier == null)
+            'No new ${planet.name} deposits',
+        ].join(' · ');
     }
-    return '$available of $total deposits available';
   }
 }
 

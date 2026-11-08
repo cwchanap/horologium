@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/audio_manager.dart';
 import 'package:horologium/game/storage_alerts.dart';
@@ -2489,10 +2490,144 @@ void main() {
         findsOneWidget,
       );
       await tester.tap(find.byKey(const Key('site-deck-next-goal')));
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+      // The goal's carried track pre-selects Surveying instead of the
+      // Extraction default.
+      expect(
+        find.byKey(const Key('mining-technology-buy-surveying')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('mining-technology-buy-extraction')),
+        findsNothing,
+      );
     });
+
+    testWidgets('technology navigation without a goal defaults to Extraction', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+
+      shellHandles(tester).openTechnology();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('mining-technology-buy-extraction')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('mining-technology-buy-surveying')),
+        findsNothing,
+      );
+    });
+
+    testWidgets(
+      'consecutive purchases update the open Technology sheet in place',
+      (tester) async {
+        final repository = CountingMiningSaveRepository();
+        await repository.save(homeworldMasteredState(_start, cash: 1_000));
+        final effects = FakeBackgroundMusicPlayer();
+        final audio = AudioManager(
+          backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+          soundEffectPlayer: effects,
+        );
+        addTearDown(audio.dispose);
+        final hapticCalls = <MethodCall>[];
+        TestWidgetsFlutterBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+              if (call.method == 'HapticFeedback.vibrate') {
+                hapticCalls.add(call);
+              }
+              return null;
+            });
+        addTearDown(() {
+          TestWidgetsFlutterBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(SystemChannels.platform, null);
+        });
+        await pumpShell(tester, repository: repository, audioManager: audio);
+        // At the taller UAT size the sheet's upgrade row is on screen.
+        tester.view.physicalSize = const Size(430, 932);
+        await tester.pump();
+
+        await tester.tap(find.byKey(const Key('site-deck-next-goal')));
+        await tester.pumpAndSettle();
+
+        final sheet = find.byKey(const Key('mining-technology-sheet'));
+        final buySurveying = find.byKey(
+          const Key('mining-technology-buy-surveying'),
+        );
+        expect(sheet, findsOneWidget);
+        expect(buySurveying, findsOneWidget);
+        expect(find.text('Surveys 4 new Homeworld deposits'), findsOneWidget);
+        expect(
+          find.text('Next: Surveys 3 new Homeworld deposits'),
+          findsOneWidget,
+        );
+
+        // Surveying 1: the same sheet visibly advances level and price.
+        await tester.tap(buySurveying);
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(sheet, findsOneWidget);
+        expect(buySurveying, findsOneWidget);
+        expect(find.text('Surveys 3 new Homeworld deposits'), findsOneWidget);
+        expect(
+          find.text('Next: Surveys 99 new Homeworld deposits'),
+          findsOneWidget,
+        );
+        expect(shellHandles(tester).controller.state.technology.surveying, 1);
+        expect(shellHandles(tester).controller.state.cash, 700);
+
+        // Surveying 2 spends the rest; the next level is visibly out of
+        // reach on the same sheet instead of closing on success.
+        await tester.tap(buySurveying);
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(sheet, findsOneWidget);
+        expect(buySurveying, findsOneWidget);
+        expect(find.text('Surveys 99 new Homeworld deposits'), findsOneWidget);
+        expect(
+          find.text(
+            'Next: Surveys 194 new Homeworld deposits · '
+            'Needed for Lunar Frontier',
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Need 1,500 cash.'), findsOneWidget);
+        final button = tester.widget<ElevatedButton>(
+          find.descendant(
+            of: buySurveying,
+            matching: find.byType(ElevatedButton),
+          ),
+        );
+        expect(button.onPressed, isNull);
+        expect(shellHandles(tester).controller.state.technology.surveying, 2);
+        expect(shellHandles(tester).controller.state.cash, 0);
+        expect(
+          effects.playedAssets.where((path) => path == 'audio/upgrade.wav'),
+          hasLength(2),
+        );
+        expect(
+          hapticCalls
+              .where(
+                (call) => call.arguments == 'HapticFeedbackType.lightImpact',
+              )
+              .length,
+          2,
+        );
+
+        // The disabled button cannot buy the unaffordable next level.
+        await tester.tap(buySurveying);
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(shellHandles(tester).controller.state.technology.surveying, 2);
+        expect(
+          effects.playedAssets.where((path) => path == 'audio/upgrade.wav'),
+          hasLength(2),
+        );
+      },
+    );
 
     testWidgets('a planet goal opens the Stellar Map', (tester) async {
       final repository = CountingMiningSaveRepository();
