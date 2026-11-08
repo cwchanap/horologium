@@ -84,6 +84,7 @@ class _MiningShellState extends State<MiningShell>
   bool _recoverySnackBarScheduled = false;
   DockBayId? _selectedBayId;
   MiningSiteId? _openSiteId;
+  ModalRoute<dynamic>? _sheetRoute;
   int _miningImpactSequence = 0;
   MiningNavigationDestination _selectedDestination =
       MiningNavigationDestination.siteDeck;
@@ -245,57 +246,64 @@ class _MiningShellState extends State<MiningShell>
   Future<void> _showMiningSheet(
     Widget Function(MiningSave state) sheetBuilder,
   ) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black26,
-      constraints: const BoxConstraints(maxWidth: double.infinity),
-      builder: (sheetContext) {
-        final sheet = sheetBuilder(_displayState);
-        if (sheet is! TechnologySheet && sheet is! MiningSettingsSheet) {
-          return sheet;
-        }
-        final settings = sheet is MiningSettingsSheet;
-        final deck = SiteDeckView.from(
-          state: _displayState,
-          content: _content,
-          isBusy: _controller.isBusy,
-        );
-        final site = _content.site(_openSiteId ?? deck.sites.first.id);
-        final destination = settings
-            ? MiningNavigationDestination.settings
-            : MiningNavigationDestination.technology;
-        // The bottom-sheet route is a separate overlay route, so
-        // `MiningShell.setState` does not rebuild it. Consume the shell's
-        // display notifier so the scene HUD tracks live cash/cargo/capacity
-        // while the foreground timer accrues.
-        return ValueListenableBuilder<MiningSave>(
-          valueListenable: _displayNotifier,
-          builder: (context, state, _) {
-            final liveDeck = SiteDeckView.from(
-              state: state,
-              content: _content,
-              isBusy: _controller.isBusy,
-            );
-            return MiningSheetScene(
-              backgroundAsset: settings ? site.cardAsset : site.cavernAsset,
-              destination: destination,
-              cash: state.cash,
-              cargo: liveDeck.totalCargo,
-              capacity: liveDeck.totalCapacity,
-              projectedValue: liveDeck.projectedValue,
-              onDestinationSelected: (next) {
-                if (next == destination) return;
-                Navigator.of(sheetContext).pop();
-                _handleNavigation(next);
-              },
-              child: sheetBuilder(state),
-            );
-          },
-        );
-      },
-    );
+    ModalRoute<dynamic>? pushed;
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black26,
+        constraints: const BoxConstraints(maxWidth: double.infinity),
+        builder: (sheetContext) {
+          pushed = ModalRoute.of(sheetContext);
+          _sheetRoute = pushed;
+          final sheet = sheetBuilder(_displayState);
+          if (sheet is! TechnologySheet && sheet is! MiningSettingsSheet) {
+            return sheet;
+          }
+          final settings = sheet is MiningSettingsSheet;
+          final deck = SiteDeckView.from(
+            state: _displayState,
+            content: _content,
+            isBusy: _controller.isBusy,
+          );
+          final site = _content.site(_openSiteId ?? deck.sites.first.id);
+          final destination = settings
+              ? MiningNavigationDestination.settings
+              : MiningNavigationDestination.technology;
+          // The bottom-sheet route is a separate overlay route, so
+          // `MiningShell.setState` does not rebuild it. Consume the shell's
+          // display notifier so the scene HUD tracks live cash/cargo/capacity
+          // while the foreground timer accrues.
+          return ValueListenableBuilder<MiningSave>(
+            valueListenable: _displayNotifier,
+            builder: (context, state, _) {
+              final liveDeck = SiteDeckView.from(
+                state: state,
+                content: _content,
+                isBusy: _controller.isBusy,
+              );
+              return MiningSheetScene(
+                backgroundAsset: settings ? site.cardAsset : site.cavernAsset,
+                destination: destination,
+                cash: state.cash,
+                cargo: liveDeck.totalCargo,
+                capacity: liveDeck.totalCapacity,
+                projectedValue: liveDeck.projectedValue,
+                onDestinationSelected: (next) {
+                  if (next == destination) return;
+                  Navigator.of(sheetContext).pop();
+                  _handleNavigation(next);
+                },
+                child: sheetBuilder(state),
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      if (identical(_sheetRoute, pushed)) _sheetRoute = null;
+    }
     if (mounted) unawaited(_audioManager.playSound(GameSound.tap));
   }
 
@@ -627,6 +635,7 @@ class _MiningShellState extends State<MiningShell>
       } else {
         unawaited(_audioManager.playSound(GameSound.reject));
       }
+      if (!result.isSuccess) _dismissSheetForFailure();
       _showResult(
         result.isSuccess
             ? result.message ?? successMessage
@@ -636,7 +645,15 @@ class _MiningShellState extends State<MiningShell>
       if (!mounted) return;
       _refreshPresentation();
       unawaited(_audioManager.playSound(GameSound.reject));
+      _dismissSheetForFailure();
       _showResult('Action failed.');
+    }
+  }
+
+  void _dismissSheetForFailure() {
+    final route = _sheetRoute;
+    if (route != null && route.isCurrent) {
+      Navigator.of(context).pop();
     }
   }
 
