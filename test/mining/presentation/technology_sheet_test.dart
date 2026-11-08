@@ -245,8 +245,6 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(purchases, [TechnologyTrack.extraction]);
-    // A successful purchase keeps the sheet open for another upgrade; the
-    // player, not the button, dismisses it.
     expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
     await tester.tap(find.bySemanticsLabel('Close Technology'));
     await tester.pump();
@@ -350,7 +348,6 @@ void main() {
       findsNothing,
     );
 
-    // Selection is user-controlled afterwards.
     await tester.tap(find.byKey(const Key('technology-track-logistics')));
     await tester.pump();
     expect(find.text('Commission Landing Basin'), findsOneWidget);
@@ -385,8 +382,6 @@ void main() {
     await tester.pump();
     expect(find.text('Commission Landing Basin'), findsOneWidget);
 
-    // The shell reprojects the view after a purchase: same widget position,
-    // new track data, retained selection.
     live.value = TechnologySheetView(
       tracks: [
         _view().tracks.first,

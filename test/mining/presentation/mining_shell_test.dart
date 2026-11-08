@@ -2493,8 +2493,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
-      // The goal's carried track pre-selects Surveying instead of the
-      // Extraction default.
       expect(
         find.byKey(const Key('mining-technology-buy-surveying')),
         findsOneWidget,
@@ -2547,7 +2545,6 @@ void main() {
               .setMockMethodCallHandler(SystemChannels.platform, null);
         });
         await pumpShell(tester, repository: repository, audioManager: audio);
-        // At the taller UAT size the sheet's upgrade row is on screen.
         tester.view.physicalSize = const Size(430, 932);
         await tester.pump();
 
@@ -2566,7 +2563,6 @@ void main() {
           findsOneWidget,
         );
 
-        // Surveying 1: the same sheet visibly advances level and price.
         await tester.tap(buySurveying);
         await tester.pump(const Duration(milliseconds: 300));
 
@@ -2580,8 +2576,6 @@ void main() {
         expect(shellHandles(tester).controller.state.technology.surveying, 1);
         expect(shellHandles(tester).controller.state.cash, 700);
 
-        // Surveying 2 spends the rest; the next level is visibly out of
-        // reach on the same sheet instead of closing on success.
         await tester.tap(buySurveying);
         await tester.pump(const Duration(milliseconds: 300));
 
@@ -2618,7 +2612,6 @@ void main() {
           2,
         );
 
-        // The disabled button cannot buy the unaffordable next level.
         await tester.tap(buySurveying);
         await tester.pump(const Duration(milliseconds: 300));
         expect(shellHandles(tester).controller.state.technology.surveying, 2);
