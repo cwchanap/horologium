@@ -22,6 +22,13 @@ double depositVisualSize(int footprint) => switch (footprint) {
   _ => throw ArgumentError.value(footprint),
 };
 
+final EdgeInsets miningGridOverlayMargin = EdgeInsets.fromLTRB(
+  depositVisualSize(1) / 2 - miningGridCellSize / 2,
+  depositVisualSize(1) / 2 + 18 - miningGridCellSize / 2,
+  depositVisualSize(1) / 2 - miningGridCellSize / 2,
+  depositVisualSize(1) / 2 - miningGridCellSize / 2,
+);
+
 /// Stable overlay/visual key derived from the deposit's authored geometry:
 /// dense-field resources key by footprint, not by list position.
 String _depositKey(MiningDepositDefinition definition) =>
@@ -128,7 +135,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
   /// scale-aware pan bounds clamp it closer.
   Matrix4 _initialCamera(Size viewport, Offset focus) {
     final insets = widget.viewportInsets;
-    final margin = insets / miningGridMinScale;
+    final margin = insets / miningGridMinScale + miningGridOverlayMargin;
     final view = widget.view;
     final childWidth = view.definition.gridWidth * miningGridCellSize;
     final childHeight = view.definition.gridHeight * miningGridCellSize;
@@ -165,7 +172,9 @@ class _MiningGridMapState extends State<MiningGridMap> {
         return InteractiveViewer(
           key: const Key('mining-grid-interactive'),
           transformationController: _transformationController,
-          boundaryMargin: widget.viewportInsets / miningGridMinScale,
+          boundaryMargin:
+              widget.viewportInsets / miningGridMinScale +
+              miningGridOverlayMargin,
           constrained: false,
           alignment: Alignment.topLeft,
           minScale: miningGridMinScale,

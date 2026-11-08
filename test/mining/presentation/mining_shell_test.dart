@@ -2610,6 +2610,40 @@ void main() {
     ]);
   });
 
+  testWidgets('a rejected purchase dismisses the sheet for the failure', (
+    tester,
+  ) async {
+    final repository = DelayedMiningSaveRepository();
+    await repository.save(homeworldMasteredState(_start, cash: 1_000));
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await pumpShell(tester, repository: repository, audioManager: audio);
+    tester.view.physicalSize = const Size(430, 932);
+    await tester.pump();
+
+    shellHandles(tester).openTechnology();
+    await tester.pumpAndSettle();
+    final sheet = find.byKey(const Key('mining-technology-sheet'));
+    expect(sheet, findsOneWidget);
+
+    repository.delayNextSave = true;
+    await tester.tap(find.byKey(const Key('mining-technology-buy-extraction')));
+    await repository.saveStarted.future;
+    repository.allowSave.completeError(StateError('save failed'));
+    await tester.pumpAndSettle();
+
+    expect(sheet, findsNothing);
+    expect(find.text('Action failed.'), findsOneWidget);
+    final state = shellHandles(tester).controller.state;
+    expect(state.technology.extraction, 0);
+    expect(state.cash, 1_000);
+    expect(effects.playedAssets.last, 'audio/reject.wav');
+  });
+
   testWidgets('a second stale spawn reports the failure politely', (
     tester,
   ) async {
