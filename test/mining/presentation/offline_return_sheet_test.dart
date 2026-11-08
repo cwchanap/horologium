@@ -604,4 +604,67 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  for (final scale in const [1.0, 1.3]) {
+    testWidgets('the all-full warning scrolls fully clear of the footer at '
+        '360x640 and ${scale}x text', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 640);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      final content = MiningContentRegistry.stellarMining();
+      const summary = OfflineProductionSummary(
+        elapsedAway: Duration(hours: 1),
+        elapsedUsed: Duration(hours: 1),
+        produced: {ResourceType.gold: 5},
+        productionByPlanet: {
+          MiningPlanetId.homeworld: {ResourceType.gold: 5},
+        },
+        fullSites: {
+          MiningSiteId.landingBasin,
+          MiningSiteId.carbonRidge,
+          MiningSiteId.graniteCrater,
+        },
+        wasOfflineCapped: false,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+            child: Scaffold(
+              body: OfflineReturnSheet(
+                summary: summary,
+                content: content,
+                state: _state(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final warning = find.text('All 3 sites full · sell to resume');
+      expect(warning, findsOneWidget);
+      const footerTop = 640 - 152.0;
+      for (var i = 0; i < 10; i++) {
+        if (tester.getRect(warning).bottom <= footerTop) break;
+        await tester.drag(
+          find.byKey(const Key('offline-return-sheet')),
+          const Offset(0, -60),
+        );
+        await tester.pump();
+      }
+      final rect = tester.getRect(warning);
+      expect(rect.top, greaterThanOrEqualTo(0));
+      expect(rect.bottom, lessThanOrEqualTo(footerTop));
+      expect(warning.hitTestable(), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('All 3 sites full · sell to resume'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

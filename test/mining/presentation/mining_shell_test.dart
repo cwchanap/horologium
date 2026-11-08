@@ -12,11 +12,13 @@ import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_grid_map.dart';
+import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/mining_shell.dart';
+import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -2107,6 +2109,14 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(repository.saveCount, 2);
 
+      final persisted = await repository.load(nowUtc: clock.now);
+      expect(persisted.recoveredFromInvalidSave, isFalse);
+      expect(
+        persisted.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+        accrued,
+      );
+      expect(persisted.state.lastAccruedAtUtc, clock.now);
+
       final reloaded = MiningController(
         content: MiningContentRegistry.stellarMining(),
         repository: repository,
@@ -2170,6 +2180,14 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(repository.saveCount, 3);
+
+      final persisted = await repository.load(nowUtc: clock.now);
+      expect(persisted.recoveredFromInvalidSave, isFalse);
+      expect(
+        persisted.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+        accrued,
+      );
+      expect(persisted.state.lastAccruedAtUtc, clock.now);
 
       final reloaded = MiningController(
         content: MiningContentRegistry.stellarMining(),
@@ -2741,6 +2759,36 @@ void main() {
           ),
           findsOneWidget,
         );
+        final node1 = find.descendant(
+          of: sheet,
+          matching: find.byKey(const Key('technology-node-surveying-1')),
+        );
+        expect(
+          find.descendant(of: node1, matching: find.text('1')),
+          findsOneWidget,
+        );
+        expect(tester.widget<MiningHex>(node1).fill, const Color(0xFF0E1828));
+        expect(tester.widget<MiningHex>(node1).border, MiningTheme.warning);
+        expect(
+          tester
+              .widget<Text>(
+                find.descendant(of: node1, matching: find.text('1')),
+              )
+              .style
+              ?.color,
+          MiningTheme.warning,
+        );
+        expect(
+          find.ancestor(
+            of: node1,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Transform &&
+                  (widget.transform.getMaxScaleOnAxis() - 1.12).abs() < 0.001,
+            ),
+          ),
+          findsOneWidget,
+        );
         expect(
           find.descendant(of: buySurveying, matching: find.text('300')),
           findsOneWidget,
@@ -2770,6 +2818,58 @@ void main() {
             of: sheet,
             matching: find.bySemanticsLabel(
               RegExp(r'^Surveying level 2, next'),
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.widget<MiningHex>(node1).fill, MiningTheme.accent);
+        expect(tester.widget<MiningHex>(node1).border, MiningTheme.accent);
+        expect(
+          tester
+              .widget<Text>(
+                find.descendant(of: node1, matching: find.text('1')),
+              )
+              .style
+              ?.color,
+          const Color(0xFF04121A),
+        );
+        expect(
+          find.ancestor(
+            of: node1,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Transform &&
+                  (widget.transform.getMaxScaleOnAxis() - 1.12).abs() < 0.001,
+            ),
+          ),
+          findsNothing,
+        );
+        final node2 = find.descendant(
+          of: sheet,
+          matching: find.byKey(const Key('technology-node-surveying-2')),
+        );
+        expect(
+          find.descendant(of: node2, matching: find.text('2')),
+          findsOneWidget,
+        );
+        expect(tester.widget<MiningHex>(node2).fill, const Color(0xFF0E1828));
+        expect(tester.widget<MiningHex>(node2).border, MiningTheme.warning);
+        expect(
+          tester
+              .widget<Text>(
+                find.descendant(of: node2, matching: find.text('2')),
+              )
+              .style
+              ?.color,
+          MiningTheme.warning,
+        );
+        expect(
+          find.ancestor(
+            of: node2,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Transform &&
+                  (widget.transform.getMaxScaleOnAxis() - 1.12).abs() < 0.001,
             ),
           ),
           findsOneWidget,
@@ -2808,6 +2908,47 @@ void main() {
             of: sheet,
             matching: find.bySemanticsLabel(
               RegExp(r'^Surveying level 3, next'),
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.widget<MiningHex>(node2).fill, MiningTheme.accent);
+        expect(tester.widget<MiningHex>(node2).border, MiningTheme.accent);
+        expect(
+          tester
+              .widget<Text>(
+                find.descendant(of: node2, matching: find.text('2')),
+              )
+              .style
+              ?.color,
+          const Color(0xFF04121A),
+        );
+        final node3 = find.descendant(
+          of: sheet,
+          matching: find.byKey(const Key('technology-node-surveying-3')),
+        );
+        expect(
+          find.descendant(of: node3, matching: find.text('3')),
+          findsOneWidget,
+        );
+        expect(tester.widget<MiningHex>(node3).fill, const Color(0xFF0E1828));
+        expect(tester.widget<MiningHex>(node3).border, MiningTheme.warning);
+        expect(
+          tester
+              .widget<Text>(
+                find.descendant(of: node3, matching: find.text('3')),
+              )
+              .style
+              ?.color,
+          MiningTheme.warning,
+        );
+        expect(
+          find.ancestor(
+            of: node3,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Transform &&
+                  (widget.transform.getMaxScaleOnAxis() - 1.12).abs() < 0.001,
             ),
           ),
           findsOneWidget,
