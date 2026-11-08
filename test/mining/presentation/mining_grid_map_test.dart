@@ -39,10 +39,12 @@ MineSiteView _view(
 Future<void> _pumpMap(
   WidgetTester tester,
   MineSiteView view,
-  void Function(MiningGridCell) onCellTap,
-) async {
+  void Function(MiningGridCell) onCellTap, {
+  Size size = const Size(430, 500),
+  EdgeInsets viewportInsets = EdgeInsets.zero,
+}) async {
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = const Size(430, 500);
+  tester.view.physicalSize = size;
   addTearDown(() {
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
@@ -50,15 +52,20 @@ Future<void> _pumpMap(
   await tester.pumpWidget(
     MaterialApp(
       home: MiningGridMap(
+        key: ValueKey(view.siteId),
         view: view,
         onCellTap: onCellTap,
         impactSequence: 0,
         reducedMotion: true,
+        viewportInsets: viewportInsets,
       ),
     ),
   );
   await tester.pump();
 }
+
+Rect _surfaceRect(WidgetTester tester) =>
+    tester.getRect(find.byKey(const Key('mining-grid-surface')));
 
 void main() {
   test('the shared static fixture site is not animated', () {
@@ -91,11 +98,12 @@ void main() {
       );
       expect(viewport.overlaps(deposit), isTrue);
 
-      await tester.drag(
+      await tester.timedDrag(
         find.byKey(const Key('mining-grid-interactive')),
         const Offset(-600, 0),
+        const Duration(milliseconds: 300),
       );
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 2));
       expect(taps, isEmpty);
 
       final far = tester.getRect(
@@ -331,5 +339,204 @@ void main() {
       findsWidgets,
     );
     handle.dispose();
+  });
+
+  testWidgets('converts screen insets into scene pan boundaries and frames the '
+      'starter deposit', (tester) async {
+    const insets = EdgeInsets.fromLTRB(58, 100, 96, 196);
+    final view = _view(MiningSiteId.landingBasin);
+    // deployableCells stays empty until a dock rig is selected; the
+    // starter frame must still land on the first surveyed deposit.
+    expect(view.deployableCells, isEmpty);
+    await _pumpMap(
+      tester,
+      view,
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: insets,
+    );
+
+    final viewer = tester.widget<InteractiveViewer>(
+      find.byKey(const Key('mining-grid-interactive')),
+    );
+    expect(viewer.minScale, 0.8);
+    expect(viewer.maxScale, 1.6);
+    expect(
+      viewer.boundaryMargin,
+      const EdgeInsets.fromLTRB(72.5, 125, 120, 245),
+    );
+
+    // The (1,1) 2x2 starter deposit centers inside the unoccluded band
+    // as far as the clamped pan bounds allow: (176, 237) at this size.
+    final deposit = tester.getRect(
+      find.byKey(const Key('mining-deposit-1-1-2')),
+    );
+    expect(deposit.center, const Offset(176, 237));
+  });
+
+  testWidgets('centers the initial camera on the placed-rig bounding box', (
+    tester,
+  ) async {
+    // Rigs at (6,0) and (8,4) bound cells x 6-8, y 0-4: child-space
+    // center (420, 140).
+    await _pumpMap(
+      tester,
+      _view(
+        MiningSiteId.landingBasin,
+        rigs: const [
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(6, 0)),
+          MiningRigPlacement(tier: RigTier.t3, cell: MiningGridCell(8, 4)),
+        ],
+      ),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: const EdgeInsets.fromLTRB(58, 100, 96, 196),
+    );
+
+    // Unoccluded center (176, 374) would translate to (-244, 234); the
+    // top boundary clamps ty to the 125 margin.
+    expect(_surfaceRect(tester).topLeft, const Offset(-244, 125));
+  });
+
+  testWidgets('keeps the identity camera when no focus qualifies', (
+    tester,
+  ) async {
+    final definition = _content.site(MiningSiteId.landingBasin);
+    final starter = definition.deposits.first;
+    // The only surveyed deposit has every perimeter slot mined, so no
+    // deposit qualifies and no rigs exist: the camera stays at identity.
+    final view = MineSiteView(
+      siteId: MiningSiteId.landingBasin,
+      planetId: MiningPlanetId.homeworld,
+      definition: definition,
+      isUnlocked: true,
+      surveyingLevel: 0,
+      deposits: [
+        MineSiteDepositView(
+          definition: starter,
+          minerCount: 8,
+          slotCount: 8,
+          isSurveyed: true,
+        ),
+      ],
+      rigs: const [],
+      deployableCells: const {},
+      deployedRigs: const [],
+      rate: 0,
+      capacity: 1,
+      cargo: 0,
+      projectedSale: 0,
+      activePlanetCargo: 0,
+      activePlanetProjectedSale: 0,
+      isActivePlanet: true,
+      selectedBayId: null,
+      selectedRig: null,
+      isBusy: false,
+    );
+    await _pumpMap(
+      tester,
+      view,
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: const EdgeInsets.fromLTRB(58, 100, 96, 196),
+    );
+
+    expect(_surfaceRect(tester).topLeft, Offset.zero);
+  });
+
+  testWidgets('keeps the panned camera across a same-site view rebuild', (
+    tester,
+  ) async {
+    const rigs = [
+      MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+    ];
+    const insets = EdgeInsets.fromLTRB(58, 100, 96, 196);
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin, rigs: rigs),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: insets,
+    );
+    // The rig's bounding-box frame lands before the first pan.
+    expect(_surfaceRect(tester).topLeft, const Offset(-20, 125));
+    await tester.timedDrag(
+      find.byKey(const Key('mining-grid-interactive')),
+      const Offset(-160, -90),
+      const Duration(milliseconds: 300),
+    );
+    await tester.pump(const Duration(seconds: 2));
+    final panned = _surfaceRect(tester).topLeft;
+    expect(panned, isNot(const Offset(-20, 125)));
+
+    // The next-second refresh supplies a fresh view instance behind the
+    // same site key: the widget-local camera must not move.
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin, rigs: rigs),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: insets,
+    );
+    expect(_surfaceRect(tester).topLeft, panned);
+  });
+
+  testWidgets('reframes the camera on site change and re-entry', (
+    tester,
+  ) async {
+    const insets = EdgeInsets.fromLTRB(58, 100, 96, 196);
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: insets,
+    );
+    expect(_surfaceRect(tester).topLeft, const Offset(64, 125));
+
+    await tester.timedDrag(
+      find.byKey(const Key('mining-grid-interactive')),
+      const Offset(-160, -90),
+      const Duration(milliseconds: 300),
+    );
+    await tester.pump(const Duration(seconds: 2));
+    final panned = _surfaceRect(tester).topLeft;
+    expect(panned, isNot(const Offset(64, 125)));
+
+    // A site swap remounts the keyed map: the fresh frame lands on the
+    // new site's surveyed starter deposit instead of the panned camera.
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.carbonRidge),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: insets,
+    );
+    expect(_surfaceRect(tester).topLeft, const Offset(64, 125));
+
+    // Re-entry after the map unmounts also frames fresh.
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: insets,
+    );
+    await tester.timedDrag(
+      find.byKey(const Key('mining-grid-interactive')),
+      const Offset(-160, -90),
+      const Duration(milliseconds: 300),
+    );
+    await tester.pump(const Duration(seconds: 2));
+    expect(_surfaceRect(tester).topLeft, isNot(const Offset(64, 125)));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: insets,
+    );
+    expect(_surfaceRect(tester).topLeft, const Offset(64, 125));
   });
 }

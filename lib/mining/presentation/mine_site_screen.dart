@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mine_site_view.dart';
@@ -10,6 +12,35 @@ import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
+
+// Mine Site chrome placement shared by the Stack children and the
+// unoccluded pan band handed to MiningGridMap.viewportInsets: every offset
+// that hides the cavern has exactly one constant, so chrome cannot silently
+// cover legal grid cells. Heights mirror the fixed sizes inside
+// MiningCashChip, _MineChromeButton, MiningNavigationBar, and the
+// horizontal FleetDock.
+const double _portraitCashChipTop = 54;
+const double _portraitCashChipHeight = 46;
+const double _portraitBackTop = 146;
+const double _portraitBackLeft = 14;
+const double _portraitBackWidth = 44;
+const double _portraitBackHeight = 48;
+const double _portraitCargoTop = 50;
+const double _portraitCargoRight = 12;
+const double _portraitCargoSize = 84;
+const double _portraitDockHorizontalMargin = 12;
+const double _portraitDockBottom = 100;
+const double _portraitDockHeight = 96;
+const double _portraitNavHeight = 88;
+const double _landscapeCashChipTop = 52;
+const double _landscapeCargoTop = 52;
+const double _landscapeCargoRight = 14;
+const double _landscapeCargoSize = 74;
+const double _landscapeToolbarLeft = 12;
+const double _landscapeToolbarBottom = 16;
+const double _landscapeToolbarWidth = 252;
+const double _landscapeToolbarHeight = 54;
+const double _landscapeRightRailWidth = 104;
 
 class MineSiteScreen extends StatelessWidget {
   const MineSiteScreen({
@@ -141,6 +172,16 @@ class _PortraitMineSite extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pad = MediaQuery.paddingOf(context);
+    final viewportInsets = EdgeInsets.fromLTRB(
+      pad.left + _portraitBackLeft + _portraitBackWidth,
+      pad.top + _portraitCashChipTop + _portraitCashChipHeight,
+      pad.right + _portraitCargoRight + _portraitCargoSize,
+      pad.bottom +
+          math.max(
+            _portraitNavHeight,
+            _portraitDockBottom + _portraitDockHeight,
+          ),
+    );
     return ColoredBox(
       key: const Key('mine-site-screen'),
       color: const Color(0xFF0A1218),
@@ -155,16 +196,17 @@ class _PortraitMineSite extends StatelessWidget {
               onGridCellTap: onGridCellTap,
               onSellCargo: onSellCargo,
               portraitTopInset: pad.top,
+              viewportInsets: viewportInsets,
             ),
           ),
           Positioned(
-            top: 54 + pad.top,
+            top: _portraitCashChipTop + pad.top,
             left: 0,
             child: MiningCashChip(cash: cash),
           ),
           Positioned(
-            top: 146 + pad.top,
-            left: 14,
+            top: _portraitBackTop + pad.top,
+            left: _portraitBackLeft,
             child: _MineChromeButton(
               key: const Key('mine-site-back'),
               icon: Icons.chevron_left_rounded,
@@ -173,9 +215,9 @@ class _PortraitMineSite extends StatelessWidget {
             ),
           ),
           Positioned(
-            left: 12,
-            right: 12,
-            bottom: 100 + pad.bottom,
+            left: _portraitDockHorizontalMargin,
+            right: _portraitDockHorizontalMargin,
+            bottom: _portraitDockBottom + pad.bottom,
             child: FleetDock(
               view: fleetDock,
               axis: FleetDockAxis.horizontal,
@@ -242,6 +284,12 @@ class _LandscapeMineSite extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pad = MediaQuery.paddingOf(context);
+    final viewportInsets = EdgeInsets.fromLTRB(
+      pad.left,
+      math.max(pad.top, _landscapeCargoTop + _landscapeCargoSize),
+      _landscapeCargoRight + _landscapeCargoSize,
+      pad.bottom + _landscapeToolbarBottom + _landscapeToolbarHeight,
+    );
     return ColoredBox(
       key: const Key('mine-site-screen'),
       color: const Color(0xFF07111E),
@@ -250,7 +298,7 @@ class _LandscapeMineSite extends StatelessWidget {
           Positioned(
             left: 0,
             top: 0,
-            right: 104 + pad.right,
+            right: _landscapeRightRailWidth + pad.right,
             bottom: 0,
             child: _CavernScene(
               view: view,
@@ -259,19 +307,19 @@ class _LandscapeMineSite extends StatelessWidget {
               onMiningImpact: onMiningImpact,
               onGridCellTap: onGridCellTap,
               onSellCargo: onSellCargo,
-              landscapeLeftInset: pad.left,
+              viewportInsets: viewportInsets,
             ),
           ),
           Positioned(
-            top: 52,
+            top: _landscapeCashChipTop,
             left: pad.left,
             child: MiningCashChip(cash: cash, compact: true),
           ),
           Positioned(
-            left: 12 + pad.left,
-            bottom: 16 + pad.bottom,
-            width: 252,
-            height: 54,
+            left: _landscapeToolbarLeft + pad.left,
+            bottom: _landscapeToolbarBottom + pad.bottom,
+            width: _landscapeToolbarWidth,
+            height: _landscapeToolbarHeight,
             child: SizedBox(
               key: const Key('mine-site-toolbar'),
               child: MiningNavigationBar(
@@ -286,7 +334,7 @@ class _LandscapeMineSite extends StatelessWidget {
             top: 0,
             right: pad.right,
             bottom: 0,
-            width: 104,
+            width: _landscapeRightRailWidth,
             child: Container(
               decoration: const BoxDecoration(
                 color: Color.fromRGBO(6, 10, 16, .92),
@@ -320,7 +368,7 @@ class _CavernScene extends StatelessWidget {
     required this.onGridCellTap,
     required this.onSellCargo,
     this.portraitTopInset = 0,
-    this.landscapeLeftInset = 0,
+    this.viewportInsets = EdgeInsets.zero,
   });
 
   final MineSiteView view;
@@ -330,7 +378,7 @@ class _CavernScene extends StatelessWidget {
   final ValueChanged<MiningGridCell> onGridCellTap;
   final VoidCallback onSellCargo;
   final double portraitTopInset;
-  final double landscapeLeftInset;
+  final EdgeInsets viewportInsets;
 
   @override
   Widget build(BuildContext context) {
@@ -347,19 +395,21 @@ class _CavernScene extends StatelessWidget {
                 impactSequence: impactSequence,
                 onMiningImpact: onMiningImpact,
                 onGridCellTap: onGridCellTap,
-                landscapeLeftInset: landscapeLeftInset,
+                viewportInsets: viewportInsets,
                 cavernWidth: constraints.maxWidth,
               ),
             ),
             Positioned(
-              top: landscape ? 52 : 50 + portraitTopInset,
-              right: landscape ? 14 : 12,
+              top: landscape
+                  ? _landscapeCargoTop
+                  : _portraitCargoTop + portraitTopInset,
+              right: landscape ? _landscapeCargoRight : _portraitCargoRight,
               child: MiningCargoGauge(
                 containerKey: const Key('mine-site-cargo'),
                 cargo: view.cargo,
                 capacity: view.capacity,
                 projectedValue: view.activePlanetProjectedSale,
-                size: landscape ? 74 : 84,
+                size: landscape ? _landscapeCargoSize : _portraitCargoSize,
                 rate: view.rate,
               ),
             ),
@@ -395,7 +445,7 @@ class _MineCavern extends StatelessWidget {
     required this.impactSequence,
     this.onMiningImpact,
     required this.onGridCellTap,
-    this.landscapeLeftInset = 0,
+    this.viewportInsets = EdgeInsets.zero,
     this.cavernWidth = 0,
   });
 
@@ -405,7 +455,7 @@ class _MineCavern extends StatelessWidget {
   final int impactSequence;
   final VoidCallback? onMiningImpact;
   final ValueChanged<MiningGridCell> onGridCellTap;
-  final double landscapeLeftInset;
+  final EdgeInsets viewportInsets;
   final double cavernWidth;
 
   @override
@@ -418,11 +468,13 @@ class _MineCavern extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           MiningGridMap(
+            key: ValueKey(view.siteId),
             view: view,
             onCellTap: onGridCellTap,
             impactSequence: impactSequence,
             onMiningImpact: onMiningImpact,
             reducedMotion: reducedMotion,
+            viewportInsets: viewportInsets,
           ),
           if (!landscape) ...[
             const Positioned(
@@ -578,8 +630,8 @@ class _MineChromeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: 44,
-    height: 48,
+    width: _portraitBackWidth,
+    height: _portraitBackHeight,
     child: MiningHex(
       fill: const Color.fromRGBO(6, 10, 16, .82),
       border: const Color.fromRGBO(83, 212, 232, .32),
