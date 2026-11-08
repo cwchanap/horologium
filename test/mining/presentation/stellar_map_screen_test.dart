@@ -292,6 +292,54 @@ void main() {
     );
   });
 
+  testWidgets('an unlocked paid planet keeps its cash requirement ticked', (
+    tester,
+  ) async {
+    final view = StellarMapView.from(
+      state: _stateWith(
+        cash: 0,
+        technology: const TechnologyLevels(surveying: 5),
+        unlockedPlanets: {
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+          MiningPlanetId.marsFrontier,
+        },
+        sites: {
+          for (final site in _content.planet(MiningPlanetId.homeworld).sites)
+            site.id: _progress(unlocked: true, commissioned: true),
+          for (final site
+              in _content.planet(MiningPlanetId.lunarFrontier).sites)
+            site.id: _progress(unlocked: true, commissioned: true),
+        },
+      ),
+      content: _content,
+    );
+    await _pumpMap(tester, view: view);
+
+    final mars = find.byKey(
+      const Key('mining-stellar-map-planet-marsFrontier'),
+    );
+    await tester.ensureVisible(mars);
+    await tester.pump();
+    expect(
+      find.descendant(
+        of: mars,
+        matching: find.bySemanticsLabel(RegExp(r'^16\.00M cash, satisfied')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: mars,
+        matching: find.bySemanticsLabel(
+          RegExp(r'^Lunar Frontier sites 3/3, satisfied'),
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'locked card keeps requirements and busy notice above its action',
     (tester) async {

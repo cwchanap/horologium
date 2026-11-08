@@ -557,6 +557,37 @@ void main() {
       expect(mars.canUnlock, isFalse);
     });
 
+    test('an unlocked paid planet keeps its cash gate satisfied', () {
+      final view = StellarMapView.from(
+        state: stateWith(
+          now: now,
+          cash: 0,
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+            MiningPlanetId.marsFrontier,
+          },
+          sites: {
+            ...commissionedSites(MiningPlanetId.homeworld),
+            ...commissionedSites(MiningPlanetId.lunarFrontier),
+          },
+        ),
+        content: content,
+      );
+
+      final mars = view.planet(MiningPlanetId.marsFrontier);
+      expect(mars.isUnlocked, isTrue);
+      expect(mars.hasCash, isTrue);
+      expect(mars.canUnlock, isFalse);
+      expect(
+        mars.requirements
+            .singleWhere((requirement) => requirement.label == '16.00M cash')
+            .isSatisfied,
+        isTrue,
+      );
+    });
+
     test('reports planet totals, requirements, indicators, and busy state', () {
       final view = StellarMapView.from(
         state: stateWith(

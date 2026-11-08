@@ -181,6 +181,7 @@ class MiningSheetScene extends StatelessWidget {
     required this.cash,
     required this.cargo,
     required this.capacity,
+    required this.projectedValue,
     required this.onDestinationSelected,
   });
   final Widget child;
@@ -189,6 +190,7 @@ class MiningSheetScene extends StatelessWidget {
   final int cash;
   final double cargo;
   final double capacity;
+  final int projectedValue;
   final ValueChanged<MiningNavigationDestination> onDestinationSelected;
 
   @override
@@ -259,7 +261,7 @@ class MiningSheetScene extends StatelessWidget {
               child: MiningCargoGauge(
                 cargo: cargo,
                 capacity: capacity,
-                projectedValue: 0,
+                projectedValue: projectedValue,
                 size: 80,
               ),
             ),
