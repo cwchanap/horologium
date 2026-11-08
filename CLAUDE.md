@@ -122,7 +122,8 @@ across all unlocked planets, and selling empties only the active planet's
 cargo. A recall with cargo that cannot fit the replacement rig is rejected;
 the user must sell before recalling. The shell's foreground timer refreshes
 the controller once per second; initialization/lifecycle accrual remains
-clock-based and deterministic.
+clock-based and deterministic. The offline-return sheet only surfaces for an
+away interval of at least five minutes; shorter absences accrue silently.
 
 Resource identity is the exhaustive `ResourceType` enum in
 `lib/game/resources/resource_type.dart`. Use enum keys and exhaustive switches;

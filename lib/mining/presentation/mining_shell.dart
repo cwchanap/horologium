@@ -233,12 +233,12 @@ class _MiningShellState extends State<MiningShell>
   }
 
   Future<void> _showOfflineReturn(OfflineProductionSummary summary) {
+    if (summary.elapsedAway < const Duration(minutes: 5)) {
+      return Future<void>.value();
+    }
     return _showMiningSheet(
-      (_) => OfflineReturnSheet(
-        summary: summary,
-        content: _content,
-        cash: _displayState.cash,
-      ),
+      (state) =>
+          OfflineReturnSheet(summary: summary, content: _content, state: state),
     );
   }
 
@@ -284,6 +284,7 @@ class _MiningShellState extends State<MiningShell>
               cash: state.cash,
               cargo: liveDeck.totalCargo,
               capacity: liveDeck.totalCapacity,
+              projectedValue: liveDeck.projectedValue,
               onDestinationSelected: (next) {
                 if (next == destination) return;
                 Navigator.of(sheetContext).pop();

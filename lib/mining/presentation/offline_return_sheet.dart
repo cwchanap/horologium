@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_simulation.dart';
+import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
@@ -12,12 +13,12 @@ class OfflineReturnSheet extends StatelessWidget {
     super.key,
     required this.summary,
     required this.content,
-    this.cash = 0,
+    required this.state,
   });
 
   final OfflineProductionSummary summary;
   final MiningContentRegistry content;
-  final int cash;
+  final MiningSave state;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -180,7 +181,7 @@ class OfflineReturnSheet extends StatelessWidget {
             Positioned(
               top: (landscape ? 52 : 54) + pad.top,
               left: pad.left,
-              child: MiningCashChip(cash: cash, compact: landscape),
+              child: MiningCashChip(cash: state.cash, compact: landscape),
             ),
           ],
         );
@@ -324,6 +325,9 @@ class OfflineReturnSheet extends StatelessWidget {
     required bool framed,
   }) {
     final planet = content.planet(id);
+    final fullOnPlanet = planet.sites
+        .where((site) => summary.fullSites.contains(site.id))
+        .toList();
     return Container(
       key: Key('offline-return-planet-${id.name}'),
       padding: framed ? const EdgeInsets.all(14) : EdgeInsets.zero,
@@ -357,13 +361,28 @@ class OfflineReturnSheet extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                '${planet.sites.length} SITES',
-                style: const TextStyle(
-                  fontFamily: 'IBM Plex Mono',
-                  color: Colors.white38,
-                  fontSize: 10,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${planet.sites.length} SITES',
+                    style: const TextStyle(
+                      fontFamily: 'IBM Plex Mono',
+                      color: Colors.white38,
+                      fontSize: 10,
+                    ),
+                  ),
+                  Text(
+                    formatMiningCash(state.saleValue(content, id)),
+                    key: Key('offline-return-sale-${id.name}'),
+                    style: const TextStyle(
+                      fontFamily: 'IBM Plex Mono',
+                      color: MiningTheme.warning,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -400,43 +419,44 @@ class OfflineReturnSheet extends StatelessWidget {
                 ],
               ),
             ),
-          for (final site in planet.sites.where(
-            (site) => summary.fullSites.contains(site.id),
-          ))
-            Container(
-              margin: const EdgeInsets.only(top: 3),
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-              decoration: BoxDecoration(
-                color: MiningTheme.gate.withAlpha(26),
-                border: Border.all(color: MiningTheme.gate.withAlpha(102)),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.inventory_2,
-                    size: 17,
-                    color: MiningTheme.gate,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Storage full: ${site.name}.',
-                      style: const TextStyle(
-                        fontFamily: 'IBM Plex Mono',
-                        color: MiningTheme.gate,
-                        fontSize: 11,
-                        height: 1.35,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          if (fullOnPlanet.length == planet.sites.length)
+            _fullWarning(
+              'All ${planet.sites.length} sites full · sell to resume',
+            )
+          else
+            for (final site in fullOnPlanet)
+              _fullWarning('Storage full: ${site.name}.'),
         ],
       ),
     );
   }
+
+  Widget _fullWarning(String message) => Container(
+    margin: const EdgeInsets.only(top: 3),
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+    decoration: BoxDecoration(
+      color: MiningTheme.gate.withAlpha(26),
+      border: Border.all(color: MiningTheme.gate.withAlpha(102)),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.inventory_2, size: 17, color: MiningTheme.gate),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            message,
+            style: const TextStyle(
+              fontFamily: 'IBM Plex Mono',
+              color: MiningTheme.gate,
+              fontSize: 11,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _resourceIcon(ResourceType resource) {
     final silhouette = MiningContentRegistry.resourceSilhouettes[resource]!;

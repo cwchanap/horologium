@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:horologium/mining/mining_content.dart';
+import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 
 Future<void> _pumpFrame(WidgetTester tester) async {
@@ -49,4 +51,39 @@ void main() {
       expect(close.right, lessThanOrEqualTo(874 - padRight));
     },
   );
+
+  testWidgets('the scene cargo ring reports the real sellable value', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 640);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MiningSheetScene(
+          backgroundAsset: MiningContentRegistry.stellarMining()
+              .site(MiningSiteId.landingBasin)
+              .cavernAsset,
+          destination: MiningNavigationDestination.technology,
+          cash: 100,
+          cargo: 12,
+          capacity: 40,
+          projectedValue: 48,
+          onDestinationSelected: (_) {},
+          child: const SizedBox.shrink(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.bySemanticsLabel(RegExp(r'^Cargo 12\.0 of 40\.0, value 48 cash')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }

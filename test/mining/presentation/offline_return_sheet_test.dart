@@ -3,8 +3,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_simulation.dart';
+import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/offline_return_sheet.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
+
+final _now = DateTime.utc(2026, 8, 26, 12);
+
+SiteProgress _site({double stored = 0}) => SiteProgress(
+  unlocked: true,
+  commissioned: true,
+  storedAmount: stored,
+  rigPlacements: const [],
+);
+
+MiningSave _state({
+  int relaunchCount = 0,
+  Set<MiningPlanetId>? unlockedPlanets,
+  Map<MiningSiteId, SiteProgress>? sites,
+}) {
+  final base = MiningSave.initial(nowUtc: _now, relaunchCount: relaunchCount);
+  return base.copyWith(
+    unlockedPlanetIds: unlockedPlanets,
+    sites: sites == null ? null : {...base.sites, ...sites},
+  );
+}
 
 void main() {
   testWidgets('landscape continue action is visible without scrolling', (
@@ -25,6 +47,7 @@ void main() {
               padding: EdgeInsets.zero,
               child: OfflineReturnSheet(
                 content: MiningContentRegistry.stellarMining(),
+                state: _state(),
                 summary: const OfflineProductionSummary(
                   elapsedAway: Duration(hours: 30),
                   elapsedUsed: Duration(hours: 24),
@@ -103,6 +126,7 @@ void main() {
           body: OfflineReturnSheet(
             summary: summary,
             content: MiningContentRegistry.stellarMining(),
+            state: _state(),
           ),
         ),
       ),
@@ -236,6 +260,7 @@ void main() {
             body: OfflineReturnSheet(
               summary: summary,
               content: MiningContentRegistry.stellarMining(),
+              state: _state(),
             ),
           ),
         ),
@@ -313,6 +338,7 @@ void main() {
             body: OfflineReturnSheet(
               summary: summary,
               content: MiningContentRegistry.stellarMining(),
+              state: _state(),
             ),
           ),
         ),
@@ -370,7 +396,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: OfflineReturnSheet(summary: summary, content: content),
+          body: OfflineReturnSheet(
+            summary: summary,
+            content: content,
+            state: _state(),
+          ),
         ),
       ),
     );
@@ -397,6 +427,7 @@ void main() {
           body: OfflineReturnSheet(
             summary: summary,
             content: MiningContentRegistry.stellarMining(),
+            state: _state(),
           ),
         ),
       ),
@@ -433,6 +464,7 @@ void main() {
             body: OfflineReturnSheet(
               summary: summary,
               content: MiningContentRegistry.stellarMining(),
+              state: _state(),
             ),
           ),
         ),
@@ -442,6 +474,134 @@ void main() {
     final dismiss = find.byKey(const Key('offline-return-dismiss'));
     expect(tester.getSize(dismiss).height, greaterThanOrEqualTo(48));
     expect(MiningVisuals.offlineHero, isNotEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'reports each planet post-accrual sellable value with the run multiplier',
+    (tester) async {
+      final content = MiningContentRegistry.stellarMining();
+      const summary = OfflineProductionSummary(
+        elapsedAway: Duration(hours: 1),
+        elapsedUsed: Duration(hours: 1),
+        produced: {ResourceType.gold: 5, ResourceType.waterIce: 20},
+        productionByPlanet: {
+          MiningPlanetId.homeworld: {ResourceType.gold: 5},
+          MiningPlanetId.lunarFrontier: {ResourceType.waterIce: 20},
+        },
+        fullSites: {},
+        wasOfflineCapped: false,
+      );
+      MiningSave sellable({int relaunchCount = 0}) => _state(
+        relaunchCount: relaunchCount,
+        unlockedPlanets: {
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+        },
+        sites: {
+          MiningSiteId.landingBasin: _site(stored: 105),
+          MiningSiteId.frozenBasin: _site(stored: 20),
+        },
+      );
+
+      Future<void> pumpSheet(MiningSave state) => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: OfflineReturnSheet(
+              summary: summary,
+              content: content,
+              state: state,
+            ),
+          ),
+        ),
+      );
+
+      String? saleLabel(MiningPlanetId id) => tester
+          .widget<Text>(find.byKey(Key('offline-return-sale-${id.name}')))
+          .data;
+
+      await pumpSheet(sellable());
+      await tester.pump();
+      expect(saleLabel(MiningPlanetId.homeworld), '420');
+      expect(saleLabel(MiningPlanetId.lunarFrontier), '120');
+
+      await pumpSheet(sellable(relaunchCount: 1));
+      await tester.pump();
+      expect(saleLabel(MiningPlanetId.homeworld), '630');
+      expect(saleLabel(MiningPlanetId.lunarFrontier), '180');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('collapses the warnings only when every authored site is full', (
+    tester,
+  ) async {
+    final content = MiningContentRegistry.stellarMining();
+    const summary = OfflineProductionSummary(
+      elapsedAway: Duration(hours: 1),
+      elapsedUsed: Duration(hours: 1),
+      produced: {ResourceType.gold: 5, ResourceType.waterIce: 20},
+      productionByPlanet: {
+        MiningPlanetId.homeworld: {ResourceType.gold: 5},
+        MiningPlanetId.lunarFrontier: {ResourceType.waterIce: 20},
+      },
+      fullSites: {
+        MiningSiteId.landingBasin,
+        MiningSiteId.carbonRidge,
+        MiningSiteId.graniteCrater,
+        MiningSiteId.heliumMare,
+      },
+      wasOfflineCapped: false,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: OfflineReturnSheet(
+            summary: summary,
+            content: content,
+            state: _state(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final homeworld = find.byKey(const Key('offline-return-planet-homeworld'));
+    final lunar = find.byKey(const Key('offline-return-planet-lunarFrontier'));
+    expect(
+      find.descendant(
+        of: homeworld,
+        matching: find.text('All 3 sites full · sell to resume'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: homeworld,
+        matching: find.textContaining('Storage full:'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: lunar,
+        matching: find.text('Storage full: Helium Mare.'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: lunar, matching: find.textContaining('sites full')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: homeworld, matching: find.text('+5.0')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: lunar, matching: find.text('+20.0')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 }

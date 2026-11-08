@@ -337,6 +337,7 @@ class StellarMapView {
     required bool isBusy,
   }) {
     final requiredMasteryPlanetId = definition.unlockRequiredMasteryPlanetId;
+    final isUnlocked = state.unlockedPlanetIds.contains(definition.id);
     final hasRequiredMastery =
         requiredMasteryPlanetId == null ||
         content.isPlanetMastered(requiredMasteryPlanetId, commissionedSiteIds);
@@ -401,7 +402,7 @@ class StellarMapView {
       requirements.add(
         StellarMapRequirementView(
           label: '${formatMiningCash(definition.unlockCashCost)} cash',
-          isSatisfied: state.cash >= definition.unlockCashCost,
+          isSatisfied: isUnlocked || state.cash >= definition.unlockCashCost,
         ),
       );
     }
@@ -409,7 +410,7 @@ class StellarMapView {
     return StellarMapPlanetView(
       id: definition.id,
       name: definition.name,
-      isUnlocked: state.unlockedPlanetIds.contains(definition.id),
+      isUnlocked: isUnlocked,
       isActive: state.activePlanetId == definition.id,
       sitesCommissioned: sitesCommissioned,
       siteTotal: definition.sites.length,
@@ -419,7 +420,7 @@ class StellarMapView {
       hasSurveying:
           state.technology.surveying >= definition.unlockRequiredSurveyingLevel,
       unlockCashCost: definition.unlockCashCost,
-      hasCash: state.cash >= definition.unlockCashCost,
+      hasCash: isUnlocked || state.cash >= definition.unlockCashCost,
       cargo: cargo,
       capacity: capacity,
       rate: rate,

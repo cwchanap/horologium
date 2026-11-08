@@ -467,6 +467,44 @@ void main() {
     },
   );
 
+  testWidgets('the sheet cargo gauge values only the active planet', (
+    tester,
+  ) async {
+    final content = MiningContentRegistry.stellarMining();
+    final base = deployedLandingState(_start, cargo: 100);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(
+      base.copyWith(
+        unlockedPlanetIds: {
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+        },
+        sites: {
+          ...base.sites,
+          MiningSiteId.frozenBasin: base.sites[MiningSiteId.frozenBasin]!
+              .copyWith(unlocked: true, storedAmount: 600),
+        },
+      ),
+    );
+    await pumpShell(tester, repository: repository);
+
+    shellHandles(tester).openTechnology();
+    await tester.pump();
+
+    final gauge = tester.widget<MiningCargoGauge>(
+      find.descendant(
+        of: find.byType(MiningSheetScene),
+        matching: find.byKey(const Key('mining-cargo-gauge')),
+      ),
+    );
+    expect(gauge.cargo, 100);
+    expect(
+      gauge.projectedValue,
+      base.saleValue(content, MiningPlanetId.homeworld),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('renders the Site Deck and active-planet HUD', (tester) async {
     await pumpShell(tester);
 
@@ -1908,7 +1946,7 @@ void main() {
         2.0,
       );
 
-      clock.now = _start.add(const Duration(seconds: 14));
+      clock.now = _start.add(const Duration(minutes: 6));
       await tester.pump(const Duration(seconds: 2));
       expect(
         shellHandles(
@@ -1945,7 +1983,7 @@ void main() {
       // A system dialog or the notification shade only inactivates: no
       // checkpoint, no alert projection, and the return sheet stays hidden
       // even though the site kept producing.
-      clock.now = _start.add(const Duration(seconds: 6));
+      clock.now = _start.add(const Duration(minutes: 6));
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       await tester.pump();
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -2029,11 +2067,98 @@ void main() {
 
     // The best-effort checkpoint handler absorbs the storage failure: the
     // lifecycle still completes, and resume accrues from the last good save.
-    clock.now = _start.add(const Duration(seconds: 6));
+    clock.now = _start.add(const Duration(minutes: 6));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('offline-return-sheet')), findsOneWidget);
+  });
+
+  testWidgets(
+    'a cold load under five minutes accrues without the return sheet',
+    (tester) async {
+      final clock = TestClock(
+        _start.add(const Duration(minutes: 4, seconds: 59)),
+      );
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingBasin(_start));
+      await pumpShell(tester, repository: repository, clock: clock);
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
+      expect(
+        shellHandles(
+          tester,
+        ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+        greaterThan(0),
+      );
+    },
+  );
+
+  testWidgets('a cold load at five minutes shows the return sheet', (
+    tester,
+  ) async {
+    final clock = TestClock(_start.add(const Duration(minutes: 5)));
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingBasin(_start));
+    await pumpShell(tester, repository: repository, clock: clock);
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byKey(const Key('offline-return-sheet')), findsOneWidget);
+    expect(find.textContaining('Gold'), findsWidgets);
+  });
+
+  testWidgets(
+    'a background return under five minutes accrues without the sheet',
+    (tester) async {
+      final clock = TestClock(_start);
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingBasin(_start));
+      await pumpShell(tester, repository: repository, clock: clock);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      await tester.pump();
+
+      clock.now = _start.add(const Duration(minutes: 4, seconds: 59));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
+      expect(
+        shellHandles(
+          tester,
+        ).controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+        greaterThan(0),
+      );
+    },
+  );
+
+  testWidgets('a background return at five minutes shows the sheet', (
+    tester,
+  ) async {
+    final clock = TestClock(_start);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(deployedLandingBasin(_start));
+    await pumpShell(tester, repository: repository, clock: clock);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    await tester.pump();
+
+    clock.now = _start.add(const Duration(minutes: 5));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byKey(const Key('offline-return-sheet')), findsOneWidget);
+    expect(find.textContaining('Gold'), findsWidgets);
   });
 
   testWidgets('lifecycle resume does not replay passive impacts', (
