@@ -148,8 +148,10 @@ Offset _cellPoint(WidgetTester tester, MiningGridCell cell) {
 
 /// Portrait cavern band the clearance insets reserve for the pannable map:
 /// back column, cash chip band, cargo gauge column, and fleet dock/nav.
-Rect _unoccludedBand(Size size) =>
-    Rect.fromLTRB(58, 100, size.width - 96, size.height - 196);
+/// [top]/[bottom] mirror the screen-space insets so the same band can be
+/// checked under real safe-area padding.
+Rect _unoccludedBand(Size size, {double top = 100, double bottom = 196}) =>
+    Rect.fromLTRB(58, top, size.width - 96, size.height - bottom);
 
 /// Landscape cavern band: cash chip/cargo top band, gauge column, and the
 /// compact navigation toolbar above the left cutout and home indicator.
@@ -210,6 +212,75 @@ Future<Offset> _panCellToward(
     await tester.pump(const Duration(seconds: 2));
   }
   return _cellPoint(tester, cell);
+}
+
+/// Animated-layer keys proving the (1,0)/(2,49) edge rigs and their mined
+/// resources stay on the unobscured cavern: each rig's robot plus the HP
+/// chrome of the deposit it mines.
+final _edgeCellOverlays = <MiningGridCell, List<String>>{
+  const MiningGridCell(1, 0): const [
+    'landing-basin-robot-1-0',
+    'landing-basin-hp-1-1-2',
+  ],
+  const MiningGridCell(2, 49): const [
+    'landing-basin-robot-2-49',
+    'landing-basin-hp-2-48-1',
+  ],
+};
+
+/// For every entry in [overlays], pans the cell into [band] at the current
+/// scale, taps it, and asserts the tap produced exactly one new [cellTaps]
+/// callback carrying that cell — clearing first so a stale result from an
+/// earlier scale cannot satisfy the matcher. Each rig's robot/HP overlays
+/// must then sit inside [cavern] and outside every [hud] rect.
+Future<void> _expectEdgeCellsTappable(
+  WidgetTester tester, {
+  required Rect band,
+  required Rect cavern,
+  required List<Rect> hud,
+  required List<MiningGridCell> cellTaps,
+  required Map<MiningGridCell, List<String>> overlays,
+  required double scale,
+}) async {
+  for (final entry in overlays.entries) {
+    final cell = entry.key;
+    final point = await _panCellToward(tester, cell, band.center);
+    expect(
+      band.contains(point),
+      isTrue,
+      reason: '$cell at $scale: $point outside $band',
+    );
+    for (final chrome in hud) {
+      expect(
+        chrome.contains(point),
+        isFalse,
+        reason: '$cell at $scale under $chrome',
+      );
+    }
+    cellTaps.clear();
+    await tester.tapAt(point);
+    await tester.pump();
+    expect(
+      cellTaps,
+      orderedEquals(<MiningGridCell>[cell]),
+      reason: 'tap $cell at $scale',
+    );
+    for (final overlayKey in entry.value) {
+      final overlay = tester.getRect(find.byKey(Key(overlayKey)));
+      expect(
+        cavern.contains(overlay.center),
+        isTrue,
+        reason: '$overlayKey at $scale: $overlay',
+      );
+      for (final chrome in hud) {
+        expect(
+          chrome.contains(overlay.center),
+          isFalse,
+          reason: '$overlayKey at $scale under $chrome',
+        );
+      }
+    }
+  }
 }
 
 void main() {
@@ -1271,7 +1342,21 @@ void main() {
       tester.view.resetDevicePixelRatio();
       tester.view.resetPadding();
     });
-    final state = _stateWith(landing: _progress(commissioned: true));
+    final initial = MiningSave.initial(nowUtc: _start);
+    final state = initial.copyWith(
+      technology: const TechnologyLevels(surveying: 5),
+      sites: {
+        ...initial.sites,
+        MiningSiteId.landingBasin: _progress(
+          commissioned: true,
+          rigs: const [
+            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(1, 0)),
+            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(2, 49)),
+          ],
+        ),
+      },
+    );
+    final cellTaps = <MiningGridCell>[];
     await tester.pumpWidget(
       MaterialApp(
         theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
@@ -1279,7 +1364,7 @@ void main() {
           view: _siteView(state),
           fleetDock: _dockView(state),
           cash: 100,
-          onGridCellTap: (_) {},
+          onGridCellTap: cellTaps.add,
           onBayTap: (_) {},
           onSpawnRig: () {},
           onSellCargo: () {},
@@ -1299,6 +1384,29 @@ void main() {
       viewer.boundaryMargin,
       const EdgeInsets.fromLTRB(72.5, 198.75, 120, 287.5),
     );
+
+    // The same clearance must keep the edge rigs tappable with their
+    // robot/HP overlays visible at both zoom extremes.
+    final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
+    final band = _unoccludedBand(
+      cavern.size,
+      top: 159,
+      bottom: 230,
+    ).shift(cavern.topLeft);
+    final hud = _hudRects(tester);
+    for (final scale in const [0.8, 1.6]) {
+      _setGridScale(tester, scale);
+      await tester.pump();
+      await _expectEdgeCellsTappable(
+        tester,
+        band: band,
+        cavern: cavern,
+        hud: hud,
+        cellTaps: cellTaps,
+        overlays: _edgeCellOverlays,
+        scale: scale,
+      );
+    }
   });
 
   testWidgets(
@@ -1363,17 +1471,18 @@ void main() {
         bottom: 91,
       ).shift(cavern.topLeft);
       final hud = _hudRects(tester);
-      _setGridScale(tester, 0.8);
-      await tester.pump();
-      for (final cell in const [MiningGridCell(1, 0), MiningGridCell(2, 49)]) {
-        final point = await _panCellToward(tester, cell, band.center);
-        expect(band.contains(point), isTrue, reason: '$cell at $point');
-        for (final chrome in hud) {
-          expect(chrome.contains(point), isFalse, reason: '$cell $chrome');
-        }
-        await tester.tapAt(point);
+      for (final scale in const [0.8, 1.6]) {
+        _setGridScale(tester, scale);
         await tester.pump();
-        expect(cellTaps, contains(cell));
+        await _expectEdgeCellsTappable(
+          tester,
+          band: band,
+          cavern: cavern,
+          hud: hud,
+          cellTaps: cellTaps,
+          overlays: _edgeCellOverlays,
+          scale: scale,
+        );
       }
     },
   );
@@ -1408,55 +1517,20 @@ void main() {
       );
 
       final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
-      final band = _unoccludedBand(size);
+      final band = _unoccludedBand(size).shift(cavern.topLeft);
       final hud = _hudRects(tester);
-      final overlays = {
-        const MiningGridCell(1, 0): const [
-          'landing-basin-robot-1-0',
-          'landing-basin-hp-1-1-2',
-        ],
-        const MiningGridCell(2, 49): const [
-          'landing-basin-robot-2-49',
-          'landing-basin-hp-2-48-1',
-        ],
-      };
       for (final scale in const [0.8, 1.6]) {
         _setGridScale(tester, scale);
         await tester.pump();
-        for (final entry in overlays.entries) {
-          final cell = entry.key;
-          final point = await _panCellToward(tester, cell, band.center);
-          expect(
-            band.contains(point),
-            isTrue,
-            reason: '$cell at $scale: $point outside $band',
-          );
-          for (final chrome in hud) {
-            expect(
-              chrome.contains(point),
-              isFalse,
-              reason: '$cell at $scale under $chrome',
-            );
-          }
-          await tester.tapAt(point);
-          await tester.pump();
-          expect(cellTaps, contains(cell), reason: '$scale tap $cell');
-          for (final overlayKey in entry.value) {
-            final overlay = tester.getRect(find.byKey(Key(overlayKey)));
-            expect(
-              cavern.contains(overlay.center),
-              isTrue,
-              reason: '$overlayKey at $scale: $overlay',
-            );
-            for (final chrome in hud) {
-              expect(
-                chrome.contains(overlay.center),
-                isFalse,
-                reason: '$overlayKey at $scale under $chrome',
-              );
-            }
-          }
-        }
+        await _expectEdgeCellsTappable(
+          tester,
+          band: band,
+          cavern: cavern,
+          hud: hud,
+          cellTaps: cellTaps,
+          overlays: _edgeCellOverlays,
+          scale: scale,
+        );
       }
     });
   }
