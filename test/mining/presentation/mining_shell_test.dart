@@ -174,15 +174,40 @@ Finder _inGoalStrip(Finder matching) => find.descendant(
 );
 
 /// Taps the center of a grid cell through the pannable mine-site transform.
+/// The cell is first dragged toward the cavern's clear center band so the
+/// physical tap lands inside the grid surface instead of HUD chrome. Timed
+/// drags keep the end-of-gesture velocity realistic so the
+/// InteractiveViewer pan and its inertia behave like a physical flick.
 Future<void> tapGridCell(WidgetTester tester, MiningGridCell cell) async {
-  final surface = tester.getRect(find.byKey(const Key('mining-grid-surface')));
-  await tester.tapAt(
-    surface.topLeft +
+  final interactive = find.byKey(const Key('mining-grid-interactive'));
+  Offset cellPoint() {
+    final surface = tester.getRect(
+      find.byKey(const Key('mining-grid-surface')),
+    );
+    final scale = surface.width / (50 * miningGridCellSize);
+    return surface.topLeft +
         Offset(
-          (cell.x + .5) * miningGridCellSize,
-          (cell.y + .5) * miningGridCellSize,
-        ),
+          (cell.x + .5) * miningGridCellSize * scale,
+          (cell.y + .5) * miningGridCellSize * scale,
+        );
+  }
+
+  final viewport = tester.getRect(interactive);
+  final target = Offset(
+    viewport.left + viewport.width / 2,
+    viewport.top + viewport.height * .42,
   );
+  for (var i = 0; i < 10; i++) {
+    final delta = target - cellPoint();
+    if (delta.distance < .5) break;
+    await tester.timedDrag(
+      interactive,
+      delta,
+      const Duration(milliseconds: 300),
+    );
+    await tester.pump(const Duration(seconds: 2));
+  }
+  await tester.tapAt(cellPoint());
 }
 
 /// A free Surveying-0 perimeter cell of Landing Basin, distinct from
