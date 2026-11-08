@@ -220,8 +220,6 @@ void main() {
           state: lunar,
           content: content,
         ).track(TechnologyTrack.surveying);
-        // Lunar Frontier is already unlocked, so its Surveying requirement
-        // is not restated.
         expect(
           surveying.currentEffect,
           'Reveals Frozen Basin · Surveys 2 new Lunar Frontier deposits',
@@ -231,7 +229,6 @@ void main() {
           'Reveals Titanium Highlands · Surveys 3 new Lunar Frontier deposits',
         );
 
-        // An already-unlocked site is not revealed again either.
         final siteUnlocked = TechnologySheetView.from(
           state: lunar.copyWith(
             sites: {
@@ -249,8 +246,6 @@ void main() {
     );
 
     test('surveying effect admits when a level adds nothing on the planet', () {
-      // Surveying 4 adds no Homeworld deposit or site, and the still-locked
-      // Lunar Frontier asks for 3, not 4.
       final view = TechnologySheetView.from(
         state: stateWith(
           now: now,
