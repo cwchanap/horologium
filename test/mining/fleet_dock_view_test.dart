@@ -97,27 +97,35 @@ void main() {
       isBusy: false,
     );
 
-    expect(viewFor().dockHint, 'TAP A RIG, THEN A NODE');
+    expect(viewFor().dockHint, 'TAP A RIG, THEN A HIGHLIGHTED CELL');
 
     // The initial homeworld dock holds T1 rigs in b1 and b2.
     expect(
       viewFor(selectedBayId: DockBayId.b1).dockHint,
-      'T1 + T1 = T2 • STRONGER PER SLOT',
+      'TAP A HIGHLIGHTED CELL • T1 + T1 = T2 IN DOCK',
     );
     expect(
       viewFor(
         bays: {DockBayId.b1: RigTier.t4},
         selectedBayId: DockBayId.b1,
       ).dockHint,
-      'T4 + T4 = T5 • STRONGER PER SLOT',
+      'TAP A HIGHLIGHTED CELL • T4 + T4 = T5 IN DOCK',
     );
     expect(
       viewFor(
         bays: {DockBayId.b1: RigTier.t5},
         selectedBayId: DockBayId.b1,
       ).dockHint,
-      'TAP A NODE TO DEPLOY',
+      'TAP A HIGHLIGHTED CELL',
     );
+
+    for (final view in [
+      viewFor(),
+      viewFor(selectedBayId: DockBayId.b1),
+      viewFor(bays: {DockBayId.b1: RigTier.t5}, selectedBayId: DockBayId.b1),
+    ]) {
+      expect(view.dockHint, isNot(contains('NODE')));
+    }
   });
 
   test('busy state keeps the merge flag off without a merge hint', () {

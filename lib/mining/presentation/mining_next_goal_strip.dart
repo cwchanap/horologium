@@ -21,7 +21,7 @@ class MiningNextGoalStrip extends StatelessWidget {
   final bool compact;
 
   /// The strip is fixed-height chrome: its text grows up to the largest scale
-  /// at which the title and detail lines both fit the 56 px portrait slot.
+  /// at which the title and detail lines both fit the 76 px portrait slot.
   /// The semantics label always carries the full copy.
   static const _maxTextScale = 1.3;
 
@@ -112,7 +112,7 @@ class MiningNextGoalStrip extends StatelessWidget {
                   Expanded(
                     child: Text(
                       goal.detail,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: detailStyle,
                     ),
@@ -135,7 +135,7 @@ class MiningNextGoalStrip extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            height: compact ? 48 : 56,
+            height: compact ? 48 : 76,
             padding: EdgeInsets.fromLTRB(10, 4, navigable ? 4 : 10, 4),
             decoration: BoxDecoration(
               color: MiningTheme.panel,

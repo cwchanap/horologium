@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
@@ -162,6 +164,17 @@ class _MissingIoDeckArtBundle extends CachingAssetBundle {
 }
 
 void main() {
+  setUpAll(() async {
+    if (kIsWeb) return;
+    final loader = FontLoader('Orbitron')
+      ..addFont(
+        File(
+          'assets/fonts/Orbitron-Variable.ttf',
+        ).readAsBytes().then(ByteData.sublistView),
+      );
+    await loader.load();
+  });
+
   testWidgets('matches the authored 402x874 Site Deck composition', (
     tester,
   ) async {
@@ -1049,6 +1062,99 @@ void main() {
     );
   });
 
+  testWidgets('names a goal-referenced locked site and its resource', (
+    tester,
+  ) async {
+    final state = _stateWith(
+      sites: {
+        MiningSiteId.landingBasin: _progress(
+          unlocked: true,
+          commissioned: true,
+        ),
+      },
+    );
+    await _pumpDeck(tester, view: _deckView(state), nextGoal: _goalFor(state));
+
+    final strip = find.byKey(const Key('site-deck-next-goal'));
+    expect(
+      find.descendant(
+        of: strip,
+        matching: find.textContaining('Unlock Carbon Ridge'),
+      ),
+      findsOneWidget,
+    );
+
+    final card = find.byKey(const Key('site-card-carbonRidge'));
+    final name = find.descendant(of: card, matching: find.text('Carbon Ridge'));
+    expect(name, findsOneWidget);
+    expect(
+      find.descendant(of: card, matching: find.text('COAL')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: card,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Image &&
+              widget.image is AssetImage &&
+              (widget.image as AssetImage).assetName ==
+                  'assets/images/mining/nodes/coal.png',
+        ),
+      ),
+      findsOneWidget,
+    );
+    final level = find.descendant(of: card, matching: find.text('LV 0'));
+    expect(level, findsOneWidget);
+    expect(
+      tester.getRect(name).bottom,
+      lessThanOrEqualTo(tester.getRect(level).top),
+      reason: 'the site name must sit above the lock requirements',
+    );
+  });
+
+  testWidgets('scales the full Io Frontier title down at 360 px', (
+    tester,
+  ) async {
+    final state = _stateWith(
+      unlockedPlanetIds: MiningPlanetId.values.toSet(),
+      activePlanetId: MiningPlanetId.ioFrontier,
+    );
+    await _pumpDeck(tester, view: _deckView(state));
+
+    final title = find.text('IO FRONTIER');
+    expect(title, findsOneWidget);
+    expect(
+      find.ancestor(of: title, matching: find.byType(FittedBox)),
+      findsOneWidget,
+    );
+    final paragraph = tester.renderObject<RenderParagraph>(title);
+    expect(
+      paragraph.didExceedMaxLines,
+      isFalse,
+      reason: 'the planet title must scale down, not ellipsize',
+    );
+    final titleRect = tester.getRect(title);
+    final progress = tester.getRect(
+      find.byKey(const Key('site-deck-planet-progress')),
+    );
+    expect(
+      titleRect.left,
+      greaterThanOrEqualTo(progress.left),
+      reason: 'title must stay inside the planet progress region',
+    );
+    expect(
+      titleRect.right,
+      lessThanOrEqualTo(progress.right),
+      reason: 'title must stay inside the planet progress region',
+    );
+    expect(
+      paragraph.size.width,
+      greaterThan(titleRect.width),
+      reason: 'real Orbitron IO FRONTIER is wider than its fitted box',
+    );
+  }, skip: kIsWeb);
+
   testWidgets('offsets interactive chrome below non-zero safe-area insets', (
     tester,
   ) async {
@@ -1121,15 +1227,15 @@ void main() {
         final strip = tester.getRect(
           find.byKey(const Key('site-deck-next-goal')),
         );
-        expect(strip, const Rect.fromLTRB(14, 714, 388, 770));
+        expect(strip, const Rect.fromLTRB(14, 694, 388, 770));
         final scroll = tester.getRect(
           find.byKey(const Key('site-deck-scroll')),
         );
         expect(scroll.top, 164);
         expect(
           scroll.bottom,
-          706,
-          reason: '874 - 96 - 72, 8 px above the strip',
+          686,
+          reason: '874 - 96 - 92, 8 px above the strip',
         );
         final nav = tester.getRect(
           find.byKey(const Key('mining-bottom-navigation')),

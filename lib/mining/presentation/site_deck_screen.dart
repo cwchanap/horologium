@@ -142,7 +142,7 @@ class _PortraitSiteDeck extends StatelessWidget {
 
   /// Bottom navigation height reserved under the card list.
   static const _navReserve = 96.0;
-  static const _goalHeight = 56.0;
+  static const _goalHeight = 76.0;
   static const _goalGap = 8.0;
 
   @override
@@ -305,15 +305,18 @@ class _PlanetProgress extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              view.planetName.toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.1,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                view.planetName.toUpperCase(),
+                maxLines: 1,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                ),
               ),
             ),
             const SizedBox(height: 6),
@@ -646,66 +649,125 @@ class _LockedSite extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final prerequisiteGate = _prerequisiteGate;
+    final silhouette =
+        MiningContentRegistry.resourceSilhouettes[card.definition.resource];
     return Center(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.lock_rounded, color: Colors.white38, size: 30),
-          const SizedBox(width: 18),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 240),
-            child: Column(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.biotech_rounded,
-                      size: 19,
-                      color: MiningTheme.accent,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'LV ${card.requiredSurveyingLevel}',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
+                Image.asset(
+                  card.definition.depositAsset,
+                  width: 22,
+                  height: 22,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const SizedBox(width: 22, height: 22),
                 ),
-                const SizedBox(height: 9),
-                Row(
-                  children: [
-                    Image.asset(MiningVisuals.cashIcon, width: 19, height: 19),
-                    const SizedBox(width: 8),
-                    Text(
-                      formatMiningCash(card.unlockCost),
-                      style: const TextStyle(
-                        color: MiningTheme.gate,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                const SizedBox(width: 9),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 240),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        card.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          height: 1.1,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                if (prerequisiteGate != null) ...[
-                  const SizedBox(height: 9),
-                  Text(
-                    prerequisiteGate,
-                    style: const TextStyle(
-                      color: MiningTheme.warning,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
+                      Text(
+                        (silhouette?.name ?? 'Resource').toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: silhouette?.color ?? MiningTheme.warning,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_rounded, color: Colors.white38, size: 30),
+                const SizedBox(width: 18),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 240),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.biotech_rounded,
+                            size: 19,
+                            color: MiningTheme.accent,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'LV ${card.requiredSurveyingLevel}',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 9),
+                      Row(
+                        children: [
+                          Image.asset(
+                            MiningVisuals.cashIcon,
+                            width: 19,
+                            height: 19,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            formatMiningCash(card.unlockCost),
+                            style: const TextStyle(
+                              color: MiningTheme.gate,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (prerequisiteGate != null) ...[
+                        const SizedBox(height: 9),
+                        Text(
+                          prerequisiteGate,
+                          style: const TextStyle(
+                            color: MiningTheme.warning,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
