@@ -129,7 +129,7 @@ void main() {
       SemanticsAction.tap,
     );
     expect(selected, hasLength(2));
-    expect(tester.getSize(find.byType(MiningNextGoalStrip)).height, 56);
+    expect(tester.getSize(find.byType(MiningNextGoalStrip)).height, 76);
     semantics.dispose();
   });
 
@@ -204,7 +204,7 @@ void main() {
 
           expect(tester.takeException(), isNull, reason: reason);
           final strip = tester.getRect(find.byType(MiningNextGoalStrip));
-          expect(strip.height, compact ? 48 : 56, reason: reason);
+          expect(strip.height, compact ? 48 : 76, reason: reason);
           expect(
             find.byKey(const Key('next-goal-cash')),
             goal.isCashGated ? findsOneWidget : findsNothing,
@@ -283,4 +283,58 @@ void main() {
       expect(tester.takeException(), isNull, reason: 'compact=$compact');
     }
   });
+
+  testWidgets('portrait detail wraps to two Orbitron lines beside the cash', (
+    tester,
+  ) async {
+    const goal = MiningNextGoalView(
+      kind: MiningGoalKind.commissionSite,
+      title: 'Commission Titanium Highlands',
+      detail: 'Last Io Frontier site: mastery pays +90.00M cash.',
+      target: MiningGoalTarget.mineSite(MiningSiteId.titaniumHighlands),
+      cash: 12_000,
+      cashCost: 25_000,
+    );
+    for (final (width, textScale, twoLines) in [
+      (332.0, 1.0, 32.0),
+      (332.0, 1.3, 40.0),
+      (374.0, 1.3, 40.0),
+    ]) {
+      final reason = '$width at $textScale';
+      await _pumpStrip(tester, goal, width: width, textScale: textScale);
+
+      expect(tester.takeException(), isNull, reason: reason);
+      expect(
+        tester.getSize(find.byType(MiningNextGoalStrip)).height,
+        76,
+        reason: reason,
+      );
+      final detail = tester.renderObject<RenderParagraph>(
+        find.text(goal.detail),
+      );
+      expect(
+        detail.size.height,
+        closeTo(twoLines, 0.5),
+        reason: 'detail must occupy two lines, not one: $reason',
+      );
+      expect(
+        tester.getRect(find.text(goal.detail)).bottom,
+        lessThanOrEqualTo(
+          tester.getRect(find.byType(MiningNextGoalStrip)).bottom,
+        ),
+        reason: reason,
+      );
+    }
+
+    await _pumpStrip(tester, goal, compact: true, width: 850, textScale: 1.3);
+    expect(tester.takeException(), isNull);
+    expect(tester.getSize(find.byType(MiningNextGoalStrip)).height, 48);
+    expect(
+      tester
+          .renderObject<RenderParagraph>(find.textContaining('mastery pays'))
+          .maxLines,
+      1,
+      reason: 'the compact landscape strip stays a single line',
+    );
+  }, skip: kIsWeb);
 }

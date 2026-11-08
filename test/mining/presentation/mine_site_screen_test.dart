@@ -1237,14 +1237,17 @@ void main() {
   ) async {
     final state = _stateWith(landing: _progress(commissioned: true));
     await _pumpMineSite(tester, view: _siteView(state), dock: _dockView(state));
-    expect(find.text('TAP A RIG, THEN A NODE'), findsOneWidget);
+    expect(find.text('TAP A RIG, THEN A HIGHLIGHTED CELL'), findsOneWidget);
 
     await _pumpMineSite(
       tester,
       view: _siteView(state, selectedBayId: DockBayId.b1),
       dock: _dockView(state, selectedBayId: DockBayId.b1),
     );
-    expect(find.text('T1 + T1 = T2 • STRONGER PER SLOT'), findsOneWidget);
+    expect(
+      find.text('TAP A HIGHLIGHTED CELL • T1 + T1 = T2 IN DOCK'),
+      findsOneWidget,
+    );
   });
 
   testWidgets(

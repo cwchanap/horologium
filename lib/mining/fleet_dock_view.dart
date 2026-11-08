@@ -65,13 +65,13 @@ class FleetDockView {
     final selectedRig = selectedBayId == null ? null : dock[selectedBayId];
     final String dockHint;
     if (selectedRig == null) {
-      dockHint = 'TAP A RIG, THEN A NODE';
+      dockHint = 'TAP A RIG, THEN A HIGHLIGHTED CELL';
     } else if (selectedRig == RigTier.t5) {
-      dockHint = 'TAP A NODE TO DEPLOY';
+      dockHint = 'TAP A HIGHLIGHTED CELL';
     } else {
       final tier = selectedRig.name.toUpperCase();
       final next = RigTier.values[selectedRig.index + 1].name.toUpperCase();
-      dockHint = '$tier + $tier = $next • STRONGER PER SLOT';
+      dockHint = 'TAP A HIGHLIGHTED CELL • $tier + $tier = $next IN DOCK';
     }
     final hasEmptyBay = DockBayId.values.any((id) => dock[id] == null);
     final spawnDisabledReason = isBusy
