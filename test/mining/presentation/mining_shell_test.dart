@@ -2644,6 +2644,153 @@ void main() {
     expect(effects.playedAssets.last, 'audio/reject.wav');
   });
 
+  testWidgets(
+    'a late purchase failure keeps replacement sheets and reports after '
+    'they close',
+    (tester) async {
+      final repository = DelayedMiningSaveRepository();
+      await repository.save(homeworldMasteredState(_start, cash: 1_000));
+      final effects = FakeBackgroundMusicPlayer();
+      final audio = AudioManager(
+        backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+        soundEffectPlayer: effects,
+      );
+      addTearDown(audio.dispose);
+      await pumpShell(tester, repository: repository, audioManager: audio);
+      tester.view.physicalSize = const Size(874, 402);
+      await tester.pump();
+
+      shellHandles(tester).openTechnology();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+
+      repository.delayNextSave = true;
+      final buy = find.byKey(const Key('mining-technology-buy-extraction'));
+      await tester.ensureVisible(buy);
+      await tester.tap(buy);
+      await repository.saveStarted.future;
+
+      final scene = find.byType(MiningSheetScene);
+      await tester.tap(
+        find.descendant(
+          of: scene,
+          matching: find.byKey(const Key('mining-nav-settings')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('mining-settings-sheet')), findsOneWidget);
+
+      await tester.tap(
+        find.descendant(
+          of: scene,
+          matching: find.byKey(const Key('mining-nav-technology')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final replacement = find.byKey(const Key('mining-technology-sheet'));
+      expect(replacement, findsOneWidget);
+
+      repository.allowSave.completeError(StateError('save failed'));
+      await tester.pumpAndSettle();
+
+      expect(replacement, findsOneWidget);
+      expect(find.text('Action failed.'), findsNothing);
+
+      await tester.tap(find.bySemanticsLabel('Close Technology'));
+      await tester.pumpAndSettle();
+      expect(replacement, findsNothing);
+      expect(find.text('Action failed.'), findsOneWidget);
+      final state = shellHandles(tester).controller.state;
+      expect(state.technology.extraction, 0);
+      expect(state.cash, 1_000);
+      expect(effects.playedAssets, contains('audio/reject.wav'));
+    },
+  );
+
+  testWidgets(
+    'a late purchase failure keeps a sheet reopened after dismissal',
+    (tester) async {
+      final repository = DelayedMiningSaveRepository();
+      await repository.save(homeworldMasteredState(_start, cash: 1_000));
+      final effects = FakeBackgroundMusicPlayer();
+      final audio = AudioManager(
+        backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+        soundEffectPlayer: effects,
+      );
+      addTearDown(audio.dispose);
+      await pumpShell(tester, repository: repository, audioManager: audio);
+      tester.view.physicalSize = const Size(430, 932);
+      await tester.pump();
+
+      shellHandles(tester).openTechnology();
+      await tester.pumpAndSettle();
+
+      repository.delayNextSave = true;
+      await tester.tap(
+        find.byKey(const Key('mining-technology-buy-extraction')),
+      );
+      await repository.saveStarted.future;
+
+      await tester.tap(find.bySemanticsLabel('Close Technology'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('mining-technology-sheet')), findsNothing);
+      shellHandles(tester).openSettings();
+      await tester.pumpAndSettle();
+      final settings = find.byKey(const Key('mining-settings-sheet'));
+      expect(settings, findsOneWidget);
+
+      repository.allowSave.completeError(StateError('save failed'));
+      await tester.pumpAndSettle();
+
+      expect(settings, findsOneWidget);
+      expect(find.text('Action failed.'), findsNothing);
+
+      await tester.tap(find.bySemanticsLabel('Close Settings'));
+      await tester.pumpAndSettle();
+      expect(settings, findsNothing);
+      expect(find.text('Action failed.'), findsOneWidget);
+      final state = shellHandles(tester).controller.state;
+      expect(state.technology.extraction, 0);
+      expect(state.cash, 1_000);
+      expect(effects.playedAssets, contains('audio/reject.wav'));
+    },
+  );
+
+  testWidgets('a late purchase failure reports once the sheet is dismissed', (
+    tester,
+  ) async {
+    final repository = DelayedMiningSaveRepository();
+    await repository.save(homeworldMasteredState(_start, cash: 1_000));
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await pumpShell(tester, repository: repository, audioManager: audio);
+    tester.view.physicalSize = const Size(430, 932);
+    await tester.pump();
+
+    shellHandles(tester).openTechnology();
+    await tester.pumpAndSettle();
+
+    repository.delayNextSave = true;
+    await tester.tap(find.byKey(const Key('mining-technology-buy-extraction')));
+    await repository.saveStarted.future;
+
+    await tester.tap(find.bySemanticsLabel('Close Technology'));
+    await tester.pumpAndSettle();
+
+    repository.allowSave.completeError(StateError('save failed'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Action failed.'), findsOneWidget);
+    final state = shellHandles(tester).controller.state;
+    expect(state.technology.extraction, 0);
+    expect(state.cash, 1_000);
+    expect(effects.playedAssets.last, 'audio/reject.wav');
+  });
+
   testWidgets('a second stale spawn reports the failure politely', (
     tester,
   ) async {

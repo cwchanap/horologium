@@ -85,6 +85,7 @@ class _MiningShellState extends State<MiningShell>
   DockBayId? _selectedBayId;
   MiningSiteId? _openSiteId;
   ModalRoute<dynamic>? _sheetRoute;
+  String? _pendingSheetFailure;
   int _miningImpactSequence = 0;
   MiningNavigationDestination _selectedDestination =
       MiningNavigationDestination.siteDeck;
@@ -256,7 +257,7 @@ class _MiningShellState extends State<MiningShell>
         constraints: const BoxConstraints(maxWidth: double.infinity),
         builder: (sheetContext) {
           pushed = ModalRoute.of(sheetContext);
-          _sheetRoute = pushed;
+          if (pushed?.isCurrent ?? false) _sheetRoute = pushed;
           final sheet = sheetBuilder(_displayState);
           if (sheet is! TechnologySheet && sheet is! MiningSettingsSheet) {
             return sheet;
@@ -303,6 +304,13 @@ class _MiningShellState extends State<MiningShell>
       );
     } finally {
       if (identical(_sheetRoute, pushed)) _sheetRoute = null;
+      final failure = _pendingSheetFailure;
+      if (mounted &&
+          failure != null &&
+          (ModalRoute.of(context)?.isCurrent ?? false)) {
+        _pendingSheetFailure = null;
+        _showResult(failure);
+      }
     }
     if (mounted) unawaited(_audioManager.playSound(GameSound.tap));
   }
@@ -600,6 +608,8 @@ class _MiningShellState extends State<MiningShell>
     // persistence was in flight, a late success must not recreate a hidden
     // selection that could deploy in another site.
     final actionSiteId = _openSiteId;
+    final actionRoute = _sheetRoute;
+    _pendingSheetFailure = null;
     final pendingOperation = operation();
     _refreshPresentation();
     try {
@@ -635,25 +645,32 @@ class _MiningShellState extends State<MiningShell>
       } else {
         unawaited(_audioManager.playSound(GameSound.reject));
       }
-      if (!result.isSuccess) _dismissSheetForFailure();
-      _showResult(
-        result.isSuccess
-            ? result.message ?? successMessage
-            : result.message ?? 'Action failed.',
-      );
+      if (result.isSuccess) {
+        _showResult(result.message ?? successMessage);
+      } else {
+        _dismissSheetForFailure(actionRoute);
+        _showActionFailure(result.message ?? 'Action failed.');
+      }
     } catch (_) {
       if (!mounted) return;
       _refreshPresentation();
       unawaited(_audioManager.playSound(GameSound.reject));
-      _dismissSheetForFailure();
-      _showResult('Action failed.');
+      _dismissSheetForFailure(actionRoute);
+      _showActionFailure('Action failed.');
     }
   }
 
-  void _dismissSheetForFailure() {
-    final route = _sheetRoute;
+  void _dismissSheetForFailure(ModalRoute<dynamic>? route) {
     if (route != null && route.isCurrent) {
       Navigator.of(context).pop();
+    }
+  }
+
+  void _showActionFailure(String message) {
+    if (ModalRoute.of(context)?.isCurrent ?? false) {
+      _showResult(message);
+    } else {
+      _pendingSheetFailure = message;
     }
   }
 
