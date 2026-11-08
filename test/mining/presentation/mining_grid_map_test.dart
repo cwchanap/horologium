@@ -398,6 +398,39 @@ void main() {
     expect(_surfaceRect(tester).topLeft, const Offset(-244, 155));
   });
 
+  testWidgets('centers the grid on a viewport wider than the child', (
+    tester,
+  ) async {
+    // A wide web window can exceed the 2800px grid: the reversed x bounds
+    // (288 > 12) must not reach num.clamp, and the axis centers instead.
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(3100, 900),
+    );
+
+    // ty still clamps to the 30 margin; tx centers (3100 - 2800) / 2.
+    expect(_surfaceRect(tester).topLeft, const Offset(150, 30));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('centers the grid on a viewport taller than the child', (
+    tester,
+  ) async {
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 3100),
+    );
+
+    // tx clamps to the 12 margin; reversed y bounds (288 > 30) center:
+    // (3100 - 2800 - 12 + 30) / 2 = 159.
+    expect(_surfaceRect(tester).topLeft, const Offset(12, 159));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('keeps the identity camera when no focus qualifies', (
     tester,
   ) async {
