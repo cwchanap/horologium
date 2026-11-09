@@ -21,10 +21,13 @@ class FleetDock extends StatelessWidget {
   final VoidCallback onSpawnRig;
   final FleetDockAxis axis;
 
+  static const double horizontalHeight = 96;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       key: const Key('fleet-dock'),
+      height: axis == FleetDockAxis.horizontal ? horizontalHeight : null,
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       color: Colors.transparent,
       child: axis == FleetDockAxis.vertical

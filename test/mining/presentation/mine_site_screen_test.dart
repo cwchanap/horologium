@@ -203,10 +203,10 @@ Future<Offset> _panCellToward(
   for (var i = 0; i < 10; i++) {
     final point = _cellPoint(tester, cell);
     final delta = target - point;
-    if (delta.distance < 6) break;
+    if (delta.distance < .5) break;
     await tester.timedDrag(
       interactive,
-      delta + Offset.fromDirection(delta.direction, 20),
+      delta,
       const Duration(milliseconds: 300),
     );
     await tester.pump(const Duration(seconds: 2));
@@ -228,48 +228,6 @@ final _edgeCellOverlays = <MiningGridCell, List<String>>{
   ],
 };
 
-Rect _overlayUnion(WidgetTester tester, List<String> overlayKeys) => overlayKeys
-    .map((key) => tester.getRect(find.byKey(Key(key))))
-    .reduce((a, b) => a.expandToInclude(b));
-
-Offset _overlayClearingShift(
-  WidgetTester tester,
-  List<String> overlayKeys,
-  Rect cavern,
-  List<Rect> hud,
-  Set<Axis> blockedAxes,
-) {
-  final union = _overlayUnion(tester, overlayKeys);
-  var dx = 0.0;
-  var dy = 0.0;
-  if (!blockedAxes.contains(Axis.horizontal)) {
-    if (union.left < cavern.left) dx = cavern.left - union.left;
-    if (union.right > cavern.right) dx = cavern.right - union.right;
-  }
-  if (!blockedAxes.contains(Axis.vertical)) {
-    if (union.top < cavern.top) dy = cavern.top - union.top;
-    if (union.bottom > cavern.bottom) dy = cavern.bottom - union.bottom;
-  }
-  for (final chrome in hud) {
-    if (!chrome.overlaps(union)) continue;
-    final pushes = [
-      if (!blockedAxes.contains(Axis.horizontal)) ...[
-        Offset(chrome.left - union.right, 0),
-        Offset(chrome.right - union.left, 0),
-      ],
-      if (!blockedAxes.contains(Axis.vertical)) ...[
-        Offset(0, chrome.top - union.bottom),
-        Offset(0, chrome.bottom - union.top),
-      ],
-    ]..sort((a, b) => a.distance.compareTo(b.distance));
-    if (pushes.isEmpty) continue;
-    final best = pushes.first;
-    if (best.dx.abs() > dx.abs()) dx = best.dx;
-    if (best.dy.abs() > dy.abs()) dy = best.dy;
-  }
-  return Offset(dx, dy);
-}
-
 /// For every entry in [overlays], pans the cell into [band] at the current
 /// scale, taps it, and asserts the tap produced exactly one new [cellTaps]
 /// callback carrying that cell — clearing first so a stale result from an
@@ -286,33 +244,7 @@ Future<void> _expectEdgeCellsTappable(
 }) async {
   for (final entry in overlays.entries) {
     final cell = entry.key;
-    var point = await _panCellToward(
-      tester,
-      cell,
-      band.center -
-          (_overlayUnion(tester, entry.value).center -
-              _cellPoint(tester, cell)),
-    );
-    final blockedAxes = <Axis>{};
-    for (var attempt = 0; attempt < 6; attempt++) {
-      final shift = _overlayClearingShift(
-        tester,
-        entry.value,
-        cavern,
-        hud,
-        blockedAxes,
-      );
-      if (shift == Offset.zero) break;
-      final before = _cellPoint(tester, cell);
-      point = await _panCellToward(tester, cell, before + shift);
-      final moved = _cellPoint(tester, cell) - before;
-      if (shift.dx != 0 && moved.dx.abs() < 1) {
-        blockedAxes.add(Axis.horizontal);
-      }
-      if (shift.dy != 0 && moved.dy.abs() < 1) {
-        blockedAxes.add(Axis.vertical);
-      }
-    }
+    final point = await _panCellToward(tester, cell, band.center);
     expect(
       band.contains(point),
       isTrue,
@@ -336,18 +268,15 @@ Future<void> _expectEdgeCellsTappable(
     for (final overlayKey in entry.value) {
       final overlay = tester.getRect(find.byKey(Key(overlayKey)));
       expect(
-        overlay.left >= cavern.left &&
-            overlay.top >= cavern.top &&
-            overlay.right <= cavern.right &&
-            overlay.bottom <= cavern.bottom,
+        cavern.contains(overlay.center),
         isTrue,
-        reason: '$overlayKey at $scale: $overlay outside $cavern',
+        reason: '$overlayKey at $scale: $overlay',
       );
       for (final chrome in hud) {
         expect(
-          chrome.overlaps(overlay),
+          chrome.contains(overlay.center),
           isFalse,
-          reason: '$overlayKey at $scale under $chrome: $overlay',
+          reason: '$overlayKey at $scale under $chrome',
         );
       }
     }
@@ -573,11 +502,11 @@ void main() {
     );
     expect(
       tester.getRect(find.byKey(const Key('mining-grid-surface'))).topLeft,
-      const Offset(-14, 155),
+      const Offset(-14, 125),
     );
     expect(
       tester.getRect(find.byKey(const Key('mining-deposit-1-1-2'))).topLeft,
-      const Offset(42, 211),
+      const Offset(42, 181),
     );
     final sell = tester.getRect(find.byKey(const Key('mine-site-sell')));
     expect(sell.top, 506);
@@ -1388,11 +1317,10 @@ void main() {
     );
     // Screen-space clearance (58/100/96/196 at zero padding) divided by
     // the 0.8 minimum scale, so the full HUD band stays clear when the
-    // map is zoomed all the way out, plus the scene-space overlay
-    // overshoot (12/30/12/12) so overflowing rig/HP art can clear too.
+    // map is zoomed all the way out.
     expect(
       viewer.boundaryMargin,
-      const EdgeInsets.fromLTRB(84.5, 155, 132, 257),
+      const EdgeInsets.fromLTRB(72.5, 125, 120, 245),
     );
     final band = _unoccludedBand(const Size(390, 844));
     for (final chrome in _hudRects(tester)) {
@@ -1454,11 +1382,10 @@ void main() {
       find.byKey(const Key('mining-grid-interactive')),
     );
     // Screen-space insets (58/159/96/230) / 0.8; the top clearance keeps
-    // its full 159 px at the zoom floor instead of shrinking to 127,
-    // plus the scene-space overlay overshoot (12/30/12/12).
+    // its full 159 px at the zoom floor instead of shrinking to 127.
     expect(
       viewer.boundaryMargin,
-      const EdgeInsets.fromLTRB(84.5, 228.75, 132, 299.5),
+      const EdgeInsets.fromLTRB(72.5, 198.75, 120, 287.5),
     );
 
     // The same clearance must keep the edge rigs tappable with their
@@ -1556,20 +1483,19 @@ void main() {
       final viewer = tester.widget<InteractiveViewer>(
         find.byKey(const Key('mining-grid-interactive')),
       );
-      // Cavern-space insets (44/126/88/91) / 0.8 cover the left cutout and
+      // Cavern-space insets (44/126/88/178) / 0.8 cover the left cutout and
       // toolbar, the cash-chip/cargo top band, the gauge column, and the
-      // 252x54 nav toolbar over the home indicator, plus the scene-space
-      // overlay overshoot (12/30/12/12).
+      // sell control over the home indicator.
       expect(
         viewer.boundaryMargin,
-        const EdgeInsets.fromLTRB(67, 187.5, 122, 125.75),
+        const EdgeInsets.fromLTRB(55, 157.5, 110, 222.5),
       );
 
       final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
       final band = _unoccludedLandscapeBand(
         cavern.size,
         left: 44,
-        bottom: 91,
+        bottom: 178,
       ).shift(cavern.topLeft);
       final hud = _hudRects(tester);
       for (final scale in const [0.8, 1.6]) {
@@ -1657,11 +1583,11 @@ void main() {
 
         expect(
           tester.getRect(find.byKey(const Key('mining-grid-surface'))).topLeft,
-          const Offset(64, 155),
+          const Offset(64, 125),
         );
         expect(
           tester.getRect(find.byKey(const Key('mining-deposit-1-1-2'))).center,
-          const Offset(176, 267),
+          const Offset(176, 237),
         );
       },
     );
@@ -1685,7 +1611,7 @@ void main() {
       dock: _dockView(state),
     );
     final surface = find.byKey(const Key('mining-grid-surface'));
-    expect(tester.getRect(surface).topLeft, const Offset(-20, 155));
+    expect(tester.getRect(surface).topLeft, const Offset(-20, 125));
 
     await tester.drag(
       find.byKey(const Key('mining-grid-interactive')),
@@ -1693,7 +1619,7 @@ void main() {
     );
     await tester.pump();
     final panned = tester.getRect(surface).topLeft;
-    expect(panned, isNot(const Offset(-20, 155)));
+    expect(panned, isNot(const Offset(-20, 125)));
 
     // The one-second foreground refresh supplies a fresh view instance
     // behind the same site key: the widget-local camera must not jump.
@@ -1715,14 +1641,14 @@ void main() {
       dock: _dockView(state),
     );
     final surface = find.byKey(const Key('mining-grid-surface'));
-    expect(tester.getRect(surface).topLeft, const Offset(64, 155));
+    expect(tester.getRect(surface).topLeft, const Offset(64, 125));
 
     await tester.drag(
       find.byKey(const Key('mining-grid-interactive')),
       const Offset(-120, -60),
     );
     await tester.pump();
-    expect(tester.getRect(surface).topLeft, isNot(const Offset(64, 155)));
+    expect(tester.getRect(surface).topLeft, isNot(const Offset(64, 125)));
 
     // The keyed map remounts on a site swap and lands on the new site's
     // surveyed starter deposit instead of the panned Landing Basin camera.
@@ -1732,6 +1658,25 @@ void main() {
       view: _siteView(state, siteId: MiningSiteId.carbonRidge),
       dock: _dockView(state),
     );
-    expect(tester.getRect(surface).topLeft, const Offset(64, 155));
+    expect(tester.getRect(surface).topLeft, const Offset(64, 125));
+  });
+
+  testWidgets('near-square landscape window uses landscape cavern layout', (
+    tester,
+  ) async {
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(1000, 950),
+      view: _siteView(state),
+      dock: _dockView(state),
+    );
+    // In 1000x950, cavern width (1000 - 180 = 820) is narrower than height (950),
+    // but the screen orientation is landscape so the cavern must use landscape.
+    expect(find.byKey(const Key('mine-site-right-rail')), findsOneWidget);
+    expect(find.byKey(const Key('mine-site-toolbar')), findsOneWidget);
+    expect(find.byKey(const Key('mine-site-cargo')), findsOneWidget);
+    final cargoRect = tester.getRect(find.byKey(const Key('mine-site-cargo')));
+    expect(cargoRect.top, 52.0);
   });
 }

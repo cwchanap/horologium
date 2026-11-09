@@ -17,11 +17,14 @@ class MiningNavigationBar extends StatelessWidget {
   final ValueChanged<MiningNavigationDestination> onDestinationSelected;
   final bool compact;
 
+  static const double height = 88;
+  static const double compactHeight = 54;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       key: const Key('mining-bottom-navigation'),
-      height: compact ? 54 : 88,
+      height: compact ? compactHeight : height,
       color: Colors.transparent,
       child: Padding(
         padding: EdgeInsets.only(bottom: compact ? 0 : 26),

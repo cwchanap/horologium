@@ -78,6 +78,9 @@ class MiningHud extends StatelessWidget {
 class MiningCashChip extends StatelessWidget {
   const MiningCashChip({super.key, required this.cash, this.compact = false});
 
+  static const double height = 46;
+  static const double compactHeight = 39;
+
   final int cash;
   final bool compact;
 
@@ -87,8 +90,11 @@ class MiningCashChip extends StatelessWidget {
       label: 'Cash ${formatMiningCash(cash)}',
       child: Container(
         key: const Key('mining-cash-chip'),
-        height: compact ? 39 : 46,
-        constraints: BoxConstraints(minWidth: 76, minHeight: compact ? 39 : 46),
+        height: compact ? compactHeight : height,
+        constraints: BoxConstraints(
+          minWidth: 76,
+          minHeight: compact ? compactHeight : height,
+        ),
         padding: compact
             ? const EdgeInsets.fromLTRB(12, 9, 20, 9)
             : const EdgeInsets.fromLTRB(14, 11, 22, 11),

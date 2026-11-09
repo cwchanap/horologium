@@ -73,7 +73,7 @@ class _MiningShellState extends State<MiningShell>
   late final bool _createdAudioManager;
   late final StorageAlerts _storageAlerts;
   late MiningSave _displayState;
-  late final ValueNotifier<MiningSave> _displayNotifier;
+  late final _MiningDisplayNotifier _displayNotifier;
   Timer? _refreshTimer;
   bool _initialized = false;
   // Set by the first paused/hidden event and cleared on resume: the only
@@ -84,8 +84,6 @@ class _MiningShellState extends State<MiningShell>
   bool _recoverySnackBarScheduled = false;
   DockBayId? _selectedBayId;
   MiningSiteId? _openSiteId;
-  ModalRoute<dynamic>? _sheetRoute;
-  String? _pendingSheetFailure;
   int _miningImpactSequence = 0;
   MiningNavigationDestination _selectedDestination =
       MiningNavigationDestination.siteDeck;
@@ -104,7 +102,7 @@ class _MiningShellState extends State<MiningShell>
       nowUtc: nowUtc,
     );
     _displayState = MiningSave.initial(nowUtc: nowUtc());
-    _displayNotifier = ValueNotifier<MiningSave>(_displayState);
+    _displayNotifier = _MiningDisplayNotifier(_displayState);
     WidgetsBinding.instance.addObserver(this);
     _alertOwner = this;
     _storageAlerts.ownsAlert = () => identical(_alertOwner, this);
@@ -214,7 +212,7 @@ class _MiningShellState extends State<MiningShell>
     if (!_initialized) return;
     if (announceCargo) _announceFullCargo(_displayState);
     _displayState = _controller.state;
-    _displayNotifier.value = _controller.state;
+    _displayNotifier.refresh(_controller.state);
     _reducedMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? _reducedMotion;
     if (mounted) setState(() {});
@@ -238,80 +236,72 @@ class _MiningShellState extends State<MiningShell>
     if (summary.elapsedAway < const Duration(minutes: 5)) {
       return Future<void>.value();
     }
-    return _showMiningSheet(
-      (state) =>
-          OfflineReturnSheet(summary: summary, content: _content, state: state),
+    return _showModalSheet(
+      OfflineReturnSheet(
+        summary: summary,
+        content: _content,
+        state: _displayState,
+      ),
     );
   }
 
-  Future<void> _showMiningSheet(
-    Widget Function(MiningSave state) sheetBuilder,
-  ) async {
-    ModalRoute<dynamic>? pushed;
-    try {
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        barrierColor: Colors.black26,
-        constraints: const BoxConstraints(maxWidth: double.infinity),
-        builder: (sheetContext) {
-          pushed = ModalRoute.of(sheetContext);
-          if (pushed?.isCurrent ?? false) _sheetRoute = pushed;
-          final sheet = sheetBuilder(_displayState);
-          if (sheet is! TechnologySheet && sheet is! MiningSettingsSheet) {
-            return sheet;
-          }
-          final settings = sheet is MiningSettingsSheet;
-          final deck = SiteDeckView.from(
-            state: _displayState,
-            content: _content,
-            isBusy: _controller.isBusy,
-          );
-          final site = _content.site(_openSiteId ?? deck.sites.first.id);
-          final destination = settings
-              ? MiningNavigationDestination.settings
-              : MiningNavigationDestination.technology;
-          // The bottom-sheet route is a separate overlay route, so
-          // `MiningShell.setState` does not rebuild it. Consume the shell's
-          // display notifier so the scene HUD tracks live cash/cargo/capacity
-          // while the foreground timer accrues.
-          return ValueListenableBuilder<MiningSave>(
-            valueListenable: _displayNotifier,
-            builder: (context, state, _) {
-              final liveDeck = SiteDeckView.from(
-                state: state,
-                content: _content,
-                isBusy: _controller.isBusy,
-              );
-              return MiningSheetScene(
-                backgroundAsset: settings ? site.cardAsset : site.cavernAsset,
-                destination: destination,
-                cash: state.cash,
-                cargo: liveDeck.totalCargo,
-                capacity: liveDeck.totalCapacity,
-                projectedValue: liveDeck.projectedValue,
-                onDestinationSelected: (next) {
-                  if (next == destination) return;
-                  Navigator.of(sheetContext).pop();
-                  _handleNavigation(next);
-                },
-                child: sheetBuilder(state),
-              );
-            },
-          );
-        },
-      );
-    } finally {
-      if (identical(_sheetRoute, pushed)) _sheetRoute = null;
-      final failure = _pendingSheetFailure;
-      if (mounted &&
-          failure != null &&
-          (ModalRoute.of(context)?.isCurrent ?? false)) {
-        _pendingSheetFailure = null;
-        _showResult(failure);
-      }
-    }
+  Future<void> _showModalSheet(Widget child) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black26,
+      constraints: const BoxConstraints(maxWidth: double.infinity),
+      builder: (_) => child,
+    );
+    if (mounted) unawaited(_audioManager.playSound(GameSound.tap));
+  }
+
+  Future<void> _showMiningSceneSheet({
+    required MiningNavigationDestination destination,
+    required Widget Function(BuildContext context, MiningSave state) builder,
+  }) async {
+    final settings = destination == MiningNavigationDestination.settings;
+    final deck = SiteDeckView.from(
+      state: _displayState,
+      content: _content,
+      isBusy: _controller.isBusy,
+    );
+    final site = _content.site(_openSiteId ?? deck.sites.first.id);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black26,
+      constraints: const BoxConstraints(maxWidth: double.infinity),
+      builder: (sheetContext) {
+        return ValueListenableBuilder<MiningSave>(
+          valueListenable: _displayNotifier,
+          builder: (context, state, _) {
+            final liveDeck = SiteDeckView.from(
+              state: state,
+              content: _content,
+              isBusy: _controller.isBusy,
+            );
+            return MiningSheetScene(
+              backgroundAsset: settings ? site.cardAsset : site.cavernAsset,
+              destination: destination,
+              cash: state.cash,
+              cargo: liveDeck.totalCargo,
+              capacity: liveDeck.totalCapacity,
+              projectedValue: liveDeck.projectedValue,
+              onDestinationSelected: (next) {
+                if (next == destination) return;
+                Navigator.of(sheetContext).pop();
+                _handleNavigation(next);
+              },
+              child: builder(context, state),
+            );
+          },
+        );
+      },
+    );
     if (mounted) unawaited(_audioManager.playSound(GameSound.tap));
   }
 
@@ -320,12 +310,14 @@ class _MiningShellState extends State<MiningShell>
     if (!_initialized) return;
     unawaited(_audioManager.playSound(GameSound.tap));
     unawaited(_audioManager.maybeStartBgm());
+    final settingsSheet = MiningSettingsSheet(
+      audioManager: _audioManager,
+      storageAlerts: _storageAlerts,
+    );
     unawaited(
-      _showMiningSheet(
-        (_) => MiningSettingsSheet(
-          audioManager: _audioManager,
-          storageAlerts: _storageAlerts,
-        ),
+      _showMiningSceneSheet(
+        destination: MiningNavigationDestination.settings,
+        builder: (context, _) => settingsSheet,
       ),
     );
   }
@@ -336,9 +328,14 @@ class _MiningShellState extends State<MiningShell>
     unawaited(_audioManager.playSound(GameSound.tap));
     unawaited(_audioManager.maybeStartBgm());
     unawaited(
-      _showMiningSheet(
-        (state) => TechnologySheet(
-          view: TechnologySheetView.from(state: state, content: _content),
+      _showMiningSceneSheet(
+        destination: MiningNavigationDestination.technology,
+        builder: (context, state) => TechnologySheet(
+          view: TechnologySheetView.from(
+            state: state,
+            content: _content,
+            isBusy: _controller.isBusy,
+          ),
           initialTrack: initialTrack,
           onPurchase: _purchaseTechnology,
           onSelectionChanged: () =>
@@ -351,7 +348,7 @@ class _MiningShellState extends State<MiningShell>
   void _purchaseTechnology(TechnologyTrack track) {
     _runSheetAction(
       () => _controller.purchaseTechnology(track),
-      successMessage: 'Technology upgraded.',
+      successMessage: null,
       sound: GameSound.upgrade,
     );
   }
@@ -376,8 +373,8 @@ class _MiningShellState extends State<MiningShell>
     if (!_initialized) return;
     unawaited(_audioManager.playSound(GameSound.tap));
     unawaited(
-      _showMiningSheet(
-        (_) => RelaunchSheet(
+      _showModalSheet(
+        RelaunchSheet(
           relaunchCount: _controller.state.relaunchCount,
           onConfirm: _confirmRelaunch,
         ),
@@ -598,7 +595,7 @@ class _MiningShellState extends State<MiningShell>
 
   Future<void> _runSheetAction(
     Future<MiningActionResult> Function() operation, {
-    required String successMessage,
+    String? successMessage,
     required GameSound sound,
     void Function(MiningActionResult result)? onSuccess,
   }) async {
@@ -608,8 +605,6 @@ class _MiningShellState extends State<MiningShell>
     // persistence was in flight, a late success must not recreate a hidden
     // selection that could deploy in another site.
     final actionSiteId = _openSiteId;
-    final actionRoute = _sheetRoute;
-    _pendingSheetFailure = null;
     final pendingOperation = operation();
     _refreshPresentation();
     try {
@@ -642,35 +637,19 @@ class _MiningShellState extends State<MiningShell>
         unawaited(
           _audioManager.playSound(commissioned ? GameSound.milestone : sound),
         );
+        final message = result.message ?? successMessage;
+        if (message != null) {
+          _showResult(message);
+        }
       } else {
         unawaited(_audioManager.playSound(GameSound.reject));
-      }
-      if (result.isSuccess) {
-        _showResult(result.message ?? successMessage);
-      } else {
-        _dismissSheetForFailure(actionRoute);
-        _showActionFailure(result.message ?? 'Action failed.');
+        _showResult(result.message ?? 'Action failed.');
       }
     } catch (_) {
       if (!mounted) return;
       _refreshPresentation();
       unawaited(_audioManager.playSound(GameSound.reject));
-      _dismissSheetForFailure(actionRoute);
-      _showActionFailure('Action failed.');
-    }
-  }
-
-  void _dismissSheetForFailure(ModalRoute<dynamic>? route) {
-    if (route != null && route.isCurrent) {
-      Navigator.of(context).pop();
-    }
-  }
-
-  void _showActionFailure(String message) {
-    if (ModalRoute.of(context)?.isCurrent ?? false) {
-      _showResult(message);
-    } else {
-      _pendingSheetFailure = message;
+      _showResult('Action failed.');
     }
   }
 
@@ -900,5 +879,17 @@ class _MiningShellState extends State<MiningShell>
         child: surface,
       ),
     );
+  }
+}
+
+class _MiningDisplayNotifier extends ValueNotifier<MiningSave> {
+  _MiningDisplayNotifier(super.value);
+
+  void refresh(MiningSave state) {
+    if (value == state) {
+      notifyListeners();
+    } else {
+      value = state;
+    }
   }
 }
