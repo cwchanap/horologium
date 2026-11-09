@@ -532,7 +532,7 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 2));
     final panned = _surfaceRect(tester).topLeft;
-    expect(panned, isNot(const Offset(64, 155)));
+    expect(panned, isNot(const Offset(64, 125)));
 
     // A site swap remounts the keyed map: the fresh frame lands on the
     // new site's surveyed starter deposit instead of the panned camera.
