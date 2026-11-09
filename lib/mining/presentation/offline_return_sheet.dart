@@ -421,7 +421,9 @@ class OfflineReturnSheet extends StatelessWidget {
             ),
           if (fullOnPlanet.length == planet.sites.length)
             _fullWarning(
-              'All ${planet.sites.length} sites full · sell to resume',
+              id == state.activePlanetId
+                  ? 'All ${planet.sites.length} sites full · sell to resume'
+                  : 'All ${planet.sites.length} sites full · travel to sell',
             )
           else
             for (final site in fullOnPlanet)

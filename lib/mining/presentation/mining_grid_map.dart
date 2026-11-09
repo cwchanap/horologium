@@ -22,13 +22,6 @@ double depositVisualSize(int footprint) => switch (footprint) {
   _ => throw ArgumentError.value(footprint),
 };
 
-final EdgeInsets miningGridOverlayMargin = EdgeInsets.fromLTRB(
-  depositVisualSize(1) / 2 - miningGridCellSize / 2,
-  depositVisualSize(1) / 2 + 18 - miningGridCellSize / 2,
-  depositVisualSize(1) / 2 - miningGridCellSize / 2,
-  depositVisualSize(1) / 2 - miningGridCellSize / 2,
-);
-
 /// Stable overlay/visual key derived from the deposit's authored geometry:
 /// dense-field resources key by footprint, not by list position.
 String _depositKey(MiningDepositDefinition definition) =>
@@ -130,20 +123,18 @@ class _MiningGridMapState extends State<MiningGridMap> {
     return null;
   }
 
-  /// One camera axis: clamps [desired] into the pan interval, or centers
-  /// the child when the bounds are reversed because the viewport is larger
-  /// than the grid (a wide web window or zoomed-out browser).
+  /// One camera axis: clamps [desired] into the pan interval, or defaults
+  /// to 0.0 when the bounds are reversed because the viewport is larger than
+  /// the grid (matching InteractiveViewer's translation clamp).
   double _axisTranslation(double desired, double lower, double upper) =>
-      lower > upper
-      ? (lower + upper) / 2
-      : desired.clamp(lower, upper).toDouble();
+      lower > upper ? 0.0 : desired.clamp(lower, upper).toDouble();
 
   /// The 1.0x transform placed once, before the first InteractiveViewer
   /// build: [focus] lands on the unoccluded viewport's center unless the
-  /// scale-aware pan bounds clamp it closer or center the axis.
+  /// scale-aware pan bounds clamp it closer or zero the axis.
   Matrix4 _initialCamera(Size viewport, Offset focus) {
     final insets = widget.viewportInsets;
-    final margin = insets / miningGridMinScale + miningGridOverlayMargin;
+    final margin = insets / miningGridMinScale;
     final view = widget.view;
     final childWidth = view.definition.gridWidth * miningGridCellSize;
     final childHeight = view.definition.gridHeight * miningGridCellSize;
@@ -184,9 +175,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
         return InteractiveViewer(
           key: const Key('mining-grid-interactive'),
           transformationController: _transformationController,
-          boundaryMargin:
-              widget.viewportInsets / miningGridMinScale +
-              miningGridOverlayMargin,
+          boundaryMargin: widget.viewportInsets / miningGridMinScale,
           constrained: false,
           alignment: Alignment.topLeft,
           minScale: miningGridMinScale,

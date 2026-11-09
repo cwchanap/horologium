@@ -2628,105 +2628,8 @@ void main() {
     ]);
   });
 
-  testWidgets('a rejected purchase dismisses the sheet for the failure', (
-    tester,
-  ) async {
-    final repository = DelayedMiningSaveRepository();
-    await repository.save(homeworldMasteredState(_start, cash: 1_000));
-    final effects = FakeBackgroundMusicPlayer();
-    final audio = AudioManager(
-      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
-      soundEffectPlayer: effects,
-    );
-    addTearDown(audio.dispose);
-    await pumpShell(tester, repository: repository, audioManager: audio);
-    tester.view.physicalSize = const Size(430, 932);
-    await tester.pump();
-
-    shellHandles(tester).openTechnology();
-    await tester.pumpAndSettle();
-    final sheet = find.byKey(const Key('mining-technology-sheet'));
-    expect(sheet, findsOneWidget);
-
-    repository.delayNextSave = true;
-    await tester.tap(find.byKey(const Key('mining-technology-buy-extraction')));
-    await repository.saveStarted.future;
-    repository.allowSave.completeError(StateError('save failed'));
-    await tester.pumpAndSettle();
-
-    expect(sheet, findsNothing);
-    expect(find.text('Action failed.'), findsOneWidget);
-    final state = shellHandles(tester).controller.state;
-    expect(state.technology.extraction, 0);
-    expect(state.cash, 1_000);
-    expect(effects.playedAssets.last, 'audio/reject.wav');
-  });
-
   testWidgets(
-    'a late purchase failure keeps replacement sheets and reports after '
-    'they close',
-    (tester) async {
-      final repository = DelayedMiningSaveRepository();
-      await repository.save(homeworldMasteredState(_start, cash: 1_000));
-      final effects = FakeBackgroundMusicPlayer();
-      final audio = AudioManager(
-        backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
-        soundEffectPlayer: effects,
-      );
-      addTearDown(audio.dispose);
-      await pumpShell(tester, repository: repository, audioManager: audio);
-      tester.view.physicalSize = const Size(874, 402);
-      await tester.pump();
-
-      shellHandles(tester).openTechnology();
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
-
-      repository.delayNextSave = true;
-      final buy = find.byKey(const Key('mining-technology-buy-extraction'));
-      await tester.ensureVisible(buy);
-      await tester.tap(buy);
-      await repository.saveStarted.future;
-
-      final scene = find.byType(MiningSheetScene);
-      await tester.tap(
-        find.descendant(
-          of: scene,
-          matching: find.byKey(const Key('mining-nav-settings')),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('mining-settings-sheet')), findsOneWidget);
-
-      await tester.tap(
-        find.descendant(
-          of: scene,
-          matching: find.byKey(const Key('mining-nav-technology')),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final replacement = find.byKey(const Key('mining-technology-sheet'));
-      expect(replacement, findsOneWidget);
-
-      repository.allowSave.completeError(StateError('save failed'));
-      await tester.pumpAndSettle();
-
-      expect(replacement, findsOneWidget);
-      expect(find.text('Action failed.'), findsNothing);
-
-      await tester.tap(find.bySemanticsLabel('Close Technology'));
-      await tester.pumpAndSettle();
-      expect(replacement, findsNothing);
-      expect(find.text('Action failed.'), findsOneWidget);
-      final state = shellHandles(tester).controller.state;
-      expect(state.technology.extraction, 0);
-      expect(state.cash, 1_000);
-      expect(effects.playedAssets, contains('audio/reject.wav'));
-    },
-  );
-
-  testWidgets(
-    'a late purchase failure keeps a sheet reopened after dismissal',
+    'a rejected purchase keeps the sheet open and plays reject audio',
     (tester) async {
       final repository = DelayedMiningSaveRepository();
       await repository.save(homeworldMasteredState(_start, cash: 1_000));
@@ -2742,35 +2645,71 @@ void main() {
 
       shellHandles(tester).openTechnology();
       await tester.pumpAndSettle();
+      final sheet = find.byKey(const Key('mining-technology-sheet'));
+      expect(sheet, findsOneWidget);
 
       repository.delayNextSave = true;
-      await tester.tap(
-        find.byKey(const Key('mining-technology-buy-extraction')),
-      );
+      final buy = find.byKey(const Key('mining-technology-buy-extraction'));
+      await tester.tap(buy);
       await repository.saveStarted.future;
+      await tester.pump();
 
-      await tester.tap(find.bySemanticsLabel('Close Technology'));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('mining-technology-sheet')), findsNothing);
-      shellHandles(tester).openSettings();
-      await tester.pumpAndSettle();
-      final settings = find.byKey(const Key('mining-settings-sheet'));
-      expect(settings, findsOneWidget);
+      // The button disables while the save is in flight.
+      final inFlightButton = tester.widget<ElevatedButton>(
+        find.descendant(of: buy, matching: find.byType(ElevatedButton)),
+      );
+      expect(inFlightButton.onPressed, isNull);
 
       repository.allowSave.completeError(StateError('save failed'));
       await tester.pumpAndSettle();
 
-      expect(settings, findsOneWidget);
-      expect(find.text('Action failed.'), findsNothing);
-
-      await tester.tap(find.bySemanticsLabel('Close Settings'));
-      await tester.pumpAndSettle();
-      expect(settings, findsNothing);
-      expect(find.text('Action failed.'), findsOneWidget);
+      // The sheet stays open and plays the reject audio without mutating.
+      expect(sheet, findsOneWidget);
       final state = shellHandles(tester).controller.state;
       expect(state.technology.extraction, 0);
       expect(state.cash, 1_000);
-      expect(effects.playedAssets, contains('audio/reject.wav'));
+      expect(effects.playedAssets.last, 'audio/reject.wav');
+
+      // Once settled, the button re-enables for retry.
+      final settledButton = tester.widget<ElevatedButton>(
+        find.descendant(of: buy, matching: find.byType(ElevatedButton)),
+      );
+      expect(settledButton.onPressed, isNotNull);
+    },
+  );
+
+  testWidgets(
+    'a successful technology purchase updates the sheet in place and shows no toast',
+    (tester) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(homeworldMasteredState(_start, cash: 1_000));
+      final effects = FakeBackgroundMusicPlayer();
+      final audio = AudioManager(
+        backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+        soundEffectPlayer: effects,
+      );
+      addTearDown(audio.dispose);
+      await pumpShell(tester, repository: repository, audioManager: audio);
+      tester.view.physicalSize = const Size(430, 932);
+      await tester.pump();
+
+      shellHandles(tester).openTechnology();
+      await tester.pumpAndSettle();
+
+      final buy = find.byKey(const Key('mining-technology-buy-extraction'));
+      await tester.tap(buy);
+      await tester.pumpAndSettle();
+
+      // No SnackBar toast is queued behind the modal sheet.
+      expect(find.text('Technology upgraded.'), findsNothing);
+      final state = shellHandles(tester).controller.state;
+      expect(state.technology.extraction, 1);
+      expect(effects.playedAssets, contains('audio/upgrade.wav'));
+
+      // Dismiss the sheet and ensure no stale toast appears on the shell.
+      await tester.tap(find.bySemanticsLabel('Close Technology'));
+      await tester.pumpAndSettle();
+      expect(find.text('Technology upgraded.'), findsNothing);
     },
   );
 
@@ -2944,7 +2883,7 @@ void main() {
         );
         expect(sheet, findsOneWidget);
         expect(buySurveying, findsOneWidget);
-        expect(find.text('Surveys 4 new Homeworld deposits'), findsOneWidget);
+        expect(find.text('Surveys 4 Homeworld deposits'), findsOneWidget);
         expect(
           find.text('Next: Surveys 3 new Homeworld deposits'),
           findsOneWidget,
@@ -2998,7 +2937,7 @@ void main() {
 
         expect(sheet, findsOneWidget);
         expect(buySurveying, findsOneWidget);
-        expect(find.text('Surveys 3 new Homeworld deposits'), findsOneWidget);
+        expect(find.text('Surveys 3 Homeworld deposits'), findsOneWidget);
         expect(
           find.text('Next: Surveys 99 new Homeworld deposits'),
           findsOneWidget,
@@ -3085,7 +3024,7 @@ void main() {
 
         expect(sheet, findsOneWidget);
         expect(buySurveying, findsOneWidget);
-        expect(find.text('Surveys 99 new Homeworld deposits'), findsOneWidget);
+        expect(find.text('Surveys 99 Homeworld deposits'), findsOneWidget);
         expect(
           find.text(
             'Next: Surveys 194 new Homeworld deposits · '

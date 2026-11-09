@@ -363,15 +363,15 @@ void main() {
     expect(viewer.maxScale, 1.6);
     expect(
       viewer.boundaryMargin,
-      const EdgeInsets.fromLTRB(84.5, 155, 132, 257),
+      const EdgeInsets.fromLTRB(72.5, 125, 120, 245),
     );
 
     // The (1,1) 2x2 starter deposit centers inside the unoccluded band
-    // as far as the clamped pan bounds allow: (176, 267) at this size.
+    // as far as the clamped pan bounds allow: (176, 237) at this size.
     final deposit = tester.getRect(
       find.byKey(const Key('mining-deposit-1-1-2')),
     );
-    expect(deposit.center, const Offset(176, 267));
+    expect(deposit.center, const Offset(176, 237));
   });
 
   testWidgets('centers the initial camera on the placed-rig bounding box', (
@@ -394,15 +394,16 @@ void main() {
     );
 
     // Unoccluded center (176, 374) would translate to (-244, 234); the
-    // top boundary clamps ty to the 155 margin.
-    expect(_surfaceRect(tester).topLeft, const Offset(-244, 155));
+    // top boundary clamps ty to the 125 margin.
+    expect(_surfaceRect(tester).topLeft, const Offset(-244, 125));
   });
 
-  testWidgets('centers the grid on a viewport wider than the child', (
+  testWidgets('zeros the axis on a viewport wider than the child', (
     tester,
   ) async {
     // A wide web window can exceed the 2800px grid: the reversed x bounds
-    // (288 > 12) must not reach num.clamp, and the axis centers instead.
+    // must not reach num.clamp and start at 0.0 matching InteractiveViewer's
+    // clamp translation so the grid does not jump on first pan.
     await _pumpMap(
       tester,
       _view(MiningSiteId.landingBasin),
@@ -410,12 +411,11 @@ void main() {
       size: const Size(3100, 900),
     );
 
-    // ty still clamps to the 30 margin; tx centers (3100 - 2800) / 2.
-    expect(_surfaceRect(tester).topLeft, const Offset(150, 30));
+    expect(_surfaceRect(tester).topLeft, Offset.zero);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('centers the grid on a viewport taller than the child', (
+  testWidgets('zeros the axis on a viewport taller than the child', (
     tester,
   ) async {
     await _pumpMap(
@@ -425,9 +425,7 @@ void main() {
       size: const Size(390, 3100),
     );
 
-    // tx clamps to the 12 margin; reversed y bounds (288 > 30) center:
-    // (3100 - 2800 - 12 + 30) / 2 = 159.
-    expect(_surfaceRect(tester).topLeft, const Offset(12, 159));
+    expect(_surfaceRect(tester).topLeft, Offset.zero);
     expect(tester.takeException(), isNull);
   });
 
@@ -492,7 +490,7 @@ void main() {
       viewportInsets: insets,
     );
     // The rig's bounding-box frame lands before the first pan.
-    expect(_surfaceRect(tester).topLeft, const Offset(-20, 155));
+    expect(_surfaceRect(tester).topLeft, const Offset(-20, 125));
     await tester.timedDrag(
       find.byKey(const Key('mining-grid-interactive')),
       const Offset(-160, -90),
@@ -500,7 +498,7 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 2));
     final panned = _surfaceRect(tester).topLeft;
-    expect(panned, isNot(const Offset(-20, 155)));
+    expect(panned, isNot(const Offset(-20, 125)));
 
     // The next-second refresh supplies a fresh view instance behind the
     // same site key: the widget-local camera must not move.
@@ -525,7 +523,7 @@ void main() {
       size: const Size(390, 844),
       viewportInsets: insets,
     );
-    expect(_surfaceRect(tester).topLeft, const Offset(64, 155));
+    expect(_surfaceRect(tester).topLeft, const Offset(64, 125));
 
     await tester.timedDrag(
       find.byKey(const Key('mining-grid-interactive')),
@@ -545,7 +543,7 @@ void main() {
       size: const Size(390, 844),
       viewportInsets: insets,
     );
-    expect(_surfaceRect(tester).topLeft, const Offset(64, 155));
+    expect(_surfaceRect(tester).topLeft, const Offset(64, 125));
 
     // Re-entry after the map unmounts also frames fresh.
     await _pumpMap(
@@ -561,7 +559,7 @@ void main() {
       const Duration(milliseconds: 300),
     );
     await tester.pump(const Duration(seconds: 2));
-    expect(_surfaceRect(tester).topLeft, isNot(const Offset(64, 155)));
+    expect(_surfaceRect(tester).topLeft, isNot(const Offset(64, 125)));
     await tester.pumpWidget(const SizedBox.shrink());
     await _pumpMap(
       tester,
@@ -570,6 +568,6 @@ void main() {
       size: const Size(390, 844),
       viewportInsets: insets,
     );
-    expect(_surfaceRect(tester).topLeft, const Offset(64, 155));
+    expect(_surfaceRect(tester).topLeft, const Offset(64, 125));
   });
 }

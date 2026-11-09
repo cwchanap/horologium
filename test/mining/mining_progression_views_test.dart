@@ -181,8 +181,8 @@ void main() {
         final surveying = view.track(TechnologyTrack.surveying);
         expect(
           surveying.currentEffect,
-          'Reveals Carbon Ridge · Reveals Granite Crater · '
-          'Surveys 4 new Homeworld deposits',
+          'Carbon Ridge revealed · Granite Crater revealed · '
+          'Surveys 4 Homeworld deposits',
         );
         expect(surveying.nextEffect, 'Surveys 3 new Homeworld deposits');
       },
@@ -197,7 +197,7 @@ void main() {
         content: content,
       );
       final surveying = view.track(TechnologyTrack.surveying);
-      expect(surveying.currentEffect, 'Surveys 99 new Homeworld deposits');
+      expect(surveying.currentEffect, 'Surveys 99 Homeworld deposits');
       expect(
         surveying.nextEffect,
         'Surveys 194 new Homeworld deposits · Needed for Lunar Frontier',
@@ -222,7 +222,7 @@ void main() {
         ).track(TechnologyTrack.surveying);
         expect(
           surveying.currentEffect,
-          'Reveals Frozen Basin · Surveys 2 new Lunar Frontier deposits',
+          'Frozen Basin revealed · Surveys 2 Lunar Frontier deposits',
         );
         expect(
           surveying.nextEffect,
@@ -238,10 +238,7 @@ void main() {
           ),
           content: content,
         ).track(TechnologyTrack.surveying);
-        expect(
-          siteUnlocked.currentEffect,
-          'Surveys 2 new Lunar Frontier deposits',
-        );
+        expect(siteUnlocked.currentEffect, 'Surveys 2 Lunar Frontier deposits');
       },
     );
 
@@ -276,7 +273,18 @@ void main() {
       final surveying = view.track(TechnologyTrack.surveying);
       expect(surveying.isMaxLevel, isTrue);
       expect(surveying.nextEffect, isNull);
-      expect(surveying.currentEffect, 'Surveys 300 new Io Frontier deposits');
+      expect(surveying.currentEffect, 'Surveys 300 Io Frontier deposits');
+    });
+
+    test('isBusy disables track purchase and explains the pending wait', () {
+      final view = TechnologySheetView.from(
+        state: stateWith(now: now, cash: 1000000),
+        content: content,
+        isBusy: true,
+      );
+      final track = view.track(TechnologyTrack.extraction);
+      expect(track.canPurchase, isFalse);
+      expect(track.disabledReason, 'Finishing previous action…');
     });
   });
 

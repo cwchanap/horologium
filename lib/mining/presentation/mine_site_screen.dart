@@ -16,22 +16,21 @@ import 'package:horologium/mining/presentation/mining_visuals.dart';
 // Mine Site chrome placement shared by the Stack children and the
 // unoccluded pan band handed to MiningGridMap.viewportInsets: every offset
 // that hides the cavern has exactly one constant, so chrome cannot silently
-// cover legal grid cells. Heights mirror the fixed sizes inside
+// cover legal grid cells. Heights reference the fixed sizes owned by
 // MiningCashChip, _MineChromeButton, MiningNavigationBar, and the
 // horizontal FleetDock.
 const double _portraitCashChipTop = 54;
-const double _portraitCashChipHeight = 46;
+const double _portraitCashChipHeight = MiningCashChip.height;
 const double _portraitBackTop = 146;
 const double _portraitBackLeft = 14;
-const double _portraitBackWidth = 44;
-const double _portraitBackHeight = 48;
+const double _portraitBackWidth = _MineChromeButton.width;
 const double _portraitCargoTop = 50;
 const double _portraitCargoRight = 12;
 const double _portraitCargoSize = 84;
 const double _portraitDockHorizontalMargin = 12;
 const double _portraitDockBottom = 100;
-const double _portraitDockHeight = 96;
-const double _portraitNavHeight = 88;
+const double _portraitDockHeight = FleetDock.horizontalHeight;
+const double _portraitNavHeight = MiningNavigationBar.height;
 const double _landscapeCashChipTop = 52;
 const double _landscapeCargoTop = 52;
 const double _landscapeCargoRight = 14;
@@ -39,8 +38,10 @@ const double _landscapeCargoSize = 74;
 const double _landscapeToolbarLeft = 12;
 const double _landscapeToolbarBottom = 16;
 const double _landscapeToolbarWidth = 252;
-const double _landscapeToolbarHeight = 54;
+const double _landscapeToolbarHeight = MiningNavigationBar.compactHeight;
 const double _landscapeRightRailWidth = 104;
+const double _landscapeSellBottom = 78;
+const double _landscapeSellHeight = 79;
 
 class MineSiteScreen extends StatelessWidget {
   const MineSiteScreen({
@@ -190,6 +191,7 @@ class _PortraitMineSite extends StatelessWidget {
           Positioned.fill(
             child: _CavernScene(
               view: view,
+              landscape: false,
               reducedMotion: reducedMotion,
               impactSequence: impactSequence,
               onMiningImpact: onMiningImpact,
@@ -288,7 +290,11 @@ class _LandscapeMineSite extends StatelessWidget {
       pad.left,
       math.max(pad.top, _landscapeCargoTop + _landscapeCargoSize),
       _landscapeCargoRight + _landscapeCargoSize,
-      pad.bottom + _landscapeToolbarBottom + _landscapeToolbarHeight,
+      pad.bottom +
+          math.max(
+            _landscapeToolbarBottom + _landscapeToolbarHeight,
+            _landscapeSellBottom + _landscapeSellHeight,
+          ),
     );
     return ColoredBox(
       key: const Key('mine-site-screen'),
@@ -302,6 +308,7 @@ class _LandscapeMineSite extends StatelessWidget {
             bottom: 0,
             child: _CavernScene(
               view: view,
+              landscape: true,
               reducedMotion: reducedMotion,
               impactSequence: impactSequence,
               onMiningImpact: onMiningImpact,
@@ -362,6 +369,7 @@ class _LandscapeMineSite extends StatelessWidget {
 class _CavernScene extends StatelessWidget {
   const _CavernScene({
     required this.view,
+    required this.landscape,
     required this.reducedMotion,
     required this.impactSequence,
     this.onMiningImpact,
@@ -372,6 +380,7 @@ class _CavernScene extends StatelessWidget {
   });
 
   final MineSiteView view;
+  final bool landscape;
   final bool reducedMotion;
   final int impactSequence;
   final VoidCallback? onMiningImpact;
@@ -384,7 +393,6 @@ class _CavernScene extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final landscape = constraints.maxWidth > constraints.maxHeight;
         return Stack(
           children: [
             Positioned.fill(
@@ -423,7 +431,7 @@ class _CavernScene extends StatelessWidget {
                   : constraints.maxHeight < 750
                   ? constraints.maxHeight - 310
                   : 506,
-              bottom: landscape ? 78 : null,
+              bottom: landscape ? _landscapeSellBottom : null,
               child: _SellControl(
                 view: view,
                 compact: landscape,
@@ -624,14 +632,17 @@ class _MineChromeButton extends StatelessWidget {
     required this.onPressed,
   });
 
+  static const double width = 44;
+  static const double height = 48;
+
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: _portraitBackWidth,
-    height: _portraitBackHeight,
+    width: width,
+    height: height,
     child: MiningHex(
       fill: const Color.fromRGBO(6, 10, 16, .82),
       border: const Color.fromRGBO(83, 212, 232, .32),

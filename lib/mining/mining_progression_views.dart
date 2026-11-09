@@ -15,6 +15,7 @@ class TechnologyTrackView {
     required this.isAffordable,
     required this.isMaxLevel,
     required this.disabledReason,
+    this.isBusy = false,
   });
 
   final TechnologyTrack track;
@@ -28,8 +29,10 @@ class TechnologyTrackView {
   final bool isAffordable;
   final bool isMaxLevel;
   final String? disabledReason;
+  final bool isBusy;
 
-  bool get canPurchase => !isMaxLevel && isGateSatisfied && isAffordable;
+  bool get canPurchase =>
+      !isBusy && !isMaxLevel && isGateSatisfied && isAffordable;
 }
 
 class TechnologySheetView {
@@ -43,18 +46,20 @@ class TechnologySheetView {
   static TechnologySheetView from({
     required MiningSave state,
     required MiningContentRegistry content,
+    bool isBusy = false,
   }) => TechnologySheetView(
     tracks: List<TechnologyTrackView>.unmodifiable([
       for (final track in TechnologyTrack.values)
-        _trackView(state, content, track),
+        _trackView(state, content, track, isBusy: isBusy),
     ]),
   );
 
   static TechnologyTrackView _trackView(
     MiningSave state,
     MiningContentRegistry content,
-    TechnologyTrack track,
-  ) {
+    TechnologyTrack track, {
+    bool isBusy = false,
+  }) {
     final level = state.technology.levelFor(track);
     final name = _trackName(track);
 
@@ -63,7 +68,7 @@ class TechnologySheetView {
         track: track,
         name: name,
         level: level,
-        currentEffect: _effect(state, content, track, level),
+        currentEffect: _effect(state, content, track, level, isNext: false),
         nextEffect: null,
         cost: null,
         gateSiteName: null,
@@ -71,6 +76,7 @@ class TechnologySheetView {
         isAffordable: true,
         isMaxLevel: true,
         disabledReason: 'Technology is at max level.',
+        isBusy: isBusy,
       );
     }
 
@@ -83,18 +89,21 @@ class TechnologySheetView {
       track: track,
       name: name,
       level: level,
-      currentEffect: _effect(state, content, track, level),
-      nextEffect: _effect(state, content, track, level + 1),
+      currentEffect: _effect(state, content, track, level, isNext: false),
+      nextEffect: _effect(state, content, track, level + 1, isNext: true),
       cost: cost,
       gateSiteName: content.site(gateSite).name,
       isGateSatisfied: gateSatisfied,
       isAffordable: affordable,
       isMaxLevel: false,
-      disabledReason: !gateSatisfied
+      disabledReason: isBusy
+          ? 'Finishing previous action…'
+          : !gateSatisfied
           ? 'Commission the ${content.site(gateSite).name} site first.'
           : !affordable
           ? 'Need ${formatMiningCash(cost)} cash.'
           : null,
+      isBusy: isBusy,
     );
   }
 
@@ -105,8 +114,9 @@ class TechnologySheetView {
     MiningSave state,
     MiningContentRegistry content,
     TechnologyTrack track,
-    int level,
-  ) {
+    int level, {
+    required bool isNext,
+  }) {
     switch (track) {
       case TechnologyTrack.extraction:
         return 'Mining rate ×'
@@ -127,13 +137,13 @@ class TechnologySheetView {
             ' · fills in ${formatMiningDuration(window)} at T1';
       case TechnologyTrack.surveying:
         final planet = content.planet(state.activePlanetId);
-        final newSites = <String>[
+        final sites = <String>[
           for (final site in planet.sites)
             if (site.requiredSurveyingLevel == level &&
                 state.sites[site.id]?.unlocked != true)
               site.name,
         ];
-        final newDeposits = planet.sites
+        final deposits = planet.sites
             .expand((site) => site.deposits)
             .where((deposit) => deposit.requiredSurveyingLevel == level)
             .length;
@@ -145,14 +155,25 @@ class TechnologySheetView {
             break;
           }
         }
+        if (isNext) {
+          return [
+            for (final name in sites) 'Reveals $name',
+            if (deposits > 0)
+              'Surveys $deposits new ${planet.name} '
+                  '${deposits == 1 ? 'deposit' : 'deposits'}',
+            if (frontier != null) 'Needed for ${frontier.name}',
+            if (sites.isEmpty && deposits == 0 && frontier == null)
+              'No new ${planet.name} deposits',
+          ].join(' · ');
+        }
         return [
-          for (final name in newSites) 'Reveals $name',
-          if (newDeposits > 0)
-            'Surveys $newDeposits new ${planet.name} '
-                '${newDeposits == 1 ? 'deposit' : 'deposits'}',
-          if (frontier != null) 'Needed for ${frontier.name}',
-          if (newSites.isEmpty && newDeposits == 0 && frontier == null)
-            'No new ${planet.name} deposits',
+          for (final name in sites) '$name revealed',
+          if (deposits > 0)
+            'Surveys $deposits ${planet.name} '
+                '${deposits == 1 ? 'deposit' : 'deposits'}',
+          if (frontier != null) 'Permits ${frontier.name}',
+          if (sites.isEmpty && deposits == 0 && frontier == null)
+            'No ${planet.name} deposits',
         ].join(' · ');
     }
   }

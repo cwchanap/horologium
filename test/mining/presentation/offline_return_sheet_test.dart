@@ -594,6 +594,46 @@ void main() {
       find.descendant(of: lunar, matching: find.textContaining('sites full')),
       findsNothing,
     );
+
+    // When a non-active planet has all sites full, the prompt directs the
+    // player to travel there first because selling only empties active cargo.
+    const nonActiveAllFullSummary = OfflineProductionSummary(
+      elapsedAway: Duration(hours: 1),
+      elapsedUsed: Duration(hours: 1),
+      produced: {ResourceType.gold: 5, ResourceType.waterIce: 20},
+      productionByPlanet: {
+        MiningPlanetId.homeworld: {ResourceType.gold: 5},
+        MiningPlanetId.lunarFrontier: {ResourceType.waterIce: 20},
+      },
+      fullSites: {
+        MiningSiteId.heliumMare,
+        MiningSiteId.frozenBasin,
+        MiningSiteId.titaniumHighlands,
+      },
+      wasOfflineCapped: false,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: OfflineReturnSheet(
+            summary: nonActiveAllFullSummary,
+            content: content,
+            state: _state(), // active is homeworld
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    final lunarCard = find.byKey(
+      const Key('offline-return-planet-lunarFrontier'),
+    );
+    expect(
+      find.descendant(
+        of: lunarCard,
+        matching: find.text('All 3 sites full · travel to sell'),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.descendant(of: homeworld, matching: find.text('+5.0')),
       findsOneWidget,
