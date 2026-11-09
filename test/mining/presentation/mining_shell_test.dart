@@ -2629,7 +2629,7 @@ void main() {
   });
 
   testWidgets(
-    'a rejected purchase keeps the sheet open and plays reject audio',
+    'a rejected purchase dismisses the sheet so the failure is visible',
     (tester) async {
       final repository = DelayedMiningSaveRepository();
       await repository.save(homeworldMasteredState(_start, cash: 1_000));
@@ -2663,18 +2663,14 @@ void main() {
       repository.allowSave.completeError(StateError('save failed'));
       await tester.pumpAndSettle();
 
-      // The sheet stays open and plays the reject audio without mutating.
-      expect(sheet, findsOneWidget);
+      // The covering sheet is dismissed so the failure SnackBar is visible
+      // on the shell, and the rejection plays audio without mutating.
+      expect(sheet, findsNothing);
+      expect(find.text('Action failed.'), findsOneWidget);
       final state = shellHandles(tester).controller.state;
       expect(state.technology.extraction, 0);
       expect(state.cash, 1_000);
-      expect(effects.playedAssets.last, 'audio/reject.wav');
-
-      // Once settled, the button re-enables for retry.
-      final settledButton = tester.widget<ElevatedButton>(
-        find.descendant(of: buy, matching: find.byType(ElevatedButton)),
-      );
-      expect(settledButton.onPressed, isNotNull);
+      expect(effects.playedAssets, contains('audio/reject.wav'));
     },
   );
 

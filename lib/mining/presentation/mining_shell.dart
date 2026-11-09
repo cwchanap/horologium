@@ -542,17 +542,17 @@ class _MiningShellState extends State<MiningShell>
             } else {
               unawaited(_audioManager.playSound(GameSound.reject));
             }
-            _showResult(
-              result.isSuccess
-                  ? 'Sold ${formatMiningCash(result.revenue!)} cash.'
-                  : result.message ?? 'Sale failed.',
-            );
+            if (result.isSuccess) {
+              _showResult('Sold ${formatMiningCash(result.revenue!)} cash.');
+            } else {
+              _showActionFailure(result.message ?? 'Sale failed.');
+            }
           })
           .catchError((_) {
             if (!mounted) return;
             _refreshPresentation();
             unawaited(_audioManager.playSound(GameSound.reject));
-            _showResult('Sale failed.');
+            _showActionFailure('Sale failed.');
           }),
     );
   }
@@ -643,14 +643,23 @@ class _MiningShellState extends State<MiningShell>
         }
       } else {
         unawaited(_audioManager.playSound(GameSound.reject));
-        _showResult(result.message ?? 'Action failed.');
+        _showActionFailure(result.message ?? 'Action failed.');
       }
     } catch (_) {
       if (!mounted) return;
       _refreshPresentation();
       unawaited(_audioManager.playSound(GameSound.reject));
-      _showResult('Action failed.');
+      _showActionFailure('Action failed.');
     }
+  }
+
+  /// A sheet route covering the shell hides the Scaffold SnackBar, so the
+  /// covering route is dismissed before the failure is reported.
+  void _showActionFailure(String message) {
+    if (ModalRoute.of(context)?.isCurrent == false) {
+      Navigator.of(context).pop();
+    }
+    _showResult(message);
   }
 
   void _showResult(String message) {
