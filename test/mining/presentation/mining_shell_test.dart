@@ -2744,6 +2744,90 @@ void main() {
     expect(effects.playedAssets.last, 'audio/reject.wav');
   });
 
+  testWidgets('a failed sale leaves a sheet opened during the save intact', (
+    tester,
+  ) async {
+    final repository = DelayedMiningSaveRepository();
+    await repository.save(deployedLandingState(_start, cargo: 10));
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await pumpShell(tester, repository: repository, audioManager: audio);
+
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+    repository.delayNextSave = true;
+    await tester.tap(find.byKey(const Key('mine-site-sell')));
+    await repository.saveStarted.future;
+
+    // The sale was launched from the Mine Site surface, so a sheet opened
+    // while its save is in flight is not the initiating route and must not
+    // be popped when the failure lands. Landing Basin's animated layer keeps
+    // scheduling frames, so the sheet entrance is pumped rather than settled.
+    shellHandles(tester).openSettings();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+    final settingsSheet = find.byKey(const Key('mining-settings-sheet'));
+    expect(settingsSheet, findsOneWidget);
+
+    repository.allowSave.completeError(StateError('save failed'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+
+    expect(settingsSheet, findsOneWidget);
+    expect(find.text('Sale failed.'), findsOneWidget);
+    final state = shellHandles(tester).controller.state;
+    expect(state.cash, 100);
+    expect(state.sites[MiningSiteId.landingBasin]!.storedAmount, 10);
+    expect(effects.playedAssets.last, 'audio/reject.wav');
+  });
+
+  testWidgets('a late purchase failure leaves a different sheet intact', (
+    tester,
+  ) async {
+    final repository = DelayedMiningSaveRepository();
+    await repository.save(homeworldMasteredState(_start, cash: 1_000));
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await pumpShell(tester, repository: repository, audioManager: audio);
+    tester.view.physicalSize = const Size(430, 932);
+    await tester.pump();
+
+    shellHandles(tester).openTechnology();
+    await tester.pumpAndSettle();
+
+    repository.delayNextSave = true;
+    await tester.tap(find.byKey(const Key('mining-technology-buy-extraction')));
+    await repository.saveStarted.future;
+
+    // The initiating Technology sheet was already dismissed and replaced
+    // by Settings before the save failed, so the failure reports without
+    // popping the current route.
+    await tester.tap(find.bySemanticsLabel('Close Technology'));
+    await tester.pumpAndSettle();
+    shellHandles(tester).openSettings();
+    await tester.pumpAndSettle();
+    final settingsSheet = find.byKey(const Key('mining-settings-sheet'));
+    expect(settingsSheet, findsOneWidget);
+
+    repository.allowSave.completeError(StateError('save failed'));
+    await tester.pumpAndSettle();
+
+    expect(settingsSheet, findsOneWidget);
+    expect(find.text('Action failed.'), findsOneWidget);
+    final state = shellHandles(tester).controller.state;
+    expect(state.technology.extraction, 0);
+    expect(state.cash, 1_000);
+    expect(effects.playedAssets.last, 'audio/reject.wav');
+  });
+
   testWidgets('a second stale spawn reports the failure politely', (
     tester,
   ) async {

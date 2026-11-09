@@ -337,7 +337,10 @@ class _MiningShellState extends State<MiningShell>
             isBusy: _controller.isBusy,
           ),
           initialTrack: initialTrack,
-          onPurchase: _purchaseTechnology,
+          onPurchase: (track) => _purchaseTechnology(
+            track,
+            initiatingRoute: ModalRoute.of(context),
+          ),
           onSelectionChanged: () =>
               unawaited(_audioManager.playSound(GameSound.tap)),
         ),
@@ -345,11 +348,15 @@ class _MiningShellState extends State<MiningShell>
     );
   }
 
-  void _purchaseTechnology(TechnologyTrack track) {
+  void _purchaseTechnology(
+    TechnologyTrack track, {
+    ModalRoute<dynamic>? initiatingRoute,
+  }) {
     _runSheetAction(
       () => _controller.purchaseTechnology(track),
       successMessage: null,
       sound: GameSound.upgrade,
+      initiatingRoute: initiatingRoute,
     );
   }
 
@@ -598,6 +605,7 @@ class _MiningShellState extends State<MiningShell>
     String? successMessage,
     required GameSound sound,
     void Function(MiningActionResult result)? onSuccess,
+    ModalRoute<dynamic>? initiatingRoute,
   }) async {
     if (!_initialized || _controller.isBusy) return;
     final before = _controller.state;
@@ -643,20 +651,29 @@ class _MiningShellState extends State<MiningShell>
         }
       } else {
         unawaited(_audioManager.playSound(GameSound.reject));
-        _showActionFailure(result.message ?? 'Action failed.');
+        _showActionFailure(
+          result.message ?? 'Action failed.',
+          initiatingRoute: initiatingRoute,
+        );
       }
     } catch (_) {
       if (!mounted) return;
       _refreshPresentation();
       unawaited(_audioManager.playSound(GameSound.reject));
-      _showActionFailure('Action failed.');
+      _showActionFailure('Action failed.', initiatingRoute: initiatingRoute);
     }
   }
 
-  /// A sheet route covering the shell hides the Scaffold SnackBar, so the
-  /// covering route is dismissed before the failure is reported.
-  void _showActionFailure(String message) {
-    if (ModalRoute.of(context)?.isCurrent == false) {
+  /// A sheet route covering the shell hides the Scaffold SnackBar, so a
+  /// failure dismisses a covering route only when it is the sheet that
+  /// initiated the action and that route is still current. Navigation that
+  /// arrived after the action started — including actions launched from the
+  /// primary surfaces, which have no initiating route — stays intact.
+  void _showActionFailure(
+    String message, {
+    ModalRoute<dynamic>? initiatingRoute,
+  }) {
+    if (initiatingRoute != null && initiatingRoute.isCurrent) {
       Navigator.of(context).pop();
     }
     _showResult(message);
