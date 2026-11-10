@@ -241,6 +241,7 @@ class _MiningShellState extends State<MiningShell>
         summary: summary,
         content: _content,
         state: _displayState,
+        onSellCargo: _sellCargo,
       ),
     );
   }
@@ -534,7 +535,12 @@ class _MiningShellState extends State<MiningShell>
   }
 
   void _sellCargo() {
-    if (!_initialized || _controller.isBusy) return;
+    if (!_initialized) return;
+    if (_controller.isBusy) {
+      unawaited(_audioManager.playSound(GameSound.reject));
+      _showResult('Finishing previous action…');
+      return;
+    }
     final pendingOperation = _controller.sellAllCargo();
     _refreshPresentation();
     unawaited(
@@ -860,7 +866,7 @@ class _MiningShellState extends State<MiningShell>
           nextGoal: MiningNextGoalView.from(
             state: _displayState,
             content: _content,
-            sellableValue: siteDeck.projectedValue,
+            sellableValue: siteDeck.sale.projectedValue,
           ),
           onGoalSelected: _openGoal,
         );

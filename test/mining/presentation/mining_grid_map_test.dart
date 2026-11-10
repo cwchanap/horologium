@@ -7,6 +7,7 @@ import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_grid_map.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
+import 'package:horologium/mining/site_deck_view.dart';
 
 import '../../support/mining_visual_frames.dart';
 
@@ -459,6 +460,11 @@ void main() {
       projectedSale: 0,
       activePlanetCargo: 0,
       activePlanetProjectedSale: 0,
+      sale: MiningSaleAffordance.from(
+        isBusy: false,
+        cargo: 0,
+        projectedValue: 0,
+      ),
       isActivePlanet: true,
       selectedBayId: null,
       selectedRig: null,

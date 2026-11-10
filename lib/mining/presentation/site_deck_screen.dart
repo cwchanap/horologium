@@ -898,9 +898,9 @@ String _siteCardSemantics(MiningSiteCardView card) {
       '${timeToFull == null ? '' : ', full in ${formatMiningDuration(timeToFull)}'}';
 }
 
-/// Planet-wide Sell action for Site Deck chrome. Enabled only by
-/// `view.sale.canSell`; carries `view.sale.label` for semantics and shows the
-/// projected cash value because the cargo gauge does not render it visibly.
+/// Sell action for Site Deck chrome. Enabled only by `view.sale.canSell`;
+/// carries `view.sale.label` for semantics and shows the projected cash value
+/// because the cargo gauge does not render it visibly.
 class _SiteDeckSellAction extends StatelessWidget {
   const _SiteDeckSellAction({required this.view, required this.onSellCargo});
 
@@ -957,7 +957,7 @@ class _SiteDeckSellAction extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              '+${formatMiningCash(view.projectedValue)}',
+              '+${formatMiningCash(view.sale.projectedValue)}',
               maxLines: 1,
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
             ),
