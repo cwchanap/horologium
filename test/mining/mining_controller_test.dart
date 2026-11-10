@@ -827,6 +827,283 @@ void main() {
     });
   });
 
+  group('placed rig upgrade', () {
+    test('rigMergeFailure reports mismatched tiers and the T5 ceiling', () {
+      for (final source in RigTier.values) {
+        for (final target in RigTier.values) {
+          final failure = rigMergeFailure(source, target);
+          if (source != target) {
+            expect(
+              failure,
+              'Rigs must be the same tier.',
+              reason: '${source.name} + ${target.name}',
+            );
+          } else if (source == RigTier.t5) {
+            expect(failure, 'T5 rigs cannot merge.');
+          } else {
+            expect(failure, isNull, reason: source.name);
+          }
+        }
+      }
+    });
+
+    test('merge checks empty bays before the tier rule', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(
+          clock.now,
+          docks: docksFor(homeworld: dock(b3: RigTier.t5)),
+        ),
+      );
+
+      expect(
+        (await controller.mergeDockRigs(DockBayId.b4, DockBayId.b3)).message,
+        'Source dock bay is empty.',
+      );
+      expect(
+        (await controller.mergeDockRigs(DockBayId.b3, DockBayId.b4)).message,
+        'Target dock bay is empty.',
+      );
+    });
+
+    test('upgrade replaces the placed tier in its cell, spends the bay, and '
+        'persists', () async {
+      final repository = CountingMiningSaveRepository();
+      final controller = await controllerOver(
+        repository,
+        seed: seededSave(
+          clock.now,
+          cash: 500,
+          docks: docksFor(
+            homeworld: dock(b1: RigTier.t4, b2: RigTier.t2),
+          ),
+          sites: sitesFor(
+            landing: site(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 5000,
+              rigs: placements(n1: RigTier.t2),
+            ),
+          ),
+        ),
+      );
+      final savesBefore = repository.saveCount;
+      clock.now = clock.now.add(const Duration(seconds: 10));
+
+      final result = await controller.upgradePlacedRig(
+        DockBayId.b2,
+        MiningSiteId.landingBasin,
+        n1Cell,
+      );
+
+      expect(result.isSuccess, isTrue);
+      expect(controller.state.cash, 500);
+      final landing = controller.state.sites[MiningSiteId.landingBasin]!;
+      expect(landing.rigPlacements, [
+        MiningRigPlacement(tier: RigTier.t3, cell: n1Cell),
+      ]);
+      expect(landing.storedAmount, 5007.5);
+      expect(controller.state.docks[MiningPlanetId.homeworld], {
+        DockBayId.b1: RigTier.t4,
+        DockBayId.b2: null,
+        DockBayId.b3: null,
+        DockBayId.b4: null,
+      });
+      expect(repository.saveCount, savesBefore + 1);
+
+      final reloaded = MiningController(
+        content: _content,
+        repository: MiningSaveRepository(),
+        nowUtc: clock.call,
+      );
+      await reloaded.initialize();
+      final reloadedLanding = reloaded.state.sites[MiningSiteId.landingBasin]!;
+      expect(reloadedLanding.rigPlacements, [
+        MiningRigPlacement(tier: RigTier.t3, cell: n1Cell),
+      ]);
+      expect(reloadedLanding.storedAmount, 5007.5);
+    });
+
+    test('upgrade ignores recall capacity and dock-full rules', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: landingWithTwoT1RigsAndCargo(clock.now).copyWith(
+          docks: docksFor(
+            homeworld: dock(
+              b1: RigTier.t1,
+              b2: RigTier.t2,
+              b3: RigTier.t3,
+              b4: RigTier.t4,
+            ),
+          ),
+        ),
+      );
+
+      final result = await controller.upgradePlacedRig(
+        DockBayId.b1,
+        MiningSiteId.landingBasin,
+        n1Cell,
+      );
+
+      expect(result.isSuccess, isTrue);
+      final landing = controller.state.sites[MiningSiteId.landingBasin]!;
+      expect(landing.rigPlacements, [
+        MiningRigPlacement(tier: RigTier.t2, cell: n1Cell),
+        MiningRigPlacement(tier: RigTier.t1, cell: n2Cell),
+      ]);
+      expect(landing.storedAmount, 6000);
+      expect(controller.state.docks[MiningPlanetId.homeworld], {
+        DockBayId.b1: null,
+        DockBayId.b2: RigTier.t2,
+        DockBayId.b3: RigTier.t3,
+        DockBayId.b4: RigTier.t4,
+      });
+
+      final recall = await controller.recallRig(
+        MiningSiteId.landingBasin,
+        n2Cell,
+      );
+      expect(recall.isSuccess, isFalse);
+      expect(recall.message, 'Sell cargo before recalling this rig.');
+    });
+
+    test('upgrade reports merge failures and leaves state unchanged', () async {
+      final repository = CountingMiningSaveRepository();
+      final controller = await controllerOver(
+        repository,
+        seed: seededSave(
+          clock.now,
+          docks: docksFor(
+            homeworld: dock(b1: RigTier.t3, b2: RigTier.t5),
+          ),
+          sites: sitesFor(
+            landing: site(
+              unlocked: true,
+              commissioned: true,
+              rigs: placements(n1: RigTier.t1, n2: RigTier.t5),
+            ),
+          ),
+        ),
+      );
+      final before = controller.state.toJson();
+      final savesBefore = repository.saveCount;
+
+      expect(
+        (await controller.upgradePlacedRig(
+          DockBayId.b1,
+          MiningSiteId.landingBasin,
+          n1Cell,
+        )).message,
+        'Rigs must be the same tier.',
+      );
+      expect(
+        (await controller.upgradePlacedRig(
+          DockBayId.b2,
+          MiningSiteId.landingBasin,
+          n2Cell,
+        )).message,
+        'T5 rigs cannot merge.',
+      );
+      expect(controller.state.toJson(), before);
+      expect(repository.saveCount, savesBefore);
+    });
+
+    test(
+      'upgrade requires the active planet, a source rig, and an occupied cell',
+      () async {
+        final controller = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(
+            clock.now,
+            technology: const TechnologyLevels(surveying: 3),
+            unlockedPlanets: const {
+              MiningPlanetId.homeworld,
+              MiningPlanetId.lunarFrontier,
+            },
+            docks: docksFor(homeworld: dock(b1: RigTier.t1)),
+            sites: sitesFor(
+              landing: site(
+                unlocked: true,
+                commissioned: true,
+                rigs: placements(n1: RigTier.t1),
+              ),
+              frozen: site(
+                unlocked: true,
+                commissioned: true,
+                rigs: siteRig(frozenCell, RigTier.t1),
+              ),
+            ),
+          ),
+        );
+        final before = controller.state.toJson();
+
+        expect(
+          (await controller.upgradePlacedRig(
+            DockBayId.b1,
+            MiningSiteId.frozenBasin,
+            frozenCell,
+          )).message,
+          'Site is not on the active planet.',
+        );
+        expect(
+          (await controller.upgradePlacedRig(
+            DockBayId.b4,
+            MiningSiteId.landingBasin,
+            n1Cell,
+          )).message,
+          'Dock bay is empty.',
+        );
+        expect(
+          (await controller.upgradePlacedRig(
+            DockBayId.b1,
+            MiningSiteId.landingBasin,
+            n2Cell,
+          )).message,
+          'Grid cell is empty.',
+        );
+        expect(controller.state.toJson(), before);
+      },
+    );
+
+    test(
+      'failed save keeps the placed tier and a queued upgrade still succeeds',
+      () async {
+        final repository = ThrowingFirstSaveRepository();
+        final controller = await controllerOver(
+          repository,
+          seed: deployedLandingBasinState(clock.now).copyWith(
+            docks: docksFor(homeworld: dock(b1: RigTier.t1)),
+          ),
+        );
+        final before = controller.state.toJson();
+        final first = controller.upgradePlacedRig(
+          DockBayId.b1,
+          MiningSiteId.landingBasin,
+          n1Cell,
+        );
+        final second = controller.upgradePlacedRig(
+          DockBayId.b1,
+          MiningSiteId.landingBasin,
+          n1Cell,
+        );
+
+        await expectLater(first, throwsStateError);
+        await repository.secondSaveStarted.future;
+        expect(controller.state.toJson(), before);
+        repository.allowSecondSave.complete();
+        expect((await second).isSuccess, isTrue);
+        expect(
+          controller.state.sites[MiningSiteId.landingBasin]!.rigPlacements,
+          [MiningRigPlacement(tier: RigTier.t2, cell: n1Cell)],
+        );
+        expect(
+          controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b1],
+          isNull,
+        );
+      },
+    );
+  });
+
   group('technology, travel, and sale', () {
     test('technology gates use commissioned sites', () async {
       final controller = await controllerOver(
