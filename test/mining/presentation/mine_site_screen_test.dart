@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mine_site_view.dart';
@@ -144,6 +147,8 @@ Future<void> _pumpMineSite(
   await tester.pumpWidget(
     MaterialApp(
       theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+      builder: (context, child) =>
+          Material(type: MaterialType.transparency, child: child!),
       home: MediaQuery(
         data: MediaQueryData(
           disableAnimations: disableAnimations,
@@ -318,6 +323,17 @@ Future<void> _expectEdgeCellsTappable(
 }
 
 void main() {
+  setUpAll(() async {
+    if (kIsWeb) return;
+    final loader = FontLoader('Orbitron')
+      ..addFont(
+        File(
+          'assets/fonts/Orbitron-Variable.ttf',
+        ).readAsBytes().then(ByteData.sublistView),
+      );
+    await loader.load();
+  });
+
   testWidgets(
     'uses the Landing Basin grid layer for an occupied T1 rig',
     (tester) async {
@@ -1013,6 +1029,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+          builder: (context, child) =>
+              Material(type: MaterialType.transparency, child: child!),
           home: MineSiteScreen(
             view: _siteView(state),
             fleetDock: _dockView(state),
@@ -1075,6 +1093,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+          builder: (context, child) =>
+              Material(type: MaterialType.transparency, child: child!),
           home: MineSiteScreen(
             view: _siteView(state),
             fleetDock: _dockView(state),
@@ -1361,7 +1381,7 @@ void main() {
     );
 
     final hint = find.byKey(const Key('fleet-dock-hint'));
-    expect(tester.widget<Text>(hint).maxLines, 1);
+    expect(tester.widget<Text>(hint).maxLines, 2);
     final paragraph = tester.renderObject<RenderParagraph>(hint);
     expect(paragraph.didExceedMaxLines, isFalse);
   });
@@ -1428,6 +1448,8 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+        builder: (context, child) =>
+            Material(type: MaterialType.transparency, child: child!),
         home: MineSiteScreen(
           view: _siteView(state),
           fleetDock: _dockView(state),
@@ -1531,6 +1553,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+          builder: (context, child) =>
+              Material(type: MaterialType.transparency, child: child!),
           home: MineSiteScreen(
             view: _siteView(state),
             fleetDock: _dockView(state),
@@ -1874,28 +1898,58 @@ void main() {
 
   testWidgets('keeps the selected-dock hint legible at 360 px', (tester) async {
     final state = _stateWith(cash: 200, landing: _progress(commissioned: true));
-    await _pumpMineSite(
-      tester,
-      size: const Size(360, 640),
-      view: _siteView(state, selectedBayId: DockBayId.b1),
-      dock: _dockView(state, selectedBayId: DockBayId.b1),
-    );
+    var height = 0.0;
+    for (final textScale in const [1.0, 1.3]) {
+      await _pumpMineSite(
+        tester,
+        size: const Size(360, 640),
+        view: _siteView(state, selectedBayId: DockBayId.b1),
+        dock: _dockView(state, selectedBayId: DockBayId.b1),
+        textScale: textScale,
+      );
 
-    final hint = find.byKey(const Key('fleet-dock-hint'));
-    expect(
-      tester.widget<Text>(hint).data,
-      'CELL: DEPLOY · RIG: UPGRADE · BAY: MERGE',
-    );
-    final render = tester.renderObject<RenderParagraph>(hint);
-    final bounds = MatrixUtils.transformRect(
-      render.getTransformTo(null),
-      render.paintBounds,
-    );
-    expect(
-      bounds.height,
-      greaterThanOrEqualTo(5),
-      reason: 'transformed height ${bounds.height}',
-    );
+      final hint = find.byKey(const Key('fleet-dock-hint'));
+      expect(
+        tester.widget<Text>(hint).data,
+        'CELL: DEPLOY · RIG: UPGRADE · BAY: MERGE',
+      );
+      final render = tester.renderObject<RenderParagraph>(hint);
+      expect(
+        render.text.style?.fontFamily,
+        'Orbitron',
+        reason: 'the hint must measure the shipped font, not the test fallback',
+      );
+      expect(
+        render.didExceedMaxLines,
+        isFalse,
+        reason: 'textScale $textScale wraps inside two lines',
+      );
+      final bounds = MatrixUtils.transformRect(
+        render.getTransformTo(null),
+        render.paintBounds,
+      );
+      expect(
+        bounds.height / render.size.height,
+        greaterThanOrEqualTo(.9),
+        reason:
+            'textScale $textScale scale factor '
+            '${bounds.height / render.size.height}',
+      );
+      expect(
+        bounds.height,
+        greaterThanOrEqualTo(20),
+        reason: 'textScale $textScale transformed height ${bounds.height}',
+      );
+      if (textScale == 1.3) {
+        expect(
+          bounds.height,
+          greaterThan(height * 1.15),
+          reason: 'textScale 1.3 height ${bounds.height} vs 1.0 height $height',
+        );
+      }
+      height = bounds.height;
+      expect(tester.takeException(), isNull, reason: 'textScale $textScale');
+    }
   });
 
   testWidgets('BUILD exposes a semantic tap action that forwards its tier', (
