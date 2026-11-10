@@ -16,7 +16,7 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
   foreground refresh, lifecycle checkpoints, audio, reduced-motion
   propagation, and Flutter navigation/action sheets.
 - `MiningController` is the sole public mutation boundary. Unlock, spawn,
-  merge, deploy, recall, sale, technology, planet unlock/travel,
+  merge, deploy, recall, upgrade, sale, technology, planet unlock/travel,
   and lifecycle checkpoint operations accrue current state, mutate in order, and persist
   through the repository. `relaunch` is the deliberate exception: it gates on
   the current state's commissioned flags and resets immediately without
@@ -109,19 +109,29 @@ floored planet totals.
 Newly unlocked planets start with their authored starter dock bays and starter
 site.
 
-Rig tier and Extraction determine rate. Each site's `baseCapacity` is its base
-rate times `MiningContentRegistry.storageWindow` (2 hours), so storage holds
-two hours of base production; Logistics extends that window and Extraction
-shortens it. Offline accrual is capped at a fixed 24 hours
-(`offlineAccrualCap`) as a clock safety net; Logistics no longer changes it.
-All player-visible cash goes through `formatMiningCash` (compact `M`/`B` from
-one million) and resource amounts through `formatMiningUnits`. Pacing is
-proven by the public-action journey on its injected clock, never by a
-wall-clock playtest. The simulation stores cargo per flat site, produces
-across all unlocked planets, and selling empties only the active planet's
-cargo. A recall with cargo that cannot fit the replacement rig is rejected;
-the user must sell before recalling. The shell's foreground timer refreshes
-the controller once per second; initialization/lifecycle accrual remains
+Rig tier and Extraction determine rate. `MiningContentRegistry.rigCost` is
+the single rig-price formula (planet `rigSpawnCost` × 2^tier index), shared
+by the controller, fleet dock, and journey. `spawnRig(tier:)` buys exactly
+the requested tier into the first free dock bay and defaults to T1;
+`upgradePlacedRig` raises a placed rig one tier in its cell by consuming a
+same-tier dock rig under the shared `rigMergeFailure` rule. Each site's
+`baseCapacity` is its base rate times `MiningContentRegistry.storageWindow`
+(2 hours), so storage holds two hours of base production; Logistics extends
+that window and Extraction shortens it. Offline accrual is capped at a fixed
+24 hours (`offlineAccrualCap`) as a clock safety net; Logistics no longer
+changes it. All player-visible cash goes through `formatMiningCash` (compact
+`M`/`B` from one million) and resource amounts through `formatMiningUnits`.
+Pacing is proven by the public-action journey on its injected clock, never
+by a wall-clock playtest. The simulation stores cargo per flat site and
+produces across all unlocked planets. One `sellAllCargo` sale empties every
+unlocked planet's sites, credits the sum of separately floored per-planet
+`MiningSave.saleValue` totals, and persists once. `MiningSave.storedCargo`
+totals one planet's cargo; `storedCargoAcrossUnlockedPlanets` and
+`saleValueAcrossUnlockedPlanets` iterate unlocked planets only, so Sell
+controls display the global total while HUD gauges stay active-planet-local.
+A recall with cargo that cannot fit the replacement rig is rejected; the
+user must sell before recalling. The shell's foreground timer refreshes the
+controller once per second; initialization/lifecycle accrual remains
 clock-based and deterministic. The offline-return sheet only surfaces for an
 away interval of at least five minutes; shorter absences accrue silently.
 
