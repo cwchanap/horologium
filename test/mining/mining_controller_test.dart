@@ -1010,7 +1010,97 @@ void main() {
       },
     );
 
-    test('sale clears active planet cargo and floors aggregate once', () async {
+    test(
+      'sale clears every unlocked planet and floors each planet separately',
+      () async {
+        final repository = CountingMiningSaveRepository();
+        final controller = await controllerOver(
+          repository,
+          seed: seededSave(
+            clock.now,
+            cash: 1000,
+            technology: const TechnologyLevels(surveying: 5),
+            unlockedPlanets: MiningPlanetId.values.toSet(),
+            activePlanet: MiningPlanetId.homeworld,
+            sites: sitesFor(
+              landing: site(
+                unlocked: true,
+                commissioned: true,
+                storedAmount: 0.9,
+                rigs: placements(n1: RigTier.t1),
+              ),
+              carbon: site(
+                unlocked: true,
+                commissioned: true,
+                storedAmount: 0.9,
+                rigs: siteRig(carbonCell, RigTier.t1),
+              ),
+              granite: site(
+                unlocked: true,
+                commissioned: true,
+                storedAmount: 0.9,
+                rigs: siteRig(graniteCell, RigTier.t1),
+              ),
+              frozen: site(
+                unlocked: true,
+                commissioned: true,
+                storedAmount: 10,
+                rigs: siteRig(frozenCell, RigTier.t1),
+              ),
+              ochre: site(unlocked: true),
+              nickel: site(unlocked: true),
+              sulfur: site(
+                unlocked: true,
+                commissioned: true,
+                storedAmount: 42,
+                rigs: siteRig(
+                  firstPerimeterCell(MiningSiteId.sulfurFlats),
+                  RigTier.t1,
+                ),
+              ),
+            ),
+          ),
+        );
+        final savesBefore = repository.saveCount;
+
+        final result = await controller.sellAllCargo();
+
+        // Homeworld 0.9*4 + 0.9*3 + 0.9*5 = 10.8 -> 10, Lunar 10*6 = 60,
+        // Io 42*300 = 12600: each planet floors its own unrounded total.
+        expect(result.isSuccess, isTrue);
+        expect(result.revenue, 12670);
+        expect(result.sold, {
+          ResourceType.gold: 0.9,
+          ResourceType.coal: 0.9,
+          ResourceType.stone: 0.9,
+          ResourceType.waterIce: 10,
+          ResourceType.sulfur: 42,
+        });
+        expect(controller.state.cash, 13670);
+        expect(controller.state.activePlanetId, MiningPlanetId.homeworld);
+        expect(repository.saveCount, savesBefore + 1);
+        for (final id in MiningSiteId.values) {
+          expect(
+            controller.state.sites[id]!.storedAmount,
+            0,
+            reason: '${id.name} cargo',
+          );
+        }
+
+        final reloaded = MiningController(
+          content: _content,
+          repository: MiningSaveRepository(),
+          nowUtc: clock.call,
+        );
+        await reloaded.initialize();
+        expect(reloaded.state.cash, 13670);
+        for (final id in MiningSiteId.values) {
+          expect(reloaded.state.sites[id]!.storedAmount, 0);
+        }
+      },
+    );
+
+    test('sale succeeds on inactive-only cargo', () async {
       final controller = await controllerOver(
         MiningSaveRepository(),
         seed: seededSave(
@@ -1018,33 +1108,16 @@ void main() {
           cash: 1000,
           technology: const TechnologyLevels(surveying: 5),
           unlockedPlanets: MiningPlanetId.values.toSet(),
-          activePlanet: MiningPlanetId.homeworld,
+          activePlanet: MiningPlanetId.marsFrontier,
           sites: sitesFor(
-            landing: site(
-              unlocked: true,
-              commissioned: true,
-              storedAmount: 0.9,
-              rigs: placements(n1: RigTier.t1),
-            ),
-            carbon: site(
-              unlocked: true,
-              commissioned: true,
-              storedAmount: 0.9,
-              rigs: siteRig(carbonCell, RigTier.t1),
-            ),
-            granite: site(
-              unlocked: true,
-              commissioned: true,
-              storedAmount: 0.9,
-              rigs: siteRig(graniteCell, RigTier.t1),
-            ),
+            landing: site(unlocked: true, commissioned: true),
             frozen: site(
               unlocked: true,
               commissioned: true,
               storedAmount: 10,
               rigs: siteRig(frozenCell, RigTier.t1),
             ),
-            ochre: site(unlocked: true),
+            ochre: site(unlocked: true, commissioned: true),
             nickel: site(unlocked: true),
             sulfur: site(
               unlocked: true,
@@ -1061,22 +1134,103 @@ void main() {
 
       final result = await controller.sellAllCargo();
 
-      expect(result.revenue, 10);
-      expect(result.sold, {
-        ResourceType.gold: 0.9,
-        ResourceType.coal: 0.9,
-        ResourceType.stone: 0.9,
-      });
-      expect(controller.state.cash, 1010);
-      expect(
-        controller.state.sites[MiningSiteId.frozenBasin]!.storedAmount,
-        10,
-      );
-      expect(
-        controller.state.sites[MiningSiteId.sulfurFlats]!.storedAmount,
-        42,
-      );
+      expect(result.isSuccess, isTrue);
+      expect(result.revenue, 12660);
+      expect(result.sold, {ResourceType.waterIce: 10, ResourceType.sulfur: 42});
+      expect(controller.state.cash, 13660);
+      expect(controller.state.activePlanetId, MiningPlanetId.marsFrontier);
+      expect(controller.state.sites[MiningSiteId.frozenBasin]!.storedAmount, 0);
+      expect(controller.state.sites[MiningSiteId.sulfurFlats]!.storedAmount, 0);
     });
+
+    test('sale clears tiny cargo that floors to zero cash', () async {
+      final repository = CountingMiningSaveRepository();
+      final controller = await controllerOver(
+        repository,
+        seed: seededSave(
+          clock.now,
+          cash: 1000,
+          technology: const TechnologyLevels(surveying: 3),
+          unlockedPlanets: const {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+          sites: sitesFor(
+            landing: site(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 0.1,
+              rigs: placements(n1: RigTier.t1),
+            ),
+            frozen: site(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 0.1,
+              rigs: siteRig(frozenCell, RigTier.t1),
+            ),
+          ),
+        ),
+      );
+      final savesBefore = repository.saveCount;
+
+      final result = await controller.sellAllCargo();
+
+      // 0.1*4 -> 0 and 0.1*6 -> 0: positive cargo still sells for 0 cash.
+      expect(result.isSuccess, isTrue);
+      expect(result.revenue, 0);
+      expect(result.sold, {ResourceType.gold: 0.1, ResourceType.waterIce: 0.1});
+      expect(controller.state.cash, 1000);
+      expect(repository.saveCount, savesBefore + 1);
+      expect(
+        controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+        0,
+      );
+      expect(controller.state.sites[MiningSiteId.frozenBasin]!.storedAmount, 0);
+    });
+
+    test('sale with no cargo fails without writing', () async {
+      final repository = CountingMiningSaveRepository();
+      final controller = await controllerOver(
+        repository,
+        seed: deployedLandingBasinState(clock.now),
+      );
+      final before = controller.state.toJson();
+      final savesBefore = repository.saveCount;
+
+      final result = await controller.sellAllCargo();
+
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'No cargo to sell.');
+      expect(result.sold, isNull);
+      expect(controller.state.toJson(), before);
+      expect(repository.saveCount, savesBefore);
+    });
+
+    test(
+      'failed sale save keeps cargo and a queued sale still succeeds',
+      () async {
+        final repository = ThrowingFirstSaveRepository();
+        final controller = await controllerOver(
+          repository,
+          seed: landingWithTwoT1RigsAndCargo(clock.now),
+        );
+        final before = controller.state.toJson();
+        final first = controller.sellAllCargo();
+        final second = controller.sellAllCargo();
+
+        await expectLater(first, throwsStateError);
+        await repository.secondSaveStarted.future;
+        expect(controller.state.toJson(), before);
+        repository.allowSecondSave.complete();
+        final result = await second;
+
+        expect(result.isSuccess, isTrue);
+        expect(
+          controller.state.sites[MiningSiteId.landingBasin]!.storedAmount,
+          0,
+        );
+      },
+    );
 
     test(
       'sale revenue applies the relaunch multiplier from pre-sale state',
@@ -1084,6 +1238,11 @@ void main() {
         final seed = seededSave(
           clock.now,
           cash: 1000,
+          technology: const TechnologyLevels(surveying: 3),
+          unlockedPlanets: const {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
           sites: sitesFor(
             landing: site(
               unlocked: true,
@@ -1097,21 +1256,27 @@ void main() {
               storedAmount: 0.25,
               rigs: siteRig(carbonCell, RigTier.t1),
             ),
+            frozen: site(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 0.25,
+              rigs: siteRig(frozenCell, RigTier.t1),
+            ),
           ),
         ).copyWith(relaunchCount: 1);
         final controller = await controllerOver(
           MiningSaveRepository(),
           seed: seed,
         );
-        // 0.375*4 + 0.25*3 = 2.25 unrounded, ×1.5 -> 3.375, floored once.
-        final expectedRevenue = controller.state.saleValue(
-          _content,
-          MiningPlanetId.homeworld,
-        );
+        // Homeworld 0.375*4 + 0.25*3 = 2.25 unrounded, ×1.5 -> 3.375,
+        // floored to 3; Lunar 0.25*6*1.5 = 2.25 floored to 2.
+        final expectedRevenue =
+            controller.state.saleValue(_content, MiningPlanetId.homeworld) +
+            controller.state.saleValue(_content, MiningPlanetId.lunarFrontier);
 
         final result = await controller.sellAllCargo();
 
-        expect(expectedRevenue, 3);
+        expect(expectedRevenue, 5);
         expect(result.revenue, expectedRevenue);
         expect(controller.state.cash, 1000 + expectedRevenue);
         expect(
@@ -1120,6 +1285,10 @@ void main() {
         );
         expect(
           controller.state.sites[MiningSiteId.carbonRidge]!.storedAmount,
+          0,
+        );
+        expect(
+          controller.state.sites[MiningSiteId.frozenBasin]!.storedAmount,
           0,
         );
       },

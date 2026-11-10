@@ -199,10 +199,7 @@ class MineSiteView {
     final planetId = content.planetForSite(siteId);
     final progress = state.sites[siteId]!;
     final active = planetId == state.activePlanetId;
-    var activePlanetCargo = 0.0;
-    for (final activeDefinition in content.planet(state.activePlanetId).sites) {
-      activePlanetCargo += state.sites[activeDefinition.id]!.storedAmount;
-    }
+    final activePlanetCargo = state.storedCargo(content, state.activePlanetId);
     final activePlanetProjectedSale = state.saleValue(
       content,
       state.activePlanetId,
