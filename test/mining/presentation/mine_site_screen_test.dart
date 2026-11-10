@@ -1381,7 +1381,7 @@ void main() {
     );
 
     final hint = find.byKey(const Key('fleet-dock-hint'));
-    expect(tester.widget<Text>(hint).maxLines, 2);
+    expect(tester.widget<Text>(hint).maxLines, 3);
     final paragraph = tester.renderObject<RenderParagraph>(hint);
     expect(paragraph.didExceedMaxLines, isFalse);
   });
@@ -1922,8 +1922,15 @@ void main() {
       expect(
         render.didExceedMaxLines,
         isFalse,
-        reason: 'textScale $textScale wraps inside two lines',
+        reason: 'textScale $textScale fits the hint lines without truncation',
       );
+      if (!kIsWeb) {
+        expect(
+          render.getMaxIntrinsicWidth(double.infinity),
+          closeTo(textScale == 1.0 ? 257.594482421875 : 327.6728515625, 4),
+          reason: 'textScale $textScale must measure shipped Orbitron widths',
+        );
+      }
       final bounds = MatrixUtils.transformRect(
         render.getTransformTo(null),
         render.paintBounds,
