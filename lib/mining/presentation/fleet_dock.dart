@@ -65,36 +65,55 @@ class FleetDock extends StatelessWidget {
                 color: Colors.white54,
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
-                letterSpacing: .8,
+                letterSpacing: .6,
               ),
             ),
           ),
         ),
-        if (view.bestAffordableTier != null) ...[
-          const SizedBox(width: 7),
-          _BuildPill(view: view, onBuildRig: onBuildRig),
-        ],
       ],
     ),
     const SizedBox(height: 9),
-    Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        SizedBox(
-          width: 60,
-          height: 66,
-          child: _SpawnHex(view: view, onSpawnRig: onSpawnRig, showRig: true),
-        ),
-        for (final bayId in DockBayId.values)
-          SizedBox(
-            width: 60,
-            height: 66,
-            child: _BayButton(
-              view: view.bay(bayId),
-              onTap: () => onBayTap(bayId),
+    LayoutBuilder(
+      builder: (context, constraints) {
+        final buildWidth = view.bestAffordableTier != null ? 48.0 : 0.0;
+        final slot = ((constraints.maxWidth - buildWidth - 20) / 5).clamp(
+          48.0,
+          60.0,
+        );
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            SizedBox(
+              width: slot,
+              height: 66,
+              child: _SpawnHex(
+                view: view,
+                onSpawnRig: onSpawnRig,
+                showRig: true,
+              ),
             ),
-          ),
-      ],
+            for (final bayId in DockBayId.values)
+              SizedBox(
+                width: slot,
+                height: 66,
+                child: _BayButton(
+                  view: view.bay(bayId),
+                  onTap: () => onBayTap(bayId),
+                ),
+              ),
+            if (view.bestAffordableTier != null)
+              SizedBox(
+                width: buildWidth,
+                height: 66,
+                child: _BuildPill(
+                  view: view,
+                  onBuildRig: onBuildRig,
+                  rotated: true,
+                ),
+              ),
+          ],
+        );
+      },
     ),
   ];
 
@@ -104,21 +123,21 @@ class FleetDock extends StatelessWidget {
       const SizedBox(height: 6),
       SizedBox(
         width: 96,
-        height: 22,
+        height: 44,
         child: _BuildPill(view: view, onBuildRig: onBuildRig),
       ),
     ],
     const SizedBox(height: 6),
     SizedBox(
       width: 56,
-      height: 62,
+      height: 56,
       child: _SpawnHex(view: view, onSpawnRig: onSpawnRig, showRig: true),
     ),
     const SizedBox(height: 4),
     for (final bayId in DockBayId.values) ...[
       SizedBox(
         width: 56,
-        height: 62,
+        height: 56,
         child: _BayButton(view: view.bay(bayId), onTap: () => onBayTap(bayId)),
       ),
       if (bayId != DockBayId.values.last) const SizedBox(height: 4),
@@ -130,50 +149,66 @@ class _FleetLabel extends StatelessWidget {
   const _FleetLabel();
 
   @override
-  Widget build(BuildContext context) => FittedBox(
+  Widget build(BuildContext context) => const FittedBox(
     fit: BoxFit.scaleDown,
     alignment: Alignment.centerLeft,
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Image.asset(MiningVisuals.mergeIcon, width: 14, height: 14),
-        const SizedBox(width: 6),
-        const Text(
-          'FLEET',
-          style: TextStyle(
-            color: Colors.white54,
-            fontSize: 9,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.2,
-          ),
-        ),
-      ],
+    child: Text(
+      'FLEET',
+      style: TextStyle(
+        color: Colors.white54,
+        fontSize: 9,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.2,
+      ),
     ),
   );
 }
 
 class _BuildPill extends StatelessWidget {
-  const _BuildPill({required this.view, required this.onBuildRig});
+  const _BuildPill({
+    required this.view,
+    required this.onBuildRig,
+    this.rotated = false,
+  });
 
   final FleetDockView view;
   final ValueChanged<RigTier> onBuildRig;
+  final bool rotated;
 
   @override
   Widget build(BuildContext context) {
     final tier = view.bestAffordableTier!;
     final enabled = view.canBuild;
+    final VoidCallback? onTap = enabled ? () => onBuildRig(tier) : null;
+    Widget label = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        'BUILD ${tier.name.toUpperCase()} · '
+        '${formatMiningCash(view.buildCost)}',
+        maxLines: 1,
+        style: TextStyle(
+          color: enabled ? MiningTheme.highlight : Colors.white38,
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          letterSpacing: .6,
+        ),
+      ),
+    );
+    if (rotated) {
+      label = RotatedBox(quarterTurns: 3, child: label);
+    }
     return Semantics(
       button: true,
       enabled: enabled,
       label: view.buildHint,
       excludeSemantics: true,
+      onTap: onTap,
       child: GestureDetector(
         key: const Key('fleet-dock-build'),
         behavior: HitTestBehavior.opaque,
-        onTap: enabled ? () => onBuildRig(tier) : null,
+        onTap: onTap,
         child: Container(
-          height: 16,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: Color.fromRGBO(24, 255, 255, enabled ? .14 : .06),
             border: Border.all(
@@ -181,20 +216,7 @@ class _BuildPill extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              'BUILD ${tier.name.toUpperCase()} · '
-              '${formatMiningCash(view.buildCost)}',
-              maxLines: 1,
-              style: TextStyle(
-                color: enabled ? MiningTheme.highlight : Colors.white38,
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-                letterSpacing: .6,
-              ),
-            ),
-          ),
+          child: Center(child: label),
         ),
       ),
     );

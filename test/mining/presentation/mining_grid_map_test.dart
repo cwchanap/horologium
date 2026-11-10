@@ -622,7 +622,6 @@ void main() {
     );
     expect(upgrade, findsOneWidget);
 
-    // The semantic tap routes the same cell as the physical tap.
     tester.semantics.performAction(
       find.semantics.byLabel(
         RegExp(r'T1 rig at \(3,2\) mining deposit \(1,1\)\. Upgrade to T2\.'),
@@ -655,8 +654,6 @@ void main() {
       (_) {},
     );
 
-    // Recall is impossible with a full dock, but the selected T1 upgrades
-    // the placed T1: the node stays enabled and never says "Dock is full.".
     expect(
       _rigSemantics(
         'T1 rig at (3,2) mining deposit (1,1). Upgrade to T2.',

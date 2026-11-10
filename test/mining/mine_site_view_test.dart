@@ -385,7 +385,6 @@ void main() {
       view.gridTapOutcome(const MiningGridCell(3, 2)).action,
       MineSiteGridTapAction.upgrade,
     );
-    // A free cell still deploys the selected rig.
     final freeCell = view.deployableCells.first;
     expect(view.gridTapOutcome(freeCell).action, MineSiteGridTapAction.deploy);
   });

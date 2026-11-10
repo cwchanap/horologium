@@ -1348,7 +1348,6 @@ void main() {
 
     await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
     await tester.pump();
-    // The fixture leaves b1 empty; b2 holds the starter T1.
     await tester.tap(find.byKey(const ValueKey<String>('b2')));
     await tester.pump();
     await tapGridCell(tester, landingRigCell);
@@ -1361,7 +1360,6 @@ void main() {
     expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b2], isNull);
     expect(find.text('Rig upgraded.'), findsOneWidget);
 
-    // The consumed bay's selection cleared: a free-cell tap cannot deploy.
     await tapGridCell(tester, _freeLandingDeployCell);
     await tester.pump(const Duration(milliseconds: 300));
     state = shellHandles(tester).controller.state;
@@ -1437,7 +1435,6 @@ void main() {
     await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
     await tester.pump();
 
-    // Initial cash is 100: T3 costs exactly 100, so BUILD offers T3.
     final pill = find.byKey(const Key('fleet-dock-build'));
     expect(pill, findsOneWidget);
     expect(find.text('BUILD T3 · 100'), findsOneWidget);
@@ -1449,15 +1446,12 @@ void main() {
     expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b3], RigTier.t3);
     expect(find.text('T3 rig spawned.'), findsOneWidget);
 
-    // The built rig took the selection and deploys directly.
     await tapGridCell(tester, _freeLandingDeployCell);
     await tester.pump(const Duration(milliseconds: 300));
     state = shellHandles(tester).controller.state;
     expect(state.sites[MiningSiteId.landingBasin]!.rigPlacements, [
       MiningRigPlacement(tier: RigTier.t3, cell: _freeLandingDeployCell),
     ]);
-    // The first deploy also commissions Landing Basin, so the rig cue is
-    // upgraded to the milestone jingle.
     expect(effects.playedAssets, [
       'audio/tap.wav',
       'audio/tap.wav',
