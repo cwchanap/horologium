@@ -240,7 +240,6 @@ class SiteDeckView {
     final planet = content.planet(state.activePlanetId);
     final cardList = <MiningSiteCardView>[];
     var commissionedCount = 0;
-    var totalCargo = 0.0;
     var totalCapacity = 0.0;
     var totalRate = 0.0;
 
@@ -264,7 +263,6 @@ class SiteDeckView {
               progress.unlocked,
             );
       if (progress.commissioned) commissionedCount++;
-      totalCargo += progress.storedAmount;
       totalCapacity += metrics.capacity;
       totalRate += metrics.rate;
       cardList.add(
@@ -297,7 +295,7 @@ class SiteDeckView {
       cards: Map<MiningSiteId, MiningSiteCardView>.unmodifiable(cards),
       commissionedCount: commissionedCount,
       siteCount: planet.sites.length,
-      totalCargo: totalCargo,
+      totalCargo: state.storedCargo(content, planet.id),
       totalCapacity: totalCapacity,
       totalRate: totalRate,
       projectedValue: state.saleValue(content, state.activePlanetId),

@@ -55,8 +55,8 @@ typedef _Investment = ({
 
 /// A returning player driven only through public controller actions.
 ///
-/// Each visit lets [step] pass, then travels to and sells every unlocked
-/// planet, as a returning player collects everything. Between visits it
+/// Each visit lets [step] pass, then sells every unlocked planet's cargo in
+/// one sale, as a returning player collects everything. Between visits it
 /// buys the rig or technology with the best payback whenever that payback
 /// is shorter than the wait for the current progression target.
 class JourneyPlayer {
@@ -67,6 +67,7 @@ class JourneyPlayer {
   final MiningContentRegistry content;
   Duration step = const Duration(minutes: 1);
   int visits = 0;
+  int sales = 0;
 
   MiningSave get state => controller.state;
 
@@ -82,21 +83,11 @@ class JourneyPlayer {
     clock.advance(step);
     visits++;
     controller.refresh();
-    final home = state.activePlanetId;
-    for (final planet in MiningPlanetId.values) {
-      if (!state.unlockedPlanetIds.contains(planet)) continue;
-      await travel(planet);
-      final sale = SiteDeckView.from(
-        state: state,
-        content: content,
-        isBusy: false,
-      ).sale;
-      if (sale.canSell) {
-        final result = await controller.sellAllCargo();
-        expect(result.isSuccess, isTrue, reason: 'sell ${planet.name}');
-      }
+    if (state.storedCargoAcrossUnlockedPlanets(content) > 0) {
+      sales++;
+      final result = await controller.sellAllCargo();
+      expect(result.isSuccess, isTrue, reason: 'sell all unlocked planets');
     }
-    await travel(home);
   }
 
   /// Visits until cash reaches [cashAtLeast], investing along the way.
@@ -875,6 +866,12 @@ Future<void> _journey(
 
   final run1 = await _playRun(player, cadence);
 
+  expect(
+    player.sales,
+    lessThanOrEqualTo(player.visits),
+    reason: 'one sale per visit at ${cadence.inHours}h cadence',
+  );
+
   // Run 1 keeps the original absolute pacing bands; run 2 is judged only
   // against run 1 below.
   expect(run1.opening, lessThanOrEqualTo(const Duration(minutes: 20)));
@@ -952,6 +949,11 @@ Future<void> _journey(
   expect(returned.state.technology, const TechnologyLevels());
   expect(returned.state.relaunchCount, 1);
   final run2 = await _playRun(run2Player, cadence);
+  expect(
+    run2Player.sales,
+    lessThanOrEqualTo(run2Player.visits),
+    reason: 'one sale per visit at ${cadence.inHours}h cadence',
+  );
   debugPrint(
     'RELAUNCH run=2 mastery=${(run2.io.inMinutes / 60).toStringAsFixed(1)}h '
     'run1=${(run1.io.inMinutes / 60).toStringAsFixed(1)}h '

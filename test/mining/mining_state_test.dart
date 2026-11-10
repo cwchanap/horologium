@@ -262,6 +262,61 @@ void main() {
     );
   });
 
+  test('storedCargo sums one planet\'s authored site amounts', () {
+    final content = MiningContentRegistry.stellarMining();
+    final now = DateTime.utc(2026, 8, 26, 12);
+    final base = MiningSave.initial(nowUtc: now);
+    final state = base.copyWith(
+      unlockedPlanetIds: const {
+        MiningPlanetId.homeworld,
+        MiningPlanetId.lunarFrontier,
+      },
+      activePlanetId: MiningPlanetId.lunarFrontier,
+      sites: {
+        ...base.sites,
+        MiningSiteId.landingBasin: base.sites[MiningSiteId.landingBasin]!
+            .copyWith(unlocked: true, storedAmount: 10),
+        MiningSiteId.carbonRidge: base.sites[MiningSiteId.carbonRidge]!
+            .copyWith(unlocked: true, storedAmount: 5.5),
+        MiningSiteId.frozenBasin: base.sites[MiningSiteId.frozenBasin]!
+            .copyWith(unlocked: true, storedAmount: 7.25),
+      },
+    );
+
+    expect(state.storedCargo(content, MiningPlanetId.homeworld), 15.5);
+    expect(state.storedCargo(content, MiningPlanetId.lunarFrontier), 7.25);
+    expect(state.storedCargo(content, MiningPlanetId.marsFrontier), 0);
+  });
+
+  test('across-unlocked totals floor each planet separately and multiply', () {
+    final content = MiningContentRegistry.stellarMining();
+    final now = DateTime.utc(2026, 8, 26, 12);
+    final base = MiningSave.initial(nowUtc: now);
+    // 0.375 gold is 1.5 cash and 0.25 water ice is 1.5 cash: each planet
+    // floors on its own, so the total is 2, not the 3 that one global
+    // floor of the combined 3.0 would give.
+    final state = base.copyWith(
+      unlockedPlanetIds: const {
+        MiningPlanetId.homeworld,
+        MiningPlanetId.lunarFrontier,
+      },
+      sites: {
+        ...base.sites,
+        MiningSiteId.landingBasin: base.sites[MiningSiteId.landingBasin]!
+            .copyWith(unlocked: true, storedAmount: 0.375),
+        MiningSiteId.frozenBasin: base.sites[MiningSiteId.frozenBasin]!
+            .copyWith(unlocked: true, storedAmount: 0.25),
+      },
+    );
+
+    expect(state.storedCargoAcrossUnlockedPlanets(content), 0.625);
+    expect(state.saleValueAcrossUnlockedPlanets(content), 2);
+    expect(
+      state.copyWith(relaunchCount: 2).saleValueAcrossUnlockedPlanets(content),
+      6,
+    );
+  });
+
   test('save JSON uses flat sites and enum-keyed docks', () {
     final state = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 26, 12));
 

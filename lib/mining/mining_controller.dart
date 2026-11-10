@@ -518,32 +518,34 @@ class MiningController {
   Future<MiningSaleResult> sellAllCargo() => _enqueueMutation(() async {
     final candidate = simulation.accrue(_state, _nowUtc().toUtc());
 
+    // Each unlocked planet floors its own sale value, so global revenue is
+    // the sum of per-planet floors read off the accrued state before cargo
+    // is zeroed.
+    final revenue = candidate.state.saleValueAcrossUnlockedPlanets(content);
     var totalCargo = 0.0;
     final sold = <ResourceType, double>{};
     final sites = <MiningSiteId, SiteProgress>{...candidate.state.sites};
 
-    for (final definition
-        in content.planet(candidate.state.activePlanetId).sites) {
-      final progress = sites[definition.id]!;
-      if (progress.storedAmount <= 0) continue;
+    for (final planetId in MiningPlanetId.values) {
+      if (!candidate.state.unlockedPlanetIds.contains(planetId)) continue;
+      for (final definition in content.planet(planetId).sites) {
+        final progress = sites[definition.id]!;
+        if (progress.storedAmount <= 0) continue;
 
-      totalCargo += progress.storedAmount;
-      sold.update(
-        definition.resource,
-        (value) => value + progress.storedAmount,
-        ifAbsent: () => progress.storedAmount,
-      );
-      sites[definition.id] = progress.copyWith(storedAmount: 0);
+        totalCargo += progress.storedAmount;
+        sold.update(
+          definition.resource,
+          (value) => value + progress.storedAmount,
+          ifAbsent: () => progress.storedAmount,
+        );
+        sites[definition.id] = progress.copyWith(storedAmount: 0);
+      }
     }
 
     if (totalCargo <= 0) {
       return const MiningSaleResult.failure('No cargo to sell.');
     }
 
-    final revenue = candidate.state.saleValue(
-      content,
-      candidate.state.activePlanetId,
-    );
     final next = candidate.state.copyWith(
       cash: candidate.state.cash + revenue,
       sites: sites,

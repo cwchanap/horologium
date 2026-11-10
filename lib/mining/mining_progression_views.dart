@@ -366,7 +366,6 @@ class StellarMapView {
         .where((site) => state.sites[site.id]?.commissioned == true)
         .length;
     final indicators = <StellarMapSiteIndicatorView>[];
-    var cargo = 0.0;
     var capacity = 0.0;
     var rate = 0.0;
     for (final site in definition.sites) {
@@ -392,7 +391,6 @@ class StellarMapView {
               .floor(),
         ),
       );
-      cargo += progress.storedAmount;
       capacity += metrics.capacity;
       rate += metrics.rate;
     }
@@ -442,7 +440,7 @@ class StellarMapView {
           state.technology.surveying >= definition.unlockRequiredSurveyingLevel,
       unlockCashCost: definition.unlockCashCost,
       hasCash: isUnlocked || state.cash >= definition.unlockCashCost,
-      cargo: cargo,
+      cargo: state.storedCargo(content, definition.id),
       capacity: capacity,
       rate: rate,
       projectedValue: state.saleValue(content, definition.id),
