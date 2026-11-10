@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -758,6 +759,67 @@ void main() {
     expect(routeCurrentAtCallback, isFalse);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
+  });
+
+  testWidgets('SELL ALL is a semantic button whose tap sells once', (
+    tester,
+  ) async {
+    final content = MiningContentRegistry.stellarMining();
+    const summary = OfflineProductionSummary(
+      elapsedAway: Duration(hours: 1),
+      elapsedUsed: Duration(hours: 1),
+      produced: {ResourceType.gold: 5},
+      productionByPlanet: {
+        MiningPlanetId.homeworld: {ResourceType.gold: 5},
+      },
+      fullSites: {},
+      wasOfflineCapped: false,
+    );
+    var sales = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: OutlinedButton(
+              key: const Key('open-return'),
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                builder: (_) => OfflineReturnSheet(
+                  summary: summary,
+                  content: content,
+                  state: _state(
+                    sites: {MiningSiteId.landingBasin: _site(stored: 105)},
+                  ),
+                  onSellCargo: () => sales++,
+                ),
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('open-return')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    final semantics = tester.ensureSemantics();
+
+    final node = tester
+        .getSemantics(find.bySemanticsLabel('Sell all cargo for 420 cash.'))
+        .getSemanticsData();
+    expect(node.flagsCollection.isButton, isTrue);
+    expect(node.hasAction(SemanticsAction.tap), isTrue);
+
+    tester.semantics.performAction(
+      find.semantics.byLabel('Sell all cargo for 420 cash.'),
+      SemanticsAction.tap,
+    );
+    expect(sales, 1);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
+    semantics.dispose();
   });
 
   testWidgets('the continue action pops without selling', (tester) async {

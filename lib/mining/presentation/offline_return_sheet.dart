@@ -265,6 +265,11 @@ class OfflineReturnSheet extends StatelessWidget {
 
   Widget _continueAction(BuildContext context) {
     final saleValue = state.saleValueAcrossUnlockedPlanets(content);
+    void sellAll() {
+      Navigator.of(context).pop();
+      onSellCargo();
+    }
+
     return Row(
       children: [
         Expanded(
@@ -276,13 +281,11 @@ class OfflineReturnSheet extends StatelessWidget {
               container: true,
               excludeSemantics: true,
               button: true,
+              onTap: sellAll,
               label: 'Sell all cargo for ${formatMiningCash(saleValue)} cash.',
               child: OutlinedButton(
                 key: const Key('offline-return-sell-all'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  onSellCargo();
-                },
+                onPressed: sellAll,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: MiningTheme.highlight,
                   backgroundColor: MiningTheme.highlight.withAlpha(36),

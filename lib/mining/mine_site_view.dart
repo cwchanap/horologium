@@ -84,6 +84,9 @@ class MineSiteView {
   final int projectedSale;
   final double activePlanetCargo;
   final int activePlanetProjectedSale;
+
+  /// Sale affordance aggregated across every unlocked planet, so cargo on
+  /// an inactive planet still enables the sale.
   final MiningSaleAffordance sale;
   final bool isActivePlanet;
   final DockBayId? selectedBayId;
@@ -176,6 +179,8 @@ class MineSiteView {
     };
   }
 
+  /// True while cargo remains on any unlocked planet, even when its
+  /// aggregate value floors to 0 cash.
   bool get canSell => sale.canSell;
 
   static MineSiteView from({
