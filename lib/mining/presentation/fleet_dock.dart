@@ -13,12 +13,14 @@ class FleetDock extends StatelessWidget {
     required this.view,
     required this.onBayTap,
     required this.onSpawnRig,
+    required this.onBuildRig,
     this.axis = FleetDockAxis.horizontal,
   });
 
   final FleetDockView view;
   final ValueChanged<DockBayId> onBayTap;
   final VoidCallback onSpawnRig;
+  final ValueChanged<RigTier> onBuildRig;
   final FleetDockAxis axis;
 
   static const double horizontalHeight = 96;
@@ -68,6 +70,10 @@ class FleetDock extends StatelessWidget {
             ),
           ),
         ),
+        if (view.bestAffordableTier != null) ...[
+          const SizedBox(width: 7),
+          _BuildPill(view: view, onBuildRig: onBuildRig),
+        ],
       ],
     ),
     const SizedBox(height: 9),
@@ -94,6 +100,14 @@ class FleetDock extends StatelessWidget {
 
   List<Widget> _verticalChildren() => [
     const _FleetLabel(),
+    if (view.bestAffordableTier != null) ...[
+      const SizedBox(height: 6),
+      SizedBox(
+        width: 96,
+        height: 22,
+        child: _BuildPill(view: view, onBuildRig: onBuildRig),
+      ),
+    ],
     const SizedBox(height: 6),
     SizedBox(
       width: 56,
@@ -136,6 +150,55 @@ class _FleetLabel extends StatelessWidget {
       ],
     ),
   );
+}
+
+class _BuildPill extends StatelessWidget {
+  const _BuildPill({required this.view, required this.onBuildRig});
+
+  final FleetDockView view;
+  final ValueChanged<RigTier> onBuildRig;
+
+  @override
+  Widget build(BuildContext context) {
+    final tier = view.bestAffordableTier!;
+    final enabled = view.canBuild;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: view.buildHint,
+      excludeSemantics: true,
+      child: GestureDetector(
+        key: const Key('fleet-dock-build'),
+        behavior: HitTestBehavior.opaque,
+        onTap: enabled ? () => onBuildRig(tier) : null,
+        child: Container(
+          height: 16,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: Color.fromRGBO(24, 255, 255, enabled ? .14 : .06),
+            border: Border.all(
+              color: Color.fromRGBO(24, 255, 255, enabled ? .55 : .24),
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'BUILD ${tier.name.toUpperCase()} · '
+              '${formatMiningCash(view.buildCost)}',
+              maxLines: 1,
+              style: TextStyle(
+                color: enabled ? MiningTheme.highlight : Colors.white38,
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                letterSpacing: .6,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _SpawnHex extends StatelessWidget {

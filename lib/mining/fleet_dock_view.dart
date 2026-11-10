@@ -32,6 +32,10 @@ class FleetDockView {
     required this.canSpawn,
     required this.spawnDisabledReason,
     required this.spawnHint,
+    required this.bestAffordableTier,
+    required this.buildCost,
+    required this.canBuild,
+    required this.buildHint,
     required this.dockHint,
     required this.isBusy,
   });
@@ -42,6 +46,10 @@ class FleetDockView {
   final bool canSpawn;
   final String? spawnDisabledReason;
   final String spawnHint;
+  final RigTier? bestAffordableTier;
+  final int buildCost;
+  final bool canBuild;
+  final String? buildHint;
 
   /// Resolved instruction copy for the dock hint row.
   final String dockHint;
@@ -69,9 +77,7 @@ class FleetDockView {
     } else if (selectedRig == RigTier.t5) {
       dockHint = 'TAP A HIGHLIGHTED CELL';
     } else {
-      final tier = selectedRig.name.toUpperCase();
-      final next = RigTier.values[selectedRig.index + 1].name.toUpperCase();
-      dockHint = 'TAP A HIGHLIGHTED CELL • $tier + $tier = $next IN DOCK';
+      dockHint = 'CELL: DEPLOY · RIG: UPGRADE · BAY: MERGE';
     }
     final hasEmptyBay = DockBayId.values.any((id) => dock[id] == null);
     final spawnDisabledReason = isBusy
@@ -82,6 +88,19 @@ class FleetDockView {
         ? 'Need ${formatMiningCash(spawnCost)} cash.'
         : null;
 
+    RigTier? bestAffordableTier;
+    if (hasEmptyBay) {
+      for (final tier in RigTier.values.skip(1)) {
+        if (state.cash >= content.rigCost(state.activePlanetId, tier)) {
+          bestAffordableTier = tier;
+        }
+      }
+    }
+    final canBuild = !isBusy && bestAffordableTier != null;
+    final buildCost = bestAffordableTier == null
+        ? 0
+        : content.rigCost(state.activePlanetId, bestAffordableTier);
+
     final bays = <DockBayId, FleetDockBayView>{};
     for (final id in DockBayId.values) {
       final rig = dock[id];
@@ -91,8 +110,7 @@ class FleetDockView {
           !isSelected &&
           rig != null &&
           selectedRig != null &&
-          rig == selectedRig &&
-          rig != RigTier.t5;
+          rigMergeFailure(selectedRig, rig) == null;
       final tierName = rig?.name.toUpperCase();
       final hint = isBusy
           ? 'Finishing previous action…'
@@ -123,6 +141,15 @@ class FleetDockView {
       spawnHint: canSpawn
           ? 'Spawn a T1 rig for ${formatMiningCash(spawnCost)} cash.'
           : spawnDisabledReason,
+      bestAffordableTier: bestAffordableTier,
+      buildCost: buildCost,
+      canBuild: canBuild,
+      buildHint: bestAffordableTier == null
+          ? null
+          : canBuild
+          ? 'Build a ${bestAffordableTier.name.toUpperCase()} rig for '
+                '${formatMiningCash(buildCost)} cash.'
+          : 'Finishing previous action…',
       dockHint: dockHint,
       isBusy: isBusy,
     );

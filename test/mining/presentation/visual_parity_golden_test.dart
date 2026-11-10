@@ -103,6 +103,7 @@ void main() {
             onGridCellTap: (_) {},
             onBayTap: (_) {},
             onSpawnRig: () {},
+            onBuildRig: (_) {},
             onSellCargo: () {},
             onBack: () {},
             onSettings: () {},

@@ -228,6 +228,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
                           width: view.definition.gridWidth,
                           height: view.definition.gridHeight,
                           deployableCells: view.deployableCells,
+                          upgradeableCells: view.upgradeableCells,
                         ),
                       ),
                     ),
@@ -259,7 +260,9 @@ class _MiningGridMapState extends State<MiningGridMap> {
                       height: miningGridCellSize,
                       child: Semantics(
                         button: true,
-                        enabled: rig.canRecall,
+                        enabled: view.selectedRig != null
+                            ? rig.canUpgradeWithSelection
+                            : rig.canRecall,
                         label: _rigLabel(rig),
                         onTap: () => widget.onCellTap(rig.placement.cell),
                         // IgnorePointer sits below the Semantics node so
@@ -293,11 +296,19 @@ class _MiningGridMapState extends State<MiningGridMap> {
   }
 
   String _rigLabel(MineSiteRigView rig) {
-    final reason = rig.disabledReason;
-    return '${rig.placement.tier.name.toUpperCase()} rig at '
+    final base =
+        '${rig.placement.tier.name.toUpperCase()} rig at '
         '(${rig.placement.cell.x},${rig.placement.cell.y}) mining '
-        'deposit (${rig.target.x},${rig.target.y}).'
-        '${reason == null ? '' : ' $reason'}';
+        'deposit (${rig.target.x},${rig.target.y}).';
+    if (widget.view.selectedRig != null) {
+      if (rig.canUpgradeWithSelection) {
+        final next = RigTier.values[rig.placement.tier.index + 1];
+        return '$base Upgrade to ${next.name.toUpperCase()}.';
+      }
+      return '$base ${rig.upgradeFailure}';
+    }
+    final reason = rig.disabledReason;
+    return '$base${reason == null ? '' : ' $reason'}';
   }
 }
 
@@ -368,11 +379,13 @@ class MiningGridPainter extends CustomPainter {
     required this.width,
     required this.height,
     required this.deployableCells,
+    required this.upgradeableCells,
   });
 
   final int width;
   final int height;
   final Set<MiningGridCell> deployableCells;
+  final Set<MiningGridCell> upgradeableCells;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -382,6 +395,14 @@ class MiningGridPainter extends CustomPainter {
       canvas.drawRect(
         Rect.fromLTWH(cellPos.x * cell, cellPos.y * cell, cell, cell),
         highlight,
+      );
+    }
+    final upgradeHighlight = Paint()
+      ..color = const Color.fromRGBO(245, 180, 76, .22);
+    for (final cellPos in upgradeableCells) {
+      canvas.drawRect(
+        Rect.fromLTWH(cellPos.x * cell, cellPos.y * cell, cell, cell),
+        upgradeHighlight,
       );
     }
     final line = Paint()
@@ -407,5 +428,6 @@ class MiningGridPainter extends CustomPainter {
   bool shouldRepaint(MiningGridPainter oldDelegate) =>
       oldDelegate.width != width ||
       oldDelegate.height != height ||
-      !setEquals(oldDelegate.deployableCells, deployableCells);
+      !setEquals(oldDelegate.deployableCells, deployableCells) ||
+      !setEquals(oldDelegate.upgradeableCells, upgradeableCells);
 }

@@ -363,4 +363,174 @@ void main() {
       'Resources occupy this cell.',
     );
   });
+
+  test('a matching selected dock rig upgrades the occupied cell', () {
+    final view = viewFor(
+      stateWith(
+        landing: progress(
+          commissioned: true,
+          rigs: const [
+            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          ],
+        ),
+      ),
+      selectedBayId: DockBayId.b1,
+    );
+
+    final rig = view.rigAt(const MiningGridCell(3, 2))!;
+    expect(rig.canUpgradeWithSelection, isTrue);
+    expect(rig.upgradeFailure, isNull);
+    expect(view.upgradeableCells, {const MiningGridCell(3, 2)});
+    expect(
+      view.gridTapOutcome(const MiningGridCell(3, 2)).action,
+      MineSiteGridTapAction.upgrade,
+    );
+    // A free cell still deploys the selected rig.
+    final freeCell = view.deployableCells.first;
+    expect(view.gridTapOutcome(freeCell).action, MineSiteGridTapAction.deploy);
+  });
+
+  test('a mismatched selected dock rig reports the merge rule', () {
+    final initial = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 26));
+    final state = initial.copyWith(
+      docks: {
+        ...initial.docks,
+        MiningPlanetId.homeworld: {
+          ...initial.docks[MiningPlanetId.homeworld]!,
+          DockBayId.b1: RigTier.t2,
+        },
+      },
+      sites: {
+        ...initial.sites,
+        MiningSiteId.landingBasin: progress(
+          commissioned: true,
+          rigs: const [
+            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          ],
+        ),
+      },
+    );
+    final view = viewFor(state, selectedBayId: DockBayId.b1);
+
+    final rig = view.rigAt(const MiningGridCell(3, 2))!;
+    expect(rig.canUpgradeWithSelection, isFalse);
+    expect(rig.upgradeFailure, 'Rigs must be the same tier.');
+    expect(view.upgradeableCells, isEmpty);
+    expect(
+      view.gridTapOutcome(const MiningGridCell(3, 2)).message,
+      'Rigs must be the same tier.',
+    );
+  });
+
+  test('a selected T5 cannot merge into a placed T5', () {
+    final initial = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 26));
+    final state = initial.copyWith(
+      docks: {
+        ...initial.docks,
+        MiningPlanetId.homeworld: {
+          ...initial.docks[MiningPlanetId.homeworld]!,
+          DockBayId.b1: RigTier.t5,
+        },
+      },
+      sites: {
+        ...initial.sites,
+        MiningSiteId.landingBasin: progress(
+          commissioned: true,
+          rigs: const [
+            MiningRigPlacement(tier: RigTier.t5, cell: MiningGridCell(3, 2)),
+          ],
+        ),
+      },
+    );
+    final view = viewFor(state, selectedBayId: DockBayId.b1);
+
+    final rig = view.rigAt(const MiningGridCell(3, 2))!;
+    expect(rig.canUpgradeWithSelection, isFalse);
+    expect(rig.upgradeFailure, 'T5 rigs cannot merge.');
+    expect(
+      view.gridTapOutcome(const MiningGridCell(3, 2)).message,
+      'T5 rigs cannot merge.',
+    );
+  });
+
+  test('the upgrade path stays busy-blocked like every grid tap', () {
+    final view = viewFor(
+      stateWith(
+        landing: progress(
+          commissioned: true,
+          rigs: const [
+            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          ],
+        ),
+      ),
+      selectedBayId: DockBayId.b1,
+      isBusy: true,
+    );
+
+    final rig = view.rigAt(const MiningGridCell(3, 2))!;
+    expect(rig.canUpgradeWithSelection, isFalse);
+    expect(rig.upgradeFailure, 'Finishing previous action…');
+    expect(view.upgradeableCells, isEmpty);
+    expect(
+      view.gridTapOutcome(const MiningGridCell(3, 2)).message,
+      'Finishing previous action…',
+    );
+  });
+
+  test('upgrade ignores the recall-only cargo and dock-space rules', () {
+    final initial = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 26));
+    final state = initial.copyWith(
+      docks: {
+        ...initial.docks,
+        MiningPlanetId.homeworld: const {
+          DockBayId.b1: RigTier.t1,
+          DockBayId.b2: RigTier.t1,
+          DockBayId.b3: RigTier.t1,
+          DockBayId.b4: RigTier.t1,
+        },
+      },
+      sites: {
+        ...initial.sites,
+        MiningSiteId.landingBasin: progress(
+          commissioned: true,
+          storedAmount: 6000,
+          rigs: const [
+            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          ],
+        ),
+      },
+    );
+    final view = viewFor(state, selectedBayId: DockBayId.b1);
+
+    final rig = view.rigAt(const MiningGridCell(3, 2))!;
+    expect(rig.canRecall, isFalse);
+    expect(rig.canUpgradeWithSelection, isTrue);
+    expect(view.upgradeableCells, {const MiningGridCell(3, 2)});
+    expect(
+      view.gridTapOutcome(const MiningGridCell(3, 2)).action,
+      MineSiteGridTapAction.upgrade,
+    );
+  });
+
+  test('an occupied cell without a dock selection still recalls', () {
+    final view = viewFor(
+      stateWith(
+        landing: progress(
+          commissioned: true,
+          rigs: const [
+            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          ],
+        ),
+      ),
+    );
+
+    final rig = view.rigAt(const MiningGridCell(3, 2))!;
+    expect(rig.canUpgradeWithSelection, isFalse);
+    expect(rig.upgradeFailure, isNull);
+    expect(view.upgradeableCells, isEmpty);
+    expect(
+      view.gridTapOutcome(const MiningGridCell(3, 2)).action,
+      MineSiteGridTapAction.recall,
+    );
+  });
 }
