@@ -99,6 +99,7 @@ void main() {
 
     expect(viewFor().dockHint, 'TAP A RIG, THEN A HIGHLIGHTED CELL');
 
+    // The initial homeworld dock holds T1 rigs in b1 and b2.
     for (final tier in const [RigTier.t1, RigTier.t2, RigTier.t3, RigTier.t4]) {
       expect(
         viewFor(

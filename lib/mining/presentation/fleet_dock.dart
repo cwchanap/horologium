@@ -47,73 +47,66 @@ class FleetDock extends StatelessWidget {
   }
 
   List<Widget> _horizontalChildren() => [
+    SizedBox(
+      height: 44,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _FleetLabel(),
+                const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    view.dockHint,
+                    key: const Key('fleet-dock-hint'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: .6,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (view.bestAffordableTier != null) ...[
+            const SizedBox(width: 7),
+            SizedBox(
+              width: 96,
+              height: 44,
+              child: _BuildPill(view: view, onBuildRig: onBuildRig),
+            ),
+          ],
+        ],
+      ),
+    ),
+    const SizedBox(height: 4),
     Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const _FleetLabel(),
-        const SizedBox(width: 7),
-        Expanded(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              view.dockHint,
-              key: const Key('fleet-dock-hint'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white54,
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: .6,
-              ),
+        SizedBox(
+          width: 60,
+          height: 44,
+          child: _SpawnHex(view: view, onSpawnRig: onSpawnRig, showRig: true),
+        ),
+        for (final bayId in DockBayId.values)
+          SizedBox(
+            width: 60,
+            height: 44,
+            child: _BayButton(
+              view: view.bay(bayId),
+              onTap: () => onBayTap(bayId),
             ),
           ),
-        ),
       ],
-    ),
-    const SizedBox(height: 9),
-    LayoutBuilder(
-      builder: (context, constraints) {
-        final buildWidth = view.bestAffordableTier != null ? 48.0 : 0.0;
-        final slot = ((constraints.maxWidth - buildWidth - 20) / 5).clamp(
-          48.0,
-          60.0,
-        );
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            SizedBox(
-              width: slot,
-              height: 66,
-              child: _SpawnHex(
-                view: view,
-                onSpawnRig: onSpawnRig,
-                showRig: true,
-              ),
-            ),
-            for (final bayId in DockBayId.values)
-              SizedBox(
-                width: slot,
-                height: 66,
-                child: _BayButton(
-                  view: view.bay(bayId),
-                  onTap: () => onBayTap(bayId),
-                ),
-              ),
-            if (view.bestAffordableTier != null)
-              SizedBox(
-                width: buildWidth,
-                height: 66,
-                child: _BuildPill(
-                  view: view,
-                  onBuildRig: onBuildRig,
-                  rotated: true,
-                ),
-              ),
-          ],
-        );
-      },
     ),
   ];
 
@@ -165,22 +158,17 @@ class _FleetLabel extends StatelessWidget {
 }
 
 class _BuildPill extends StatelessWidget {
-  const _BuildPill({
-    required this.view,
-    required this.onBuildRig,
-    this.rotated = false,
-  });
+  const _BuildPill({required this.view, required this.onBuildRig});
 
   final FleetDockView view;
   final ValueChanged<RigTier> onBuildRig;
-  final bool rotated;
 
   @override
   Widget build(BuildContext context) {
     final tier = view.bestAffordableTier!;
     final enabled = view.canBuild;
     final VoidCallback? onTap = enabled ? () => onBuildRig(tier) : null;
-    Widget label = FittedBox(
+    final label = FittedBox(
       fit: BoxFit.scaleDown,
       child: Text(
         'BUILD ${tier.name.toUpperCase()} · '
@@ -194,9 +182,6 @@ class _BuildPill extends StatelessWidget {
         ),
       ),
     );
-    if (rotated) {
-      label = RotatedBox(quarterTurns: 3, child: label);
-    }
     return Semantics(
       button: true,
       enabled: enabled,
@@ -248,8 +233,8 @@ class _SpawnHex extends StatelessWidget {
           if (showRig)
             Image.asset(
               MiningVisuals.rigAsset(RigTier.t1),
-              width: 30,
-              height: 30,
+              width: 24,
+              height: 24,
             ),
           // Frontier spawn costs (`40,000`, `4.00M`) scale down to fit the hex.
           FittedBox(
@@ -316,7 +301,7 @@ class _BayButton extends StatelessWidget {
         onTap: view.isBusy ? null : onTap,
         child: Container(
           key: ValueKey<String>(view.id.name),
-          constraints: const BoxConstraints(minHeight: 54, minWidth: 48),
+          constraints: const BoxConstraints(minHeight: 44, minWidth: 48),
           padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
           child: Stack(
             alignment: Alignment.center,
