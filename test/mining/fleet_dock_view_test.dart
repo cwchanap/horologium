@@ -99,8 +99,6 @@ void main() {
 
     expect(viewFor().dockHint, 'TAP A RIG, THEN A HIGHLIGHTED CELL');
 
-    // The initial homeworld dock holds T1 rigs in b1 and b2; a selected
-    // T1–T4 teaches deploy on a cell, upgrade on a rig, merge on a bay.
     for (final tier in const [RigTier.t1, RigTier.t2, RigTier.t3, RigTier.t4]) {
       expect(
         viewFor(
@@ -142,7 +140,6 @@ void main() {
       isBusy: false,
     );
 
-    // T5+T5 and T5+T3 both fail the shared merge rule, so nothing lights up.
     expect(view.bays[DockBayId.b2]!.canMergeWithSelection, isFalse);
     expect(view.bays[DockBayId.b3]!.canMergeWithSelection, isFalse);
   });
@@ -159,7 +156,6 @@ void main() {
       isBusy: isBusy,
     );
 
-    // Homeworld spawn cost is 25: T2 costs 50, T3 100, T4 200, T5 400.
     expect(viewFor(cash: 49).bestAffordableTier, isNull);
     expect(viewFor(cash: 50).bestAffordableTier, RigTier.t2);
     expect(viewFor(cash: 199).bestAffordableTier, RigTier.t3);
@@ -171,7 +167,6 @@ void main() {
     expect(build.canBuild, isTrue);
     expect(build.buildHint, 'Build a T4 rig for 200 cash.');
 
-    // A full dock hides BUILD rather than disabling it; busy only disables.
     final full = viewFor(
       cash: 1000,
       bays: {for (final bay in DockBayId.values) bay: RigTier.t1},

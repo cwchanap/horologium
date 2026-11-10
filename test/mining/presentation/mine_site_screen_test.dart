@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/fleet_dock_view.dart';
 import 'package:horologium/mining/mine_site_view.dart';
@@ -1745,9 +1746,7 @@ void main() {
     expect(cargoRect.top, 52.0);
   });
 
-  testWidgets('BUILD forwards its displayed tier in the portrait header', (
-    tester,
-  ) async {
+  testWidgets('BUILD forwards its displayed tier on portrait', (tester) async {
     final built = <RigTier>[];
     final state = _stateWith(cash: 200, landing: _progress(commissioned: true));
     await _pumpMineSite(
@@ -1886,12 +1885,59 @@ void main() {
       tester.widget<Text>(hint).data,
       'CELL: DEPLOY · RIG: UPGRADE · BAY: MERGE',
     );
-    // The FittedBox shrink factor must stay near 1: below ~6 px of rendered
-    // height the merged deploy/upgrade/merge copy would be illegible.
-    expect(
-      tester.getSize(hint).height,
-      greaterThanOrEqualTo(6),
-      reason: 'scaled height ${tester.getSize(hint).height}',
+    final render = tester.renderObject<RenderParagraph>(hint);
+    final bounds = MatrixUtils.transformRect(
+      render.getTransformTo(null),
+      render.paintBounds,
     );
+    expect(
+      bounds.height,
+      greaterThanOrEqualTo(6),
+      reason: 'transformed height ${bounds.height}',
+    );
+  });
+
+  testWidgets('BUILD exposes a semantic tap action that forwards its tier', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    final built = <RigTier>[];
+    final state = _stateWith(cash: 200, landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      view: _siteView(state),
+      dock: _dockView(state),
+      onBuildRig: built.add,
+    );
+
+    tester.semantics.performAction(
+      find.semantics.byLabel('Build a T4 rig for 200 cash.'),
+      SemanticsAction.tap,
+    );
+    expect(built, [RigTier.t4]);
+    handle.dispose();
+  });
+
+  testWidgets('BUILD keeps at least a 44 px touch target at every size', (
+    tester,
+  ) async {
+    final state = _stateWith(cash: 200, landing: _progress(commissioned: true));
+    for (final size in const [
+      Size(360, 640),
+      Size(390, 844),
+      Size(430, 932),
+      Size(874, 402),
+    ]) {
+      await _pumpMineSite(
+        tester,
+        size: size,
+        view: _siteView(state),
+        dock: _dockView(state),
+      );
+      final target = tester.getSize(find.byKey(const Key('fleet-dock-build')));
+      expect(target.width, greaterThanOrEqualTo(44), reason: '$size width');
+      expect(target.height, greaterThanOrEqualTo(44), reason: '$size height');
+      expect(tester.takeException(), isNull, reason: '$size');
+    }
   });
 }
