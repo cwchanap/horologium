@@ -99,18 +99,18 @@ void main() {
 
     expect(viewFor().dockHint, 'TAP A RIG, THEN A HIGHLIGHTED CELL');
 
-    // The initial homeworld dock holds T1 rigs in b1 and b2.
-    expect(
-      viewFor(selectedBayId: DockBayId.b1).dockHint,
-      'TAP A HIGHLIGHTED CELL • T1 + T1 = T2 IN DOCK',
-    );
-    expect(
-      viewFor(
-        bays: {DockBayId.b1: RigTier.t4},
-        selectedBayId: DockBayId.b1,
-      ).dockHint,
-      'TAP A HIGHLIGHTED CELL • T4 + T4 = T5 IN DOCK',
-    );
+    // The initial homeworld dock holds T1 rigs in b1 and b2; a selected
+    // T1–T4 teaches deploy on a cell, upgrade on a rig, merge on a bay.
+    for (final tier in const [RigTier.t1, RigTier.t2, RigTier.t3, RigTier.t4]) {
+      expect(
+        viewFor(
+          bays: {DockBayId.b1: tier},
+          selectedBayId: DockBayId.b1,
+        ).dockHint,
+        'CELL: DEPLOY · RIG: UPGRADE · BAY: MERGE',
+        reason: tier.name,
+      );
+    }
     expect(
       viewFor(
         bays: {DockBayId.b1: RigTier.t5},
@@ -126,6 +126,63 @@ void main() {
     ]) {
       expect(view.dockHint, isNot(contains('NODE')));
     }
+  });
+
+  test('highlights merge targets through the shared merge rule', () {
+    final view = FleetDockView.from(
+      state: stateWith(
+        bays: {
+          DockBayId.b1: RigTier.t5,
+          DockBayId.b2: RigTier.t5,
+          DockBayId.b3: RigTier.t3,
+        },
+      ),
+      content: content,
+      selectedBayId: DockBayId.b1,
+      isBusy: false,
+    );
+
+    // T5+T5 and T5+T3 both fail the shared merge rule, so nothing lights up.
+    expect(view.bays[DockBayId.b2]!.canMergeWithSelection, isFalse);
+    expect(view.bays[DockBayId.b3]!.canMergeWithSelection, isFalse);
+  });
+
+  test('derives the best affordable build tier from cash and a free bay', () {
+    FleetDockView viewFor({
+      int? cash,
+      Map<DockBayId, RigTier?>? bays,
+      bool isBusy = false,
+    }) => FleetDockView.from(
+      state: stateWith(cash: cash, bays: bays),
+      content: content,
+      selectedBayId: null,
+      isBusy: isBusy,
+    );
+
+    // Homeworld spawn cost is 25: T2 costs 50, T3 100, T4 200, T5 400.
+    expect(viewFor(cash: 49).bestAffordableTier, isNull);
+    expect(viewFor(cash: 50).bestAffordableTier, RigTier.t2);
+    expect(viewFor(cash: 199).bestAffordableTier, RigTier.t3);
+    expect(viewFor(cash: 1000).bestAffordableTier, RigTier.t5);
+
+    final build = viewFor(cash: 200);
+    expect(build.bestAffordableTier, RigTier.t4);
+    expect(build.buildCost, 200);
+    expect(build.canBuild, isTrue);
+    expect(build.buildHint, 'Build a T4 rig for 200 cash.');
+
+    // A full dock hides BUILD rather than disabling it; busy only disables.
+    final full = viewFor(
+      cash: 1000,
+      bays: {for (final bay in DockBayId.values) bay: RigTier.t1},
+    );
+    expect(full.bestAffordableTier, isNull);
+    expect(full.canBuild, isFalse);
+
+    final busy = viewFor(cash: 1000, isBusy: true);
+    expect(busy.bestAffordableTier, RigTier.t5);
+    expect(busy.canBuild, isFalse);
+    expect(busy.buildHint, 'Finishing previous action…');
   });
 
   test('busy state keeps the merge flag off without a merge hint', () {

@@ -51,6 +51,7 @@ class MineSiteScreen extends StatelessWidget {
     required this.onGridCellTap,
     required this.onBayTap,
     required this.onSpawnRig,
+    required this.onBuildRig,
     required this.onSellCargo,
     required this.onBack,
     required this.onSettings,
@@ -66,6 +67,7 @@ class MineSiteScreen extends StatelessWidget {
   final ValueChanged<MiningGridCell> onGridCellTap;
   final ValueChanged<DockBayId> onBayTap;
   final VoidCallback onSpawnRig;
+  final ValueChanged<RigTier> onBuildRig;
   final VoidCallback onSellCargo;
   final VoidCallback onBack;
   final VoidCallback onSettings;
@@ -91,6 +93,7 @@ class MineSiteScreen extends StatelessWidget {
                 onGridCellTap: onGridCellTap,
                 onBayTap: onBayTap,
                 onSpawnRig: onSpawnRig,
+                onBuildRig: onBuildRig,
                 onSellCargo: onSellCargo,
                 onBack: onBack,
                 onSettings: onSettings,
@@ -106,6 +109,7 @@ class MineSiteScreen extends StatelessWidget {
                 onGridCellTap: onGridCellTap,
                 onBayTap: onBayTap,
                 onSpawnRig: onSpawnRig,
+                onBuildRig: onBuildRig,
                 onSellCargo: onSellCargo,
                 onBack: onBack,
                 onSettings: onSettings,
@@ -127,6 +131,7 @@ class _PortraitMineSite extends StatelessWidget {
     required this.onGridCellTap,
     required this.onBayTap,
     required this.onSpawnRig,
+    required this.onBuildRig,
     required this.onSellCargo,
     required this.onBack,
     required this.onSettings,
@@ -142,6 +147,7 @@ class _PortraitMineSite extends StatelessWidget {
   final ValueChanged<MiningGridCell> onGridCellTap;
   final ValueChanged<DockBayId> onBayTap;
   final VoidCallback onSpawnRig;
+  final ValueChanged<RigTier> onBuildRig;
   final VoidCallback onSellCargo;
   final VoidCallback onBack;
   final VoidCallback onSettings;
@@ -225,6 +231,7 @@ class _PortraitMineSite extends StatelessWidget {
               axis: FleetDockAxis.horizontal,
               onBayTap: onBayTap,
               onSpawnRig: onSpawnRig,
+              onBuildRig: onBuildRig,
             ),
           ),
           Positioned(
@@ -253,6 +260,7 @@ class _LandscapeMineSite extends StatelessWidget {
     required this.onGridCellTap,
     required this.onBayTap,
     required this.onSpawnRig,
+    required this.onBuildRig,
     required this.onSellCargo,
     required this.onBack,
     required this.onSettings,
@@ -268,6 +276,7 @@ class _LandscapeMineSite extends StatelessWidget {
   final ValueChanged<MiningGridCell> onGridCellTap;
   final ValueChanged<DockBayId> onBayTap;
   final VoidCallback onSpawnRig;
+  final ValueChanged<RigTier> onBuildRig;
   final VoidCallback onSellCargo;
   final VoidCallback onBack;
   final VoidCallback onSettings;
@@ -356,6 +365,7 @@ class _LandscapeMineSite extends StatelessWidget {
                   axis: FleetDockAxis.vertical,
                   onBayTap: onBayTap,
                   onSpawnRig: onSpawnRig,
+                  onBuildRig: onBuildRig,
                 ),
               ),
             ),

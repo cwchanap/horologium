@@ -17,9 +17,20 @@ final _start = DateTime.utc(2026, 8, 26, 12);
 MineSiteView _view(
   MiningSiteId siteId, {
   List<MiningRigPlacement> rigs = const [],
+  DockBayId? selectedBayId,
+  Map<DockBayId, RigTier?>? dockBays,
 }) {
   final initial = MiningSave.initial(nowUtc: _start);
   final state = initial.copyWith(
+    docks: dockBays == null
+        ? initial.docks
+        : {
+            ...initial.docks,
+            MiningPlanetId.homeworld: {
+              ...initial.docks[MiningPlanetId.homeworld]!,
+              ...dockBays,
+            },
+          },
     sites: {
       ...initial.sites,
       siteId: initial.sites[siteId]!.copyWith(
@@ -32,10 +43,20 @@ MineSiteView _view(
     state: state,
     content: _content,
     siteId: siteId,
-    selectedBayId: null,
+    selectedBayId: selectedBayId,
     isBusy: false,
   );
 }
+
+Finder _rigSemantics(String label, {required bool enabled}) =>
+    find.byWidgetPredicate(
+      (widget) =>
+          widget is Semantics &&
+          widget.properties.button == true &&
+          widget.properties.enabled == enabled &&
+          widget.properties.label != null &&
+          widget.properties.label!.contains(label),
+    );
 
 Future<void> _pumpMap(
   WidgetTester tester,
@@ -453,6 +474,7 @@ void main() {
       ],
       rigs: const [],
       deployableCells: const {},
+      upgradeableCells: const {},
       deployedRigs: const [],
       rate: 0,
       capacity: 1,
@@ -575,5 +597,162 @@ void main() {
       viewportInsets: insets,
     );
     expect(_surfaceRect(tester).topLeft, const Offset(64, 125));
+  });
+
+  testWidgets('announces the upgrade action on a matching selected rig', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    final taps = <MiningGridCell>[];
+    await _pumpMap(
+      tester,
+      _view(
+        MiningSiteId.landingBasin,
+        rigs: const [
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+        ],
+        selectedBayId: DockBayId.b1,
+      ),
+      taps.add,
+    );
+
+    final upgrade = _rigSemantics(
+      'T1 rig at (3,2) mining deposit (1,1). Upgrade to T2.',
+      enabled: true,
+    );
+    expect(upgrade, findsOneWidget);
+
+    // The semantic tap routes the same cell as the physical tap.
+    tester.semantics.performAction(
+      find.semantics.byLabel(
+        RegExp(r'T1 rig at \(3,2\) mining deposit \(1,1\)\. Upgrade to T2\.'),
+      ),
+      SemanticsAction.tap,
+    );
+    expect(taps.single, const MiningGridCell(3, 2));
+    handle.dispose();
+  });
+
+  testWidgets('a full dock still enables a valid placed upgrade', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await _pumpMap(
+      tester,
+      _view(
+        MiningSiteId.landingBasin,
+        rigs: const [
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+        ],
+        selectedBayId: DockBayId.b1,
+        dockBays: const {
+          DockBayId.b1: RigTier.t1,
+          DockBayId.b2: RigTier.t1,
+          DockBayId.b3: RigTier.t1,
+          DockBayId.b4: RigTier.t1,
+        },
+      ),
+      (_) {},
+    );
+
+    // Recall is impossible with a full dock, but the selected T1 upgrades
+    // the placed T1: the node stays enabled and never says "Dock is full.".
+    expect(
+      _rigSemantics(
+        'T1 rig at (3,2) mining deposit (1,1). Upgrade to T2.',
+        enabled: true,
+      ),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel(RegExp('Dock is full')), findsNothing);
+    handle.dispose();
+  });
+
+  testWidgets('reports merge-rule failures on selected upgrade targets', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    final view = _view(
+      MiningSiteId.landingBasin,
+      rigs: const [
+        MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+        MiningRigPlacement(tier: RigTier.t5, cell: MiningGridCell(3, 1)),
+      ],
+      selectedBayId: DockBayId.b1,
+      dockBays: const {DockBayId.b1: RigTier.t5},
+    );
+    await _pumpMap(tester, view, (_) {});
+
+    expect(
+      _rigSemantics(
+        'T1 rig at (3,2) mining deposit (1,1). Rigs must be the same tier.',
+        enabled: false,
+      ),
+      findsOneWidget,
+    );
+    expect(
+      _rigSemantics(
+        'T5 rig at (3,1) mining deposit (1,1). T5 rigs cannot merge.',
+        enabled: false,
+      ),
+      findsOneWidget,
+    );
+    handle.dispose();
+  });
+
+  testWidgets('feeds upgrade targets to the grid painter as a second set', (
+    tester,
+  ) async {
+    const cells = [MiningGridCell(3, 2), MiningGridCell(3, 1)];
+    final view = _view(
+      MiningSiteId.landingBasin,
+      rigs: [
+        MiningRigPlacement(tier: RigTier.t1, cell: cells[0]),
+        MiningRigPlacement(tier: RigTier.t5, cell: cells[1]),
+      ],
+      selectedBayId: DockBayId.b1,
+    );
+    expect(view.upgradeableCells, {cells[0]});
+    await _pumpMap(tester, view, (_) {});
+
+    final painter =
+        tester
+                .widget<CustomPaint>(
+                  find.descendant(
+                    of: find.byKey(const Key('mining-grid-surface')),
+                    matching: find.byWidgetPredicate(
+                      (widget) =>
+                          widget is CustomPaint &&
+                          widget.painter is MiningGridPainter,
+                    ),
+                  ),
+                )
+                .painter
+            as MiningGridPainter;
+    expect(painter.upgradeableCells, {cells[0]});
+    expect(painter.deployableCells, view.deployableCells);
+  });
+
+  testWidgets('keeps recall semantics while no dock rig is selected', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await _pumpMap(
+      tester,
+      _view(
+        MiningSiteId.landingBasin,
+        rigs: const [
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+        ],
+      ),
+      (_) {},
+    );
+
+    expect(
+      _rigSemantics('T1 rig at (3,2) mining deposit (1,1).', enabled: true),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel(RegExp('Upgrade to')), findsNothing);
+    handle.dispose();
   });
 }

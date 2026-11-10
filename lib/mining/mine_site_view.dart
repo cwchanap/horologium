@@ -22,14 +22,18 @@ class MineSiteRigView {
     required this.target,
     required this.canRecall,
     required this.disabledReason,
+    required this.canUpgradeWithSelection,
+    required this.upgradeFailure,
   });
   final MiningRigPlacement placement;
   final MiningDepositDefinition target;
   final bool canRecall;
   final String? disabledReason;
+  final bool canUpgradeWithSelection;
+  final String? upgradeFailure;
 }
 
-enum MineSiteGridTapAction { deploy, recall, blocked }
+enum MineSiteGridTapAction { deploy, recall, upgrade, blocked }
 
 class MineSiteGridTapOutcome {
   const MineSiteGridTapOutcome.deploy()
@@ -37,6 +41,9 @@ class MineSiteGridTapOutcome {
       message = null;
   const MineSiteGridTapOutcome.recall()
     : action = MineSiteGridTapAction.recall,
+      message = null;
+  const MineSiteGridTapOutcome.upgrade()
+    : action = MineSiteGridTapAction.upgrade,
       message = null;
   const MineSiteGridTapOutcome.blocked(this.message)
     : action = MineSiteGridTapAction.blocked;
@@ -67,7 +74,9 @@ class MineSiteView {
     required this.selectedRig,
     required this.isBusy,
     required Set<MiningGridCell> deployableCells,
-  }) : deployableCells = Set.unmodifiable(deployableCells);
+    required Set<MiningGridCell> upgradeableCells,
+  }) : deployableCells = Set.unmodifiable(deployableCells),
+       upgradeableCells = Set.unmodifiable(upgradeableCells);
 
   final MiningSiteId siteId;
   final MiningPlanetId planetId;
@@ -77,6 +86,7 @@ class MineSiteView {
   final List<MineSiteDepositView> deposits;
   final List<MineSiteRigView> rigs;
   final Set<MiningGridCell> deployableCells;
+  final Set<MiningGridCell> upgradeableCells;
   final List<RigTier> deployedRigs;
   final double rate;
   final double capacity;
@@ -139,6 +149,11 @@ class MineSiteView {
 
     final rig = rigAt(cell);
     if (rig != null) {
+      if (selectedRig != null) {
+        return rig.canUpgradeWithSelection
+            ? const MineSiteGridTapOutcome.upgrade()
+            : MineSiteGridTapOutcome.blocked(rig.upgradeFailure!);
+      }
       if (rig.canRecall) return const MineSiteGridTapOutcome.recall();
       return MineSiteGridTapOutcome.blocked(
         rig.disabledReason ?? 'Finishing previous action…',
@@ -179,8 +194,8 @@ class MineSiteView {
     };
   }
 
-  /// True while cargo remains on any unlocked planet, even when its
-  /// aggregate value floors to 0 cash.
+  /// True while the shell is not busy and cargo remains on any unlocked
+  /// planet, even when its aggregate value floors to 0 cash.
   bool get canSell => sale.canSell;
 
   static MineSiteView from({
@@ -258,11 +273,25 @@ class MineSiteView {
               : !hasEmptyDockBay
               ? 'Dock is full.'
               : null;
+          final canUpgradeWithSelection =
+              !isBusy &&
+              active &&
+              selectedRig != null &&
+              rigMergeFailure(selectedRig, placement.tier) == null;
+          final String? upgradeFailure = selectedRig == null
+              ? null
+              : isBusy
+              ? 'Finishing previous action…'
+              : !active
+              ? 'Travel to this planet first.'
+              : rigMergeFailure(selectedRig, placement.tier);
           return MineSiteRigView(
             placement: placement,
             target: targetByRigCell[placement.cell]!,
             canRecall: canRecall,
             disabledReason: disabledReason,
+            canUpgradeWithSelection: canUpgradeWithSelection,
+            upgradeFailure: upgradeFailure,
           );
         }(),
     ]);
@@ -290,6 +319,10 @@ class MineSiteView {
           ).isAllowed)
             candidate,
     };
+    final upgradeableCells = <MiningGridCell>{
+      for (final rig in rigViews)
+        if (rig.canUpgradeWithSelection) rig.placement.cell,
+    };
 
     return MineSiteView(
       siteId: siteId,
@@ -300,6 +333,7 @@ class MineSiteView {
       deposits: deposits,
       rigs: rigViews,
       deployableCells: deployableCells,
+      upgradeableCells: upgradeableCells,
       deployedRigs: List<RigTier>.unmodifiable(metrics.deployedRigs),
       rate: metrics.rate,
       capacity: metrics.capacity,

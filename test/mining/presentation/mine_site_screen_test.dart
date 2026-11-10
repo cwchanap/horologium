@@ -106,13 +106,16 @@ MineSiteView _siteView(
   isBusy: isBusy,
 );
 
-FleetDockView _dockView(MiningSave state, {DockBayId? selectedBayId}) =>
-    FleetDockView.from(
-      state: state,
-      content: _content,
-      selectedBayId: selectedBayId,
-      isBusy: false,
-    );
+FleetDockView _dockView(
+  MiningSave state, {
+  DockBayId? selectedBayId,
+  bool isBusy = false,
+}) => FleetDockView.from(
+  state: state,
+  content: _content,
+  selectedBayId: selectedBayId,
+  isBusy: isBusy,
+);
 
 Future<void> _pumpMineSite(
   WidgetTester tester, {
@@ -124,6 +127,7 @@ Future<void> _pumpMineSite(
   ValueChanged<MiningGridCell>? onGridCellTap,
   ValueChanged<DockBayId>? onBayTap,
   VoidCallback? onSpawnRig,
+  ValueChanged<RigTier>? onBuildRig,
   VoidCallback? onSellCargo,
   VoidCallback? onBack,
   VoidCallback? onSettings,
@@ -152,6 +156,7 @@ Future<void> _pumpMineSite(
           onGridCellTap: onGridCellTap ?? (_) {},
           onBayTap: onBayTap ?? (_) {},
           onSpawnRig: onSpawnRig ?? () {},
+          onBuildRig: onBuildRig ?? (_) {},
           onSellCargo: onSellCargo ?? () {},
           onBack: onBack ?? () {},
           onSettings: onSettings ?? () {},
@@ -1013,6 +1018,7 @@ void main() {
             onGridCellTap: (_) {},
             onBayTap: (_) {},
             onSpawnRig: () {},
+            onBuildRig: (_) {},
             onSellCargo: () {},
             onBack: () {},
             onSettings: () {},
@@ -1074,6 +1080,7 @@ void main() {
             onGridCellTap: (_) {},
             onBayTap: (_) {},
             onSpawnRig: () {},
+            onBuildRig: (_) {},
             onSellCargo: () {},
             onBack: () {},
             onSettings: () {},
@@ -1301,7 +1308,7 @@ void main() {
       dock: _dockView(state, selectedBayId: DockBayId.b1),
     );
     expect(
-      find.text('TAP A HIGHLIGHTED CELL • T1 + T1 = T2 IN DOCK'),
+      find.text('CELL: DEPLOY · RIG: UPGRADE · BAY: MERGE'),
       findsOneWidget,
     );
   });
@@ -1426,6 +1433,7 @@ void main() {
           onGridCellTap: cellTaps.add,
           onBayTap: (_) {},
           onSpawnRig: () {},
+          onBuildRig: (_) {},
           onSellCargo: () {},
           onBack: () {},
           onSettings: () {},
@@ -1528,6 +1536,7 @@ void main() {
             onGridCellTap: cellTaps.add,
             onBayTap: (_) {},
             onSpawnRig: () {},
+            onBuildRig: (_) {},
             onSellCargo: () {},
             onBack: () {},
             onSettings: () {},
@@ -1734,5 +1743,155 @@ void main() {
     expect(find.byKey(const Key('mine-site-cargo')), findsOneWidget);
     final cargoRect = tester.getRect(find.byKey(const Key('mine-site-cargo')));
     expect(cargoRect.top, 52.0);
+  });
+
+  testWidgets('BUILD forwards its displayed tier in the portrait header', (
+    tester,
+  ) async {
+    final built = <RigTier>[];
+    final state = _stateWith(cash: 200, landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      view: _siteView(state),
+      dock: _dockView(state),
+      onBuildRig: built.add,
+    );
+
+    final pill = find.byKey(const Key('fleet-dock-build'));
+    expect(pill, findsOneWidget);
+    expect(find.text('BUILD T4 · 200'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Build a T4 rig for 200 cash.'),
+      findsOneWidget,
+    );
+    for (final bay in DockBayId.values) {
+      expect(find.byKey(ValueKey<String>(bay.name)), findsOneWidget);
+    }
+    expect(find.byKey(const Key('fleet-dock-spawn')), findsOneWidget);
+
+    await tester.tap(pill);
+    await tester.pump();
+    expect(built, [RigTier.t4]);
+  });
+
+  testWidgets('BUILD hides below T2 or on a full dock and disables on busy', (
+    tester,
+  ) async {
+    final state = _stateWith(cash: 25, landing: _progress(commissioned: true));
+    await _pumpMineSite(tester, view: _siteView(state), dock: _dockView(state));
+    expect(find.byKey(const Key('fleet-dock-build')), findsNothing);
+
+    final full = _stateWith(cash: 1000, landing: _progress(commissioned: true))
+        .copyWith(
+          docks: {
+            ...MiningSave.initial(nowUtc: _start).docks,
+            MiningPlanetId.homeworld: const {
+              DockBayId.b1: RigTier.t1,
+              DockBayId.b2: RigTier.t1,
+              DockBayId.b3: RigTier.t1,
+              DockBayId.b4: RigTier.t1,
+            },
+          },
+        );
+    await _pumpMineSite(tester, view: _siteView(full), dock: _dockView(full));
+    expect(find.byKey(const Key('fleet-dock-build')), findsNothing);
+
+    final built = <RigTier>[];
+    await _pumpMineSite(
+      tester,
+      view: _siteView(full, isBusy: true),
+      dock: _dockView(full, isBusy: true),
+      onBuildRig: built.add,
+    );
+    expect(find.byKey(const Key('fleet-dock-build')), findsNothing);
+
+    final busyState = _stateWith(
+      cash: 1000,
+      landing: _progress(commissioned: true),
+    );
+    await _pumpMineSite(
+      tester,
+      view: _siteView(busyState, isBusy: true),
+      dock: _dockView(busyState, isBusy: true),
+      onBuildRig: built.add,
+    );
+    final pill = find.byKey(const Key('fleet-dock-build'));
+    expect(pill, findsOneWidget);
+    expect(find.bySemanticsLabel('Finishing previous action…'), findsWidgets);
+    await tester.tap(pill, warnIfMissed: false);
+    await tester.pump();
+    expect(built, isEmpty);
+  });
+
+  testWidgets('BUILD stays reachable inside the landscape right rail', (
+    tester,
+  ) async {
+    final built = <RigTier>[];
+    final state = _stateWith(cash: 200, landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(874, 402),
+      view: _siteView(state),
+      dock: _dockView(state),
+      onBuildRig: built.add,
+    );
+
+    final pill = find.byKey(const Key('fleet-dock-build'));
+    expect(pill, findsOneWidget);
+    expect(
+      tester
+          .getRect(find.byKey(const Key('mine-site-right-rail')))
+          .contains(tester.getRect(pill).center),
+      isTrue,
+    );
+    await tester.tap(pill);
+    await tester.pump();
+    expect(built, [RigTier.t4]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('BUILD and the dock hint fit every supported size', (
+    tester,
+  ) async {
+    final state = _stateWith(cash: 200, landing: _progress(commissioned: true));
+    for (final size in const [
+      Size(360, 640),
+      Size(390, 844),
+      Size(430, 932),
+      Size(874, 402),
+    ]) {
+      await _pumpMineSite(
+        tester,
+        size: size,
+        view: _siteView(state, selectedBayId: DockBayId.b1),
+        dock: _dockView(state, selectedBayId: DockBayId.b1),
+      );
+      expect(tester.takeException(), isNull, reason: '$size');
+      expect(find.byKey(const Key('fleet-dock-build')), findsOneWidget);
+      expect(find.byKey(const Key('fleet-dock-spawn')), findsOneWidget);
+    }
+  });
+
+  testWidgets('keeps the selected-dock hint legible at 360 px', (tester) async {
+    final state = _stateWith(cash: 200, landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(360, 640),
+      view: _siteView(state, selectedBayId: DockBayId.b1),
+      dock: _dockView(state, selectedBayId: DockBayId.b1),
+    );
+
+    final hint = find.byKey(const Key('fleet-dock-hint'));
+    expect(
+      tester.widget<Text>(hint).data,
+      'CELL: DEPLOY · RIG: UPGRADE · BAY: MERGE',
+    );
+    // The FittedBox shrink factor must stay near 1: below ~6 px of rendered
+    // height the merged deploy/upgrade/merge copy would be illegible.
+    expect(
+      tester.getSize(hint).height,
+      greaterThanOrEqualTo(6),
+      reason: 'scaled height ${tester.getSize(hint).height}',
+    );
   });
 }

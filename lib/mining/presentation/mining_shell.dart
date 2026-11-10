@@ -419,10 +419,12 @@ class _MiningShellState extends State<MiningShell>
     );
   }
 
-  void _spawnRig() {
+  void _spawnRig() => _spawnRigTier(RigTier.t1);
+
+  void _spawnRigTier(RigTier tier) {
     _runSheetAction(
-      _controller.spawnRig,
-      successMessage: 'T1 rig spawned.',
+      () => _controller.spawnRig(tier: tier),
+      successMessage: '${tier.name.toUpperCase()} rig spawned.',
       sound: GameSound.rig,
       onSuccess: (result) => _selectedBayId = result.dockBayId,
     );
@@ -525,6 +527,14 @@ class _MiningShellState extends State<MiningShell>
           () => _controller.recallRig(siteId, cell),
           successMessage: 'Rig recalled.',
           sound: GameSound.rig,
+        );
+        break;
+      case MineSiteGridTapAction.upgrade:
+        final bay = _selectedBayId!;
+        _runSheetAction(
+          () => _controller.upgradePlacedRig(bay, siteId, cell),
+          successMessage: 'Rig upgraded.',
+          sound: GameSound.merge,
         );
         break;
       case MineSiteGridTapAction.blocked:
@@ -894,6 +904,7 @@ class _MiningShellState extends State<MiningShell>
           onGridCellTap: _handleSiteGridCellTap,
           onBayTap: _handleDockBayTap,
           onSpawnRig: _spawnRig,
+          onBuildRig: _spawnRigTier,
           onSellCargo: _sellCargo,
           onBack: _leaveSite,
           onSettings: openSettings,

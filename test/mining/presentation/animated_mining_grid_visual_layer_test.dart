@@ -228,6 +228,8 @@ MineSiteRigView _rig(
   target: target,
   canRecall: true,
   disabledReason: null,
+  canUpgradeWithSelection: false,
+  upgradeFailure: null,
 );
 
 MiningGridCell _firstAdjacentCell(MiningDepositDefinition deposit) =>
