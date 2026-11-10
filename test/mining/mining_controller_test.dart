@@ -451,6 +451,188 @@ void main() {
       expect(result.dockBayId, isNull);
     });
 
+    group('explicit-tier spawn', () {
+      test(
+        'prices every tier at 2^index times the Homeworld spawn cost',
+        () async {
+          const prices = {
+            RigTier.t1: 25,
+            RigTier.t2: 50,
+            RigTier.t3: 100,
+            RigTier.t4: 200,
+            RigTier.t5: 400,
+          };
+          for (final tier in RigTier.values) {
+            final controller = await controllerOver(
+              MiningSaveRepository(),
+              seed: seededSave(clock.now, cash: prices[tier]!),
+            );
+
+            final result = await controller.spawnRig(tier: tier);
+
+            expect(result.isSuccess, isTrue, reason: tier.name);
+            expect(result.dockBayId, DockBayId.b3, reason: tier.name);
+            expect(controller.state.cash, 0, reason: tier.name);
+            expect(controller.state.docks[MiningPlanetId.homeworld], {
+              DockBayId.b1: RigTier.t1,
+              DockBayId.b2: RigTier.t1,
+              DockBayId.b3: tier,
+              DockBayId.b4: null,
+            });
+          }
+        },
+      );
+
+      test(
+        'places the requested tier in the first free bay with one save',
+        () async {
+          final repository = CountingMiningSaveRepository();
+          final controller = await controllerOver(
+            repository,
+            seed: seededSave(
+              clock.now,
+              cash: 500,
+              docks: docksFor(
+                homeworld: dock(b1: RigTier.t1, b3: RigTier.t2),
+              ),
+            ),
+          );
+          final savesBefore = repository.saveCount;
+
+          final result = await controller.spawnRig(tier: RigTier.t5);
+
+          expect(result.isSuccess, isTrue);
+          expect(result.dockBayId, DockBayId.b2);
+          expect(controller.state.cash, 100);
+          expect(controller.state.docks[MiningPlanetId.homeworld], {
+            DockBayId.b1: RigTier.t1,
+            DockBayId.b2: RigTier.t5,
+            DockBayId.b3: RigTier.t2,
+            DockBayId.b4: null,
+          });
+          expect(repository.saveCount, savesBefore + 1);
+
+          final reloaded = MiningController(
+            content: _content,
+            repository: MiningSaveRepository(),
+            nowUtc: clock.call,
+          );
+          await reloaded.initialize();
+          expect(reloaded.state.cash, 100);
+          expect(
+            reloaded.state.docks[MiningPlanetId.homeworld]![DockBayId.b2],
+            RigTier.t5,
+          );
+        },
+      );
+
+      test(
+        'charges the active planet spawn cost for the requested tier',
+        () async {
+          for (final planet in MiningPlanetId.values) {
+            final cost = _content.rigCost(planet, RigTier.t5);
+            final controller = await controllerOver(
+              MiningSaveRepository(),
+              seed: seededSave(
+                clock.now,
+                cash: cost,
+                unlockedPlanets: MiningPlanetId.values.toSet(),
+                activePlanet: planet,
+                sites: sitesFor(
+                  landing: site(unlocked: true),
+                  frozen: site(unlocked: true),
+                  ochre: site(unlocked: true),
+                  nickel: site(unlocked: true),
+                  sulfur: site(unlocked: true),
+                ),
+              ),
+            );
+
+            final result = await controller.spawnRig(tier: RigTier.t5);
+
+            expect(result.isSuccess, isTrue, reason: planet.name);
+            expect(controller.state.cash, 0, reason: planet.name);
+            expect(
+              controller.state.docks[planet]![result.dockBayId!],
+              RigTier.t5,
+              reason: planet.name,
+            );
+          }
+        },
+      );
+
+      test('rejects a full dock and insufficient cash without substituting a '
+          'cheaper tier', () async {
+        final full = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(
+            clock.now,
+            cash: 1000,
+            docks: docksFor(
+              homeworld: dock(
+                b1: RigTier.t1,
+                b2: RigTier.t2,
+                b3: RigTier.t3,
+                b4: RigTier.t4,
+              ),
+            ),
+          ),
+        );
+
+        final fullDock = await full.spawnRig(tier: RigTier.t2);
+        expect(fullDock.isSuccess, isFalse);
+        expect(fullDock.message, 'Dock is full.');
+        expect(fullDock.dockBayId, isNull);
+
+        final poor = await controllerOver(
+          MiningSaveRepository(),
+          seed: seededSave(clock.now, cash: 399),
+        );
+        final before = poor.state.toJson();
+
+        final denied = await poor.spawnRig(tier: RigTier.t5);
+        expect(denied.isSuccess, isFalse);
+        expect(denied.message, 'Not enough cash.');
+        expect(denied.dockBayId, isNull);
+        expect(poor.state.toJson(), before);
+      });
+
+      test('a queued explicit tier never floats with income', () async {
+        final repository = DelayedMiningSaveRepository();
+        final controller = await controllerOver(
+          repository,
+          seed: seededSave(
+            clock.now,
+            cash: 100,
+            docks: docksFor(homeworld: dock()),
+            sites: sitesFor(
+              landing: site(
+                unlocked: true,
+                commissioned: true,
+                storedAmount: 50,
+                rigs: placements(n1: RigTier.t1),
+              ),
+            ),
+          ),
+        );
+
+        final sale = controller.sellAllCargo();
+        await repository.saveStarted.future;
+        final spawn = controller.spawnRig(tier: RigTier.t3);
+        repository.allowFirstSave.complete();
+
+        expect((await sale).isSuccess, isTrue);
+        final result = await spawn;
+        expect(result.isSuccess, isTrue);
+        expect(result.dockBayId, DockBayId.b1);
+        expect(controller.state.cash, 200);
+        expect(
+          controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b1],
+          RigTier.t3,
+        );
+      });
+    });
+
     test(
       'merge moves the next tier to the target and empties the source',
       () async {

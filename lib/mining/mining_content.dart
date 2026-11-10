@@ -735,6 +735,9 @@ class MiningContentRegistry {
   double cargoValue(MiningSiteId site, double amount, int relaunchCount) =>
       amount * this.site(site).saleValuePerUnit * saleMultiplier(relaunchCount);
 
+  int rigCost(MiningPlanetId id, RigTier tier) =>
+      planet(id).rigSpawnCost * (1 << tier.index);
+
   double rigRateMultiplier(RigTier tier) => rateMultipliers[tier.index];
 
   double rigCapacityMultiplier(RigTier tier) => capacityMultipliers[tier.index];

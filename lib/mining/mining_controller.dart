@@ -177,39 +177,40 @@ class MiningController {
     },
   );
 
-  Future<MiningActionResult> spawnRig() => _enqueueMutation(() async {
-    final candidate = simulation.accrue(_state, _nowUtc().toUtc());
-    final planetId = candidate.state.activePlanetId;
-    final planetDocks = candidate.state.docks[planetId]!;
-    DockBayId? emptyBay;
-    for (final bayId in DockBayId.values) {
-      if (planetDocks[bayId] == null) {
-        emptyBay = bayId;
-        break;
-      }
-    }
-    if (emptyBay == null) {
-      return const MiningActionResult.failure('Dock is full.');
-    }
+  Future<MiningActionResult> spawnRig({RigTier tier = RigTier.t1}) =>
+      _enqueueMutation(() async {
+        final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+        final planetId = candidate.state.activePlanetId;
+        final planetDocks = candidate.state.docks[planetId]!;
+        DockBayId? emptyBay;
+        for (final bayId in DockBayId.values) {
+          if (planetDocks[bayId] == null) {
+            emptyBay = bayId;
+            break;
+          }
+        }
+        if (emptyBay == null) {
+          return const MiningActionResult.failure('Dock is full.');
+        }
 
-    final cost = content.planet(planetId).rigSpawnCost;
-    if (candidate.state.cash < cost) {
-      return const MiningActionResult.failure('Not enough cash.');
-    }
+        final cost = content.rigCost(planetId, tier);
+        if (candidate.state.cash < cost) {
+          return const MiningActionResult.failure('Not enough cash.');
+        }
 
-    final docks = <MiningPlanetId, Map<DockBayId, RigTier?>>{
-      for (final entry in candidate.state.docks.entries)
-        entry.key: <DockBayId, RigTier?>{...entry.value},
-    };
-    docks[planetId]![emptyBay] = RigTier.t1;
-    final next = candidate.state.copyWith(
-      cash: candidate.state.cash - cost,
-      docks: docks,
-    );
-    await repository.save(next);
-    _state = next;
-    return MiningActionResult.success(dockBayId: emptyBay);
-  });
+        final docks = <MiningPlanetId, Map<DockBayId, RigTier?>>{
+          for (final entry in candidate.state.docks.entries)
+            entry.key: <DockBayId, RigTier?>{...entry.value},
+        };
+        docks[planetId]![emptyBay] = tier;
+        final next = candidate.state.copyWith(
+          cash: candidate.state.cash - cost,
+          docks: docks,
+        );
+        await repository.save(next);
+        _state = next;
+        return MiningActionResult.success(dockBayId: emptyBay);
+      });
 
   Future<MiningActionResult> mergeDockRigs(
     DockBayId sourceBay,

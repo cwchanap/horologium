@@ -173,21 +173,11 @@ class JourneyPlayer {
     return null;
   }
 
-  /// Builds a rig of [tier] in the active planet's dock from T1 spawns.
+  /// Buys a rig of [tier] into the active planet's first free dock bay.
   Future<DockBayId> _build(RigTier tier) async {
-    if (tier == RigTier.t1) {
-      final spawn = await controller.spawnRig();
-      expect(spawn.isSuccess, isTrue, reason: 'spawn: ${spawn.message}');
-      return spawn.dockBayId!;
-    }
-    final lower = RigTier.values[tier.index - 1];
-    final source = await _build(lower);
-    final target = await _build(lower);
-    await expectAction(
-      'merge to ${tier.name}',
-      controller.mergeDockRigs(source, target),
-    );
-    return target;
+    final spawn = await controller.spawnRig(tier: tier);
+    expect(spawn.isSuccess, isTrue, reason: 'spawn: ${spawn.message}');
+    return spawn.dockBayId!;
   }
 
   List<_Investment> _investments() {
@@ -197,7 +187,6 @@ class JourneyPlayer {
       final planet = content.planets.values
           .firstWhere((planet) => planet.sites.contains(site))
           .id;
-      final spawnCost = content.planet(planet).rigSpawnCost;
       final rigs = _rigs(site.id);
       final others = current - _siteIncome(site.id, rigs, state.technology);
       final cell = rigs.length < MiningContentRegistry.maxDeployedRigsPerSite
@@ -206,7 +195,7 @@ class JourneyPlayer {
       if (cell != null) {
         options.add((
           label: '${site.name} +T1',
-          cost: spawnCost,
+          cost: content.rigCost(planet, RigTier.t1),
           gain:
               others +
               _siteIncome(site.id, [...rigs, RigTier.t1], state.technology) -
@@ -223,11 +212,11 @@ class JourneyPlayer {
         continue;
       }
       // A full site upgrades its lowest rig in place with a matching dock rig.
-      // Building a T4 already needs every dock bay, so upgrades stop there.
+      // T5 rigs cannot merge further, so upgrades stop there.
       final placement = state.sites[site.id]!.rigPlacements.reduce(
         (a, b) => a.tier.index <= b.tier.index ? a : b,
       );
-      if (placement.tier.index >= RigTier.t4.index) continue;
+      if (placement.tier.index >= RigTier.t5.index) continue;
       final upgraded = [
         for (final rig in state.sites[site.id]!.rigPlacements)
           rig == placement ? RigTier.values[rig.tier.index + 1] : rig.tier,
@@ -236,7 +225,7 @@ class JourneyPlayer {
         label:
             '${site.name} ${placement.tier.name}->'
             '${RigTier.values[placement.tier.index + 1].name}',
-        cost: spawnCost * (1 << placement.tier.index),
+        cost: content.rigCost(planet, placement.tier),
         gain:
             others + _siteIncome(site.id, upgraded, state.technology) - current,
         buy: () async {
