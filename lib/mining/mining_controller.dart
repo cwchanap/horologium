@@ -231,11 +231,9 @@ class MiningController {
     if (targetTier == null) {
       return const MiningActionResult.failure('Target dock bay is empty.');
     }
-    if (sourceTier != targetTier) {
-      return const MiningActionResult.failure('Rigs must be the same tier.');
-    }
-    if (sourceTier == RigTier.t5) {
-      return const MiningActionResult.failure('T5 rigs cannot merge.');
+    final mergeFailure = rigMergeFailure(sourceTier, targetTier);
+    if (mergeFailure != null) {
+      return MiningActionResult.failure(mergeFailure);
     }
 
     final docks = <MiningPlanetId, Map<DockBayId, RigTier?>>{
@@ -405,6 +403,61 @@ class MiningController {
       rigPlacements: [
         for (var i = 0; i < progress.rigPlacements.length; i++)
           if (i != placementIndex) progress.rigPlacements[i],
+      ],
+    );
+    final next = candidate.state.copyWith(docks: docks, sites: sites);
+    await repository.save(next);
+    _state = next;
+    return const MiningActionResult.success();
+  });
+
+  Future<MiningActionResult> upgradePlacedRig(
+    DockBayId sourceBay,
+    MiningSiteId siteId,
+    MiningGridCell cell,
+  ) => _enqueueMutation(() async {
+    final candidate = simulation.accrue(_state, _nowUtc().toUtc());
+    final activePlanetFailure = _activePlanetSiteFailure(
+      siteId,
+      candidate.state,
+    );
+    if (activePlanetFailure != null) return activePlanetFailure;
+
+    final planetId = candidate.state.activePlanetId;
+    final planetDocks = candidate.state.docks[planetId]!;
+    final sourceTier = planetDocks[sourceBay];
+    if (sourceTier == null) {
+      return const MiningActionResult.failure('Dock bay is empty.');
+    }
+    final progress = candidate.state.sites[siteId]!;
+    final placementIndex = progress.rigPlacements.indexWhere(
+      (placement) => placement.cell == cell,
+    );
+    if (placementIndex < 0) {
+      return const MiningActionResult.failure('Grid cell is empty.');
+    }
+    final placedTier = progress.rigPlacements[placementIndex].tier;
+    final mergeFailure = rigMergeFailure(sourceTier, placedTier);
+    if (mergeFailure != null) {
+      return MiningActionResult.failure(mergeFailure);
+    }
+
+    final docks = <MiningPlanetId, Map<DockBayId, RigTier?>>{
+      for (final entry in candidate.state.docks.entries)
+        entry.key: <DockBayId, RigTier?>{...entry.value},
+    };
+    docks[planetId]![sourceBay] = null;
+    final sites = <MiningSiteId, SiteProgress>{...candidate.state.sites};
+    sites[siteId] = progress.copyWith(
+      rigPlacements: [
+        for (var i = 0; i < progress.rigPlacements.length; i++)
+          if (i == placementIndex)
+            MiningRigPlacement(
+              tier: RigTier.values[placedTier.index + 1],
+              cell: cell,
+            )
+          else
+            progress.rigPlacements[i],
       ],
     );
     final next = candidate.state.copyWith(docks: docks, sites: sites);

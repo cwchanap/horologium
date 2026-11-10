@@ -32,6 +32,12 @@ enum DockBayId { b1, b2, b3, b4 }
 
 enum RigTier { t1, t2, t3, t4, t5 }
 
+String? rigMergeFailure(RigTier source, RigTier target) {
+  if (source != target) return 'Rigs must be the same tier.';
+  if (source == RigTier.t5) return 'T5 rigs cannot merge.';
+  return null;
+}
+
 enum TechnologyTrack { extraction, logistics, surveying }
 
 class MiningSiteDefinition {

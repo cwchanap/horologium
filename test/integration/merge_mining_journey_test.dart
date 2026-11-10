@@ -190,10 +190,6 @@ class JourneyPlayer {
     return target;
   }
 
-  DockBayId _firstEmptyBay() => DockBayId.values.firstWhere(
-    (bay) => state.docks[state.activePlanetId]![bay] == null,
-  );
-
   List<_Investment> _investments() {
     final current = incomePerVisit();
     final options = <_Investment>[];
@@ -226,7 +222,7 @@ class JourneyPlayer {
         ));
         continue;
       }
-      // A full site upgrades its lowest rig by merging in a matching one.
+      // A full site upgrades its lowest rig in place with a matching dock rig.
       // Building a T4 already needs every dock bay, so upgrades stop there.
       final placement = state.sites[site.id]!.rigPlacements.reduce(
         (a, b) => a.tier.index <= b.tier.index ? a : b,
@@ -245,19 +241,10 @@ class JourneyPlayer {
             others + _siteIncome(site.id, upgraded, state.technology) - current,
         buy: () async {
           await travel(planet);
-          final recalledBay = _firstEmptyBay();
-          await expectAction(
-            'recall from ${site.name}',
-            controller.recallRig(site.id, placement.cell),
-          );
           final built = await _build(placement.tier);
           await expectAction(
-            'merge recalled rig',
-            controller.mergeDockRigs(recalledBay, built),
-          );
-          await expectAction(
-            'redeploy to ${site.name}',
-            controller.deployRig(built, site.id, placement.cell),
+            'upgrade ${site.name} rig',
+            controller.upgradePlacedRig(built, site.id, placement.cell),
           );
         },
       ));
