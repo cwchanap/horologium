@@ -156,7 +156,7 @@ class SiteMetrics {
 class MiningSaleAffordance {
   const MiningSaleAffordance._({
     required this.canSell,
-    required this.hasUnsellableCargo,
+    required this.projectedValue,
     required this.label,
   });
 
@@ -165,24 +165,21 @@ class MiningSaleAffordance {
     required double cargo,
     required int projectedValue,
   }) {
-    final canSell = !isBusy && projectedValue > 0;
-    final hasUnsellableCargo = !isBusy && cargo > 0 && projectedValue == 0;
+    final canSell = !isBusy && cargo > 0;
     final label = isBusy
         ? 'Finishing previous action…'
         : canSell
         ? 'Sell all cargo for ${formatMiningCash(projectedValue)} cash.'
-        : hasUnsellableCargo
-        ? 'Keep mining until cargo is worth at least 1 cash.'
         : 'No cargo to sell.';
     return MiningSaleAffordance._(
       canSell: canSell,
-      hasUnsellableCargo: hasUnsellableCargo,
+      projectedValue: projectedValue,
       label: label,
     );
   }
 
   final bool canSell;
-  final bool hasUnsellableCargo;
+  final int projectedValue;
   final String label;
 }
 
@@ -200,6 +197,7 @@ class SiteDeckView {
     required this.totalCapacity,
     required this.totalRate,
     required this.projectedValue,
+    required this.sale,
     required this.isBusy,
   });
 
@@ -214,6 +212,7 @@ class SiteDeckView {
   final double totalCapacity;
   final double totalRate;
   final int projectedValue;
+  final MiningSaleAffordance sale;
   final bool isBusy;
 
   MiningPlanetId get planetId => activePlanetId;
@@ -223,12 +222,6 @@ class SiteDeckView {
   double get capacity => totalCapacity;
   double get rate => totalRate;
   int get projectedSale => projectedValue;
-
-  MiningSaleAffordance get sale => MiningSaleAffordance.from(
-    isBusy: isBusy,
-    cargo: totalCargo,
-    projectedValue: projectedValue,
-  );
 
   MiningSiteCardView card(MiningSiteId id) => cards[id]!;
 
@@ -299,6 +292,11 @@ class SiteDeckView {
       totalCapacity: totalCapacity,
       totalRate: totalRate,
       projectedValue: state.saleValue(content, state.activePlanetId),
+      sale: MiningSaleAffordance.from(
+        isBusy: isBusy,
+        cargo: state.storedCargoAcrossUnlockedPlanets(content),
+        projectedValue: state.saleValueAcrossUnlockedPlanets(content),
+      ),
       isBusy: isBusy,
     );
   }

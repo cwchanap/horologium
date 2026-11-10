@@ -105,6 +105,7 @@ void main() {
     expect(view.capacity, 3600);
     expect(view.cargo, 10);
     expect(view.projectedSale, 40);
+    expect(view.sale.projectedValue, 40);
     expect(view.canSell, isTrue);
   });
 
@@ -123,7 +124,7 @@ void main() {
     expect(view.canSell, isTrue);
   });
 
-  test('keeps sub-1-cash cargo unsellable while cargo is present', () {
+  test('sells sub-1-cash cargo for a +0 sale', () {
     // 0.1 Gold at Landing Basin (4 cash/unit) = 0.4 gross, which floors to 0.
     final view = viewFor(
       stateWith(landing: progress(commissioned: true, storedAmount: 0.1)),
@@ -131,8 +132,28 @@ void main() {
 
     expect(view.activePlanetCargo, 0.1);
     expect(view.activePlanetProjectedSale, 0);
-    expect(view.canSell, isFalse);
-    expect(view.hasUnsellableCargo, isTrue);
+    expect(view.canSell, isTrue);
+    expect(view.sale.projectedValue, 0);
+    expect(view.sale.label, 'Sell all cargo for 0 cash.');
+  });
+
+  test('enables the sale when only an inactive unlocked planet has cargo', () {
+    final view = viewFor(
+      stateWith(
+        frozen: progress(unlocked: true, commissioned: true, storedAmount: 20),
+      ).copyWith(
+        unlockedPlanetIds: {
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+        },
+      ),
+    );
+
+    expect(view.activePlanetCargo, 0);
+    expect(view.activePlanetProjectedSale, 0);
+    expect(view.canSell, isTrue);
+    expect(view.sale.projectedValue, 120);
+    expect(view.sale.label, 'Sell all cargo for 120 cash.');
   });
 
   test('does not expose sale while the shell is busy', () {

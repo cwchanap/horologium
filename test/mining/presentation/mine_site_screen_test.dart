@@ -9,6 +9,7 @@ import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_grid_map.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
+import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
@@ -61,6 +62,32 @@ MiningSave _stateWithTwoSites({
         unlocked: true,
         commissioned: true,
         storedAmount: carbonCargo,
+      ),
+    },
+  );
+}
+
+MiningSave _stateWithLunarCargo({
+  required double landingCargo,
+  required double lunarCargo,
+}) {
+  final initial = MiningSave.initial(nowUtc: _start);
+  return initial.copyWith(
+    unlockedPlanetIds: const {
+      MiningPlanetId.homeworld,
+      MiningPlanetId.lunarFrontier,
+    },
+    sites: {
+      ...initial.sites,
+      MiningSiteId.landingBasin: _progress(
+        unlocked: true,
+        commissioned: true,
+        storedAmount: landingCargo,
+      ),
+      MiningSiteId.frozenBasin: _progress(
+        unlocked: true,
+        commissioned: true,
+        storedAmount: lunarCargo,
       ),
     },
   );
@@ -653,7 +680,7 @@ void main() {
     );
   });
 
-  testWidgets('shows a large active-planet sale with separators', (
+  testWidgets('shows a large all-unlocked-planet sale with separators', (
     tester,
   ) async {
     final state = _stateWithTwoSites(landingCargo: 0, carbonCargo: 5000);
@@ -667,28 +694,58 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('binds sale control to active-planet aggregate cargo and value', (
-    tester,
-  ) async {
-    final state = _stateWithTwoSites(landingCargo: 0, carbonCargo: 10);
-    await _pumpMineSite(tester, view: _siteView(state), dock: _dockView(state));
+  testWidgets(
+    'binds sale control to all-unlocked cargo while the gauge stays local',
+    (tester) async {
+      final sell = find.byKey(const Key('mine-site-sell'));
 
-    expect(
-      find.bySemanticsLabel(RegExp(r'Sell all cargo for 30 cash')),
-      findsOneWidget,
-    );
-    expect(find.text('+30'), findsOneWidget);
-    expect(
-      tester
-          .widget<OutlinedButton>(find.byKey(const Key('mine-site-sell')))
-          .onPressed,
-      isNotNull,
-    );
-  });
+      await _pumpMineSite(
+        tester,
+        view: _siteView(_stateWithLunarCargo(landingCargo: 10, lunarCargo: 20)),
+        dock: _dockView(_stateWithLunarCargo(landingCargo: 10, lunarCargo: 20)),
+      );
 
-  testWidgets('keeps sub-1-cash cargo unsellable with keep-mining feedback', (
-    tester,
-  ) async {
+      expect(
+        find.bySemanticsLabel(RegExp(r'Sell all cargo for 160 cash')),
+        findsOneWidget,
+      );
+      expect(find.text('+160'), findsOneWidget);
+      expect(tester.widget<OutlinedButton>(sell).onPressed, isNotNull);
+      expect(
+        tester
+            .widget<MiningCargoGauge>(
+              find.byKey(const Key('mining-cargo-gauge')),
+            )
+            .projectedValue,
+        40,
+        reason: 'the cargo gauge keeps the active-planet projection',
+      );
+
+      await _pumpMineSite(
+        tester,
+        view: _siteView(_stateWithLunarCargo(landingCargo: 0, lunarCargo: 20)),
+        dock: _dockView(_stateWithLunarCargo(landingCargo: 0, lunarCargo: 20)),
+      );
+
+      expect(
+        find.bySemanticsLabel(RegExp(r'Sell all cargo for 120 cash')),
+        findsOneWidget,
+      );
+      expect(find.text('+120'), findsOneWidget);
+      expect(tester.widget<OutlinedButton>(sell).onPressed, isNotNull);
+      expect(
+        tester
+            .widget<MiningCargoGauge>(
+              find.byKey(const Key('mining-cargo-gauge')),
+            )
+            .projectedValue,
+        0,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('sells sub-1-cash cargo for a +0 sale', (tester) async {
     // 0.1 Gold at Landing Basin (4 cash/unit) = 0.4 gross, which floors to 0.
     final state = _stateWith(
       landing: _progress(commissioned: true, storedAmount: 0.1),
@@ -696,16 +753,15 @@ void main() {
     await _pumpMineSite(tester, view: _siteView(state), dock: _dockView(state));
 
     expect(
-      find.bySemanticsLabel(
-        RegExp(r'Keep mining until cargo is worth at least 1 cash'),
-      ),
+      find.bySemanticsLabel(RegExp(r'Sell all cargo for 0 cash')),
       findsOneWidget,
     );
+    expect(find.text('+0'), findsOneWidget);
     expect(
       tester
           .widget<OutlinedButton>(find.byKey(const Key('mine-site-sell')))
           .onPressed,
-      isNull,
+      isNotNull,
     );
   });
 

@@ -1399,6 +1399,56 @@ void main() {
     expect(effects.playedAssets, ['audio/tap.wav', 'audio/sale.wav']);
   });
 
+  testWidgets('Site Deck sells cargo across every unlocked planet', (
+    tester,
+  ) async {
+    final repository = CountingMiningSaveRepository();
+    final seeded = multiProducerState(_start);
+    await repository.save(
+      seeded.copyWith(
+        sites: {
+          ...seeded.sites,
+          MiningSiteId.landingBasin: seeded.sites[MiningSiteId.landingBasin]!
+              .copyWith(storedAmount: 10),
+        },
+      ),
+    );
+    final effects = FakeBackgroundMusicPlayer();
+    final audio = AudioManager(
+      backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+      soundEffectPlayer: effects,
+    );
+    addTearDown(audio.dispose);
+    await pumpShell(tester, repository: repository, audioManager: audio);
+
+    final sell = find.byKey(const Key('site-deck-sell'));
+    expect(sell, findsOneWidget);
+    expect(tester.widget<OutlinedButton>(sell).onPressed, isNotNull);
+    expect(
+      find.bySemanticsLabel('Sell all cargo for 3,640 cash.'),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<MiningCargoGauge>(find.byKey(const Key('mining-cargo-gauge')))
+          .projectedValue,
+      40,
+    );
+
+    await tester.tap(sell);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final state = shellHandles(tester).controller.state;
+    expect(state.cash, 3640);
+    expect(state.sites[MiningSiteId.landingBasin]!.storedAmount, 0);
+    expect(state.sites[MiningSiteId.frozenBasin]!.storedAmount, 0);
+    expect(find.text('Sold 3,640 cash.'), findsOneWidget);
+    expect(
+      effects.playedAssets.where((path) => path == 'audio/sale.wav'),
+      hasLength(1),
+    );
+  });
+
   testWidgets('a busy Site Deck sell ignores a second tap and sells once', (
     tester,
   ) async {
@@ -2241,6 +2291,84 @@ void main() {
     expect(find.byKey(const Key('offline-return-sheet')), findsOneWidget);
     expect(find.textContaining('Gold'), findsWidgets);
   });
+
+  testWidgets(
+    'Offline Return SELL ALL dismisses the sheet and sells every unlocked '
+    'planet once',
+    (tester) async {
+      final clock = TestClock(_start.add(const Duration(minutes: 5)));
+      final repository = CountingMiningSaveRepository();
+      await repository.save(multiProducerState(_start));
+      final effects = FakeBackgroundMusicPlayer();
+      final audio = AudioManager(
+        backgroundMusicPlayer: FakeBackgroundMusicPlayer(),
+        soundEffectPlayer: effects,
+      );
+      addTearDown(audio.dispose);
+      await pumpShell(
+        tester,
+        repository: repository,
+        clock: clock,
+        audioManager: audio,
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(const Key('offline-return-sheet')), findsOneWidget);
+      expect(find.text('SELL ALL · +6,000'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('offline-return-sell-all')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
+      final state = shellHandles(tester).controller.state;
+      expect(state.cash, 6000);
+      expect(state.sites[MiningSiteId.landingBasin]!.storedAmount, 0);
+      expect(state.sites[MiningSiteId.frozenBasin]!.storedAmount, 0);
+      expect(find.text('Sold 6,000 cash.'), findsOneWidget);
+      expect(
+        effects.playedAssets.where((path) => path == 'audio/sale.wav'),
+        hasLength(1),
+      );
+    },
+  );
+
+  testWidgets(
+    'Offline Return SELL ALL during a checkpoint reports busy and sells '
+    'nothing',
+    (tester) async {
+      final clock = TestClock(_start.add(const Duration(minutes: 5)));
+      final repository = DelayedMiningSaveRepository();
+      await repository.save(deployedLandingState(_start, cargo: 10));
+      await pumpShell(tester, repository: repository, clock: clock);
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(const Key('offline-return-sheet')), findsOneWidget);
+      expect(find.text('SELL ALL · +640'), findsOneWidget);
+
+      repository.delayNextSave = true;
+      unawaited(shellHandles(tester).controller.checkpoint());
+      await repository.saveStarted.future;
+      await tester.pump();
+      expect(shellHandles(tester).controller.isBusy, isTrue);
+
+      await tester.tap(find.byKey(const Key('offline-return-sell-all')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
+      expect(find.text('Finishing previous action…'), findsOneWidget);
+      expect(find.text('Sold 640 cash.'), findsNothing);
+
+      repository.allowSave.complete();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final state = shellHandles(tester).controller.state;
+      expect(state.cash, 100);
+      expect(state.sites[MiningSiteId.landingBasin]!.storedAmount, 160);
+      expect(find.text('Sold 640 cash.'), findsNothing);
+    },
+  );
 
   testWidgets('lifecycle resume does not replay passive impacts', (
     tester,

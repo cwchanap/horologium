@@ -14,11 +14,13 @@ class OfflineReturnSheet extends StatelessWidget {
     required this.summary,
     required this.content,
     required this.state,
+    required this.onSellCargo,
   });
 
   final OfflineProductionSummary summary;
   final MiningContentRegistry content;
   final MiningSave state;
+  final VoidCallback onSellCargo;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -261,53 +263,75 @@ class OfflineReturnSheet extends StatelessWidget {
     ],
   );
 
-  Widget _continueAction(BuildContext context) => Row(
-    children: [
-      Expanded(
-        child: SizedBox(
-          height: MediaQuery.orientationOf(context) == Orientation.landscape
-              ? 52
-              : 56,
-          child: OutlinedButton(
-            key: const Key('offline-return-dismiss'),
-            onPressed: () => Navigator.of(context).pop(),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: MiningTheme.highlight,
-              backgroundColor: MiningTheme.highlight.withAlpha(36),
-              side: const BorderSide(color: MiningTheme.highlight, width: 1.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+  Widget _continueAction(BuildContext context) {
+    final saleValue = state.saleValueAcrossUnlockedPlanets(content);
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: MediaQuery.orientationOf(context) == Orientation.landscape
+                ? 52
+                : 56,
+            child: Semantics(
+              container: true,
+              excludeSemantics: true,
+              button: true,
+              label: 'Sell all cargo for ${formatMiningCash(saleValue)} cash.',
+              child: OutlinedButton(
+                key: const Key('offline-return-sell-all'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  onSellCargo();
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: MiningTheme.highlight,
+                  backgroundColor: MiningTheme.highlight.withAlpha(36),
+                  side: const BorderSide(
+                    color: MiningTheme.highlight,
+                    width: 1.5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'SELL ALL · +${formatMiningCash(saleValue)}',
+                    maxLines: 1,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               ),
             ),
-            child: const Text(
-              'CONTINUE MINING',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: MediaQuery.orientationOf(context) == Orientation.landscape
+              ? 52
+              : 56,
+          height: MediaQuery.orientationOf(context) == Orientation.landscape
+              ? 58
+              : 62,
+          child: MiningHex(
+            fill: MiningTheme.highlight,
+            border: MiningTheme.highlight,
+            semanticLabel: 'Continue mining',
+            onTap: () => Navigator.of(context).pop(),
+            child: const Icon(
+              Icons.play_arrow,
+              size: 28,
+              color: Color(0xFF04121A),
             ),
           ),
         ),
-      ),
-      const SizedBox(width: 10),
-      SizedBox(
-        width: MediaQuery.orientationOf(context) == Orientation.landscape
-            ? 52
-            : 56,
-        height: MediaQuery.orientationOf(context) == Orientation.landscape
-            ? 58
-            : 62,
-        child: MiningHex(
-          fill: MiningTheme.highlight,
-          border: MiningTheme.highlight,
-          semanticLabel: 'Continue mining',
-          onTap: () => Navigator.of(context).pop(),
-          child: const Icon(
-            Icons.play_arrow,
-            size: 28,
-            color: Color(0xFF04121A),
-          ),
-        ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 
   Widget _reports({bool framed = true}) => Column(
     children: [
@@ -421,9 +445,7 @@ class OfflineReturnSheet extends StatelessWidget {
             ),
           if (fullOnPlanet.length == planet.sites.length)
             _fullWarning(
-              id == state.activePlanetId
-                  ? 'All ${planet.sites.length} sites full · sell to resume'
-                  : 'All ${planet.sites.length} sites full · travel to sell',
+              'All ${planet.sites.length} sites full · sell to resume',
             )
           else
             for (final site in fullOnPlanet)

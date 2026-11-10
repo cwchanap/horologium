@@ -48,6 +48,7 @@ void main() {
               child: OfflineReturnSheet(
                 content: MiningContentRegistry.stellarMining(),
                 state: _state(),
+                onSellCargo: () {},
                 summary: const OfflineProductionSummary(
                   elapsedAway: Duration(hours: 30),
                   elapsedUsed: Duration(hours: 24),
@@ -69,7 +70,7 @@ void main() {
       ),
     );
     await tester.pump();
-    final button = find.byKey(const Key('offline-return-dismiss'));
+    final button = find.byKey(const Key('offline-return-sell-all'));
     expect(button.hitTestable(), findsOneWidget);
     final report = find.byKey(const Key('offline-return-planet-homeworld'));
     expect(tester.widget<Container>(report).decoration, isNull);
@@ -127,6 +128,7 @@ void main() {
             summary: summary,
             content: MiningContentRegistry.stellarMining(),
             state: _state(),
+            onSellCargo: () {},
           ),
         ),
       ),
@@ -261,6 +263,7 @@ void main() {
               summary: summary,
               content: MiningContentRegistry.stellarMining(),
               state: _state(),
+              onSellCargo: () {},
             ),
           ),
         ),
@@ -339,6 +342,7 @@ void main() {
               summary: summary,
               content: MiningContentRegistry.stellarMining(),
               state: _state(),
+              onSellCargo: () {},
             ),
           ),
         ),
@@ -400,6 +404,7 @@ void main() {
             summary: summary,
             content: content,
             state: _state(),
+            onSellCargo: () {},
           ),
         ),
       ),
@@ -428,6 +433,7 @@ void main() {
             summary: summary,
             content: MiningContentRegistry.stellarMining(),
             state: _state(),
+            onSellCargo: () {},
           ),
         ),
       ),
@@ -465,14 +471,15 @@ void main() {
               summary: summary,
               content: MiningContentRegistry.stellarMining(),
               state: _state(),
+              onSellCargo: () {},
             ),
           ),
         ),
       ),
     );
     await tester.pump();
-    final dismiss = find.byKey(const Key('offline-return-dismiss'));
-    expect(tester.getSize(dismiss).height, greaterThanOrEqualTo(48));
+    final sellAll = find.byKey(const Key('offline-return-sell-all'));
+    expect(tester.getSize(sellAll).height, greaterThanOrEqualTo(48));
     expect(MiningVisuals.offlineHero, isNotEmpty);
     expect(tester.takeException(), isNull);
   });
@@ -511,6 +518,7 @@ void main() {
               summary: summary,
               content: content,
               state: state,
+              onSellCargo: () {},
             ),
           ),
         ),
@@ -561,6 +569,7 @@ void main() {
             summary: summary,
             content: content,
             state: _state(),
+            onSellCargo: () {},
           ),
         ),
       ),
@@ -595,8 +604,8 @@ void main() {
       findsNothing,
     );
 
-    // When a non-active planet has all sites full, the prompt directs the
-    // player to travel there first because selling only empties active cargo.
+    // Selling clears cargo on every unlocked planet, so the all-full prompt
+    // reads the same whether or not the planet is active.
     const nonActiveAllFullSummary = OfflineProductionSummary(
       elapsedAway: Duration(hours: 1),
       elapsedUsed: Duration(hours: 1),
@@ -619,6 +628,7 @@ void main() {
             summary: nonActiveAllFullSummary,
             content: content,
             state: _state(), // active is homeworld
+            onSellCargo: () {},
           ),
         ),
       ),
@@ -630,7 +640,7 @@ void main() {
     expect(
       find.descendant(
         of: lunarCard,
-        matching: find.text('All 3 sites full · travel to sell'),
+        matching: find.text('All 3 sites full · sell to resume'),
       ),
       findsOneWidget,
     );
@@ -643,6 +653,160 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('SELL ALL reports the all-unlocked-planet sale total', (
+    tester,
+  ) async {
+    final content = MiningContentRegistry.stellarMining();
+    const summary = OfflineProductionSummary(
+      elapsedAway: Duration(hours: 1),
+      elapsedUsed: Duration(hours: 1),
+      produced: {ResourceType.gold: 5, ResourceType.waterIce: 20},
+      productionByPlanet: {
+        MiningPlanetId.homeworld: {ResourceType.gold: 5},
+        MiningPlanetId.lunarFrontier: {ResourceType.waterIce: 20},
+      },
+      fullSites: {},
+      wasOfflineCapped: false,
+    );
+    final state = _state(
+      unlockedPlanets: {MiningPlanetId.homeworld, MiningPlanetId.lunarFrontier},
+      sites: {
+        MiningSiteId.landingBasin: _site(stored: 105),
+        MiningSiteId.frozenBasin: _site(stored: 20),
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: OfflineReturnSheet(
+            summary: summary,
+            content: content,
+            state: state,
+            onSellCargo: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('SELL ALL · +540'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Sell all cargo for 540 cash.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('SELL ALL pops the sheet before invoking the sale once', (
+    tester,
+  ) async {
+    final content = MiningContentRegistry.stellarMining();
+    const summary = OfflineProductionSummary(
+      elapsedAway: Duration(hours: 1),
+      elapsedUsed: Duration(hours: 1),
+      produced: {ResourceType.gold: 5},
+      productionByPlanet: {
+        MiningPlanetId.homeworld: {ResourceType.gold: 5},
+      },
+      fullSites: {},
+      wasOfflineCapped: false,
+    );
+    final state = _state(
+      sites: {MiningSiteId.landingBasin: _site(stored: 105)},
+    );
+    var sales = 0;
+    var routeCurrentAtCallback = true;
+    ModalRoute<dynamic>? sheetRoute;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: OutlinedButton(
+              key: const Key('open-return'),
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                builder: (sheetContext) {
+                  sheetRoute = ModalRoute.of(sheetContext);
+                  return OfflineReturnSheet(
+                    summary: summary,
+                    content: content,
+                    state: state,
+                    onSellCargo: () {
+                      sales++;
+                      routeCurrentAtCallback = sheetRoute?.isCurrent ?? true;
+                    },
+                  );
+                },
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('open-return')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('offline-return-sheet')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('offline-return-sell-all')));
+    expect(sales, 1);
+    expect(routeCurrentAtCallback, isFalse);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
+  });
+
+  testWidgets('the continue action pops without selling', (tester) async {
+    final content = MiningContentRegistry.stellarMining();
+    const summary = OfflineProductionSummary(
+      elapsedAway: Duration(hours: 1),
+      elapsedUsed: Duration(hours: 1),
+      produced: {ResourceType.gold: 5},
+      productionByPlanet: {
+        MiningPlanetId.homeworld: {ResourceType.gold: 5},
+      },
+      fullSites: {},
+      wasOfflineCapped: false,
+    );
+    var sales = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: OutlinedButton(
+              key: const Key('open-return'),
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                builder: (_) => OfflineReturnSheet(
+                  summary: summary,
+                  content: content,
+                  state: _state(
+                    sites: {MiningSiteId.landingBasin: _site(stored: 105)},
+                  ),
+                  onSellCargo: () => sales++,
+                ),
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('open-return')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.bySemanticsLabel('Continue mining'));
+    await tester.pumpAndSettle();
+
+    expect(sales, 0);
+    expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
   });
 
   for (final scale in const [1.0, 1.3]) {
@@ -678,6 +842,7 @@ void main() {
                 summary: summary,
                 content: content,
                 state: _state(),
+                onSellCargo: () {},
               ),
             ),
           ),

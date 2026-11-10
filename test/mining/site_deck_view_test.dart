@@ -16,9 +16,15 @@ SiteProgress progress({
   rigPlacements: rigs,
 );
 
-MiningSave stateWith({Map<MiningSiteId, SiteProgress>? sites}) {
+MiningSave stateWith({
+  Map<MiningSiteId, SiteProgress>? sites,
+  Set<MiningPlanetId>? unlockedPlanetIds,
+  MiningPlanetId? activePlanetId,
+}) {
   final initial = MiningSave.initial(nowUtc: DateTime.utc(2026, 8, 26));
   return initial.copyWith(
+    unlockedPlanetIds: unlockedPlanetIds,
+    activePlanetId: activePlanetId,
     sites: sites == null ? null : {...initial.sites, ...sites},
   );
 }
@@ -436,7 +442,7 @@ void main() {
       );
 
       expect(sale.canSell, isFalse);
-      expect(sale.hasUnsellableCargo, isFalse);
+      expect(sale.projectedValue, 40);
       expect(sale.label, 'Finishing previous action…');
     });
 
@@ -448,20 +454,20 @@ void main() {
       );
 
       expect(sale.canSell, isTrue);
-      expect(sale.hasUnsellableCargo, isFalse);
+      expect(sale.projectedValue, 40);
       expect(sale.label, 'Sell all cargo for 40 cash.');
     });
 
-    test('disables sale with tiny-sale copy when cargo floors to zero', () {
+    test('sells cargo whose projected value floors to zero cash', () {
       final sale = MiningSaleAffordance.from(
         isBusy: false,
         cargo: 0.1,
         projectedValue: 0,
       );
 
-      expect(sale.canSell, isFalse);
-      expect(sale.hasUnsellableCargo, isTrue);
-      expect(sale.label, 'Keep mining until cargo is worth at least 1 cash.');
+      expect(sale.canSell, isTrue);
+      expect(sale.projectedValue, 0);
+      expect(sale.label, 'Sell all cargo for 0 cash.');
     });
 
     test('disables sale with empty copy when there is no cargo', () {
@@ -472,7 +478,7 @@ void main() {
       );
 
       expect(sale.canSell, isFalse);
-      expect(sale.hasUnsellableCargo, isFalse);
+      expect(sale.projectedValue, 0);
       expect(sale.label, 'No cargo to sell.');
     });
   });
@@ -502,11 +508,11 @@ void main() {
       // 10 Gold at 4 cash/unit + 5 Coal at 3 cash/unit.
       expect(view.projectedValue, 55);
       expect(view.sale.canSell, isTrue);
-      expect(view.sale.hasUnsellableCargo, isFalse);
+      expect(view.sale.projectedValue, 55);
       expect(view.sale.label, 'Sell all cargo for 55 cash.');
     });
 
-    test('projects a tiny-sale aggregate that floors to zero cash', () {
+    test('sells a tiny-sale aggregate that floors to zero cash', () {
       // 0.1 Gold (0.4 gross) + 0.1 Coal (0.3 gross) floor to 0 together.
       final view = SiteDeckView.from(
         state: stateWith(
@@ -528,12 +534,9 @@ void main() {
       );
 
       expect(view.projectedValue, 0);
-      expect(view.sale.canSell, isFalse);
-      expect(view.sale.hasUnsellableCargo, isTrue);
-      expect(
-        view.sale.label,
-        'Keep mining until cargo is worth at least 1 cash.',
-      );
+      expect(view.sale.canSell, isTrue);
+      expect(view.sale.projectedValue, 0);
+      expect(view.sale.label, 'Sell all cargo for 0 cash.');
     });
 
     test('disables the sale while the shell is busy', () {
@@ -552,8 +555,67 @@ void main() {
       );
 
       expect(view.sale.canSell, isFalse);
-      expect(view.sale.hasUnsellableCargo, isFalse);
       expect(view.sale.label, 'Finishing previous action…');
     });
+
+    test('values cargo across every unlocked planet, not just the active', () {
+      final view = SiteDeckView.from(
+        state: stateWith(
+          unlockedPlanetIds: const {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+          sites: {
+            MiningSiteId.landingBasin: progress(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 10,
+            ),
+            MiningSiteId.frozenBasin: progress(
+              unlocked: true,
+              commissioned: true,
+              storedAmount: 20,
+            ),
+          },
+        ),
+        content: content,
+        isBusy: false,
+      );
+
+      expect(view.projectedValue, 40);
+      expect(view.totalCargo, 10);
+      expect(view.sale.canSell, isTrue);
+      expect(view.sale.projectedValue, 160);
+      expect(view.sale.label, 'Sell all cargo for 160 cash.');
+    });
+
+    test(
+      'enables the sale when only an inactive unlocked planet has cargo',
+      () {
+        final view = SiteDeckView.from(
+          state: stateWith(
+            unlockedPlanetIds: const {
+              MiningPlanetId.homeworld,
+              MiningPlanetId.lunarFrontier,
+            },
+            sites: {
+              MiningSiteId.frozenBasin: progress(
+                unlocked: true,
+                commissioned: true,
+                storedAmount: 20,
+              ),
+            },
+          ),
+          content: content,
+          isBusy: false,
+        );
+
+        expect(view.projectedValue, 0);
+        expect(view.totalCargo, 0);
+        expect(view.sale.canSell, isTrue);
+        expect(view.sale.projectedValue, 120);
+        expect(view.sale.label, 'Sell all cargo for 120 cash.');
+      },
+    );
   });
 }

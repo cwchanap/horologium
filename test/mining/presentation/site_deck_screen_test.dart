@@ -10,6 +10,7 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/next_goal_view.dart';
 import 'package:horologium/mining/presentation/mining_hex.dart';
+import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
@@ -60,7 +61,7 @@ SiteDeckView _deckView(MiningSave state, {bool isBusy = false}) =>
 MiningNextGoalView _goalFor(MiningSave state) => MiningNextGoalView.from(
   state: state,
   content: _content,
-  sellableValue: _deckView(state).projectedValue,
+  sellableValue: _deckView(state).sale.projectedValue,
 );
 
 /// The longest authored strip copy: Io's last site names its reward.
@@ -830,7 +831,95 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('disables site-deck-sell while busy, tiny-sale, or empty', (
+  testWidgets(
+    'shows the all-unlocked-planet sale while the HUD stays active-planet',
+    (tester) async {
+      final sell = find.byKey(const Key('site-deck-sell'));
+
+      await _pumpDeck(
+        tester,
+        view: _deckView(
+          _stateWith(
+            unlockedPlanetIds: const {
+              MiningPlanetId.homeworld,
+              MiningPlanetId.lunarFrontier,
+            },
+            sites: {
+              MiningSiteId.landingBasin: _progress(
+                unlocked: true,
+                commissioned: true,
+                storedAmount: 10,
+              ),
+              MiningSiteId.frozenBasin: _progress(
+                unlocked: true,
+                commissioned: true,
+                storedAmount: 20,
+              ),
+            },
+          ),
+        ),
+      );
+
+      expect(
+        find.descendant(of: sell, matching: find.text('+160')),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel('Sell all cargo for 160 cash.'),
+        findsOneWidget,
+      );
+      expect(tester.widget<OutlinedButton>(sell).onPressed, isNotNull);
+      expect(
+        tester
+            .widget<MiningCargoGauge>(
+              find.byKey(const Key('mining-cargo-gauge')),
+            )
+            .projectedValue,
+        40,
+        reason: 'the HUD gauge keeps the active-planet projection',
+      );
+
+      await _pumpDeck(
+        tester,
+        view: _deckView(
+          _stateWith(
+            unlockedPlanetIds: const {
+              MiningPlanetId.homeworld,
+              MiningPlanetId.lunarFrontier,
+            },
+            sites: {
+              MiningSiteId.frozenBasin: _progress(
+                unlocked: true,
+                commissioned: true,
+                storedAmount: 20,
+              ),
+            },
+          ),
+        ),
+      );
+
+      expect(
+        find.descendant(of: sell, matching: find.text('+120')),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel('Sell all cargo for 120 cash.'),
+        findsOneWidget,
+      );
+      expect(tester.widget<OutlinedButton>(sell).onPressed, isNotNull);
+      expect(
+        tester
+            .widget<MiningCargoGauge>(
+              find.byKey(const Key('mining-cargo-gauge')),
+            )
+            .projectedValue,
+        0,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('disables site-deck-sell while busy or empty, not at +0', (
     tester,
   ) async {
     final sellable = _stateWith(
@@ -866,11 +955,10 @@ void main() {
       },
     );
     await _pumpDeck(tester, view: _deckView(tinySale));
-    expect(tester.widget<OutlinedButton>(sell).onPressed, isNull);
+    expect(tester.widget<OutlinedButton>(sell).onPressed, isNotNull);
+    expect(find.bySemanticsLabel('Sell all cargo for 0 cash.'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(
-        'Keep mining until cargo is worth at least 1 cash.',
-      ),
+      find.descendant(of: sell, matching: find.text('+0')),
       findsOneWidget,
     );
 
