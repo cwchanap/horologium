@@ -52,29 +52,17 @@ class FleetDock extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _FleetLabel(),
-                const SizedBox(height: 2),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    view.dockHint,
-                    key: const Key('fleet-dock-hint'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white54,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: .6,
-                    ),
-                  ),
-                ),
-              ],
+            child: Text(
+              view.dockHint,
+              key: const Key('fleet-dock-hint'),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white54,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                letterSpacing: .6,
+              ),
             ),
           ),
           if (view.bestAffordableTier != null) ...[
