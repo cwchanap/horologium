@@ -292,9 +292,6 @@ void main() {
     final content = MiningContentRegistry.stellarMining();
     final now = DateTime.utc(2026, 8, 26, 12);
     final base = MiningSave.initial(nowUtc: now);
-    // 0.375 gold is 1.5 cash and 0.25 water ice is 1.5 cash: each planet
-    // floors on its own, so the total is 2, not the 3 that one global
-    // floor of the combined 3.0 would give.
     final state = base.copyWith(
       unlockedPlanetIds: const {
         MiningPlanetId.homeworld,
