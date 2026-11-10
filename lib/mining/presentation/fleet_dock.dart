@@ -55,12 +55,13 @@ class FleetDock extends StatelessWidget {
             child: Text(
               view.dockHint,
               key: const Key('fleet-dock-hint'),
-              maxLines: 2,
+              maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Colors.white54,
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
+                height: 1.2,
                 letterSpacing: .6,
               ),
             ),
