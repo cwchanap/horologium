@@ -3,7 +3,7 @@
 - Status: **Revised planning only; design review changes applied**
 - Linear: https://linear.app/cwchanap/issue/HPA-813/fewer-taps-sell-all-planets-upgrade-placed-rigs-one-tap-build
 - Design: [2026-11-09-hpa-813-fewer-taps-design.md](../specs/2026-11-09-hpa-813-fewer-taps-design.md)
-- Review: [GitHub review 2026-11-09](https://github.com/cwchanap/horologium/pull/54#pullrequestreview-5836416402)
+- Reviews: [initial review](https://github.com/cwchanap/horologium/pull/54#pullrequestreview-5836416402) and [re-review](https://github.com/cwchanap/horologium/pull/54#pullrequestreview-5836696430)
 - Baseline: `main` at `ec95c80769f3ce23bedb1c03d9285b7e4e2fcef9`, after HPA-814/PR #53
 - Delivery: **ONE PR for this ticket**. Review these docs first; controller, journey, UI, `CLAUDE.md` and tests all land on the **same branch/PR**. Controller/journey changes each get a separate **commit within this PR**, not a new ticket or PR.
 - No art/SFX generation: reuse all existing assets, audio and haptics.
@@ -13,7 +13,7 @@
 | Need | Existing owner | Minimal change |
 | --- | --- | --- |
 | Sale and cash | `MiningController.sellAllCargo`, `MiningSave.saleValue`, `MiningSimulation.accrue` | Loop unlocked planets, sum planet-floored totals, save once |
-| Cargo projections | `MiningSave.saleValue(content, planet)` | Add matching `storedCargo(content, planet)`; derive pure global totals from per-planet projections |
+| Cargo/sale button projection | `MiningSave.saleValue(content, planet)` and `MiningSaleAffordance` | Add matching `storedCargo(content, planet)` and pure global totals; put global `projectedValue` on `MiningSaleAffordance` for both visible buttons and semantics; keep HUD fields local |
 | Tier pricing | `MiningContentRegistry`/`planet.rigSpawnCost` | One `rigCost(planetId, tier)` method; formula is `spawnCost * (1 << tier.index)` |
 | Merge legality | `mergeDockRigs` + `FleetDockBayView.canMergeWithSelection` | One pure tier check beside `RigTier` shared with placed upgrades/highlights |
 | Purchased rigs | `MiningController.spawnRig`, `MiningActionResult.dockBayId` | Extend `spawnRig({RigTier tier = RigTier.t1})`; **no** `buildBestAffordableRig` method |
@@ -107,13 +107,13 @@ Do not add a second state owner, save changes, new dependencies, generic builder
 
 **Tests first:**
 
-- Cargo only on an inactive **unlocked** planet enables Site Deck and Mine Site Sell; button/semantics report all-unlocked-planet revenue, while active-planet HUD, gauges and card values stay local. `MiningNextGoalView` sees the global sale sum.
+- Cargo only on an inactive **unlocked** planet enables Site Deck and Mine Site Sell; **both the visible button amount and its semantic label** report all-unlocked-planet revenue. Specifically assert that `site_deck_screen.dart`'s `_SiteDeckSellAction` and `mine_site_screen.dart`'s `_SellControl` render `+${formatMiningCash(view.sale.projectedValue)}`, while `site_deck_screen.dart`'s HUD continues to read `view.projectedValue` and `mine_site_screen.dart`'s gauge reads `view.activePlanetProjectedSale`. Test cases where global and local totals differ, including active cargo = 0. `MiningNextGoalView` receives the global `view.sale.projectedValue`.
 - Switch `MiningSaleAffordance` eligibility from `projectedValue > 0` to `cargo > 0`. Remove dead `hasUnsellableCargo` field, label and `MineSiteView` accessor plus obsolete tests. Assert 0-value cargo can be sold and 0-cargo cannot.
 - Return sheet's primary button displays `SELL ALL · +X`, immediately dismisses the modal, calls the *existing* `_sellCargo` once, then reports real credit or failure on the visible Scaffold. The ▶ continues without a mutation. Busy state is reported explicitly rather than silently swallowed. Keep HPA-814's ≥5-minute gate and per-planet report intact.
 
 **Implementation:**
 
-1. Give Site Deck and Mine Site a separate all-unlocked-planets cargo/sale projection for the **Sell action only**. Keep `SiteDeckView.projectedValue` and Mine Site cargo gauge local. Update sell labels and `MiningNextGoalView` input, with no second sale method.
+1. Extend `MiningSaleAffordance` to expose `final int projectedValue` (already an argument to its factory), with existing `canSell` and `label`. Compute one `MiningSaleAffordance.from(isBusy: ..., cargo: state.storedCargoAcrossUnlockedPlanets(content), projectedValue: state.saleValueAcrossUnlockedPlanets(content))` in **each view's `from`** and expose it as `view.sale` (a stored read-model field, not redundant `globalCargo`/`globalProjectedValue` fields). Remove its dead `hasUnsellableCargo` branch as above. Update *both* visible Sell text bindings to `view.sale.projectedValue`, their semantic labels/enablement to `view.sale.label`/`canSell`, and `MiningNextGoalView.sellableValue` to the same amount. Preserve local `SiteDeckView.projectedValue` for the HUD/site cards and local `MineSiteView.activePlanetProjectedSale` for the cargo gauge. No second sale method.
 2. Match the existing `RelaunchSheet` callback pattern: in `OfflineReturnSheet`, `Navigator.pop` **then** invoke an `onSellCargo` shell callback (which calls `_sellCargo`); the callback checks `_controller.isBusy` and reports “Finishing previous action…” explicitly. Existing shell sale action handles persistence, haptics, sounds, success/failure SnackBars on the uncovered Scaffold. Do **not** add awaitable sale result handling, widget pending flags, inline-error state, or a second notifier.
 3. Use the existing `_displayState` snapshot for X. Its preview can be fractionally stale due to accruing seconds; the controller's persisted result and SnackBar own the real cash delta. A fake-clock, no-intervening-accrual test must see X equal the sale amount. Remove non-active-planet “travel to sell” copy.
 4. Run focused view and presentation tests, then commit this UI step on the **same PR**.
@@ -130,13 +130,13 @@ Do not add a second state owner, save changes, new dependencies, generic builder
 **Upgrade UI:**
 
 - Add `MineSiteGridTapAction.upgrade`. A tapped **occupied** cell with a dock selection routes to the shared merge-rule check, **never recall**; without selection it still uses `recallRig`. Empty-cell taps still deploy. Test same-tier success, mismatch, T5, busy, cargo and normal recall.
-- Derive `canUpgradeWithSelection` and matching occupied targets from `MineSiteView` using the shared `rigMergeFailure`. Feed targets as a second set into the existing `MiningGridPainter`; update physical hit and screen-reader semantic labels/actions. Shell invokes `upgradePlacedRig` via `_runSheetAction` and clears the consumed selected bay. No additional overlay/UI state owner.
+- Derive `canUpgradeWithSelection` and matching occupied targets from `MineSiteView` using shared `rigMergeFailure`. Feed targets as a second set into the existing `MiningGridPainter`. **Do not reuse recall-only semantics when selected:** the current `MiningGridMap` uses `Semantics(enabled: rig.canRecall, label: _rigLabel(rig), onTap: ...)`. With **no** selected dock rig, retain recall eligibility and its existing failure copy. With a **selected** dock rig, derive enabled state from valid upgrade eligibility, and label the action “Upgrade to Tn” or the same-tier/T5 merge rejection; never announce recall-only “Dock is full.” / “Sell cargo before recalling this rig.”. A full dock must **not** disable a valid placed upgrade. Semantic and physical taps both route through `gridTapOutcome` and shell. Shell invokes `upgradePlacedRig` via `_runSheetAction` and clears the consumed selected bay. No additional overlay/UI state owner.
 
 **Build UI:**
 
 - `FleetDockView.from` derives `bestAffordableTier` in T2–T5 using `content.rigCost` and `state.cash`, plus the shown cost/`canBuild`. Hide when no free bay or only T1 can be bought; disable while busy. Share the merge helper with dock-to-dock selection highlights.
-- Render a compact `BUILD Tn · price` in `FleetDock`'s existing header and keep four bays and T1 Spawn visible. Pass the **displayed** tier through a new `onBuildRig(RigTier)` callback across portrait/landscape `MineSiteScreen` to shell, where `spawnRig(tier: tier)` is invoked by the same `_runSheetAction` path and result selection as T1 Spawn. Do not let controller recompute “best” after tap.
-- Test 360×640, 390×844, 430×932 and 874×402 UI reachability and no overflows; check busy state, wrong tier, selected bay and accessible target labels. Reuse merge effect/sounds.
+- Render a compact `BUILD Tn · price` in `FleetDock`'s existing header and keep four bays and T1 Spawn visible. Pass the **displayed** tier through a new `onBuildRig(RigTier)` callback across portrait/landscape `MineSiteScreen` to shell, where `spawnRig(tier: tier)` is invoked by the same `_runSheetAction` path and result selection as T1 Spawn. Do not let controller recompute “best” after tap. **Fix selected dock hint copy:** `fleet_dock_view.dart` currently ends with `Tn + Tn = Tn+1 IN DOCK`, which hides grid upgrades. For selected T1–T4, use compact copy such as `CELL: DEPLOY · RIG: UPGRADE · BAY: MERGE`, with same-tier highlights/semantics providing the detailed rule. For T5 show deploy-only guidance; without selection keep the original select/deploy hint.
+- Test 360×640, 390×844, 430×932 and 874×402 UI reachability and no overflows; check selected-dock hint legibility at 360 px (no excessive `FittedBox` downscaling), BUILD action, busy state, wrong tier, selected bay and accessible target labels. Specifically test a full dock + matching selected rig + valid in-place upgrade: grid semantics must be **enabled** and say upgrade, not disabled with a recall error; mismatch/T5 labels must report merge-rule failures; no-selection mode still describes recall. Reuse merge effect/sounds.
 
 Run focused view/grid/dock/shell tests and commit within the same PR.
 
@@ -164,9 +164,9 @@ Report exact tested SHA/results and any unavailable host-specific gates. Do not 
 ## Acceptance checklist
 
 - [ ] One sell empties all unlocked planets, pays Σ planet-level floored values, writes once; active HUDs remain local.
-- [ ] Site Deck, Mine Site and return-sheet SELL ALL controls display global total; cargo>0 eligibility includes 0-cash sale.
+- [ ] Site Deck, Mine Site and return-sheet SELL ALL controls display the global total; both **visible** Site Deck/Mine Site amounts read `view.sale.projectedValue` while both HUD gauges remain active-only; cargo>0 eligibility includes 0-cash sale.
 - [ ] Return sheet primary pops then sells with visible feedback, ▶ only continues, busy case is explicit, five-minute gate remains.
-- [ ] A selected matching dock tier upgrades a placed rig in the same cell with cargo unchanged; mismatches/T5 never recall.
+- [ ] A selected matching dock tier upgrades a placed rig in the same cell with cargo unchanged; mismatches/T5 never recall. Selected rig semantics announce upgrade or merge failure even when recall is impossible; compact dock hint teaches in-grid upgrades and dock merging.
 - [ ] `spawnRig()` still buys T1; `spawnRig(tier: Tn)` buys exact displayed tier for `content.rigCost`, with one write and one free bay.
 - [ ] Shared price/merge helpers have single sources of truth; no dead `hasUnsellableCargo` or impossible locked-planet test.
 - [ ] Journey lifts T4 cap, models T5, sells once per visit, tests both cadences and records before/after numbers **before UI**.
@@ -182,5 +182,8 @@ Report exact tested SHA/results and any unavailable host-specific gates. Do not 
 4. **Modal complexity:** close first, then call `_sellCargo`; no local async state or new error framework.
 5. **Late risk detection:** commit/test controller+journal changes first, run 2h/6h before UI.
 6. **Dead/impossible cases:** remove `hasUnsellableCargo`, avoid invalid locked-planet cargo fixture, add per-planet `storedCargo` projection.
+7. **Re-review—sell binding:** expose global `projectedValue` on `MiningSaleAffordance`; both buttons use `view.sale.projectedValue` while their HUD gauges keep local values.
+8. **Re-review—accessibility:** switch placed-rig semantics between recall and upgrade according to dock selection; a full dock must not disable valid upgrades.
+9. **Re-review—dock copy:** teach `RIG: UPGRADE` as well as `BAY: MERGE` in short selected-tier hints, with 360px layout tests.
 
 **This remains a planning-only PR update. No Flutter tests/builds were run for the review revisions.**
