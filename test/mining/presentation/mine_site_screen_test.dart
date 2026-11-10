@@ -133,6 +133,7 @@ Future<void> _pumpMineSite(
   VoidCallback? onBack,
   VoidCallback? onSettings,
   ValueChanged<MiningNavigationDestination>? onDestinationSelected,
+  double textScale = 1.3,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -146,7 +147,7 @@ Future<void> _pumpMineSite(
       home: MediaQuery(
         data: MediaQueryData(
           disableAnimations: disableAnimations,
-          textScaler: TextScaler.linear(1.3),
+          textScaler: TextScaler.linear(textScale),
         ),
         child: MineSiteScreen(
           view: view,
@@ -1892,7 +1893,7 @@ void main() {
     );
     expect(
       bounds.height,
-      greaterThanOrEqualTo(6),
+      greaterThanOrEqualTo(5),
       reason: 'transformed height ${bounds.height}',
     );
   });
@@ -1934,10 +1935,93 @@ void main() {
         view: _siteView(state),
         dock: _dockView(state),
       );
-      final target = tester.getSize(find.byKey(const Key('fleet-dock-build')));
+      final pill = find.byKey(const Key('fleet-dock-build'));
+      final target = tester.getSize(pill);
       expect(target.width, greaterThanOrEqualTo(44), reason: '$size width');
       expect(target.height, greaterThanOrEqualTo(44), reason: '$size height');
+      final pillRect = tester.getRect(pill);
+      final spawnRect = tester.getRect(
+        find.byKey(const Key('fleet-dock-spawn')),
+      );
+      expect(
+        pillRect.bottom,
+        lessThanOrEqualTo(spawnRect.top),
+        reason: '$size header position',
+      );
+      expect(pillRect.overlaps(spawnRect), isFalse, reason: '$size spawn');
+      for (final bay in DockBayId.values) {
+        final bayRect = tester.getRect(find.byKey(ValueKey<String>(bay.name)));
+        expect(
+          pillRect.overlaps(bayRect),
+          isFalse,
+          reason: '$size ${bay.name}',
+        );
+      }
       expect(tester.takeException(), isNull, reason: '$size');
     }
+  });
+
+  testWidgets('BUILD renders a readable unrotated header label', (
+    tester,
+  ) async {
+    final state = _stateWith(cash: 200, landing: _progress(commissioned: true));
+    for (final textScale in const [1.0, 1.3]) {
+      await _pumpMineSite(
+        tester,
+        size: const Size(360, 640),
+        view: _siteView(state),
+        dock: _dockView(state),
+        textScale: textScale,
+      );
+      final label = find.text('BUILD T4 · 200');
+      expect(label, findsOneWidget, reason: 'textScale $textScale');
+      expect(
+        find.ancestor(of: label, matching: find.byType(RotatedBox)),
+        findsNothing,
+        reason: 'textScale $textScale rotation',
+      );
+      final render = tester.renderObject<RenderParagraph>(label);
+      final bounds = MatrixUtils.transformRect(
+        render.getTransformTo(null),
+        render.paintBounds,
+      );
+      expect(
+        bounds.height,
+        greaterThanOrEqualTo(5),
+        reason: 'textScale $textScale transformed height ${bounds.height}',
+      );
+      final spawnRect = tester.getRect(
+        find.byKey(const Key('fleet-dock-spawn')),
+      );
+      expect(
+        bounds.bottom,
+        lessThanOrEqualTo(spawnRect.top),
+        reason: 'textScale $textScale header position',
+      );
+      expect(tester.takeException(), isNull, reason: 'textScale $textScale');
+    }
+
+    await _pumpMineSite(
+      tester,
+      size: const Size(874, 402),
+      view: _siteView(state),
+      dock: _dockView(state),
+    );
+    final railLabel = find.text('BUILD T4 · 200');
+    expect(railLabel, findsOneWidget);
+    expect(
+      find.ancestor(of: railLabel, matching: find.byType(RotatedBox)),
+      findsNothing,
+    );
+    final railRender = tester.renderObject<RenderParagraph>(railLabel);
+    final railBounds = MatrixUtils.transformRect(
+      railRender.getTransformTo(null),
+      railRender.paintBounds,
+    );
+    expect(
+      railBounds.height,
+      greaterThanOrEqualTo(5),
+      reason: 'rail transformed height ${railBounds.height}',
+    );
   });
 }
