@@ -203,8 +203,6 @@ class MiningSave {
     return total.floor();
   }
 
-  /// Stored cargo units across [planet]'s authored sites; the units-side
-  /// twin of [saleValue].
   double storedCargo(MiningContentRegistry content, MiningPlanetId planet) {
     var total = 0.0;
     for (final definition in content.planet(planet).sites) {
@@ -213,8 +211,6 @@ class MiningSave {
     return total;
   }
 
-  /// Stored cargo units summed over [unlockedPlanetIds] in authored planet
-  /// order.
   double storedCargoAcrossUnlockedPlanets(MiningContentRegistry content) {
     var total = 0.0;
     for (final planet in MiningPlanetId.values) {
@@ -225,8 +221,6 @@ class MiningSave {
     return total;
   }
 
-  /// Sale revenue summed over [unlockedPlanetIds]: each planet's
-  /// [saleValue] floors separately, matching sequential per-planet sales.
   int saleValueAcrossUnlockedPlanets(MiningContentRegistry content) {
     var total = 0;
     for (final planet in MiningPlanetId.values) {

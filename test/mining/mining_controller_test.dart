@@ -1065,8 +1065,6 @@ void main() {
 
         final result = await controller.sellAllCargo();
 
-        // Homeworld 0.9*4 + 0.9*3 + 0.9*5 = 10.8 -> 10, Lunar 10*6 = 60,
-        // Io 42*300 = 12600: each planet floors its own unrounded total.
         expect(result.isSuccess, isTrue);
         expect(result.revenue, 12670);
         expect(result.sold, {
@@ -1175,7 +1173,6 @@ void main() {
 
       final result = await controller.sellAllCargo();
 
-      // 0.1*4 -> 0 and 0.1*6 -> 0: positive cargo still sells for 0 cash.
       expect(result.isSuccess, isTrue);
       expect(result.revenue, 0);
       expect(result.sold, {ResourceType.gold: 0.1, ResourceType.waterIce: 0.1});

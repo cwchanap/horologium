@@ -518,9 +518,6 @@ class MiningController {
   Future<MiningSaleResult> sellAllCargo() => _enqueueMutation(() async {
     final candidate = simulation.accrue(_state, _nowUtc().toUtc());
 
-    // Each unlocked planet floors its own sale value, so global revenue is
-    // the sum of per-planet floors read off the accrued state before cargo
-    // is zeroed.
     final revenue = candidate.state.saleValueAcrossUnlockedPlanets(content);
     var totalCargo = 0.0;
     final sold = <ResourceType, double>{};
