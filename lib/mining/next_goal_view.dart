@@ -76,7 +76,7 @@ class MiningNextGoalView {
   /// cash-gated.
   final int? cashCost;
 
-  /// Selling the active planet's cargo would cover [cashCost].
+  /// Selling every unlocked planet's cargo would cover [cashCost].
   final bool sellWouldAfford;
 
   bool get isCashGated => cashCost != null;
@@ -104,9 +104,9 @@ class MiningNextGoalView {
     return 'Next goal: $title. $detail$cashPart';
   }
 
-  /// [sellableValue] is the active planet's floored sale value
-  /// ([SiteDeckView.projectedValue]), so the sell hint never disagrees with
-  /// the Sell button.
+  /// [sellableValue] is the floored sale value across all unlocked planets
+  /// ([SiteDeckView.sale.projectedValue]), so the sell hint never disagrees
+  /// with the Sell button.
   static MiningNextGoalView from({
     required MiningSave state,
     required MiningContentRegistry content,

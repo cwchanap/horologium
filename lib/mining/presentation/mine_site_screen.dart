@@ -581,6 +581,7 @@ class _SellControl extends StatelessWidget {
     button: true,
     enabled: view.canSell,
     label: view.sale.label,
+    onTap: view.canSell ? onSellCargo : null,
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [

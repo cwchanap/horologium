@@ -34,9 +34,13 @@ class FleetDock extends StatelessWidget {
       color: Colors.transparent,
       child: axis == FleetDockAxis.vertical
           ? SizedBox.expand(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: _verticalChildren(),
+              child: SingleChildScrollView(
+                reverse: true,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: _verticalChildren(),
+                ),
               ),
             )
           : Column(
@@ -177,20 +181,23 @@ class _BuildPill extends StatelessWidget {
       label: view.buildHint,
       excludeSemantics: true,
       onTap: onTap,
-      child: GestureDetector(
-        key: const Key('fleet-dock-build'),
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: Color.fromRGBO(24, 255, 255, enabled ? .14 : .06),
-            border: Border.all(
-              color: Color.fromRGBO(24, 255, 255, enabled ? .55 : .24),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const Key('fleet-dock-build'),
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Color.fromRGBO(24, 255, 255, enabled ? .14 : .06),
+              border: Border.all(
+                color: Color.fromRGBO(24, 255, 255, enabled ? .55 : .24),
+              ),
+              borderRadius: BorderRadius.circular(12),
             ),
-            borderRadius: BorderRadius.circular(12),
+            child: Center(child: label),
           ),
-          child: Center(child: label),
         ),
       ),
     );
