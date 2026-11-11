@@ -2461,6 +2461,40 @@ void main() {
   );
 
   testWidgets(
+    'Offline Return SELL ALL over an open sheet exposes the shell before '
+    'reporting the sale',
+    (tester) async {
+      final clock = TestClock(_start);
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start, cargo: 10));
+      await pumpShell(tester, repository: repository, clock: clock);
+
+      shellHandles(tester).openTechnology();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      clock.now = _start.add(const Duration(minutes: 6));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(const Key('offline-return-sheet')), findsOneWidget);
+      expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('offline-return-sell-all')));
+      await tester.pumpAndSettle();
+
+      // The sale feedback lives on the shell's ScaffoldMessenger, so both
+      // stacked sheets must be gone for it to be visible.
+      expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
+      expect(find.byKey(const Key('mining-technology-sheet')), findsNothing);
+      expect(find.textContaining('Sold '), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'Offline Return SELL ALL during a checkpoint reports busy and sells '
     'nothing',
     (tester) async {

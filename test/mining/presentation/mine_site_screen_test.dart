@@ -216,6 +216,18 @@ List<Rect> _hudRects(WidgetTester tester) => [
     if (tester.any(find.byKey(Key(key)))) tester.getRect(find.byKey(Key(key))),
 ];
 
+/// The Sell control's full rect: the mine-site-sell key marks only the hex
+/// button, while the tappable column includes the projected-value label
+/// below it.
+Rect _sellControlRect(WidgetTester tester) => tester.getRect(
+  find
+      .ancestor(
+        of: find.byKey(const Key('mine-site-sell')),
+        matching: find.byType(Column),
+      )
+      .first,
+);
+
 void _setGridScale(WidgetTester tester, double scale) {
   tester
       .widget<InteractiveViewer>(
@@ -558,8 +570,8 @@ void main() {
       tester.getRect(find.byKey(const Key('mining-deposit-1-1-2'))).topLeft,
       const Offset(42, 181),
     );
-    final sell = tester.getRect(find.byKey(const Key('mine-site-sell')));
-    expect(sell.top, 506);
+    final sell = _sellControlRect(tester);
+    expect(sell.bottom, 874 - 204);
     expect(sell.right, closeTo(382, 4));
   });
 
@@ -1109,6 +1121,64 @@ void main() {
       expect(nav.bottom, 932 - 34);
     },
   );
+
+  testWidgets('keeps the portrait Sell hitbox clear of the dock BUILD pill', (
+    tester,
+  ) async {
+    // 390x780 portrait with a 34px home-indicator inset: the dock header's
+    // BUILD pill must not sit under the Sell control. Pump the screen
+    // directly so the chrome reads MediaQuery.paddingOf(context) from the
+    // view padding.
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 780);
+    tester.view.padding = const FakeViewPadding(
+      left: 0,
+      top: 0,
+      right: 0,
+      bottom: 34,
+    );
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPadding();
+    });
+    final state = _stateWith(
+      cash: 100,
+      landing: _progress(
+        commissioned: true,
+        storedAmount: 10,
+        rigs: const [
+          MiningRigPlacement(tier: RigTier.t2, cell: MiningGridCell(3, 2)),
+        ],
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+        builder: (context, child) =>
+            Material(type: MaterialType.transparency, child: child!),
+        home: MineSiteScreen(
+          view: _siteView(state),
+          fleetDock: _dockView(state),
+          cash: 100,
+          onGridCellTap: (_) {},
+          onBayTap: (_) {},
+          onSpawnRig: () {},
+          onBuildRig: (_) {},
+          onSellCargo: () {},
+          onBack: () {},
+          onSettings: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('fleet-dock-build')), findsOneWidget);
+    final sell = _sellControlRect(tester);
+    final build = tester.getRect(find.byKey(const Key('fleet-dock-build')));
+    expect(sell.overlaps(build), isFalse, reason: 'sell $sell vs $build');
+    expect(sell.bottom, lessThanOrEqualTo(build.top));
+  });
 
   testWidgets(
     'offsets landscape cash chip, toolbar, and right rail by safe-area insets',
