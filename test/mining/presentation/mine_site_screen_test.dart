@@ -807,6 +807,58 @@ void main() {
     );
   });
 
+  testWidgets('sell control forwards its semantic tap action to the sale', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    var sold = false;
+    final state = _stateWith(
+      landing: _progress(commissioned: true, storedAmount: 10),
+    );
+    await _pumpMineSite(
+      tester,
+      view: _siteView(state),
+      dock: _dockView(state),
+      onSellCargo: () => sold = true,
+    );
+
+    tester.semantics.performAction(
+      find.semantics.byLabel('Sell all cargo for 40 cash.'),
+      SemanticsAction.tap,
+    );
+    expect(sold, isTrue);
+    handle.dispose();
+  });
+
+  testWidgets('busy sell control keeps its label but drops the tap action', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    final state = _stateWith(
+      landing: _progress(commissioned: true, storedAmount: 10),
+    );
+    await _pumpMineSite(
+      tester,
+      view: _siteView(state, isBusy: true),
+      dock: _dockView(state),
+    );
+
+    final node = tester.getSemantics(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.button == true &&
+            widget.properties.label == 'Finishing previous action…',
+      ),
+    );
+    expect(
+      node.getSemanticsData().hasAction(SemanticsAction.tap),
+      isFalse,
+      reason: 'a busy sale must not announce an activatable button',
+    );
+    handle.dispose();
+  });
+
   testWidgets(
     'exposes recall capacity rejection copy without enabling recall',
     (tester) async {
@@ -1142,6 +1194,97 @@ void main() {
       // bay (b4) must not extend into the bottom 21 px.
       final lastBay = tester.getRect(find.byKey(const ValueKey<String>('b4')));
       expect(lastBay.bottom, lessThanOrEqualTo(402 - padBottom));
+    },
+  );
+
+  testWidgets(
+    'keeps the landscape rail inside safe-area insets on a short phone',
+    (tester) async {
+      // An 812x375 landscape with realistic cutouts and a 21 px home
+      // indicator leaves only 350 px inside the rail, shorter than the fixed
+      // rail children, so the vertical dock must stay inside that space.
+      const padLeft = 44.0;
+      const padRight = 44.0;
+      const padBottom = 21.0;
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(812, 375);
+      tester.view.padding = const FakeViewPadding(
+        left: padLeft,
+        top: 0,
+        right: padRight,
+        bottom: padBottom,
+      );
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPadding();
+      });
+      final built = <RigTier>[];
+      final bayTaps = <DockBayId>[];
+      final state = _stateWith(
+        cash: 200,
+        landing: _progress(
+          commissioned: true,
+          storedAmount: 10,
+          rigs: const [
+            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          ],
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+          builder: (context, child) =>
+              Material(type: MaterialType.transparency, child: child!),
+          home: MineSiteScreen(
+            view: _siteView(state),
+            fleetDock: _dockView(state),
+            cash: 100,
+            onGridCellTap: (_) {},
+            onBayTap: bayTaps.add,
+            onSpawnRig: () {},
+            onBuildRig: built.add,
+            onSellCargo: () {},
+            onBack: () {},
+            onSettings: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      // Every bay stays fully above the home-indicator inset and keeps at
+      // least a 44 px touch target.
+      for (final bay in DockBayId.values) {
+        final rect = tester.getRect(find.byKey(ValueKey<String>(bay.name)));
+        expect(
+          rect.bottom,
+          lessThanOrEqualTo(375 - padBottom),
+          reason: '${bay.name} bottom $rect',
+        );
+        expect(
+          rect.height,
+          greaterThanOrEqualTo(44),
+          reason: '${bay.name} height $rect',
+        );
+      }
+      await tester.tap(find.byKey(const ValueKey<String>('b4')));
+      await tester.pump();
+      expect(bayTaps, <DockBayId>[DockBayId.b4]);
+
+      // BUILD sits above the visible slice of the shrunken rail: it must be
+      // reachable by scrolling the dock rather than overflowing the inset.
+      await tester.ensureVisible(find.byKey(const Key('fleet-dock-build')));
+      await tester.pump();
+      final pillRect = tester.getRect(
+        find.byKey(const Key('fleet-dock-build')),
+      );
+      expect(pillRect.bottom, lessThanOrEqualTo(375 - padBottom));
+      expect(pillRect.height, greaterThanOrEqualTo(44));
+      await tester.tap(find.byKey(const Key('fleet-dock-build')));
+      await tester.pump();
+      expect(built, <RigTier>[RigTier.t4]);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -1978,6 +2121,65 @@ void main() {
     );
     expect(built, [RigTier.t4]);
     handle.dispose();
+  });
+
+  testWidgets('BUILD takes keyboard focus and activates its displayed tier', (
+    tester,
+  ) async {
+    final built = <RigTier>[];
+    final state = _stateWith(cash: 200, landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      view: _siteView(state),
+      dock: _dockView(state),
+      onBuildRig: built.add,
+    );
+
+    final pill = find.byKey(const Key('fleet-dock-build'));
+    final focusContext = tester.element(
+      find.descendant(of: pill, matching: find.byType(GestureDetector)),
+    );
+    final focusNode = Focus.of(focusContext);
+    expect(focusNode.canRequestFocus, isTrue);
+    focusNode.requestFocus();
+    await tester.pump();
+    expect(focusNode.hasFocus, isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(built, <RigTier>[RigTier.t4]);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    expect(built, <RigTier>[RigTier.t4, RigTier.t4]);
+  });
+
+  testWidgets('busy BUILD cannot be focused or keyboard-activated', (
+    tester,
+  ) async {
+    final built = <RigTier>[];
+    final busyState = _stateWith(
+      cash: 1000,
+      landing: _progress(commissioned: true),
+    );
+    await _pumpMineSite(
+      tester,
+      view: _siteView(busyState, isBusy: true),
+      dock: _dockView(busyState, isBusy: true),
+      onBuildRig: built.add,
+    );
+
+    final pill = find.byKey(const Key('fleet-dock-build'));
+    final focusContext = tester.element(
+      find.descendant(of: pill, matching: find.byType(GestureDetector)),
+    );
+    final focusNode = Focus.of(focusContext);
+    expect(focusNode.canRequestFocus, isFalse);
+    focusNode.requestFocus();
+    await tester.pump();
+    expect(focusNode.hasFocus, isFalse);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(built, isEmpty);
   });
 
   testWidgets('BUILD keeps at least a 44 px touch target at every size', (
