@@ -30,6 +30,7 @@ const double _portraitCargoSize = 84;
 const double _portraitDockHorizontalMargin = 12;
 const double _portraitDockBottom = 100;
 const double _portraitDockHeight = FleetDock.horizontalHeight;
+const double _portraitSellDockGap = 8;
 const double _portraitNavHeight = MiningNavigationBar.height;
 const double _landscapeCashChipTop = 52;
 const double _landscapeCargoTop = 52;
@@ -436,12 +437,12 @@ class _CavernScene extends StatelessWidget {
                   ? _landscapeX(236, .34, constraints.maxWidth)
                   : null,
               right: landscape ? null : 18,
-              top: landscape
-                  ? null
-                  : constraints.maxHeight < 750
-                  ? constraints.maxHeight - 310
-                  : 506,
-              bottom: landscape ? _landscapeSellBottom : null,
+              bottom: landscape
+                  ? _landscapeSellBottom
+                  : MediaQuery.paddingOf(context).bottom +
+                        _portraitDockBottom +
+                        _portraitDockHeight +
+                        _portraitSellDockGap,
               child: _SellControl(
                 view: view,
                 compact: landscape,

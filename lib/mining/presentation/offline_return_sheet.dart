@@ -266,7 +266,10 @@ class OfflineReturnSheet extends StatelessWidget {
   Widget _continueAction(BuildContext context) {
     final saleValue = state.saleValueAcrossUnlockedPlanets(content);
     void sellAll() {
-      Navigator.of(context).pop();
+      // Expose the shell before the sale reports: this sheet may sit over a
+      // preexisting Technology/Settings sheet, and a single pop() would
+      // leave that sheet's route hiding the Scaffold SnackBar.
+      Navigator.of(context).popUntil((route) => route is! PopupRoute);
       onSellCargo();
     }
 
