@@ -9,7 +9,7 @@
 
 ## Player outcome
 
-The fifth and last commissioned site on a new planet is not the milestone—the **third site** is. Commissioning a planet's last site produces an unmistakable, one-time **PLANET MASTERED** card with planet art and accurate next-planet requirements. Io's equivalent **FINAL PLANET MASTERED** card shows the already-awarded cash reward and offers Relaunch without resetting anything until the existing confirmation is accepted. Daily surfaces also communicate rig tier and upgrade targets at a glance, and the UI remains readable at 360×640.
+The **third and last commissioned site** on a planet is the mastery milestone. Commissioning a planet's last site produces an unmistakable, one-time **PLANET MASTERED** card with planet art and accurate next-planet requirements. Io's equivalent **FINAL PLANET MASTERED** card shows the already-awarded cash reward and offers Relaunch without resetting anything until the existing confirmation is accepted. Daily surfaces also communicate rig tier and upgrade targets at a glance, and the UI remains readable at 360×640.
 
 This task is presentation polish only: **no new game state, persistence, economy rules, price changes, resource/rig logic, unlock logic, asset generation, or SFX.** Existing `MiningController` actions, `MiningSimulation`, `MiningSaveRepository`, `MiningContentRegistry` and public-action journey remain authoritative.
 
