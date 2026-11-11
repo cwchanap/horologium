@@ -1200,9 +1200,6 @@ void main() {
   testWidgets(
     'keeps the landscape rail inside safe-area insets on a short phone',
     (tester) async {
-      // An 812x375 landscape with realistic cutouts and a 21 px home
-      // indicator leaves only 350 px inside the rail, shorter than the fixed
-      // rail children, so the vertical dock must stay inside that space.
       const padLeft = 44.0;
       const padRight = 44.0;
       const padBottom = 21.0;
@@ -1253,8 +1250,6 @@ void main() {
       await tester.pump();
 
       expect(tester.takeException(), isNull);
-      // Every bay stays fully above the home-indicator inset and keeps at
-      // least a 44 px touch target.
       for (final bay in DockBayId.values) {
         final rect = tester.getRect(find.byKey(ValueKey<String>(bay.name)));
         expect(
@@ -1272,8 +1267,6 @@ void main() {
       await tester.pump();
       expect(bayTaps, <DockBayId>[DockBayId.b4]);
 
-      // BUILD sits above the visible slice of the shrunken rail: it must be
-      // reachable by scrolling the dock rather than overflowing the inset.
       await tester.ensureVisible(find.byKey(const Key('fleet-dock-build')));
       await tester.pump();
       final pillRect = tester.getRect(
