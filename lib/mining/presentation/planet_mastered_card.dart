@@ -35,6 +35,21 @@ class PlanetMasteredCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final landscape = size.width > size.height;
+    // Landscape panels are always short. Portrait only compacts when large
+    // text leaves too little height for the art-led stack to reach the
+    // successor. Keep the authored art-led column at normal sizes.
+    // shortcut: the 700px breakpoint covers the short-phone large-text target;
+    // move to a measured body viewport if more screen classes need it.
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final compactPortrait = !landscape && textScale > 1 && size.height <= 700;
+    final sideBySide = landscape || compactPortrait;
+    final artSize = landscape
+        ? const Size(104, 104)
+        : compactPortrait
+        ? const Size(80, 80)
+        : const Size(160, 132);
     return MiningSheetFrame(
       key: const Key('planet-mastery-card'),
       title: isFinal ? 'FINAL PLANET MASTERED' : 'PLANET MASTERED',
@@ -69,111 +84,120 @@ class PlanetMasteredCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: Image.asset(
-              masteredPlanet.planetAsset,
-              key: const Key('planet-mastery-art'),
-              width: 160,
-              height: 132,
-              fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => const SizedBox(
-                width: 160,
-                height: 132,
-                child: Icon(
-                  Icons.public_rounded,
-                  color: Colors.white24,
-                  size: 96,
-                ),
-              ),
+      child: sideBySide
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _art(artSize),
+                const SizedBox(width: 12),
+                Expanded(child: _details(compact: true)),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(child: _art(artSize)),
+                const SizedBox(height: 8),
+                _details(compact: false),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            masteredPlanet.name,
-            key: const Key('planet-mastery-planet'),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: MiningTheme.highlight,
-              fontFamily: 'Orbitron',
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          if (isFinal) ...[
-            const SizedBox(height: 4),
-            Text(
-              '+${formatMiningCash(rewardCash ?? 0)} cash',
-              key: const Key('planet-mastery-reward'),
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: MiningTheme.warning,
-                fontFamily: 'Orbitron',
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 2),
-            const Text(
-              'completion reward',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: MiningTheme.secondaryText, fontSize: 11),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'RUN COMPLETE',
-              style: TextStyle(
-                color: MiningTheme.accent,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.4,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Relaunch to start again with sales '
-              '${formatSaleMultiplier(nextSaleMultiplier)}. '
-              'Only your relaunch count is kept.',
-              key: const Key('planet-mastery-multiplier'),
-              style: const TextStyle(
-                color: MiningTheme.secondaryText,
-                height: 1.4,
-              ),
-            ),
-          ] else ...[
-            const SizedBox(height: 2),
-            Text(
-              'All ${masteredPlanet.sites.length} sites commissioned',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: MiningTheme.secondaryText,
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '${successorName ?? 'The next frontier'} is next',
-              key: const Key('planet-mastery-successor'),
-              style: const TextStyle(
-                color: MiningTheme.accent,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                letterSpacing: .8,
-              ),
-            ),
-            const SizedBox(height: 6),
-            for (final (index, requirement) in requirements.indexed)
-              _MasteryRequirement(
-                key: Key('planet-mastery-requirement-$index'),
-                requirement: requirement,
-              ),
-          ],
-        ],
-      ),
     );
   }
+
+  Widget _art(Size size) => Image.asset(
+    masteredPlanet.planetAsset,
+    key: const Key('planet-mastery-art'),
+    width: size.width,
+    height: size.height,
+    fit: BoxFit.contain,
+    errorBuilder: (_, _, _) => SizedBox(
+      width: size.width,
+      height: size.height,
+      child: const Icon(Icons.public_rounded, color: Colors.white24, size: 96),
+    ),
+  );
+
+  Widget _details({required bool compact}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(
+        masteredPlanet.name,
+        key: const Key('planet-mastery-planet'),
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: MiningTheme.highlight,
+          fontFamily: 'Orbitron',
+          fontSize: 26,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      if (isFinal) ...[
+        const SizedBox(height: 4),
+        Text(
+          '+${formatMiningCash(rewardCash ?? 0)} cash',
+          key: const Key('planet-mastery-reward'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: MiningTheme.warning,
+            fontFamily: 'Orbitron',
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 2),
+        const Text(
+          'completion reward',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: MiningTheme.secondaryText, fontSize: 11),
+        ),
+        SizedBox(height: compact ? 10 : 16),
+        const Text(
+          'RUN COMPLETE',
+          style: TextStyle(
+            color: MiningTheme.accent,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.4,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Relaunch to start again with sales '
+          '${formatSaleMultiplier(nextSaleMultiplier)}. '
+          'Only your relaunch count is kept.',
+          key: const Key('planet-mastery-multiplier'),
+          style: const TextStyle(color: MiningTheme.secondaryText, height: 1.4),
+        ),
+      ] else ...[
+        const SizedBox(height: 2),
+        Text(
+          'All ${masteredPlanet.sites.length} sites commissioned',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: MiningTheme.secondaryText,
+            fontSize: 12,
+          ),
+        ),
+        SizedBox(height: compact ? 10 : 16),
+        Text(
+          '${successorName ?? 'The next frontier'} is next',
+          key: const Key('planet-mastery-successor'),
+          style: const TextStyle(
+            color: MiningTheme.accent,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: .8,
+          ),
+        ),
+        const SizedBox(height: 6),
+        for (final (index, requirement) in requirements.indexed)
+          _MasteryRequirement(
+            key: Key('planet-mastery-requirement-$index'),
+            requirement: requirement,
+          ),
+      ],
+    ],
+  );
 }
 
 class _MasteryRequirement extends StatelessWidget {

@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -65,6 +67,7 @@ Future<void> _pumpMap(
   VoidCallback? onRelaunch,
   ValueChanged<MiningNavigationDestination>? onDestinationSelected,
   Size viewport = const Size(360, 640),
+  bool orbitronText = false,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = viewport;
@@ -72,19 +75,30 @@ Future<void> _pumpMap(
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
   });
+  final screen = StellarMapScreen(
+    view: view,
+    content: _content,
+    onUnlock: onUnlock ?? (_) {},
+    onTravel: onTravel ?? (_) {},
+    onRelaunch: onRelaunch ?? () {},
+    onDestinationSelected: onDestinationSelected ?? (_) {},
+  );
   await tester.pumpWidget(
     MediaQuery(
       data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
       child: MaterialApp(
         theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
-        home: StellarMapScreen(
-          view: view,
-          content: _content,
-          onUnlock: onUnlock ?? (_) {},
-          onTravel: onTravel ?? (_) {},
-          onRelaunch: onRelaunch ?? () {},
-          onDestinationSelected: onDestinationSelected ?? (_) {},
-        ),
+        // The shell's Material installs Orbitron metrics above the map.
+        home: orbitronText
+            ? DefaultTextStyle(
+                style: const TextStyle(
+                  fontFamily: 'Orbitron',
+                  fontSize: 14,
+                  letterSpacing: .25,
+                ),
+                child: screen,
+              )
+            : screen,
       ),
     ),
   );
@@ -92,6 +106,15 @@ Future<void> _pumpMap(
 }
 
 void main() {
+  setUpAll(() async {
+    if (kIsWeb) return;
+    final file = File('assets/fonts/Orbitron-Variable.ttf');
+    if (!file.existsSync()) return;
+    final loader = FontLoader('Orbitron')
+      ..addFont(file.readAsBytes().then(ByteData.sublistView));
+    await loader.load();
+  });
+
   testWidgets('matches the authored 402x874 Stellar Map composition', (
     tester,
   ) async {
@@ -1230,4 +1253,74 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  group('planet names stay clear of the planet art', () {
+    for (final viewport in const [Size(360, 640), Size(390, 844)]) {
+      testWidgets('at ${viewport.width.toInt()}x${viewport.height.toInt()} '
+          'text scale 1.3', (tester) async {
+        final view = StellarMapView.from(
+          state: _stateWith(
+            // Every planet unlocked avoids the authored locked-card gate
+            // column, which is not what this name/art regression measures.
+            unlockedPlanets: {...MiningPlanetId.values},
+          ),
+          content: _content,
+        );
+        await _pumpMap(
+          tester,
+          view: view,
+          viewport: viewport,
+          orbitronText: true,
+        );
+
+        for (final planet in const [
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+          MiningPlanetId.marsFrontier,
+          MiningPlanetId.ceresFrontier,
+        ]) {
+          final card = find.byKey(
+            Key('mining-stellar-map-planet-${planet.name}'),
+          );
+          await tester.ensureVisible(card);
+          await tester.pump();
+
+          final name = find.descendant(
+            of: card,
+            matching: find.text(_content.planet(planet).name),
+          );
+          expect(name, findsOneWidget);
+          final paragraph = tester.renderObject<RenderParagraph>(name);
+          final art = tester.getRect(
+            find.byKey(Key('mining-stellar-map-planet-${planet.name}-art')),
+          );
+          final nameRect = tester.getRect(name);
+          expect(
+            nameRect.right,
+            lessThanOrEqualTo(art.left),
+            reason:
+                '${_content.planet(planet).name} paints over its planet art',
+          );
+          expect(
+            paragraph.size.width,
+            greaterThanOrEqualTo(
+              paragraph.getMaxIntrinsicWidth(double.infinity) - .5,
+            ),
+            reason: '${_content.planet(planet).name} must not wrap or clip',
+          );
+          final cardRect = tester.getRect(card);
+          expect(cardRect.contains(nameRect.topLeft), isTrue);
+          expect(
+            cardRect.contains(nameRect.bottomRight - const Offset(1, 1)),
+            isTrue,
+          );
+          expect(
+            tester.getSize(card).height,
+            planet == MiningPlanetId.homeworld ? 264 : 290,
+          );
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
 }

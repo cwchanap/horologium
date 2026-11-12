@@ -359,173 +359,198 @@ class _PlanetCard extends StatelessWidget {
     final height = view.isActive
         ? 264.0
         : (view.isUnlocked ? 290.0 : (view.isBusy ? 219.0 : 191.0));
-    return Semantics(
-      container: true,
-      label: '${view.name}, ${stateLabel.toLowerCase()} planet',
-      child: Container(
-        key: Key('mining-stellar-map-planet-${view.id.name}'),
-        height: height,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: const Color(0xF20A111A),
-          gradient: RadialGradient(
-            center: const Alignment(.45, -.5),
-            radius: .9,
-            colors: view.isActive
-                ? const [Color(0xFF1B2F47), Color(0xFF0B131C)]
-                : const [Color(0xFF1A2230), Color(0xFF0A0F16)],
-          ),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _borderColor(view)),
-          boxShadow: view.isActive
-              ? const [
-                  BoxShadow(
-                    color: Color.fromRGBO(83, 212, 232, .1),
-                    spreadRadius: 3,
-                  ),
-                ]
-              : null,
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              right: view.isActive ? -27 : -8,
-              top: view.isActive ? -43 : 2,
-              child: Opacity(
-                opacity: view.isUnlocked ? 1 : .9,
-                child: _PlanetArt(
-                  definition: definition,
-                  size: view.isActive ? 172 : 96,
-                ),
+    final nameStyle = TextStyle(
+      color: Colors.white,
+      fontSize: view.isActive ? 24 : 22,
+      fontWeight: FontWeight.w700,
+    );
+    // The shell mounts the map under a Scaffold, so the name renders in the
+    // theme's body style. Measure that same style to reserve enough of the
+    // card for the name before placing the planet art beside it.
+    final namePainter = TextPainter(
+      text: TextSpan(
+        text: view.name,
+        style:
+            Theme.of(context).textTheme.bodyMedium?.merge(nameStyle) ??
+            nameStyle,
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    final nameWidth = namePainter.width;
+    namePainter.dispose();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = constraints.maxWidth;
+        final fullArtSize = view.isActive ? 172.0 : 96.0;
+        final artBleed = view.isActive ? 27.0 : 8.0;
+        // Shrink the art only as far as the name needs to stay clear; at
+        // normal sizes the full authored globe is unchanged.
+        // shortcut: authored names fit at the 64px globe floor; revisit if
+        // longer names or much larger text scales ship.
+        final artSize = (cardWidth + artBleed - 14 - nameWidth - 8).clamp(
+          64.0,
+          fullArtSize,
+        );
+        return Semantics(
+          container: true,
+          label: '${view.name}, ${stateLabel.toLowerCase()} planet',
+          child: Container(
+            key: Key('mining-stellar-map-planet-${view.id.name}'),
+            height: height,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: const Color(0xF20A111A),
+              gradient: RadialGradient(
+                center: const Alignment(.45, -.5),
+                radius: .9,
+                colors: view.isActive
+                    ? const [Color(0xFF1B2F47), Color(0xFF0B131C)]
+                    : const [Color(0xFF1A2230), Color(0xFF0A0F16)],
               ),
-            ),
-            if (view.isActive)
-              Positioned(
-                left: 14,
-                top: 14,
-                child: _StateChip(label: stateLabel, view: view),
-              ),
-            Positioned(
-              left: 14,
-              top: view.isActive ? 56 : 16,
-              child: Text(
-                view.name,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: view.isActive ? 24 : 22,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            if (view.isActive)
-              Positioned(
-                left: 14,
-                right: 14,
-                bottom: 70,
-                child: Row(
-                  children: [
-                    for (final indicator in view.siteIndicators) ...[
-                      Expanded(
-                        child: _SiteIndicator(
-                          key: Key(
-                            'stellar-map-site-${view.id.name}-${indicator.id.name}',
-                          ),
-                          indicator: indicator,
-                          content: content,
-                        ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: _borderColor(view)),
+              boxShadow: view.isActive
+                  ? const [
+                      BoxShadow(
+                        color: Color.fromRGBO(83, 212, 232, .1),
+                        spreadRadius: 3,
                       ),
-                      if (indicator != view.siteIndicators.last)
-                        const SizedBox(width: 8),
-                    ],
-                  ],
+                    ]
+                  : null,
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -artBleed,
+                  top: view.isActive ? -43 : 2,
+                  child: Opacity(
+                    opacity: view.isUnlocked ? 1 : .9,
+                    child: _PlanetArt(definition: definition, size: artSize),
+                  ),
                 ),
-              )
-            else ...[
-              Positioned(
-                left: 14,
-                right: 14,
-                top: 54,
-                bottom: view.isUnlocked ? 70 : 60,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                if (view.isActive)
+                  Positioned(
+                    left: 14,
+                    top: 14,
+                    child: _StateChip(label: stateLabel, view: view),
+                  ),
+                Positioned(
+                  left: 14,
+                  top: view.isActive ? 56 : 16,
+                  child: Text(view.name, style: nameStyle),
+                ),
+                if (view.isActive)
+                  Positioned(
+                    left: 14,
+                    right: 14,
+                    bottom: 70,
+                    child: Row(
                       children: [
-                        for (final requirement in view.requirements)
-                          _RequirementRow(requirement: requirement),
-                        if (view.isBusy)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 4),
-                            child: Text(
-                              'Finishing previous action…',
-                              style: TextStyle(
-                                color: MiningTheme.warning,
-                                fontSize: 10,
+                        for (final indicator in view.siteIndicators) ...[
+                          Expanded(
+                            child: _SiteIndicator(
+                              key: Key(
+                                'stellar-map-site-${view.id.name}-${indicator.id.name}',
                               ),
+                              indicator: indicator,
+                              content: content,
                             ),
+                          ),
+                          if (indicator != view.siteIndicators.last)
+                            const SizedBox(width: 8),
+                        ],
+                      ],
+                    ),
+                  )
+                else ...[
+                  Positioned(
+                    left: 14,
+                    right: 14,
+                    top: 54,
+                    bottom: view.isUnlocked ? 70 : 60,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (final requirement in view.requirements)
+                              _RequirementRow(requirement: requirement),
+                            if (view.isBusy)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 4),
+                                child: Text(
+                                  'Finishing previous action…',
+                                  style: TextStyle(
+                                    color: MiningTheme.warning,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (view.isUnlocked)
+                          Row(
+                            children: [
+                              for (final indicator in view.siteIndicators) ...[
+                                Expanded(
+                                  child: _SiteIndicator(
+                                    key: Key(
+                                      'stellar-map-site-${view.id.name}-${indicator.id.name}',
+                                    ),
+                                    indicator: indicator,
+                                    content: content,
+                                  ),
+                                ),
+                                if (indicator != view.siteIndicators.last)
+                                  const SizedBox(width: 8),
+                              ],
+                            ],
                           ),
                       ],
                     ),
-                    if (view.isUnlocked)
-                      Row(
-                        children: [
-                          for (final indicator in view.siteIndicators) ...[
-                            Expanded(
-                              child: _SiteIndicator(
-                                key: Key(
-                                  'stellar-map-site-${view.id.name}-${indicator.id.name}',
-                                ),
-                                indicator: indicator,
-                                content: content,
-                              ),
-                            ),
-                            if (indicator != view.siteIndicators.last)
-                              const SizedBox(width: 8),
-                          ],
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            ],
-            Positioned(
-              left: 14,
-              right: 14,
-              bottom: 10,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (view.isActive) ...[
-                    Expanded(child: _PlanetMetrics(view: view)),
-                    const SizedBox(width: 12),
-                    _PlanetAction(
-                      view: view,
-                      onUnlock: onUnlock,
-                      onTravel: onTravel,
-                    ),
-                  ] else if (view.isUnlocked)
-                    _PlanetAction(
-                      view: view,
-                      onUnlock: onUnlock,
-                      onTravel: onTravel,
-                    )
-                  else
-                    Expanded(
-                      child: _PlanetAction(
-                        view: view,
-                        onUnlock: onUnlock,
-                        onTravel: onTravel,
-                      ),
-                    ),
+                  ),
                 ],
-              ),
+                Positioned(
+                  left: 14,
+                  right: 14,
+                  bottom: 10,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (view.isActive) ...[
+                        Expanded(child: _PlanetMetrics(view: view)),
+                        const SizedBox(width: 12),
+                        _PlanetAction(
+                          view: view,
+                          onUnlock: onUnlock,
+                          onTravel: onTravel,
+                        ),
+                      ] else if (view.isUnlocked)
+                        _PlanetAction(
+                          view: view,
+                          onUnlock: onUnlock,
+                          onTravel: onTravel,
+                        )
+                      else
+                        Expanded(
+                          child: _PlanetAction(
+                            view: view,
+                            onUnlock: onUnlock,
+                            onTravel: onTravel,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
