@@ -7,6 +7,7 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/animated_mining_grid_visual_layer.dart';
+import 'package:horologium/mining/presentation/mining_grid_map.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 import '../../support/mining_grid_fixtures.dart';
@@ -1143,6 +1144,30 @@ void main() {
       },
       skip: kIsWeb,
     );
+
+    testWidgets('keeps a below-resource label above the rig chip clearance', (
+      tester,
+    ) async {
+      // The default rig at (2,3) mines the 2x2 at (1,1): the strike
+      // midpoint sits on the rig cell's top edge, where the map paints the
+      // top-anchored chip. Reduced motion keeps the label still.
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
+      await _pumpLayer(tester, impactSequence: 0, reducedMotion: true);
+      await _pumpLayer(tester, impactSequence: 1, reducedMotion: true);
+      await tester.pump(const Duration(milliseconds: 470));
+
+      final label = find.byKey(_damageKey(_defaultCell));
+      expect(label, findsOneWidget);
+      final rect = tester.getRect(label);
+      expect(
+        rect.top,
+        _defaultCell.y * miningGridCellSize - miningRigChipClearance,
+      );
+      expect(
+        rect.bottom,
+        lessThanOrEqualTo(_defaultCell.y * miningGridCellSize),
+      );
+    }, skip: kIsWeb);
 
     testWidgets('a breaking hit shows visible zero then the fresh max at end', (
       tester,

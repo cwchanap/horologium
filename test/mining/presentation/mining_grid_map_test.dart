@@ -98,6 +98,25 @@ Color? _chipColor(WidgetTester tester, MiningGridCell cell) => tester
     .style
     ?.color;
 
+Color? _chipFill(WidgetTester tester, MiningGridCell cell) =>
+    (tester
+                .widget<Container>(
+                  find.descendant(
+                    of: find.byKey(_chipKey(cell)),
+                    matching: find.byType(Container),
+                  ),
+                )
+                .decoration
+            as BoxDecoration?)
+        ?.color;
+
+/// WCAG 2.0 relative-luminance contrast ratio between two opaque colors.
+double _contrastRatio(Color foreground, Color background) {
+  final a = foreground.computeLuminance();
+  final b = background.computeLuminance();
+  return a > b ? (a + .05) / (b + .05) : (b + .05) / (a + .05);
+}
+
 Future<void> _pumpMap(
   WidgetTester tester,
   MineSiteView view,
@@ -106,6 +125,7 @@ Future<void> _pumpMap(
   EdgeInsets viewportInsets = EdgeInsets.zero,
   int impactSequence = 0,
   bool reducedMotion = true,
+  double textScale = 1,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -115,13 +135,17 @@ Future<void> _pumpMap(
   });
   await tester.pumpWidget(
     MaterialApp(
-      home: MiningGridMap(
-        key: ValueKey(view.siteId),
-        view: view,
-        onCellTap: onCellTap,
-        impactSequence: impactSequence,
-        reducedMotion: reducedMotion,
-        viewportInsets: viewportInsets,
+      home: MediaQuery.withClampedTextScaling(
+        minScaleFactor: textScale,
+        maxScaleFactor: textScale,
+        child: MiningGridMap(
+          key: ValueKey(view.siteId),
+          view: view,
+          onCellTap: onCellTap,
+          impactSequence: impactSequence,
+          reducedMotion: reducedMotion,
+          viewportInsets: viewportInsets,
+        ),
       ),
     ),
   );
@@ -877,9 +901,57 @@ void main() {
     expect(_chipLabel(tester, eligible), 'T1→T2');
     expect(_chipLabel(tester, mismatched), 'T2');
     expect(_chipLabel(tester, topTier), 'T5');
-    expect(_chipColor(tester, eligible), gold);
-    expect(_chipColor(tester, mismatched), isNot(gold));
-    expect(_chipColor(tester, topTier), isNot(gold));
+    expect(_chipFill(tester, eligible), gold);
+    expect(_chipColor(tester, eligible), const Color(0xFF04121A));
+    expect(_chipFill(tester, mismatched), isNot(gold));
+    expect(_chipColor(tester, mismatched), isNot(const Color(0xFF04121A)));
+    expect(_chipFill(tester, topTier), isNot(gold));
+    expect(_chipColor(tester, topTier), isNot(const Color(0xFF04121A)));
+  });
+
+  testWidgets('keeps the widest T4→T5 chip legible at both text scales', (
+    tester,
+  ) async {
+    const cell = MiningGridCell(3, 2);
+    const darkInk = Color(0xFF04121A);
+    const upgradeGold = Color(0xFFF5B44C);
+    final chipHeights = <double>[];
+    for (final scale in [1.0, 1.3]) {
+      final view = _view(
+        MiningSiteId.landingBasin,
+        rigs: const [MiningRigPlacement(tier: RigTier.t4, cell: cell)],
+        selectedBayId: DockBayId.b1,
+        dockBays: const {DockBayId.b1: RigTier.t4},
+      );
+      expect(view.upgradeableCells, {cell});
+      await _pumpMap(tester, view, (_) {}, textScale: scale);
+
+      expect(_chips(), findsOneWidget, reason: 'text scale $scale');
+      expect(_rigSemanticsNodes(), findsOneWidget, reason: 'text scale $scale');
+      final chip = find.byKey(_chipKey(cell));
+      chipHeights.add(tester.getRect(chip).height);
+      final label = find.descendant(of: chip, matching: find.byType(Text));
+      expect(tester.widget<Text>(label).data, 'T4→T5');
+      // getRect includes any FittedBox shrink at the map's initial 1.0x
+      // camera; multiplying by the zoom floor gives the worst-case height.
+      expect(
+        tester.getRect(label).height * miningGridMinScale,
+        greaterThanOrEqualTo(8),
+        reason: 'text scale $scale',
+      );
+
+      expect(_chipFill(tester, cell), upgradeGold);
+      final ink = _chipColor(tester, cell)!;
+      expect(ink, darkInk);
+      expect(
+        _contrastRatio(ink, upgradeGold),
+        greaterThanOrEqualTo(4.5),
+        reason: 'text scale $scale',
+      );
+    }
+    // The top-edge anchor has a fixed scene-space height: text scale changes
+    // the label inside it, never the chip chrome.
+    expect(chipHeights[1], chipHeights[0]);
   });
 
   testWidgets('never golds a chip while no dock rig is selected', (
@@ -936,6 +1008,9 @@ void main() {
       isFalse,
       reason: 'chip $chip overlaps damage label $damage',
     );
+    // The label finishes above the rig cell edge where the chip starts, so
+    // the clearance derived from the chip height keeps it clear.
+    expect(damage.bottom, lessThanOrEqualTo(chip.top));
   }, skip: kIsWeb);
 
   test('paints a gold upgrade ring and keeps the cyan deploy fill', () {
