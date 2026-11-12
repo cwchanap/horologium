@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -103,6 +104,8 @@ Future<void> _pumpMap(
   void Function(MiningGridCell) onCellTap, {
   Size size = const Size(430, 500),
   EdgeInsets viewportInsets = EdgeInsets.zero,
+  int impactSequence = 0,
+  bool reducedMotion = true,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -116,8 +119,8 @@ Future<void> _pumpMap(
         key: ValueKey(view.siteId),
         view: view,
         onCellTap: onCellTap,
-        impactSequence: 0,
-        reducedMotion: true,
+        impactSequence: impactSequence,
+        reducedMotion: reducedMotion,
         viewportInsets: viewportInsets,
       ),
     ),
@@ -893,6 +896,47 @@ void main() {
     expect(_chipLabel(tester, cell), 'T1');
     expect(find.textContaining('→'), findsNothing);
   });
+
+  testWidgets('keeps a below-rig damage label clear of the tier chip', (
+    tester,
+  ) async {
+    // A legal rig below the 1x1 resource at (27,1) has its strike midpoint
+    // label exactly on the rig cell's top edge, where the top-anchored chip
+    // paints. Reduced motion keeps the label still, so this is the worst case.
+    const rigCell = MiningGridCell(27, 2);
+    const damageKey = Key('landing-basin-damage-27-2');
+    await warmDepositFrames(tester, MiningDepositFrames.gold);
+    final view = _view(
+      MiningSiteId.landingBasin,
+      surveying: 2,
+      rigs: const [MiningRigPlacement(tier: RigTier.t1, cell: rigCell)],
+    );
+    await _pumpMap(
+      tester,
+      view,
+      (_) {},
+      impactSequence: 0,
+      reducedMotion: true,
+    );
+    await _pumpMap(
+      tester,
+      view,
+      (_) {},
+      impactSequence: 1,
+      reducedMotion: true,
+    );
+    await tester.pump(const Duration(milliseconds: 470));
+
+    final label = find.byKey(damageKey);
+    expect(label, findsOneWidget);
+    final chip = tester.getRect(find.byKey(_chipKey(rigCell)));
+    final damage = tester.getRect(label);
+    expect(
+      chip.overlaps(damage),
+      isFalse,
+      reason: 'chip $chip overlaps damage label $damage',
+    );
+  }, skip: kIsWeb);
 
   test('paints a gold upgrade ring and keeps the cyan deploy fill', () {
     const deploy = MiningGridCell(1, 1);

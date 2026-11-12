@@ -16,6 +16,10 @@ const double miningGridMaxScale = 1.6;
 /// Gold shared by the rig upgrade chip and the upgrade-target ring.
 const Color _upgradeGold = Color(0xFFF5B44C);
 
+/// Vertical room above a rig cell that a damage label needs so the rig's
+/// top-anchored tier chip cannot cover it.
+const double miningRigChipClearance = 18;
+
 /// Oversized deposit art edge, keyed by the deposit's logical footprint in
 /// cells. The art is centered over the logical footprint so hit-testing and
 /// overlay rects stay on authored grid coordinates.

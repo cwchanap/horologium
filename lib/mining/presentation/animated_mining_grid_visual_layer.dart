@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/mine_site_view.dart';
@@ -422,13 +423,23 @@ class _AnimatedMiningGridVisualLayerState
           cell,
     );
     final drift = widget.reducedMotion ? 0.0 : tail * 18;
+    // A rig below its resource anchors this label on the shared cell edge,
+    // exactly where the map paints the rig's top-anchored tier chip. Lift it
+    // above that chip so the chip never covers the damage value.
+    final targetAbove = rig.target.y + rig.target.size == rig.placement.cell.y;
+    final top = targetAbove
+        ? math.min(
+            anchor.dy - drift,
+            rig.placement.cell.y * cell - miningRigChipClearance,
+          )
+        : anchor.dy - drift;
     return Positioned(
       key: Key(
         '$_keyPrefix-damage-'
         '${rig.placement.cell.x}-${rig.placement.cell.y}',
       ),
       left: anchor.dx - 24,
-      top: anchor.dy - drift,
+      top: top,
       width: 48,
       child: ExcludeSemantics(
         child: Opacity(
