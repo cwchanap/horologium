@@ -15,6 +15,7 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
 - `MiningShell` owns initialization, presentation state, the one-second
   foreground refresh, lifecycle checkpoints, audio, reduced-motion
   propagation, and Flutter navigation/action sheets.
+- Planet mastery feedback is a transient shell card driven by `MiningActionResult.masteredPlanetId`; it is not persisted.
 - `MiningController` is the sole public mutation boundary. Unlock, spawn,
   merge, deploy, recall, upgrade, sale, technology, planet unlock/travel,
   and lifecycle checkpoint operations accrue current state, mutate in order, and persist
