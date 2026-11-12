@@ -1,5 +1,9 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart' show ByteData, FontLoader;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -30,6 +34,19 @@ MiningSave _state({
 }
 
 void main() {
+  // Real Orbitron metrics: the test font's square glyphs understate line
+  // height, hiding footer overlap on the small viewports.
+  setUpAll(() async {
+    if (kIsWeb) return;
+    final loader = FontLoader('Orbitron')
+      ..addFont(
+        File(
+          'assets/fonts/Orbitron-Variable.ttf',
+        ).readAsBytes().then(ByteData.sublistView),
+      );
+    await loader.load();
+  });
+
   testWidgets('landscape continue action is visible without scrolling', (
     tester,
   ) async {
@@ -914,11 +931,13 @@ void main() {
 
       final warning = find.text('All 3 sites full · sell to resume');
       expect(warning, findsOneWidget);
-      const footerTop = 640 - 152.0;
+      final footerTop = tester
+          .getRect(find.byKey(const Key('offline-return-footer')))
+          .top;
       for (var i = 0; i < 10; i++) {
         if (tester.getRect(warning).bottom <= footerTop) break;
         await tester.drag(
-          find.byKey(const Key('offline-return-sheet')),
+          find.byKey(const Key('offline-return-scroll')),
           const Offset(0, -60),
         );
         await tester.pump();
@@ -934,4 +953,193 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  for (final size in const [Size(360, 640), Size(390, 844)]) {
+    testWidgets('pins the footer below all five planet reports at '
+        '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: OfflineReturnSheet(
+              summary: _fivePlanetSummary,
+              content: MiningContentRegistry.stellarMining(),
+              state: _state(),
+              onSellCargo: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final scroll = tester.getRect(
+        find.byKey(const Key('offline-return-scroll')),
+      );
+      final footer = tester.getRect(
+        find.byKey(const Key('offline-return-footer')),
+      );
+      // The fixed footer and the scrolling viewport never share pixels.
+      expect(scroll.bottom, lessThanOrEqualTo(footer.top));
+      expect(footer.bottom, size.height);
+      expect(
+        tester.getRect(find.byKey(const Key('mining-cash-chip'))).top,
+        greaterThanOrEqualTo(0),
+      );
+      expect(
+        find.byKey(const Key('offline-return-sell-all')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('offline-return-next-action')).hitTestable(),
+        findsOneWidget,
+      );
+      for (final planet in MiningPlanetId.values) {
+        expect(
+          find.byKey(Key('offline-return-planet-${planet.name}')),
+          findsOneWidget,
+        );
+      }
+
+      // Every planet report is reachable by scrolling the list only.
+      await tester.ensureVisible(find.text('Sulfur'));
+      await tester.pump();
+      expect(find.text('Sulfur').hitTestable(), findsOneWidget);
+      final lastReport = find.byKey(
+        const Key('offline-return-planet-ioFrontier'),
+      );
+      expect(tester.getRect(lastReport).bottom, lessThanOrEqualTo(footer.top));
+      expect(find.byKey(const Key('offline-return-sell-all')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('SELL ALL and continue stay pinned and unchanged at '
+        '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      var sales = 0;
+
+      Future<void> openSheet() async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: OutlinedButton(
+                  key: const Key('open-return'),
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => OfflineReturnSheet(
+                      summary: _fivePlanetSummary,
+                      content: MiningContentRegistry.stellarMining(),
+                      state: _state(),
+                      onSellCargo: () => sales++,
+                    ),
+                  ),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.byKey(const Key('open-return')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+      }
+
+      await openSheet();
+      final sellAll = find.byKey(const Key('offline-return-sell-all'));
+      expect(sellAll.hitTestable(), findsOneWidget);
+      await tester.tap(sellAll);
+      expect(sales, 1);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
+
+      await openSheet();
+      await tester.tap(find.bySemanticsLabel('Continue mining'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
+      expect(sales, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('keeps the pinned footer clear of the bottom safe-area inset', (
+    tester,
+  ) async {
+    const padBottom = 34.0;
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.padding = const FakeViewPadding(
+      left: 0,
+      top: 0,
+      right: 0,
+      bottom: padBottom,
+    );
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPadding();
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: OfflineReturnSheet(
+            summary: _fivePlanetSummary,
+            content: MiningContentRegistry.stellarMining(),
+            state: _state(),
+            onSellCargo: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester.getRect(find.byKey(const Key('offline-return-sell-all'))).bottom,
+      lessThanOrEqualTo(844 - padBottom),
+    );
+    expect(
+      tester
+          .getRect(find.byKey(const Key('offline-return-next-action')))
+          .bottom,
+      lessThanOrEqualTo(844 - padBottom),
+    );
+    expect(
+      tester.getRect(find.byKey(const Key('offline-return-footer'))).bottom,
+      844,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
+
+const _fivePlanetSummary = OfflineProductionSummary(
+  elapsedAway: Duration(hours: 8),
+  elapsedUsed: Duration(hours: 8),
+  produced: {
+    ResourceType.gold: 10,
+    ResourceType.waterIce: 20,
+    ResourceType.ironOre: 30,
+    ResourceType.nickelOre: 40,
+    ResourceType.sulfur: 50,
+  },
+  productionByPlanet: {
+    MiningPlanetId.homeworld: {ResourceType.gold: 10},
+    MiningPlanetId.lunarFrontier: {ResourceType.waterIce: 20},
+    MiningPlanetId.marsFrontier: {ResourceType.ironOre: 30},
+    MiningPlanetId.ceresFrontier: {ResourceType.nickelOre: 40},
+    MiningPlanetId.ioFrontier: {ResourceType.sulfur: 50},
+  },
+  fullSites: {},
+  wasOfflineCapped: false,
+);

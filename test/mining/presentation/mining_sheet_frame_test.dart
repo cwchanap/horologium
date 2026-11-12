@@ -86,4 +86,105 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('a pinned footer stays fixed while the body scrolls', (
+    tester,
+  ) async {
+    const padBottom = 24.0;
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.padding = const FakeViewPadding(
+      left: 0,
+      top: 0,
+      right: 0,
+      bottom: padBottom,
+    );
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPadding();
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: MiningSheetFrame(
+              key: const Key('mining-sheet-frame'),
+              title: 'Technology',
+              icon: const Icon(Icons.memory),
+              pinnedFooter: const Text('pinned footer'),
+              child: const Column(
+                children: [
+                  SizedBox(height: 400),
+                  Text('body middle'),
+                  SizedBox(height: 400),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final body = tester.getRect(find.byKey(const Key('mining-sheet-body')));
+    final footerBefore = tester.getRect(
+      find.byKey(const Key('mining-sheet-pinned-footer')),
+    );
+    expect(body.bottom, lessThanOrEqualTo(footerBefore.top));
+    expect(footerBefore.bottom, lessThanOrEqualTo(640 - padBottom));
+    expect(find.text('pinned footer').hitTestable(), findsOneWidget);
+    expect(find.text('body middle').hitTestable(), findsNothing);
+
+    await tester.drag(
+      find.byKey(const Key('mining-sheet-body')),
+      const Offset(0, -200),
+    );
+    await tester.pump();
+
+    expect(
+      tester.getRect(find.byKey(const Key('mining-sheet-pinned-footer'))),
+      footerBefore,
+    );
+    expect(find.text('pinned footer').hitTestable(), findsOneWidget);
+    expect(find.text('body middle').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('omitting the pinned footer keeps the content-sized panel', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 640);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: MiningSheetFrame(
+              key: const Key('mining-sheet-frame'),
+              title: 'Technology',
+              icon: const Icon(Icons.memory),
+              child: const SizedBox(height: 120, child: Text('short body')),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final panel = tester.getRect(find.byKey(const Key('mining-sheet-panel')));
+    expect(panel.bottom, 640);
+    expect(panel.height, lessThan(300));
+    expect(find.byKey(const Key('mining-sheet-body')), findsNothing);
+    expect(find.byKey(const Key('mining-sheet-pinned-footer')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

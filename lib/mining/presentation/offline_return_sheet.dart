@@ -124,59 +124,61 @@ class OfflineReturnSheet extends StatelessWidget {
               ),
             ] else ...[
               Positioned.fill(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    14,
-                    (constraints.maxHeight * .286).clamp(140, 250) + pad.top,
-                    14,
-                    180 + pad.bottom,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _summaryHeading(compact: false),
-                      const SizedBox(height: 46),
-                      _reports(),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 14,
-                right: 14,
-                bottom: 0,
-                height: 152 + pad.bottom,
-                child: DecoratedBox(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Color(0x00060A10), Color(0xFF060A10)],
-                      stops: [0, .28],
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        key: const Key('offline-return-scroll'),
+                        padding: EdgeInsets.fromLTRB(
+                          14,
+                          (constraints.maxHeight * .286).clamp(140, 250) +
+                              pad.top,
+                          14,
+                          12,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _summaryHeading(compact: false),
+                            const SizedBox(height: 46),
+                            _reports(),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: 32 + pad.bottom),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Next: sell cargo, or fill a free cell.',
-                            key: Key('offline-return-next-action'),
-                            style: TextStyle(
-                              fontFamily: 'IBM Plex Mono',
-                              color: Colors.white60,
-                              fontSize: 11,
+                    Container(
+                      key: const Key('offline-return-footer'),
+                      width: double.infinity,
+                      padding: EdgeInsets.fromLTRB(14, 14, 14, 32 + pad.bottom),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0x00060A10), Color(0xFF060A10)],
+                          stops: [0, .28],
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Next: sell cargo, or fill a free cell.',
+                              key: Key('offline-return-next-action'),
+                              style: TextStyle(
+                                fontFamily: 'IBM Plex Mono',
+                                color: Colors.white60,
+                                fontSize: 11,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 18),
-                        _continueAction(context),
-                      ],
+                          const SizedBox(height: 18),
+                          _continueAction(context),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ],

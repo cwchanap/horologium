@@ -50,13 +50,8 @@ class _TechnologySheetState extends State<TechnologySheet> {
           fontSize: 10,
         ),
       ),
-      child: Column(
-        children: [
-          _tree(landscape),
-          const SizedBox(height: 12),
-          _compactDetails(selected),
-        ],
-      ),
+      pinnedFooter: _compactDetails(selected),
+      child: _tree(landscape),
     );
   }
 
