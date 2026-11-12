@@ -18,6 +18,7 @@ import 'package:horologium/mining/next_goal_view.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_settings_sheet.dart';
+import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/offline_return_sheet.dart';
@@ -747,7 +748,23 @@ class _MiningShellState extends State<MiningShell>
     final messenger = ScaffoldMessenger.of(context);
     messenger.removeCurrentSnackBar();
     messenger.showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontFamily: 'Orbitron',
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: MiningTheme.primaryText,
+          ),
+        ),
+        backgroundColor: MiningTheme.panel,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: MiningTheme.accent),
+        ),
+      ),
       snackBarAnimationStyle: _reducedMotion
           ? AnimationStyle.noAnimation
           : null,
