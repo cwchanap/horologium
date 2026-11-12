@@ -377,9 +377,10 @@ Future<void> pumpShell(
   bool disableAnimations = false,
   Key? shellKey,
   int pumpCycles = 6,
+  Size viewport = _viewport,
 }) async {
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = _viewport;
+  tester.view.physicalSize = viewport;
   addTearDown(() {
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
@@ -433,6 +434,23 @@ Future<void> pumpMiningTick(
 
 MiningShellHandles shellHandles(WidgetTester tester) =>
     tester.state(find.byType(MiningShell)) as MiningShellHandles;
+
+/// Asserts the single visible SnackBar carries the authored dark style.
+void expectThemedSnackBar(WidgetTester tester, Finder message) {
+  expect(message, findsOneWidget);
+  final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+  expect(snackBar.backgroundColor, MiningTheme.panel);
+  expect(snackBar.behavior, SnackBarBehavior.floating);
+  final shape = snackBar.shape;
+  expect(shape, isA<RoundedRectangleBorder>());
+  final bordered = shape! as RoundedRectangleBorder;
+  expect(bordered.borderRadius, BorderRadius.circular(12));
+  expect(bordered.side.color, MiningTheme.accent);
+  final text = snackBar.content as Text;
+  expect(text.style?.fontFamily, 'Orbitron');
+  expect(text.style?.color, MiningTheme.primaryText);
+  expect(text.style?.fontWeight, FontWeight.w600);
+}
 
 void main() {
   setUp(() {
@@ -1759,6 +1777,70 @@ void main() {
       Duration.zero,
     );
   });
+
+  for (final size in const [Size(360, 640), Size(390, 844)]) {
+    final label = '${size.width.toInt()}x${size.height.toInt()}';
+
+    testWidgets('success feedback is a dark themed SnackBar at $label', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start, cargo: 10));
+      await pumpShell(tester, repository: repository, viewport: size);
+
+      await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('mine-site-sell')));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expectThemedSnackBar(tester, find.textContaining('Sold'));
+    });
+
+    testWidgets('rejection guidance is a dark themed SnackBar at $label', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(MiningSave.initial(nowUtc: _start));
+      await pumpShell(tester, repository: repository, viewport: size);
+
+      await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+      await tester.pump();
+      // The keyed Container is clipped inside the bay's MiningHex, so tap the
+      // InkWell ancestor that actually receives the gesture.
+      final emptyBay = find.ancestor(
+        of: find.byKey(const ValueKey<String>('b3')),
+        matching: find.byType(InkWell),
+      );
+      await tester.tap(emptyBay);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expectThemedSnackBar(tester, find.text('Select an occupied rig bay.'));
+    });
+
+    testWidgets('recovery notice is a dark themed SnackBar at $label', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        MiningSaveRepository.saveKey: '{ malformed mining json',
+      });
+      final repository = CountingMiningSaveRepository();
+
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: size,
+        pumpCycles: 12,
+      );
+
+      expectThemedSnackBar(
+        tester,
+        find.text(
+          'Mining progress could not be loaded, so a fresh mining save was '
+          'started.',
+        ),
+      );
+    });
+  }
 
   testWidgets('Site Deck unlocks an eligible site through the controller', (
     tester,
