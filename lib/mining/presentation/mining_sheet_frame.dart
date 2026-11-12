@@ -189,8 +189,15 @@ class MiningSheetFrame extends StatelessWidget {
     );
   }
 
-  Widget _header(bool landscape) => SizedBox(
-    height: landscape ? 46 : null,
+  Widget _header(bool landscape) => ConstrainedBox(
+    // A title that owns the row takes its natural wrapped height. A trailing
+    // widget claims its intrinsic width first, so at large text scales a
+    // squeezed title can wrap into a tall column; cap that legacy single-line
+    // row at the fixed header height so it cannot grow the fixed panel.
+    constraints: BoxConstraints(
+      minHeight: landscape ? 46 : 0,
+      maxHeight: landscape && trailing != null ? 46 : double.infinity,
+    ),
     child: Padding(
       padding: EdgeInsets.only(right: landscape ? 60 : 0),
       child: Row(

@@ -30,6 +30,21 @@ final _unminedDeposit = _landing.deposits[1];
 
 final _deployableCells = deployableMiningCells(_landing);
 
+/// A legal rig cell directly beside an authored 1x1 resource, where the strike
+/// midpoint sits only half a cell below the rig cell's top edge — the exact
+/// geometry that drifts a damage label up into the top-anchored tier chip.
+MiningGridCell _sideRigCell({required bool targetOnRight}) =>
+    deployableMiningCells(_landing, surveyingLevel: 2).firstWhere((cell) {
+      final target = uniqueAdjacentDeposit(
+        deposits: _landing.deposits,
+        cell: cell,
+      );
+      return target != null &&
+          target.size == 1 &&
+          target.y == cell.y &&
+          (targetOnRight ? cell.x == target.x - 1 : cell.x == target.x + 1);
+    });
+
 Key _depositKey(MiningDepositDefinition deposit) =>
     Key('landing-basin-deposit-${deposit.x}-${deposit.y}-${deposit.size}');
 
@@ -137,6 +152,7 @@ Future<void> _pumpLayer(
   List<(RigTier, MiningGridCell)> rigs = const [],
   AssetBundle? assetBundle,
   int surveying = 0,
+  double textScale = 1,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(430, 932);
@@ -162,7 +178,17 @@ Future<void> _pumpLayer(
   if (assetBundle != null) {
     home = DefaultAssetBundle(bundle: assetBundle, child: home);
   }
-  await tester.pumpWidget(MaterialApp(home: home));
+  await tester.pumpWidget(
+    MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
+      home: home,
+    ),
+  );
   await tester.pump();
 }
 
@@ -1168,6 +1194,65 @@ void main() {
         lessThanOrEqualTo(_defaultCell.y * miningGridCellSize),
       );
     }, skip: kIsWeb);
+
+    for (final textScale in const [1.0, 1.3]) {
+      testWidgets('sideways labels stay below the rig chip through the tail at '
+          'text $textScale', (tester) async {
+        // A rig beside a 1x1 resource anchors its label at the shared row's
+        // centre, only 28px below the rig cell top, then drifts up 18px —
+        // straight into the 18px top-anchored chip band. Both sides must
+        // stay below the chip for the whole visible tail.
+        final targetOnRight = _sideRigCell(targetOnRight: true);
+        final targetOnLeft = _sideRigCell(targetOnRight: false);
+        final rigs = [(RigTier.t1, targetOnRight), (RigTier.t1, targetOnLeft)];
+        await warmDepositFrames(tester, MiningDepositFrames.gold);
+        await _pumpLayer(
+          tester,
+          rigs: rigs,
+          impactSequence: 0,
+          surveying: 2,
+          textScale: textScale,
+        );
+        await _pumpLayer(
+          tester,
+          rigs: rigs,
+          impactSequence: 1,
+          surveying: 2,
+          textScale: textScale,
+        );
+
+        var elapsed = 0;
+        for (final step in const [470, 100, 100, 100, 100, 80]) {
+          await tester.pump(Duration(milliseconds: step));
+          elapsed += step;
+          for (final cell in [targetOnRight, targetOnLeft]) {
+            final label = find.byKey(_damageKey(cell));
+            expect(label, findsOneWidget, reason: 'at ${elapsed}ms $cell');
+            final labelRect = tester.getRect(label);
+            final chipRect = Rect.fromLTWH(
+              cell.x * miningGridCellSize,
+              cell.y * miningGridCellSize,
+              miningGridCellSize,
+              miningRigChipHeight,
+            );
+            expect(
+              labelRect.overlaps(chipRect),
+              isFalse,
+              reason:
+                  'damage label $cell $labelRect drifts into the rig chip '
+                  '$chipRect at ${elapsed}ms',
+            );
+            expect(
+              labelRect.top,
+              greaterThanOrEqualTo(chipRect.bottom),
+              reason:
+                  'damage label $cell must sit below the chip at '
+                  '${elapsed}ms',
+            );
+          }
+        }
+      }, skip: kIsWeb);
+    }
 
     testWidgets('a breaking hit shows visible zero then the fresh max at end', (
       tester,

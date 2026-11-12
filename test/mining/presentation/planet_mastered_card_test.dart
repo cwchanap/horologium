@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -248,6 +249,20 @@ void main() {
         primary: relaunch,
         secondary: continueButton,
         size: size,
+      );
+      // Both pinned actions stay tappable without scrolling the body.
+      expect(relaunch.hitTestable(), findsOneWidget);
+      expect(continueButton.hitTestable(), findsOneWidget);
+
+      // The heading wraps at this size and text scale; its box must grow with
+      // the wrapped lines instead of clipping the second one.
+      final heading = tester.renderObject<RenderParagraph>(
+        find.text('FINAL PLANET MASTERED'),
+      );
+      expect(
+        heading.size.height,
+        greaterThanOrEqualTo(heading.getMaxIntrinsicHeight(heading.size.width)),
+        reason: 'the milestone heading must render both wrapped lines',
       );
 
       final reward = _content.planet(_content.finalPlanetId).masteryRewardCash;
