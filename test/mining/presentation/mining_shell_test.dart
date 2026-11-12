@@ -4522,5 +4522,130 @@ void main() {
       await tester.pump();
       expect(find.byKey(const Key('mining-relaunch-sheet')), findsNothing);
     });
+
+    testWidgets('mastery title is announced as a heading', (tester) async {
+      final handle = tester.ensureSemantics();
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(tester, repository: repository);
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+
+      expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+      expect(
+        tester
+            .getSemantics(find.text('PLANET MASTERED'))
+            .getSemanticsData()
+            .flagsCollection
+            .isHeader,
+        isTrue,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('Open Map unwinds a sheet opened while mastery was saving', (
+      tester,
+    ) async {
+      final repository = DelayedMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(tester, repository: repository);
+
+      final enter = find.byKey(const Key('site-card-graniteCrater-enter'));
+      await tester.ensureVisible(enter);
+      await tester.pump();
+      await tester.tap(enter);
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey<String>('b1')));
+      await tester.pump();
+      repository.delayNextSave = true;
+      await tapGridCell(tester, _graniteCraterDeployCell);
+      await tester.pump();
+      await repository.saveStarted.future;
+
+      // The player opens Technology while the mastering deploy persists.
+      shellHandles(tester).openTechnology();
+      await pumpSheet(tester);
+      expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+
+      repository.allowSave.complete();
+      await tester.pump();
+      await pumpSheet(tester);
+      expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+      expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+
+      await tester.ensureVisible(
+        find.byKey(const Key('planet-mastery-open-map')),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('planet-mastery-open-map')));
+      await pumpSheet(tester);
+
+      expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+      expect(find.byKey(const Key('mining-technology-sheet')), findsNothing);
+      expect(find.byKey(const Key('stellar-map-screen')), findsOneWidget);
+      final shellRoute = ModalRoute.of(
+        tester.element(find.byKey(const Key('stellar-map-screen'))),
+      );
+      expect(shellRoute!.isCurrent, isTrue);
+    });
+
+    testWidgets(
+      'Relaunch unwinds a sheet opened while final mastery was saving',
+      (tester) async {
+        final repository = DelayedMiningSaveRepository();
+        await repository.save(nearFinalPlanetMasteryState(_start));
+        await pumpShell(tester, repository: repository);
+
+        final enter = find.byKey(const Key('site-card-osmiumCaldera-enter'));
+        await tester.ensureVisible(enter);
+        await tester.pump();
+        await tester.tap(enter);
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey<String>('b1')));
+        await tester.pump();
+        repository.delayNextSave = true;
+        await tapGridCell(tester, _osmiumDeployCell);
+        await tester.pump();
+        await repository.saveStarted.future;
+
+        // The player opens Settings while the mastering deploy persists.
+        shellHandles(tester).openSettings();
+        await pumpSheet(tester);
+        expect(find.byKey(const Key('mining-settings-sheet')), findsOneWidget);
+
+        repository.allowSave.complete();
+        await tester.pump();
+        await pumpSheet(tester);
+        expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+        expect(find.byKey(const Key('mining-settings-sheet')), findsOneWidget);
+
+        await tester.ensureVisible(
+          find.byKey(const Key('planet-mastery-relaunch')),
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('planet-mastery-relaunch')));
+        await pumpSheet(tester);
+
+        expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+        expect(find.byKey(const Key('mining-settings-sheet')), findsNothing);
+        expect(find.byKey(const Key('mining-relaunch-sheet')), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('relaunch-confirm')));
+        await pumpSheet(tester);
+
+        expect(find.byKey(const Key('mining-relaunch-sheet')), findsNothing);
+        expect(find.byKey(const Key('mining-settings-sheet')), findsNothing);
+        expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+        expect(
+          shellHandles(tester).controller.state.relaunchCount,
+          1,
+          reason: 'confirmation still resets the run once',
+        );
+      },
+    );
   });
 }
