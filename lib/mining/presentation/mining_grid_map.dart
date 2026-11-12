@@ -16,9 +16,20 @@ const double miningGridMaxScale = 1.6;
 /// Gold shared by the rig upgrade chip and the upgrade-target ring.
 const Color _upgradeGold = Color(0xFFF5B44C);
 
+/// Dark ink that clears 4.5:1 contrast on [_upgradeGold].
+const Color _upgradeInk = Color(0xFF04121A);
+
+/// Fixed scene-space height of the top-anchored rig chip.
+const double miningRigChipHeight = 18;
+
+/// Widest label box that still leaves the whole chip inside one cell: cell
+/// width minus the chip's 2px side padding, 1px border, and 1px of slack.
+const double _rigChipLabelMaxWidth = miningGridCellSize - 7;
+
 /// Vertical room above a rig cell that a damage label needs so the rig's
-/// top-anchored tier chip cannot cover it.
-const double miningRigChipClearance = 18;
+/// top-anchored tier chip cannot cover it: the chip's full height plus a
+/// small gap.
+const double miningRigChipClearance = miningRigChipHeight + 2;
 
 /// Oversized deposit art edge, keyed by the deposit's logical footprint in
 /// cells. The art is centered over the logical footprint so hit-testing and
@@ -349,20 +360,30 @@ class _MiningGridMapState extends State<MiningGridMap> {
               '${RigTier.values[tier.index + 1].name.toUpperCase()}'
         : tier.name.toUpperCase();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      height: miningRigChipHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       decoration: BoxDecoration(
-        color: MiningTheme.hudPanel,
+        color: upgradeable ? _upgradeGold : MiningTheme.hudPanel,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: upgradeable ? _upgradeGold : Colors.white24),
       ),
-      child: Text(
-        label,
-        maxLines: 1,
-        style: TextStyle(
-          color: upgradeable ? _upgradeGold : MiningTheme.primaryText,
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-          height: 1.1,
+      // The label shrinks to fit the fixed anchor at large text scales; the
+      // capped label box keeps the intrinsic chip narrower than the cell, so
+      // the map's outer FittedBox never scales the chip's height down.
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _rigChipLabelMaxWidth),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            maxLines: 1,
+            style: TextStyle(
+              color: upgradeable ? _upgradeInk : MiningTheme.primaryText,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              height: 1.1,
+            ),
+          ),
         ),
       ),
     );
