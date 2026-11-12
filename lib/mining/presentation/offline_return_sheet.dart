@@ -30,6 +30,10 @@ class OfflineReturnSheet extends StatelessWidget {
       builder: (context, constraints) {
         final landscape = constraints.maxWidth > constraints.maxHeight;
         final pad = MediaQuery.paddingOf(context);
+        // Portrait reports start below the pinned cash chip so nothing can
+        // scroll underneath it. The same amount is removed from the scroll's
+        // inner top padding, keeping the initial composition in place.
+        final reportViewportTop = 54 + pad.top + MiningCashChip.height + 12;
         return Stack(
           children: [
             Positioned(
@@ -123,7 +127,11 @@ class OfflineReturnSheet extends StatelessWidget {
                 ),
               ),
             ] else ...[
-              Positioned.fill(
+              Positioned(
+                top: reportViewportTop,
+                left: 0,
+                right: 0,
+                bottom: 0,
                 child: Column(
                   children: [
                     Expanded(
@@ -132,7 +140,8 @@ class OfflineReturnSheet extends StatelessWidget {
                         padding: EdgeInsets.fromLTRB(
                           14,
                           (constraints.maxHeight * .286).clamp(140, 250) +
-                              pad.top,
+                              pad.top -
+                              reportViewportTop,
                           14,
                           12,
                         ),
