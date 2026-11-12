@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +12,8 @@ import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/stellar_map_screen.dart';
+
+import '../../support/test_fonts.dart';
 
 final _content = MiningContentRegistry.stellarMining();
 final _start = DateTime.utc(2026, 8, 27, 12);
@@ -157,14 +157,8 @@ Future<void> _expectNameClearOfArt(
 }
 
 void main() {
-  setUpAll(() async {
-    if (kIsWeb) return;
-    final file = File('assets/fonts/Orbitron-Variable.ttf');
-    if (!file.existsSync()) return;
-    final loader = FontLoader('Orbitron')
-      ..addFont(file.readAsBytes().then(ByteData.sublistView));
-    await loader.load();
-  });
+  setUpAll(loadProductionTestFonts);
+  tearDownAll(restoreProductionFontsInWebTests);
 
   testWidgets('matches the authored 402x874 Stellar Map composition', (
     tester,
