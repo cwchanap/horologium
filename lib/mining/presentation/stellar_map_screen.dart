@@ -364,16 +364,13 @@ class _PlanetCard extends StatelessWidget {
       fontSize: view.isActive ? 24 : 22,
       fontWeight: FontWeight.w700,
     );
-    // The shell mounts the map under a Scaffold, so the name renders in the
-    // theme's body style. Measure that same style to reserve enough of the
-    // card for the name before placing the planet art beside it.
+    // The name Text inherits DefaultTextStyle, so measure that exact merged
+    // style rather than assuming the theme's body style.
+    final inheritedNameStyle = DefaultTextStyle.of(
+      context,
+    ).style.merge(nameStyle);
     final namePainter = TextPainter(
-      text: TextSpan(
-        text: view.name,
-        style:
-            Theme.of(context).textTheme.bodyMedium?.merge(nameStyle) ??
-            nameStyle,
-      ),
+      text: TextSpan(text: view.name, style: inheritedNameStyle),
       textDirection: Directionality.of(context),
       textScaler: MediaQuery.textScalerOf(context),
     )..layout();
