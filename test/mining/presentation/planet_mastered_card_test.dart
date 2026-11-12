@@ -7,10 +7,12 @@ import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
+import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/planet_mastered_card.dart';
 
 final _content = MiningContentRegistry.stellarMining();
+final _start = DateTime.utc(2026, 8, 27, 12);
 
 /// The mockup review sizes: three portrait phones and one short landscape.
 const _sizes = [Size(360, 640), Size(390, 844), Size(430, 932), Size(874, 402)];
@@ -51,6 +53,54 @@ PlanetMasteredCard _finalCard({
   onOpenMap: () {},
   onRelaunch: onRelaunch ?? () {},
 );
+
+/// The real projected successor gates after mastering Lunar Frontier:
+/// `StellarMapView` supplies `Lunar Frontier sites 3/3`, `Surveying 5`, and
+/// `16.00M cash` for the Mars card. No invented short labels.
+PlanetMasteredCard _projectedLaterCard({
+  VoidCallback? onContinue,
+  VoidCallback? onOpenMap,
+}) {
+  final initial = MiningSave.initial(nowUtc: _start);
+  final sites = <MiningSiteId, SiteProgress>{...initial.sites};
+  for (final planet in const [
+    MiningPlanetId.homeworld,
+    MiningPlanetId.lunarFrontier,
+  ]) {
+    for (final site in _content.planet(planet).sites) {
+      sites[site.id] = SiteProgress(
+        unlocked: true,
+        commissioned: true,
+        storedAmount: 0,
+        rigPlacements: const [],
+      );
+    }
+  }
+  final view = StellarMapView.from(
+    state: initial.copyWith(
+      technology: const TechnologyLevels(surveying: 3),
+      unlockedPlanetIds: const {
+        MiningPlanetId.homeworld,
+        MiningPlanetId.lunarFrontier,
+      },
+      sites: sites,
+    ),
+    content: _content,
+  );
+  final successor = view.planet(MiningPlanetId.marsFrontier);
+  return PlanetMasteredCard(
+    masteredPlanet: _content.planet(MiningPlanetId.lunarFrontier),
+    successorName: successor.name,
+    requirements: successor.requirements,
+    nextSaleMultiplier: view.nextSaleMultiplier,
+    onContinue: onContinue ?? () {},
+    onOpenMap: onOpenMap ?? () {},
+  );
+}
+
+bool _inside(Rect outer, Rect inner) =>
+    outer.contains(inner.topLeft) &&
+    outer.contains(inner.bottomRight - const Offset(1, 1));
 
 Future<void> _pumpCard(
   WidgetTester tester, {
@@ -441,6 +491,75 @@ void main() {
         find.byKey(const Key('planet-mastery-multiplier')),
       );
       expect(text.data, contains(formatted));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final size in const [Size(360, 640), Size(874, 402)]) {
+    testWidgets('real projected later-planet gates stay complete at '
+        '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+      var continues = 0;
+      var opens = 0;
+      final card = _projectedLaterCard(
+        onContinue: () => continues++,
+        onOpenMap: () => opens++,
+      );
+      await _pumpCard(tester, size: size, card: card);
+
+      expect(
+        card.requirements.map((requirement) => requirement.label),
+        contains('Lunar Frontier sites 3/3'),
+      );
+      final body = tester.getRect(find.byKey(const Key('mining-sheet-body')));
+      final openMap = find.byKey(const Key('planet-mastery-open-map'));
+      final continueButton = find.byKey(const Key('planet-mastery-continue'));
+      expect(openMap.hitTestable(), findsOneWidget);
+      expect(continueButton.hitTestable(), findsOneWidget);
+
+      for (var index = 0; index < card.requirements.length; index++) {
+        final gate = find.byKey(Key('planet-mastery-requirement-$index'));
+        expect(gate, findsOneWidget);
+        final rowRect = tester.getRect(gate);
+        expect(
+          rowRect.left,
+          greaterThanOrEqualTo(body.left - .5),
+          reason: 'gate $index starts outside the body',
+        );
+        expect(
+          rowRect.right,
+          lessThanOrEqualTo(body.right + .5),
+          reason: 'gate $index overflows the body horizontally',
+        );
+
+        final text = find.descendant(of: gate, matching: find.byType(Text));
+        final paragraph = tester.renderObject<RenderParagraph>(text);
+        final textWidget = tester.widget<Text>(text);
+        final textRect = tester.getRect(text);
+        expect(textRect.left, greaterThanOrEqualTo(rowRect.left - .5));
+        expect(textRect.right, lessThanOrEqualTo(rowRect.right + .5));
+        expect(textWidget.maxLines, isNull);
+        expect(textWidget.overflow, isNot(TextOverflow.ellipsis));
+        expect(
+          paragraph.size.height,
+          greaterThanOrEqualTo(
+            paragraph.getMaxIntrinsicHeight(paragraph.size.width) - .5,
+          ),
+          reason: 'gate $index loses wrapped lines',
+        );
+
+        if (!_inside(body, rowRect)) {
+          await tester.ensureVisible(gate);
+          await tester.pump();
+          _expectVisibleInBody(tester, gate);
+          expect(openMap.hitTestable(), findsOneWidget);
+          expect(continueButton.hitTestable(), findsOneWidget);
+        }
+      }
+
+      await tester.tap(openMap);
+      await tester.tap(continueButton);
+      expect(opens, 1);
+      expect(continues, 1);
       expect(tester.takeException(), isNull);
     });
   }

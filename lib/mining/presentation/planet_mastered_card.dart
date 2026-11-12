@@ -122,6 +122,7 @@ class PlanetMasteredCard extends StatelessWidget {
                   key: Key('planet-mastery-requirement-$index'),
                   requirement: requirement,
                   compact: true,
+                  intrinsicWidth: true,
                 ),
             ],
           ),
@@ -252,13 +253,17 @@ class _MasteryRequirement extends StatelessWidget {
     super.key,
     required this.requirement,
     this.compact = false,
+    this.intrinsicWidth = false,
   });
 
   final StellarMapRequirementView requirement;
 
-  /// The horizontal compact gate row sizes itself to its text; the stacked
-  /// layout stretches and wraps inside the details column.
+  /// Tightens the padding for the compact card.
   final bool compact;
+
+  /// The landscape gate Wrap sizes rows to their text so gates can share a
+  /// run; every other layout keeps the text flexible and wrapping.
+  final bool intrinsicWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -276,7 +281,7 @@ class _MasteryRequirement extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: compact ? 0 : 3),
         child: Row(
-          mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+          mainAxisSize: intrinsicWidth ? MainAxisSize.min : MainAxisSize.max,
           children: [
             Icon(
               requirement.isSatisfied ? Icons.check : Icons.close,
@@ -284,7 +289,7 @@ class _MasteryRequirement extends StatelessWidget {
               size: 16,
             ),
             SizedBox(width: compact ? 6 : 8),
-            if (compact) label else Expanded(child: label),
+            if (intrinsicWidth) label else Expanded(child: label),
           ],
         ),
       ),
