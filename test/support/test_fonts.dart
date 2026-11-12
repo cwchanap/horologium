@@ -21,8 +21,8 @@ Iterable<String> get productionFontAssets =>
 
 /// Loads the exact font assets declared in `pubspec.yaml` for widget tests on
 /// every platform. Chrome tests cannot read `dart:io` files or app assets, so
-/// the web source fetches the same bytes through the `test/fonts` symlink,
-/// which the web test server serves directly.
+/// the web source fetches byte-identical test fixtures from `test/fonts`, which
+/// the web test server serves directly.
 Future<void> loadProductionTestFonts() async {
   allowProductionFontsInWebTests();
   for (final entry in productionFontFamilies.entries) {
