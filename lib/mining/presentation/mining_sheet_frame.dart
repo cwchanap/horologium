@@ -196,13 +196,16 @@ class MiningSheetFrame extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                color: MiningTheme.accent,
-                fontSize: landscape ? 21 : 23,
-                height: 1.1,
-                fontWeight: FontWeight.w700,
+            child: Semantics(
+              header: true,
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: MiningTheme.accent,
+                  fontSize: landscape ? 21 : 23,
+                  height: 1.1,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),

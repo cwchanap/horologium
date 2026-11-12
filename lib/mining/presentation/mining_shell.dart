@@ -410,11 +410,14 @@ class _MiningShellState extends State<MiningShell>
         rewardCash: planet.masteryRewardCash,
         onContinue: () => Navigator.of(context).pop(),
         onOpenMap: () {
-          Navigator.of(context).pop();
+          // Mastery can land while a Technology/Settings sheet opened during
+          // the pending save sits under this card; unwind every covering
+          // sheet so the map is not left behind one.
+          Navigator.of(context).popUntil((route) => route is! PopupRoute);
           _handleNavigation(MiningNavigationDestination.stellarMap);
         },
         onRelaunch: () {
-          Navigator.of(context).pop();
+          Navigator.of(context).popUntil((route) => route is! PopupRoute);
           _openRelaunchSheet();
         },
       ),
