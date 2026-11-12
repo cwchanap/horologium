@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
@@ -673,6 +674,105 @@ void main() {
     expect(traveled, isEmpty);
     expect(tester.takeException(), isNull);
     semantics.dispose();
+  });
+
+  testWidgets(
+    'travel control takes Tab focus and activates with Enter or Space',
+    (tester) async {
+      final view = StellarMapView.from(
+        state: _stateWith(
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+        ),
+        content: _content,
+      );
+      final traveled = <MiningPlanetId>[];
+      await _pumpMap(
+        tester,
+        view: view,
+        viewport: const Size(390, 844),
+        onTravel: traveled.add,
+      );
+
+      final travel = find.byKey(
+        const Key('mining-stellar-map-travel-lunarFrontier'),
+      );
+      await tester.ensureVisible(travel);
+      await tester.pump();
+      final focusNode = Focus.maybeOf(
+        tester.element(
+          find
+              .descendant(of: travel, matching: find.byType(GestureDetector))
+              .first,
+        ),
+      );
+      expect(focusNode, isNotNull);
+      expect(focusNode!.canRequestFocus, isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(focusNode.hasFocus, isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(traveled, [MiningPlanetId.lunarFrontier]);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pump();
+      expect(traveled, [
+        MiningPlanetId.lunarFrontier,
+        MiningPlanetId.lunarFrontier,
+      ]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('busy travel cannot take keyboard focus or activate', (
+    tester,
+  ) async {
+    final view = StellarMapView.from(
+      state: _stateWith(
+        unlockedPlanets: {
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+        },
+      ),
+      content: _content,
+      isBusy: true,
+    );
+    final traveled = <MiningPlanetId>[];
+    await _pumpMap(
+      tester,
+      view: view,
+      viewport: const Size(390, 844),
+      onTravel: traveled.add,
+    );
+
+    final travel = find.byKey(
+      const Key('mining-stellar-map-travel-lunarFrontier'),
+    );
+    await tester.ensureVisible(travel);
+    await tester.pump();
+    final focusNode = Focus.maybeOf(
+      tester.element(
+        find
+            .descendant(of: travel, matching: find.byType(GestureDetector))
+            .first,
+      ),
+    );
+    expect(focusNode, isNotNull);
+    expect(focusNode!.canRequestFocus, isFalse);
+    focusNode.requestFocus();
+    await tester.pump();
+    expect(focusNode.hasFocus, isFalse);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    expect(traveled, isEmpty);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('874x402 landscape keeps the travel label beside its hex at text '
