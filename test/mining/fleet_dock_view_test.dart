@@ -101,22 +101,23 @@ void main() {
 
     // The initial homeworld dock holds T1 rigs in b1 and b2.
     for (final tier in const [RigTier.t1, RigTier.t2, RigTier.t3, RigTier.t4]) {
-      expect(
-        viewFor(
-          bays: {DockBayId.b1: tier},
-          selectedBayId: DockBayId.b1,
-        ).dockHint,
-        'CELL: DEPLOY · RIG: UPGRADE · BAY: MERGE',
-        reason: tier.name,
-      );
-    }
-    expect(
-      viewFor(
-        bays: {DockBayId.b1: RigTier.t5},
+      final hint = viewFor(
+        bays: {DockBayId.b1: tier},
         selectedBayId: DockBayId.b1,
-      ).dockHint,
-      'TAP A HIGHLIGHTED CELL',
-    );
+      ).dockHint;
+      expect(hint, 'DEPLOY · UPGRADE · MERGE', reason: tier.name);
+      for (final action in const ['DEPLOY', 'UPGRADE', 'MERGE']) {
+        expect(hint, contains(action), reason: '${tier.name} $action');
+      }
+    }
+    final t5Hint = viewFor(
+      bays: {DockBayId.b1: RigTier.t5},
+      selectedBayId: DockBayId.b1,
+    ).dockHint;
+    expect(t5Hint, 'TAP A HIGHLIGHTED CELL');
+    // T5 is the ceiling: the deploy-only hint must not offer impossible actions.
+    expect(t5Hint, isNot(contains('UPGRADE')));
+    expect(t5Hint, isNot(contains('MERGE')));
 
     for (final view in [
       viewFor(),

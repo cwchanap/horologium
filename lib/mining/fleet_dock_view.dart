@@ -77,7 +77,7 @@ class FleetDockView {
     } else if (selectedRig == RigTier.t5) {
       dockHint = 'TAP A HIGHLIGHTED CELL';
     } else {
-      dockHint = 'CELL: DEPLOY · RIG: UPGRADE · BAY: MERGE';
+      dockHint = 'DEPLOY · UPGRADE · MERGE';
     }
     final hasEmptyBay = DockBayId.values.any((id) => dock[id] == null);
     final spawnDisabledReason = isBusy
