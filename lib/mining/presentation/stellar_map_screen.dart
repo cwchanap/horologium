@@ -874,38 +874,40 @@ class _PlanetAction extends StatelessWidget {
         enabled: canTravel,
         label: 'Travel to ${view.name}',
         onTap: travel,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          excludeFromSemantics: true,
-          onTap: travel,
-          child: const ExcludeSemantics(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'TRAVEL',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                SizedBox(width: 8),
-                SizedBox(
-                  width: 54,
-                  height: 60,
-                  child: MiningHex(
-                    fill: MiningTheme.highlight,
-                    border: MiningTheme.highlight,
-                    child: Icon(
-                      Icons.play_arrow,
-                      size: 28,
-                      color: Color(0xFF04121A),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: travel,
+            excludeFromSemantics: true,
+            child: const ExcludeSemantics(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'TRAVEL',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
                     ),
                   ),
-                ),
-              ],
+                  SizedBox(width: 8),
+                  SizedBox(
+                    width: 54,
+                    height: 60,
+                    child: MiningHex(
+                      fill: MiningTheme.highlight,
+                      border: MiningTheme.highlight,
+                      child: Icon(
+                        Icons.play_arrow,
+                        size: 28,
+                        color: Color(0xFF04121A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
