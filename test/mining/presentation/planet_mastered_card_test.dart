@@ -80,6 +80,23 @@ Future<void> _pumpCard(
   await tester.pump();
 }
 
+/// A text/art rectangle must sit entirely inside the scrolling body viewport
+/// (the only clipped region) and above the pinned action footer.
+void _expectVisibleInBody(WidgetTester tester, Finder finder) {
+  final body = tester.getRect(find.byKey(const Key('mining-sheet-body')));
+  final footer = tester.getRect(
+    find.byKey(const Key('mining-sheet-pinned-footer')),
+  );
+  final rect = tester.getRect(finder);
+  expect(body.contains(rect.topLeft), isTrue, reason: '$finder $rect vs $body');
+  expect(
+    body.contains(rect.bottomRight - const Offset(1, 1)),
+    isTrue,
+    reason: '$finder $rect vs $body',
+  );
+  expect(rect.bottom, lessThanOrEqualTo(footer.top), reason: '$finder $rect');
+}
+
 /// The mockup's action stack: a filled cyan primary above the outlined
 /// secondary, both already inside the safe area without scrolling.
 void _expectStackedActions(
@@ -125,6 +142,24 @@ void _expectStackedActions(
   }
 }
 
+/// Normal widths keep the centered, art-led composition. The short landscape
+/// and narrow large-text cards compact the art beside the milestone details.
+void _expectArtLayout(WidgetTester tester, Size size) {
+  final body = tester.getRect(find.byKey(const Key('mining-sheet-body')));
+  final art = tester.getRect(find.byKey(const Key('planet-mastery-art')));
+  if (size == const Size(874, 402)) {
+    expect(art.left, lessThan(body.center.dx));
+    expect(art.height, greaterThanOrEqualTo(96));
+  } else if (size == const Size(360, 640)) {
+    expect(art.left, lessThan(body.center.dx));
+    expect(art.height, greaterThanOrEqualTo(72));
+  } else {
+    expect((art.center.dx - body.center.dx).abs(), lessThanOrEqualTo(8));
+    expect(art.width, greaterThanOrEqualTo(120));
+    expect(art.height, greaterThanOrEqualTo(120));
+  }
+}
+
 void main() {
   setUpAll(() async {
     if (kIsWeb) return;
@@ -154,11 +189,7 @@ void main() {
         ),
       );
 
-      final body = tester.getRect(find.byKey(const Key('mining-sheet-body')));
-      final art = tester.getRect(find.byKey(const Key('planet-mastery-art')));
-      expect((art.center.dx - body.center.dx).abs(), lessThanOrEqualTo(8));
-      expect(art.width, greaterThanOrEqualTo(120));
-      expect(art.height, greaterThanOrEqualTo(120));
+      _expectArtLayout(tester, size);
 
       final openMap = find.byKey(const Key('planet-mastery-open-map'));
       final continueButton = find.byKey(const Key('planet-mastery-continue'));
@@ -236,11 +267,7 @@ void main() {
         ),
       );
 
-      final body = tester.getRect(find.byKey(const Key('mining-sheet-body')));
-      final art = tester.getRect(find.byKey(const Key('planet-mastery-art')));
-      expect((art.center.dx - body.center.dx).abs(), lessThanOrEqualTo(8));
-      expect(art.width, greaterThanOrEqualTo(120));
-      expect(art.height, greaterThanOrEqualTo(120));
+      _expectArtLayout(tester, size);
 
       final relaunch = find.byKey(const Key('planet-mastery-relaunch'));
       final continueButton = find.byKey(const Key('planet-mastery-continue'));
@@ -290,6 +317,81 @@ void main() {
       expect(tester.takeException(), isNull);
       semantics.dispose();
     });
+  }
+
+  for (final size in const [Size(874, 402), Size(360, 640)]) {
+    final label = '${size.width.toInt()}x${size.height.toInt()}';
+    testWidgets(
+      'opens with the final name and reward above the actions at $label',
+      (tester) async {
+        var continues = 0;
+        var relaunches = 0;
+        await _pumpCard(
+          tester,
+          size: size,
+          card: _finalCard(
+            onContinue: () => continues++,
+            onRelaunch: () => relaunches++,
+          ),
+        );
+
+        _expectVisibleInBody(
+          tester,
+          find.byKey(const Key('planet-mastery-planet')),
+        );
+        _expectVisibleInBody(
+          tester,
+          find.byKey(const Key('planet-mastery-reward')),
+        );
+        _expectVisibleInBody(tester, find.text('completion reward'));
+
+        final relaunch = find.byKey(const Key('planet-mastery-relaunch'));
+        final continueButton = find.byKey(const Key('planet-mastery-continue'));
+        expect(relaunch.hitTestable(), findsOneWidget);
+        expect(continueButton.hitTestable(), findsOneWidget);
+        await tester.tap(relaunch);
+        await tester.tap(continueButton);
+        expect(relaunches, 1);
+        expect(continues, 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'opens with the planet name and successor above the actions at $label',
+      (tester) async {
+        var continues = 0;
+        var opens = 0;
+        await _pumpCard(
+          tester,
+          size: size,
+          card: _nonfinalCard(
+            onContinue: () => continues++,
+            onOpenMap: () => opens++,
+          ),
+        );
+
+        _expectVisibleInBody(
+          tester,
+          find.byKey(const Key('planet-mastery-planet')),
+        );
+        _expectVisibleInBody(tester, find.text('All 3 sites commissioned'));
+        _expectVisibleInBody(
+          tester,
+          find.byKey(const Key('planet-mastery-successor')),
+        );
+
+        final openMap = find.byKey(const Key('planet-mastery-open-map'));
+        final continueButton = find.byKey(const Key('planet-mastery-continue'));
+        expect(openMap.hitTestable(), findsOneWidget);
+        expect(continueButton.hitTestable(), findsOneWidget);
+        await tester.tap(openMap);
+        await tester.tap(continueButton);
+        expect(opens, 1);
+        expect(continues, 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final (multiplier, formatted) in const [(1.5, '×1.5'), (2.0, '×2')]) {
