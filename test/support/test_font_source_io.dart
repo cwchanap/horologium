@@ -2,9 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/services.dart' show ByteData;
 
-/// Reads the pubspec font asset from the workspace on the VM.
-Future<ByteData?> loadFontAsset(String path) async {
-  final file = File(path);
+/// Reads a production font from the workspace on the VM.
+Future<ByteData?> loadTestFontBytes(String assetPath) async {
+  final file = File(assetPath);
   if (!file.existsSync()) return null;
   return ByteData.sublistView(await file.readAsBytes());
 }
