@@ -13,6 +13,7 @@ class PlanetMasteredCard extends StatelessWidget {
     required this.masteredPlanet,
     required this.successorName,
     required this.requirements,
+    required this.nextSaleMultiplier,
     required this.onContinue,
     required this.onOpenMap,
     this.isFinal = false,
@@ -23,6 +24,9 @@ class PlanetMasteredCard extends StatelessWidget {
   final MiningPlanetDefinition masteredPlanet;
   final String? successorName;
   final List<StellarMapRequirementView> requirements;
+
+  /// The already-projected next-run sale multiplier from `StellarMapView`.
+  final double nextSaleMultiplier;
   final bool isFinal;
   final int? rewardCash;
   final VoidCallback onContinue;
@@ -39,21 +43,49 @@ class PlanetMasteredCard extends StatelessWidget {
         color: MiningTheme.highlight,
         size: 28,
       ),
+      pinnedFooter: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: _MasteryAction(
+              key: isFinal
+                  ? const Key('planet-mastery-relaunch')
+                  : const Key('planet-mastery-open-map'),
+              label: isFinal ? 'RELAUNCH' : 'Open Map',
+              emphasized: true,
+              onPressed: isFinal ? onRelaunch! : onOpenMap,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: _MasteryAction(
+              key: const Key('planet-mastery-continue'),
+              label: 'Continue',
+              emphasized: false,
+              onPressed: onContinue,
+            ),
+          ),
+        ],
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Center(
             child: Image.asset(
               masteredPlanet.planetAsset,
               key: const Key('planet-mastery-art'),
-              height: 88,
+              width: 160,
+              height: 132,
               fit: BoxFit.contain,
               errorBuilder: (_, _, _) => const SizedBox(
-                height: 88,
+                width: 160,
+                height: 132,
                 child: Icon(
                   Icons.public_rounded,
                   color: Colors.white24,
-                  size: 64,
+                  size: 96,
                 ),
               ),
             ),
@@ -62,69 +94,82 @@ class PlanetMasteredCard extends StatelessWidget {
           Text(
             masteredPlanet.name,
             key: const Key('planet-mastery-planet'),
+            textAlign: TextAlign.center,
             style: const TextStyle(
               color: MiningTheme.highlight,
-              fontSize: 20,
+              fontFamily: 'Orbitron',
+              fontSize: 26,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 10),
           if (isFinal) ...[
+            const SizedBox(height: 4),
             Text(
               '+${formatMiningCash(rewardCash ?? 0)} cash',
               key: const Key('planet-mastery-reward'),
+              textAlign: TextAlign.center,
               style: const TextStyle(
                 color: MiningTheme.warning,
-                fontSize: 16,
+                fontFamily: 'Orbitron',
+                fontSize: 24,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 2),
             const Text(
-              'Mastery reward credited. Relaunch to begin the next run.',
-              style: TextStyle(color: MiningTheme.secondaryText),
+              'completion reward',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: MiningTheme.secondaryText, fontSize: 11),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'RUN COMPLETE',
+              style: TextStyle(
+                color: MiningTheme.accent,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.4,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Relaunch to start again with sales '
+              '${formatSaleMultiplier(nextSaleMultiplier)}. '
+              'Only your relaunch count is kept.',
+              key: const Key('planet-mastery-multiplier'),
+              style: const TextStyle(
+                color: MiningTheme.secondaryText,
+                height: 1.4,
+              ),
             ),
           ] else ...[
+            const SizedBox(height: 2),
+            Text(
+              'All ${masteredPlanet.sites.length} sites commissioned',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: MiningTheme.secondaryText,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 16),
             Text(
               '${successorName ?? 'The next frontier'} is next',
               key: const Key('planet-mastery-successor'),
               style: const TextStyle(
-                color: MiningTheme.primaryText,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+                color: MiningTheme.accent,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: .8,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             for (final (index, requirement) in requirements.indexed)
               _MasteryRequirement(
                 key: Key('planet-mastery-requirement-$index'),
                 requirement: requirement,
               ),
           ],
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _MasteryAction(
-                  key: const Key('planet-mastery-continue'),
-                  label: 'Continue',
-                  emphasized: false,
-                  onPressed: onContinue,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _MasteryAction(
-                  key: isFinal
-                      ? const Key('planet-mastery-relaunch')
-                      : const Key('planet-mastery-open-map'),
-                  label: isFinal ? 'RELAUNCH' : 'Open Map',
-                  emphasized: true,
-                  onPressed: isFinal ? onRelaunch! : onOpenMap,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -186,9 +231,9 @@ class _MasteryAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = emphasized ? MiningTheme.highlight : Colors.white70;
-    final textStyle = const TextStyle(
-      fontSize: 12,
+    const textStyle = TextStyle(
+      fontFamily: 'Orbitron',
+      fontSize: 13,
       fontWeight: FontWeight.w800,
     );
     if (!emphasized) {
@@ -196,7 +241,7 @@ class _MasteryAction extends StatelessWidget {
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(48, 48),
-          foregroundColor: foreground,
+          foregroundColor: Colors.white70,
           side: const BorderSide(color: Colors.white24),
           shape: const StadiumBorder(),
           textStyle: textStyle,
@@ -208,8 +253,8 @@ class _MasteryAction extends StatelessWidget {
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
         minimumSize: const Size(48, 48),
-        foregroundColor: foreground,
-        side: BorderSide(color: MiningTheme.highlight.withAlpha(160)),
+        backgroundColor: MiningTheme.highlight,
+        foregroundColor: const Color(0xFF04121A),
         shape: const StadiumBorder(),
         textStyle: textStyle,
       ),

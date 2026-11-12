@@ -386,6 +386,12 @@ class _MiningShellState extends State<MiningShell>
   Future<void> _showPlanetMastered(MiningPlanetId planetId) {
     final planet = _content.planet(planetId);
     final isFinal = planetId == _content.finalPlanetId;
+    // One projection for every planet, including the final one, so the card
+    // never recalculates gates or the next-run multiplier itself.
+    final mapView = StellarMapView.from(
+      state: _controller.state,
+      content: _content,
+    );
     MiningPlanetDefinition? successor;
     if (!isFinal) {
       for (final candidate in _content.planets.values) {
@@ -397,16 +403,14 @@ class _MiningShellState extends State<MiningShell>
     }
     final successorView = successor == null
         ? null
-        : StellarMapView.from(
-            state: _controller.state,
-            content: _content,
-          ).planet(successor.id);
+        : mapView.planet(successor.id);
     return _showModalSheet(
       PlanetMasteredCard(
         masteredPlanet: planet,
         isFinal: isFinal,
         successorName: successorView?.name,
         requirements: successorView?.requirements ?? const [],
+        nextSaleMultiplier: mapView.nextSaleMultiplier,
         rewardCash: planet.masteryRewardCash,
         onContinue: () => Navigator.of(context).pop(),
         onOpenMap: () {

@@ -4476,6 +4476,30 @@ void main() {
       },
     );
 
+    testWidgets(
+      'final mastery after a relaunch projects the next run multiplier',
+      (tester) async {
+        final repository = CountingMiningSaveRepository();
+        await repository.save(
+          nearFinalPlanetMasteryState(_start).copyWith(relaunchCount: 1),
+        );
+        await pumpShell(tester, repository: repository);
+
+        await deployIntoMastery(
+          tester,
+          MiningSiteId.osmiumCaldera,
+          _osmiumDeployCell,
+        );
+
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('planet-mastery-multiplier')))
+              .data,
+          contains('×2'),
+        );
+      },
+    );
+
     testWidgets('reduced motion removes sheet transitions through relaunch', (
       tester,
     ) async {
