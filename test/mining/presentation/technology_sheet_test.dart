@@ -73,8 +73,8 @@ Future<void> _pumpSheet(
   });
 
   await tester.pumpWidget(
-    MaterialApp(
-      home: Scaffold(
+    _app(
+      Scaffold(
         body: TechnologySheet(
           view: _view(),
           onPurchase: (_) {},
@@ -92,6 +92,13 @@ String _trackDisplayName(TechnologyTrack track) => switch (track) {
   TechnologyTrack.surveying => 'Surveying',
 };
 
+/// Production typography: the inherited text styles only use Orbitron when
+/// the theme selects it, so loading the font alone is not enough.
+MaterialApp _app(Widget home) => MaterialApp(
+  theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+  home: home,
+);
+
 void main() {
   // Real Orbitron metrics: the test font's square glyphs understate line
   // height, hiding footer clipping on the small viewports.
@@ -104,6 +111,20 @@ void main() {
         ).readAsBytes().then(ByteData.sublistView),
       );
     await loader.load();
+  });
+
+  testWidgets('the viewport harness inherits production Orbitron typography', (
+    tester,
+  ) async {
+    await _pumpSheet(tester, const Size(360, 640));
+
+    final title = tester.widget<RichText>(
+      find.descendant(
+        of: find.text('Technology'),
+        matching: find.byType(RichText),
+      ),
+    );
+    expect((title.text as TextSpan).style?.fontFamily, 'Orbitron');
   });
 
   for (final viewport in _viewports) {
@@ -246,8 +267,8 @@ void main() {
     final live = ValueNotifier<TechnologySheetView>(_view());
     addTearDown(live.dispose);
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      _app(
+        Scaffold(
           body: ValueListenableBuilder<TechnologySheetView>(
             valueListenable: live,
             builder: (context, view, _) => TechnologySheet(
@@ -342,8 +363,8 @@ void main() {
     final purchases = <TechnologyTrack>[];
     Future<void> openSheet() async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
+        _app(
+          Scaffold(
             body: Builder(
               builder: (context) => Center(
                 child: ElevatedButton(
@@ -417,8 +438,8 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      _app(
+        Scaffold(
           body: TechnologySheet(
             view: _view(),
             onPurchase: (_) {},
@@ -445,8 +466,8 @@ void main() {
     'purchase buttons fall back to a cash icon without the asset',
     (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: DefaultAssetBundle(
+        _app(
+          DefaultAssetBundle(
             bundle: _MissingCashIconBundle(),
             child: Scaffold(
               body: TechnologySheet(view: _highCostView(), onPurchase: (_) {}),
@@ -498,8 +519,8 @@ void main() {
     final live = ValueNotifier<TechnologySheetView>(_view());
     addTearDown(live.dispose);
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      _app(
+        Scaffold(
           body: ValueListenableBuilder<TechnologySheetView>(
             valueListenable: live,
             builder: (context, view, _) =>
@@ -564,8 +585,8 @@ void main() {
     });
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: MediaQuery(
+      _app(
+        MediaQuery(
           data: const MediaQueryData(
             size: viewport,
             textScaler: TextScaler.linear(1.3),

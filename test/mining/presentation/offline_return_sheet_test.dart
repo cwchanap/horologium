@@ -33,6 +33,13 @@ MiningSave _state({
   );
 }
 
+/// Production typography: the inherited text styles only use Orbitron when
+/// the theme selects it, so loading the font alone is not enough.
+MaterialApp _app(Widget home) => MaterialApp(
+  theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+  home: home,
+);
+
 void main() {
   // Real Orbitron metrics: the test font's square glyphs understate line
   // height, hiding footer overlap on the small viewports.
@@ -47,6 +54,39 @@ void main() {
     await loader.load();
   });
 
+  testWidgets('the viewport harness inherits production Orbitron typography', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 640);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      _app(
+        Scaffold(
+          body: OfflineReturnSheet(
+            summary: _fivePlanetSummary,
+            content: MiningContentRegistry.stellarMining(),
+            state: _state(),
+            onSellCargo: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final heading = tester.widget<RichText>(
+      find.descendant(
+        of: find.textContaining('Away'),
+        matching: find.byType(RichText),
+      ),
+    );
+    expect((heading.text as TextSpan).style?.fontFamily, 'Orbitron');
+  });
+
   testWidgets('landscape continue action is visible without scrolling', (
     tester,
   ) async {
@@ -57,8 +97,8 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      _app(
+        Scaffold(
           body: Align(
             alignment: Alignment.bottomRight,
             child: Padding(
@@ -140,8 +180,8 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      _app(
+        Scaffold(
           body: OfflineReturnSheet(
             summary: summary,
             content: MiningContentRegistry.stellarMining(),
@@ -275,8 +315,8 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
+        _app(
+          Scaffold(
             body: OfflineReturnSheet(
               summary: summary,
               content: MiningContentRegistry.stellarMining(),
@@ -354,8 +394,8 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
+        _app(
+          Scaffold(
             body: OfflineReturnSheet(
               summary: summary,
               content: MiningContentRegistry.stellarMining(),
@@ -416,8 +456,8 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      _app(
+        Scaffold(
           body: OfflineReturnSheet(
             summary: summary,
             content: content,
@@ -445,8 +485,8 @@ void main() {
       wasOfflineCapped: false,
     );
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      _app(
+        Scaffold(
           body: OfflineReturnSheet(
             summary: summary,
             content: MiningContentRegistry.stellarMining(),
@@ -481,8 +521,8 @@ void main() {
       wasOfflineCapped: false,
     );
     await tester.pumpWidget(
-      MaterialApp(
-        home: MediaQuery(
+      _app(
+        MediaQuery(
           data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
           child: Scaffold(
             body: OfflineReturnSheet(
@@ -530,8 +570,8 @@ void main() {
       );
 
       Future<void> pumpSheet(MiningSave state) => tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
+        _app(
+          Scaffold(
             body: OfflineReturnSheet(
               summary: summary,
               content: content,
@@ -581,8 +621,8 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      _app(
+        Scaffold(
           body: OfflineReturnSheet(
             summary: summary,
             content: content,
@@ -640,8 +680,8 @@ void main() {
       wasOfflineCapped: false,
     );
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      _app(
+        Scaffold(
           body: OfflineReturnSheet(
             summary: nonActiveAllFullSummary,
             content: content,
@@ -697,8 +737,8 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      _app(
+        Scaffold(
           body: OfflineReturnSheet(
             summary: summary,
             content: content,
@@ -739,8 +779,8 @@ void main() {
     ModalRoute<dynamic>? sheetRoute;
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Builder(
+      _app(
+        Builder(
           builder: (context) => Scaffold(
             body: OutlinedButton(
               key: const Key('open-return'),
@@ -795,8 +835,8 @@ void main() {
     var sales = 0;
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Builder(
+      _app(
+        Builder(
           builder: (context) => Scaffold(
             body: OutlinedButton(
               key: const Key('open-return'),
@@ -854,8 +894,8 @@ void main() {
     var sales = 0;
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Builder(
+      _app(
+        Builder(
           builder: (context) => Scaffold(
             body: OutlinedButton(
               key: const Key('open-return'),
@@ -913,8 +953,8 @@ void main() {
         wasOfflineCapped: false,
       );
       await tester.pumpWidget(
-        MaterialApp(
-          home: MediaQuery(
+        _app(
+          MediaQuery(
             data: MediaQueryData(textScaler: TextScaler.linear(scale)),
             child: Scaffold(
               body: OfflineReturnSheet(
@@ -965,8 +1005,8 @@ void main() {
       });
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
+        _app(
+          Scaffold(
             body: OfflineReturnSheet(
               summary: _fivePlanetSummary,
               content: MiningContentRegistry.stellarMining(),
@@ -1030,8 +1070,8 @@ void main() {
 
       Future<void> openSheet() async {
         await tester.pumpWidget(
-          MaterialApp(
-            home: Builder(
+          _app(
+            Builder(
               builder: (context) => Scaffold(
                 body: OutlinedButton(
                   key: const Key('open-return'),
@@ -1092,8 +1132,8 @@ void main() {
     });
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      _app(
+        Scaffold(
           body: OfflineReturnSheet(
             summary: _fivePlanetSummary,
             content: MiningContentRegistry.stellarMining(),
