@@ -163,11 +163,26 @@ void _expectArtLayout(WidgetTester tester, Size size) {
 void main() {
   setUpAll(() async {
     if (kIsWeb) return;
-    final fontFile = File('assets/fonts/Orbitron-Variable.ttf');
-    if (fontFile.existsSync()) {
-      final loader = FontLoader('Orbitron');
-      loader.addFont(fontFile.readAsBytes().then(ByteData.sublistView));
-      await loader.load();
+    for (final (family, files) in [
+      ('Orbitron', ['assets/fonts/Orbitron-Variable.ttf']),
+      (
+        'IBM Plex Mono',
+        [
+          'assets/fonts/IBMPlexMono-400.ttf',
+          'assets/fonts/IBMPlexMono-500.ttf',
+          'assets/fonts/IBMPlexMono-600.ttf',
+        ],
+      ),
+    ]) {
+      final loader = FontLoader(family);
+      var loaded = false;
+      for (final path in files) {
+        final file = File(path);
+        if (!file.existsSync()) continue;
+        loaded = true;
+        loader.addFont(file.readAsBytes().then(ByteData.sublistView));
+      }
+      if (loaded) await loader.load();
     }
   });
 
@@ -358,7 +373,8 @@ void main() {
     );
 
     testWidgets(
-      'opens with the planet name and successor above the actions at $label',
+      'opens with the planet, successor, and all gates above the actions '
+      'at $label',
       (tester) async {
         var continues = 0;
         var opens = 0;
@@ -380,6 +396,25 @@ void main() {
           tester,
           find.byKey(const Key('planet-mastery-successor')),
         );
+        for (var index = 0; index < 3; index++) {
+          final gate = find.byKey(Key('planet-mastery-requirement-$index'));
+          expect(gate, findsOneWidget);
+          _expectVisibleInBody(tester, gate);
+          final text = find.descendant(of: gate, matching: find.byType(Text));
+          final paragraph = tester.renderObject<RenderParagraph>(text);
+          expect(
+            paragraph.text.style?.fontFamily,
+            'IBM Plex Mono',
+            reason: 'the gate must render in the production body font',
+          );
+          expect(
+            paragraph.size.width,
+            greaterThanOrEqualTo(
+              paragraph.getMaxIntrinsicWidth(double.infinity) - .5,
+            ),
+            reason: 'gate $index must not wrap or clip',
+          );
+        }
 
         final openMap = find.byKey(const Key('planet-mastery-open-map'));
         final continueButton = find.byKey(const Key('planet-mastery-continue'));

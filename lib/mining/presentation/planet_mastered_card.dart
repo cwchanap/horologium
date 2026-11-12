@@ -44,7 +44,6 @@ class PlanetMasteredCard extends StatelessWidget {
     // move to a measured body viewport if more screen classes need it.
     final textScale = MediaQuery.textScalerOf(context).scale(1);
     final compactPortrait = !landscape && textScale > 1 && size.height <= 700;
-    final sideBySide = landscape || compactPortrait;
     final artSize = landscape
         ? const Size(104, 104)
         : compactPortrait
@@ -84,23 +83,68 @@ class PlanetMasteredCard extends StatelessWidget {
           ),
         ],
       ),
-      child: sideBySide
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _art(artSize),
-                const SizedBox(width: 12),
-                Expanded(child: _details(compact: true)),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(child: _art(artSize)),
-                const SizedBox(height: 8),
-                _details(compact: false),
-              ],
-            ),
+      child: _body(
+        landscape: landscape,
+        compactPortrait: compactPortrait,
+        artSize: artSize,
+      ),
+    );
+  }
+
+  Widget _body({
+    required bool landscape,
+    required bool compactPortrait,
+    required Size artSize,
+  }) {
+    // Short landscape has room for a wider composition: the art and
+    // milestone summary share a row, and the complete gates sit in one
+    // wrapping row underneath instead of a tall stacked column.
+    if (landscape && !isFinal) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _art(const Size(96, 96)),
+              const SizedBox(width: 12),
+              Expanded(child: _details(compact: true, includeGates: false)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 8,
+            runSpacing: 2,
+            children: [
+              for (final (index, requirement) in requirements.indexed)
+                _MasteryRequirement(
+                  key: Key('planet-mastery-requirement-$index'),
+                  requirement: requirement,
+                  compact: true,
+                ),
+            ],
+          ),
+        ],
+      );
+    }
+    if (landscape || compactPortrait) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _art(artSize),
+          const SizedBox(width: 12),
+          Expanded(child: _details(compact: true)),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(child: _art(artSize)),
+        const SizedBox(height: 8),
+        _details(compact: false),
+      ],
     );
   }
 
@@ -117,7 +161,7 @@ class PlanetMasteredCard extends StatelessWidget {
     ),
   );
 
-  Widget _details({required bool compact}) => Column(
+  Widget _details({required bool compact, bool includeGates = true}) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Text(
@@ -178,7 +222,7 @@ class PlanetMasteredCard extends StatelessWidget {
             fontSize: 12,
           ),
         ),
-        SizedBox(height: compact ? 10 : 16),
+        SizedBox(height: compact ? 2 : 16),
         Text(
           '${successorName ?? 'The next frontier'} is next',
           key: const Key('planet-mastery-successor'),
@@ -189,51 +233,58 @@ class PlanetMasteredCard extends StatelessWidget {
             letterSpacing: .8,
           ),
         ),
-        const SizedBox(height: 6),
-        for (final (index, requirement) in requirements.indexed)
-          _MasteryRequirement(
-            key: Key('planet-mastery-requirement-$index'),
-            requirement: requirement,
-          ),
+        if (includeGates) ...[
+          const SizedBox(height: 6),
+          for (final (index, requirement) in requirements.indexed)
+            _MasteryRequirement(
+              key: Key('planet-mastery-requirement-$index'),
+              requirement: requirement,
+              compact: compact,
+            ),
+        ],
       ],
     ],
   );
 }
 
 class _MasteryRequirement extends StatelessWidget {
-  const _MasteryRequirement({super.key, required this.requirement});
+  const _MasteryRequirement({
+    super.key,
+    required this.requirement,
+    this.compact = false,
+  });
 
   final StellarMapRequirementView requirement;
+
+  /// The horizontal compact gate row sizes itself to its text; the stacked
+  /// layout stretches and wraps inside the details column.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final color = requirement.isSatisfied
         ? MiningTheme.accent
         : MiningTheme.gate;
+    final label = Text(
+      requirement.label,
+      style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+    );
     return Semantics(
       label:
           '${requirement.label}, '
           '${requirement.isSatisfied ? 'satisfied' : 'required'}',
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
+        padding: EdgeInsets.symmetric(vertical: compact ? 0 : 3),
         child: Row(
+          mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
           children: [
             Icon(
               requirement.isSatisfied ? Icons.check : Icons.close,
               color: color,
               size: 16,
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                requirement.label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
+            SizedBox(width: compact ? 6 : 8),
+            if (compact) label else Expanded(child: label),
           ],
         ),
       ),
