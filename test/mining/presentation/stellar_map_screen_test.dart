@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/mining_state.dart';
+import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/stellar_map_screen.dart';
 
@@ -435,6 +436,170 @@ void main() {
 
     expect(unlocked, [MiningPlanetId.marsFrontier]);
     expect(traveled, [MiningPlanetId.lunarFrontier]);
+  });
+
+  for (final viewport in const [Size(360, 640), Size(390, 844)]) {
+    testWidgets('non-current unlocked planets use a compact labeled travel hex '
+        'at ${viewport.width.toInt()}x${viewport.height.toInt()}', (
+      tester,
+    ) async {
+      final view = StellarMapView.from(
+        state: _stateWith(
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+        ),
+        content: _content,
+      );
+      await _pumpMap(tester, view: view, viewport: viewport);
+
+      final homeworldCard = tester.getRect(
+        find.byKey(const Key('mining-stellar-map-planet-homeworld')),
+      );
+      final lunarCard = tester.getRect(
+        find.byKey(const Key('mining-stellar-map-planet-lunarFrontier')),
+      );
+      final activeTravel = find.byKey(
+        const Key('mining-stellar-map-travel-homeworld'),
+      );
+      final lunarTravel = find.byKey(
+        const Key('mining-stellar-map-travel-lunarFrontier'),
+      );
+      await tester.ensureVisible(lunarTravel);
+      await tester.pump();
+
+      // The unlocked non-current action shows a visible label and keeps the
+      // active planet's compact hex instead of stretching across the card.
+      expect(
+        find.descendant(of: lunarTravel, matching: find.text('TRAVEL')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: activeTravel, matching: find.text('TRAVEL')),
+        findsNothing,
+      );
+      expect(tester.getSize(lunarTravel), tester.getSize(activeTravel));
+      expect(tester.getSize(lunarTravel).width, greaterThanOrEqualTo(48));
+      expect(tester.getSize(lunarTravel).height, greaterThanOrEqualTo(48));
+      expect(tester.getSize(lunarTravel).width, lessThan(lunarCard.width / 2));
+      expect(
+        tester.getRect(lunarTravel).left,
+        greaterThan(lunarCard.center.dx),
+      );
+      expect(
+        tester.getRect(lunarTravel).right,
+        greaterThan(lunarCard.right - 20),
+      );
+      expect(
+        tester.getRect(activeTravel).right,
+        greaterThan(homeworldCard.right - 20),
+      );
+
+      // Locked planets keep their full-width unlock affordance.
+      final marsUnlock = find.byKey(
+        const Key('mining-stellar-map-unlock-marsFrontier'),
+      );
+      await tester.ensureVisible(marsUnlock);
+      await tester.pump();
+      expect(
+        tester.getSize(marsUnlock).width,
+        greaterThan(lunarCard.width - 40),
+      );
+      expect(tester.getSize(marsUnlock).height, greaterThanOrEqualTo(48));
+      expect(
+        tester.getSize(marsUnlock).width,
+        greaterThan(tester.getSize(lunarTravel).width * 3),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('travel hex routes to its own planet and guards active or busy '
+      'cards', (tester) async {
+    final view = StellarMapView.from(
+      state: _stateWith(
+        unlockedPlanets: {
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+          MiningPlanetId.marsFrontier,
+        },
+      ),
+      content: _content,
+    );
+    final traveled = <MiningPlanetId>[];
+    await _pumpMap(
+      tester,
+      view: view,
+      viewport: const Size(390, 844),
+      onTravel: traveled.add,
+    );
+
+    final activeTravel = find.byKey(
+      const Key('mining-stellar-map-travel-homeworld'),
+    );
+    final activeHex = tester.widget<MiningHex>(
+      find.descendant(of: activeTravel, matching: find.byType(MiningHex)),
+    );
+    expect(activeHex.onTap, isNull);
+    expect(activeHex.semanticLabel, 'Current location');
+    await tester.tap(activeTravel);
+    await tester.pump();
+    expect(traveled, isEmpty);
+
+    final lunarTravel = find.byKey(
+      const Key('mining-stellar-map-travel-lunarFrontier'),
+    );
+    final lunarHex = tester.widget<MiningHex>(
+      find.descendant(of: lunarTravel, matching: find.byType(MiningHex)),
+    );
+    expect(lunarHex.onTap, isNotNull);
+    expect(lunarHex.semanticLabel, 'Travel here');
+    await tester.ensureVisible(lunarTravel);
+    await tester.tap(lunarTravel);
+    await tester.pump();
+
+    final marsTravel = find.byKey(
+      const Key('mining-stellar-map-travel-marsFrontier'),
+    );
+    await tester.ensureVisible(marsTravel);
+    await tester.tap(marsTravel);
+    await tester.pump();
+    expect(traveled, [
+      MiningPlanetId.lunarFrontier,
+      MiningPlanetId.marsFrontier,
+    ]);
+
+    final busyView = StellarMapView.from(
+      state: _stateWith(
+        unlockedPlanets: {
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+        },
+      ),
+      content: _content,
+      isBusy: true,
+    );
+    await _pumpMap(
+      tester,
+      view: busyView,
+      viewport: const Size(360, 640),
+      onTravel: traveled.add,
+    );
+    final busyTravel = find.byKey(
+      const Key('mining-stellar-map-travel-lunarFrontier'),
+    );
+    final busyHex = tester.widget<MiningHex>(
+      find.descendant(of: busyTravel, matching: find.byType(MiningHex)),
+    );
+    expect(busyHex.onTap, isNull);
+    await tester.ensureVisible(busyTravel);
+    await tester.tap(busyTravel);
+    await tester.pump();
+    expect(traveled, [
+      MiningPlanetId.lunarFrontier,
+      MiningPlanetId.marsFrontier,
+    ]);
   });
 
   testWidgets('fresh map teases Ceres behind Mars', (tester) async {
