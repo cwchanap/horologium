@@ -40,6 +40,84 @@ MaterialApp _app(Widget home) => MaterialApp(
   home: home,
 );
 
+/// Pumps the five-planet return sheet and proves no report can paint in the
+/// pinned cash chip's band or under the pinned footer.
+Future<void> _expectPortraitReportViewport(
+  WidgetTester tester,
+  Size size, {
+  double padTop = 0,
+}) async {
+  await tester.pumpWidget(
+    _app(
+      Scaffold(
+        body: OfflineReturnSheet(
+          summary: _fivePlanetSummary,
+          content: MiningContentRegistry.stellarMining(),
+          state: _state(),
+          onSellCargo: () {},
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+
+  // The reduced inner padding keeps the opening composition at its old spot.
+  final headingPill = tester.getRect(
+    find
+        .ancestor(
+          of: find.text('FLEET RETURNED'),
+          matching: find.byType(Container),
+        )
+        .first,
+  );
+  expect(
+    headingPill.top,
+    moreOrLessEquals(
+      (size.height * .286).clamp(140.0, 250.0) + padTop,
+      epsilon: .01,
+    ),
+  );
+
+  final chip = tester.getRect(find.byKey(const Key('mining-cash-chip')));
+  final scroll = find.byKey(const Key('offline-return-scroll'));
+  final viewport = tester.getRect(scroll);
+  final footer = tester.getRect(find.byKey(const Key('offline-return-footer')));
+  expect(viewport.top, greaterThanOrEqualTo(chip.bottom));
+  expect(viewport.overlaps(footer), isFalse);
+  expect(footer.bottom, size.height);
+
+  // Scroll the report list until its first card reaches the viewport top.
+  final homeworld = find.byKey(const Key('offline-return-planet-homeworld'));
+  for (var i = 0; i < 20 && tester.getRect(homeworld).top > viewport.top; i++) {
+    await tester.drag(scroll, const Offset(0, -80));
+    await tester.pump();
+  }
+  expect(tester.getRect(homeworld).top, lessThanOrEqualTo(viewport.top));
+
+  // Every one of the five reports stays inside the viewport and above the
+  // still-pinned footer.
+  for (final planet in MiningPlanetId.values) {
+    final report = find.byKey(Key('offline-return-planet-${planet.name}'));
+    await tester.ensureVisible(report);
+    await tester.pump();
+    final rect = tester.getRect(report);
+    // ensureVisible top-aligns the card; the sub-pixel offset is rounding.
+    expect(rect.top, greaterThanOrEqualTo(viewport.top - 0.01));
+    expect(rect.bottom, lessThanOrEqualTo(footer.top));
+    expect(rect.overlaps(chip), isFalse);
+  }
+  expect(footer.bottom, size.height);
+  expect(
+    find.byKey(const Key('offline-return-sell-all')).hitTestable(),
+    findsOneWidget,
+  );
+  expect(
+    find.byKey(const Key('offline-return-next-action')).hitTestable(),
+    findsOneWidget,
+  );
+  expect(tester.takeException(), isNull);
+}
+
 void main() {
   // Real Orbitron metrics: the test font's square glyphs understate line
   // height, hiding footer overlap on the small viewports.
@@ -1159,6 +1237,90 @@ void main() {
       tester.getRect(find.byKey(const Key('offline-return-footer'))).bottom,
       844,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final size in const [Size(360, 640), Size(390, 844)]) {
+    testWidgets('starts the portrait report viewport below the cash chip at '
+        '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await _expectPortraitReportViewport(tester, size);
+    });
+
+    testWidgets('keeps the portrait report viewport inside nonzero safe-area '
+        'insets at ${size.width.toInt()}x${size.height.toInt()}', (
+      tester,
+    ) async {
+      const padBottom = 34.0;
+      const padTop = 44.0;
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      tester.view.padding = const FakeViewPadding(
+        top: padTop,
+        bottom: padBottom,
+      );
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPadding();
+      });
+
+      await _expectPortraitReportViewport(tester, size, padTop: padTop);
+      expect(
+        tester.getRect(find.byKey(const Key('mining-cash-chip'))).top,
+        greaterThanOrEqualTo(padTop),
+      );
+      expect(
+        tester.getRect(find.byKey(const Key('offline-return-sell-all'))).bottom,
+        lessThanOrEqualTo(size.height - padBottom),
+      );
+      expect(
+        tester.getRect(find.byKey(const Key('offline-return-footer'))).bottom,
+        size.height,
+      );
+    });
+  }
+
+  testWidgets('keeps landscape reports in a separate column clear of the cash '
+      'chip and has no portrait scroll or footer keys', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(874, 402);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      _app(
+        Scaffold(
+          body: OfflineReturnSheet(
+            summary: _fivePlanetSummary,
+            content: MiningContentRegistry.stellarMining(),
+            state: _state(),
+            onSellCargo: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final chip = tester.getRect(find.byKey(const Key('mining-cash-chip')));
+    expect(find.byKey(const Key('offline-return-scroll')), findsNothing);
+    expect(find.byKey(const Key('offline-return-footer')), findsNothing);
+    for (final planet in MiningPlanetId.values) {
+      final rect = tester.getRect(
+        find.byKey(Key('offline-return-planet-${planet.name}')),
+      );
+      expect(rect.left, greaterThan(chip.right));
+      expect(rect.overlaps(chip), isFalse);
+    }
+    expect(chip.bottom, lessThanOrEqualTo(402));
     expect(tester.takeException(), isNull);
   });
 }
