@@ -6,11 +6,15 @@ import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/presentation/animated_mining_grid_visual_layer.dart';
+import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 const double miningGridCellSize = 56;
 const double miningGridMinScale = 0.8;
 const double miningGridMaxScale = 1.6;
+
+/// Gold shared by the rig upgrade chip and the upgrade-target ring.
+const Color _upgradeGold = Color(0xFFF5B44C);
 
 /// Oversized deposit art edge, keyed by the deposit's logical footprint in
 /// cells. The art is centered over the logical footprint so hit-testing and
@@ -252,7 +256,24 @@ class _MiningGridMapState extends State<MiningGridMap> {
                         ),
                       ),
                     ),
-                  for (final rig in view.rigs)
+                  for (final rig in view.rigs) ...[
+                    Positioned(
+                      key: Key(
+                        'mining-rig-chip-'
+                        '${rig.placement.cell.x}-${rig.placement.cell.y}',
+                      ),
+                      left: rig.placement.cell.x * miningGridCellSize,
+                      top: rig.placement.cell.y * miningGridCellSize,
+                      width: miningGridCellSize,
+                      child: IgnorePointer(
+                        child: ExcludeSemantics(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: _rigChip(rig),
+                          ),
+                        ),
+                      ),
+                    ),
                     Positioned(
                       left: rig.placement.cell.x * miningGridCellSize,
                       top: rig.placement.cell.y * miningGridCellSize,
@@ -272,6 +293,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
                         child: IgnorePointer(child: const SizedBox.expand()),
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -309,6 +331,37 @@ class _MiningGridMapState extends State<MiningGridMap> {
     }
     final reason = rig.disabledReason;
     return '$base${reason == null ? '' : ' $reason'}';
+  }
+
+  /// The one tier chip for a placed rig: its tier, or the gold `Tn→Tn+1` of
+  /// the same chip when this rig's cell is already an upgrade target.
+  Widget _rigChip(MineSiteRigView rig) {
+    final upgradeable = widget.view.upgradeableCells.contains(
+      rig.placement.cell,
+    );
+    final tier = rig.placement.tier;
+    final label = upgradeable
+        ? '${tier.name.toUpperCase()}→'
+              '${RigTier.values[tier.index + 1].name.toUpperCase()}'
+        : tier.name.toUpperCase();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: MiningTheme.hudPanel,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: upgradeable ? _upgradeGold : Colors.white24),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        style: TextStyle(
+          color: upgradeable ? _upgradeGold : MiningTheme.primaryText,
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          height: 1.1,
+        ),
+      ),
+    );
   }
 }
 
@@ -397,12 +450,19 @@ class MiningGridPainter extends CustomPainter {
         highlight,
       );
     }
-    final upgradeHighlight = Paint()
-      ..color = const Color.fromRGBO(245, 180, 76, .22);
+    final upgradeRing = Paint()
+      ..color = _upgradeGold
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
     for (final cellPos in upgradeableCells) {
       canvas.drawRect(
-        Rect.fromLTWH(cellPos.x * cell, cellPos.y * cell, cell, cell),
-        upgradeHighlight,
+        Rect.fromLTWH(
+          cellPos.x * cell,
+          cellPos.y * cell,
+          cell,
+          cell,
+        ).deflate(1),
+        upgradeRing,
       );
     }
     final line = Paint()

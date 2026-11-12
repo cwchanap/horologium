@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,9 +21,11 @@ MineSiteView _view(
   List<MiningRigPlacement> rigs = const [],
   DockBayId? selectedBayId,
   Map<DockBayId, RigTier?>? dockBays,
+  int surveying = 0,
 }) {
   final initial = MiningSave.initial(nowUtc: _start);
   final state = initial.copyWith(
+    technology: TechnologyLevels(surveying: surveying),
     docks: dockBays == null
         ? initial.docks
         : {
@@ -57,6 +61,41 @@ Finder _rigSemantics(String label, {required bool enabled}) =>
           widget.properties.label != null &&
           widget.properties.label!.contains(label),
     );
+
+Key _chipKey(MiningGridCell cell) => Key('mining-rig-chip-${cell.x}-${cell.y}');
+
+Finder _chips() => find.byWidgetPredicate(
+  (widget) =>
+      widget.key is ValueKey<String> &&
+      (widget.key! as ValueKey<String>).value.startsWith('mining-rig-chip-'),
+);
+
+/// Every rig semantics widget, regardless of label: each rig owns exactly one.
+Finder _rigSemanticsNodes() => find.byWidgetPredicate(
+  (widget) =>
+      widget is Semantics &&
+      widget.properties.button == true &&
+      (widget.properties.label?.contains('rig at (') ?? false),
+);
+
+String _chipLabel(WidgetTester tester, MiningGridCell cell) => tester
+    .widget<Text>(
+      find.descendant(
+        of: find.byKey(_chipKey(cell)),
+        matching: find.byType(Text),
+      ),
+    )
+    .data!;
+
+Color? _chipColor(WidgetTester tester, MiningGridCell cell) => tester
+    .widget<Text>(
+      find.descendant(
+        of: find.byKey(_chipKey(cell)),
+        matching: find.byType(Text),
+      ),
+    )
+    .style
+    ?.color;
 
 Future<void> _pumpMap(
   WidgetTester tester,
@@ -752,4 +791,213 @@ void main() {
     expect(find.bySemanticsLabel(RegExp('Upgrade to')), findsNothing);
     handle.dispose();
   });
+
+  testWidgets('renders one tier chip and one actionable rig node per rig', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    // One animated and one static site: rigs directly above authored
+    // resources at both footprint extremes.
+    final cases = <(MiningSiteId, int, List<MiningRigPlacement>)>[
+      (
+        MiningSiteId.landingBasin,
+        2,
+        const [
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(27, 0)),
+          MiningRigPlacement(tier: RigTier.t3, cell: MiningGridCell(7, 0)),
+        ],
+      ),
+      (
+        staticMiningSiteId,
+        3,
+        const [
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(22, 1)),
+          MiningRigPlacement(tier: RigTier.t3, cell: MiningGridCell(6, 0)),
+        ],
+      ),
+    ];
+    for (final (siteId, surveying, rigs) in cases) {
+      await _pumpMap(
+        tester,
+        _view(siteId, rigs: rigs, surveying: surveying),
+        (_) {},
+      );
+
+      expect(_chips(), findsNWidgets(rigs.length), reason: siteId.name);
+      expect(
+        _rigSemanticsNodes(),
+        findsNWidgets(rigs.length),
+        reason: siteId.name,
+      );
+      for (final rig in rigs) {
+        final chip = find.byKey(_chipKey(rig.cell));
+        expect(chip, findsOneWidget, reason: '${siteId.name} ${rig.cell}');
+        expect(
+          find.descendant(of: chip, matching: find.byType(IgnorePointer)),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: chip, matching: find.byType(ExcludeSemantics)),
+          findsOneWidget,
+        );
+        expect(
+          _chipLabel(tester, rig.cell),
+          rig.tier.name.toUpperCase(),
+          reason: '${siteId.name} ${rig.cell}',
+        );
+      }
+    }
+    handle.dispose();
+  });
+
+  testWidgets('golds the same chip only for a matching upgrade target', (
+    tester,
+  ) async {
+    const eligible = MiningGridCell(3, 2);
+    const mismatched = MiningGridCell(2, 3);
+    const topTier = MiningGridCell(3, 1);
+    const gold = Color(0xFFF5B44C);
+    final view = _view(
+      MiningSiteId.landingBasin,
+      rigs: const [
+        MiningRigPlacement(tier: RigTier.t1, cell: eligible),
+        MiningRigPlacement(tier: RigTier.t2, cell: mismatched),
+        MiningRigPlacement(tier: RigTier.t5, cell: topTier),
+      ],
+      selectedBayId: DockBayId.b1,
+      dockBays: const {DockBayId.b1: RigTier.t1},
+    );
+    expect(view.upgradeableCells, {eligible});
+    await _pumpMap(tester, view, (_) {});
+
+    expect(_chips(), findsNWidgets(3));
+    expect(_chipLabel(tester, eligible), 'T1→T2');
+    expect(_chipLabel(tester, mismatched), 'T2');
+    expect(_chipLabel(tester, topTier), 'T5');
+    expect(_chipColor(tester, eligible), gold);
+    expect(_chipColor(tester, mismatched), isNot(gold));
+    expect(_chipColor(tester, topTier), isNot(gold));
+  });
+
+  testWidgets('never golds a chip while no dock rig is selected', (
+    tester,
+  ) async {
+    const cell = MiningGridCell(3, 2);
+    final view = _view(
+      MiningSiteId.landingBasin,
+      rigs: const [MiningRigPlacement(tier: RigTier.t1, cell: cell)],
+    );
+    expect(view.upgradeableCells, isEmpty);
+    await _pumpMap(tester, view, (_) {});
+
+    expect(_chipLabel(tester, cell), 'T1');
+    expect(find.textContaining('→'), findsNothing);
+  });
+
+  test('paints a gold upgrade ring and keeps the cyan deploy fill', () {
+    const deploy = MiningGridCell(1, 1);
+    const upgrade = MiningGridCell(2, 1);
+    final painter = MiningGridPainter(
+      width: 4,
+      height: 4,
+      deployableCells: {deploy},
+      upgradeableCells: {upgrade},
+    );
+    final canvas = _RecordingCanvas();
+    painter.paint(canvas, const Size(224, 224));
+
+    final fill = canvas.rects.singleWhere(
+      (entry) => entry.$2.style == PaintingStyle.fill,
+    );
+    expect(fill.$1, const Rect.fromLTWH(56, 56, 56, 56));
+    expect(
+      fill.$2.color.toARGB32(),
+      const Color.fromRGBO(83, 212, 232, .16).toARGB32(),
+    );
+
+    final ring = canvas.rects.singleWhere(
+      (entry) => entry.$2.style == PaintingStyle.stroke,
+    );
+    expect(ring.$1, const Rect.fromLTWH(112, 56, 56, 56).deflate(1));
+    expect(ring.$2.color.toARGB32(), 0xFFF5B44C);
+    expect(ring.$2.strokeWidth, 2);
+  });
+
+  testWidgets('routes a chip tap through the existing map gesture surface', (
+    tester,
+  ) async {
+    const cell = MiningGridCell(3, 2);
+    final taps = <MiningGridCell>[];
+    await _pumpMap(
+      tester,
+      _view(
+        MiningSiteId.landingBasin,
+        rigs: const [MiningRigPlacement(tier: RigTier.t1, cell: cell)],
+      ),
+      taps.add,
+    );
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('mining-grid-surface')),
+        matching: find.byType(GestureDetector),
+      ),
+      findsOneWidget,
+    );
+    await tester.tapAt(tester.getRect(find.byKey(_chipKey(cell))).center);
+    await tester.pump();
+    expect(taps.single, cell);
+  });
+
+  testWidgets('keeps top-anchored chips clear of mined 1x1 and 3x3 HP', (
+    tester,
+  ) async {
+    const oneByOneRig = MiningGridCell(27, 0);
+    const threeByThreeRig = MiningGridCell(7, 0);
+    final view = _view(
+      MiningSiteId.landingBasin,
+      surveying: 2,
+      rigs: const [
+        MiningRigPlacement(tier: RigTier.t1, cell: oneByOneRig),
+        MiningRigPlacement(tier: RigTier.t1, cell: threeByThreeRig),
+      ],
+    );
+    await _pumpMap(tester, view, (_) {});
+
+    final surface = _surfaceRect(tester);
+    final hpByRig = {
+      oneByOneRig: const Key('landing-basin-hp-27-1-1'),
+      threeByThreeRig: const Key('landing-basin-hp-6-1-3'),
+    };
+    for (final entry in hpByRig.entries) {
+      final chip = tester.getRect(find.byKey(_chipKey(entry.key)));
+      final hp = tester.getRect(find.byKey(entry.value));
+      expect(
+        chip.overlaps(hp),
+        isFalse,
+        reason: '${entry.key} chip $chip overlaps HP $hp',
+      );
+      // Anchored to the rig cell's top edge in scene coordinates.
+      expect(
+        chip.topLeft,
+        surface.topLeft +
+            Offset(
+              entry.key.x * miningGridCellSize,
+              entry.key.y * miningGridCellSize,
+            ),
+        reason: '${entry.key}',
+      );
+    }
+  });
+}
+
+/// Records only rect paints: the grid painter's cell fills and upgrade ring.
+class _RecordingCanvas implements ui.Canvas {
+  final rects = <(Rect, Paint)>[];
+
+  @override
+  void drawRect(Rect rect, Paint paint) => rects.add((rect, paint));
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
 }
