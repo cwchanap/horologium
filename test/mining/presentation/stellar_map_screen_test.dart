@@ -75,8 +75,9 @@ Future<void> _pumpMap(
   VoidCallback? onRelaunch,
   ValueChanged<MiningNavigationDestination>? onDestinationSelected,
   Size viewport = const Size(360, 640),
-  double textScale = 1.3,
+  EdgeInsets padding = EdgeInsets.zero,
   TextStyle? bodyTextStyle,
+  bool materialShell = false,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = viewport;
@@ -92,15 +93,24 @@ Future<void> _pumpMap(
     onRelaunch: onRelaunch ?? () {},
     onDestinationSelected: onDestinationSelected ?? (_) {},
   );
+  final Widget home;
+  if (materialShell) {
+    home = Scaffold(body: screen);
+  } else if (bodyTextStyle != null) {
+    home = DefaultTextStyle(style: bodyTextStyle, child: screen);
+  } else {
+    home = screen;
+  }
   await tester.pumpWidget(
     MediaQuery(
-      data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+      data: MediaQueryData(
+        textScaler: const TextScaler.linear(1.3),
+        padding: padding,
+      ),
       child: MaterialApp(
         theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
-        // The shell's Material installs this style above the map.
-        home: bodyTextStyle == null
-            ? screen
-            : DefaultTextStyle(style: bodyTextStyle, child: screen),
+        // The shell's Material supplies the production body text style.
+        home: home,
       ),
     ),
   );
@@ -167,8 +177,7 @@ void main() {
       tester,
       view: view,
       viewport: const Size(402, 874),
-      textScale: 1,
-      bodyTextStyle: _productionBodyTextStyle,
+      materialShell: true,
     );
 
     expect(
@@ -1356,5 +1365,134 @@ void main() {
       }
       expect(tester.takeException(), isNull);
     });
+  });
+
+  group('locked planet requirements fit at text scale 1.3', () {
+    final cases = <(MiningPlanetId, MiningSave)>[
+      (MiningPlanetId.lunarFrontier, MiningSave.initial(nowUtc: _start)),
+      (
+        MiningPlanetId.ioFrontier,
+        _stateWith(
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+            MiningPlanetId.marsFrontier,
+            MiningPlanetId.ceresFrontier,
+          },
+        ),
+      ),
+    ];
+
+    for (final viewport in const [Size(360, 640), Size(402, 874)]) {
+      for (final (id, state) in cases) {
+        final name = _content.planet(id).name;
+        testWidgets(
+          '$name at ${viewport.width.toInt()}x${viewport.height.toInt()}',
+          (tester) async {
+            final semantics = tester.ensureSemantics();
+            final view = StellarMapView.from(state: state, content: _content);
+            await _pumpMap(
+              tester,
+              view: view,
+              viewport: viewport,
+              padding: const EdgeInsets.fromLTRB(0, 24, 0, 24),
+              materialShell: true,
+            );
+            expect(
+              tester.takeException(),
+              isNull,
+              reason: 'opening the map must not overflow',
+            );
+
+            final card = find.byKey(
+              Key('mining-stellar-map-planet-${id.name}'),
+            );
+            await tester.ensureVisible(card);
+            await tester.pump();
+            expect(
+              tester.takeException(),
+              isNull,
+              reason: '$name requirements overflow their fixed card',
+            );
+
+            final cardRect = tester.getRect(card);
+            expect(cardRect.height, 191);
+            expect(
+              tester.getSemantics(card).label,
+              startsWith('$name, locked planet'),
+            );
+            expect(
+              find.ancestor(
+                of: card,
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Semantics &&
+                      widget.properties.label == '$name, locked planet',
+                ),
+              ),
+              findsOneWidget,
+            );
+
+            final action = find.byKey(
+              Key('mining-stellar-map-unlock-${id.name}'),
+            );
+            final actionRect = tester.getRect(action);
+            expect(actionRect.height, 48);
+            expect(cardRect.contains(actionRect.topLeft), isTrue);
+            expect(
+              cardRect.contains(actionRect.bottomRight - const Offset(1, 1)),
+              isTrue,
+            );
+
+            final requirements = view.planet(id).requirements;
+            expect(requirements, hasLength(3));
+            for (final requirement in requirements) {
+              final label =
+                  '${requirement.label}, '
+                  '${requirement.isSatisfied ? 'satisfied' : 'required'}';
+              final row = find.descendant(
+                of: card,
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Semantics && widget.properties.label == label,
+                ),
+              );
+              expect(row, findsOneWidget);
+              final rowRect = tester.getRect(row);
+              expect(
+                cardRect.contains(rowRect.topLeft),
+                isTrue,
+                reason: '$label is outside the card',
+              );
+              expect(
+                cardRect.contains(rowRect.bottomRight - const Offset(1, 1)),
+                isTrue,
+                reason: '$label is clipped by the card',
+              );
+              expect(
+                rowRect.bottom,
+                lessThanOrEqualTo(actionRect.top),
+                reason: '$label is hidden behind the unlock action',
+              );
+
+              final value = find.descendant(
+                of: row,
+                matching: find.byType(Text),
+              );
+              expect(value, findsOneWidget);
+              final paragraph = tester.renderObject<RenderParagraph>(value);
+              expect(
+                paragraph.size.width,
+                greaterThanOrEqualTo(
+                  paragraph.getMaxIntrinsicWidth(double.infinity) - .5,
+                ),
+                reason: '$label value is wrapped or clipped',
+              );
+            }
+            semantics.dispose();
+          },
+        );
+      }
+    }
   });
 }

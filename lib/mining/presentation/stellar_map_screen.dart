@@ -827,7 +827,10 @@ class _RequirementRow extends StatelessWidget {
         ? MiningTheme.accent
         : MiningTheme.gate;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      // Keep three requirements inside a 191px locked card at 1.3 text
+      // scale: the 22px Orbitron line plus 2px total padding leaves a small
+      // gap and still clears the 48px unlock action below.
+      padding: const EdgeInsets.symmetric(vertical: 1),
       child: Semantics(
         label: '$label, ${requirement.isSatisfied ? 'satisfied' : 'required'}',
         child: Row(
