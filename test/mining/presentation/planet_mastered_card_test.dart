@@ -1,15 +1,13 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/planet_mastered_card.dart';
+
+import '../../support/test_fonts.dart';
 
 final _content = MiningContentRegistry.stellarMining();
 final _start = DateTime.utc(2026, 8, 27, 12);
@@ -211,30 +209,8 @@ void _expectArtLayout(WidgetTester tester, Size size) {
 }
 
 void main() {
-  setUpAll(() async {
-    if (kIsWeb) return;
-    for (final (family, files) in [
-      ('Orbitron', ['assets/fonts/Orbitron-Variable.ttf']),
-      (
-        'IBM Plex Mono',
-        [
-          'assets/fonts/IBMPlexMono-400.ttf',
-          'assets/fonts/IBMPlexMono-500.ttf',
-          'assets/fonts/IBMPlexMono-600.ttf',
-        ],
-      ),
-    ]) {
-      final loader = FontLoader(family);
-      var loaded = false;
-      for (final path in files) {
-        final file = File(path);
-        if (!file.existsSync()) continue;
-        loaded = true;
-        loader.addFont(file.readAsBytes().then(ByteData.sublistView));
-      }
-      if (loaded) await loader.load();
-    }
-  });
+  setUpAll(loadProductionTestFonts);
+  tearDownAll(restoreProductionFontsInWebTests);
 
   for (final size in _sizes) {
     final label = '${size.width.toInt()}x${size.height.toInt()}';
