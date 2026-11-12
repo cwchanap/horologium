@@ -201,9 +201,16 @@ class JourneyPlayer {
           buy: () async {
             await travel(planet);
             final bay = await _build(RigTier.t1);
-            await expectAction(
-              'deploy to ${site.name}',
-              controller.deployRig(bay, site.id, cell),
+            final deploy = await controller.deployRig(bay, site.id, cell);
+            expect(
+              deploy.isSuccess,
+              isTrue,
+              reason: 'deploy to ${site.name}: ${deploy.message}',
+            );
+            expect(
+              deploy.masteredPlanetId,
+              isNull,
+              reason: '${site.name} was already commissioned',
             );
           },
         ));
@@ -390,12 +397,27 @@ void _expectGoal(
   expect(next.title, title, reason: '$point goal title');
 }
 
-Future<void> _commission(JourneyPlayer player, MiningSiteId site) async {
+Future<void> _commission(
+  JourneyPlayer player,
+  MiningSiteId site, {
+  MiningPlanetId? masteredPlanetId,
+}) async {
   final spawn = await player.controller.spawnRig();
   expect(spawn.isSuccess, isTrue, reason: 'spawn: ${spawn.message}');
-  await expectAction(
-    'commission ${site.name}',
-    player.controller.deployRig(spawn.dockBayId!, site, journeyCell[site]!),
+  final deploy = await player.controller.deployRig(
+    spawn.dockBayId!,
+    site,
+    journeyCell[site]!,
+  );
+  expect(
+    deploy.isSuccess,
+    isTrue,
+    reason: 'commission ${site.name}: ${deploy.message}',
+  );
+  expect(
+    deploy.masteredPlanetId,
+    masteredPlanetId,
+    reason: '${site.name} is only the mastered planet report on the last site',
   );
   expect(player.controller.state.sites[site]!.commissioned, isTrue);
 }
@@ -450,13 +472,16 @@ Future<Duration> _playFrontier(
     'merge the fresh $tag rigs',
     controller.mergeDockRigs(DockBayId.b1, DockBayId.b2),
   );
-  await expectAction(
-    'commission ${planet.sites.first.name}',
-    controller.deployRig(
-      DockBayId.b2,
-      planet.sites.first.id,
-      journeyCell[planet.sites.first.id]!,
-    ),
+  final firstSiteDeploy = await controller.deployRig(
+    DockBayId.b2,
+    planet.sites.first.id,
+    journeyCell[planet.sites.first.id]!,
+  );
+  expect(firstSiteDeploy.isSuccess, isTrue);
+  expect(
+    firstSiteDeploy.masteredPlanetId,
+    isNull,
+    reason: '${planet.sites.first.name} is not the $tag mastery site',
   );
   debugPrint(
     'SEQUENCE $tag merge t1+t1->t2; deploy ${planet.sites.first.name}',
@@ -493,6 +518,11 @@ Future<Duration> _playFrontier(
       journeyCell[site.id]!,
     );
     expect(deploy.isSuccess, isTrue);
+    expect(
+      deploy.masteredPlanetId,
+      site == planet.sites.last ? planetId : null,
+      reason: '${site.name} mastery metadata',
+    );
     if (site == planet.sites.last) {
       expect(
         deploy.message,
@@ -570,13 +600,16 @@ _playRun(JourneyPlayer player, Duration cadence) async {
     controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b2],
     RigTier.t2,
   );
-  await expectAction(
-    'commission Landing Basin',
-    controller.deployRig(
-      DockBayId.b2,
-      MiningSiteId.landingBasin,
-      journeyCell[MiningSiteId.landingBasin]!,
-    ),
+  final landingDeploy = await controller.deployRig(
+    DockBayId.b2,
+    MiningSiteId.landingBasin,
+    journeyCell[MiningSiteId.landingBasin]!,
+  );
+  expect(landingDeploy.isSuccess, isTrue);
+  expect(
+    landingDeploy.masteredPlanetId,
+    isNull,
+    reason: 'Landing Basin is not the Homeworld mastery site',
   );
   expect(
     controller.state.sites[MiningSiteId.landingBasin]!.commissioned,
@@ -603,7 +636,11 @@ _playRun(JourneyPlayer player, Duration cadence) async {
     'unlock Granite Crater',
     controller.unlockSite(MiningSiteId.graniteCrater),
   );
-  await _commission(player, MiningSiteId.graniteCrater);
+  await _commission(
+    player,
+    MiningSiteId.graniteCrater,
+    masteredPlanetId: MiningPlanetId.homeworld,
+  );
   expect(
     content.isPlanetMastered(
       MiningPlanetId.homeworld,
@@ -685,13 +722,16 @@ _playRun(JourneyPlayer player, Duration cadence) async {
     'merge the fresh Lunar rigs',
     controller.mergeDockRigs(DockBayId.b1, DockBayId.b2),
   );
-  await expectAction(
-    'commission Frozen Basin',
-    controller.deployRig(
-      DockBayId.b2,
-      MiningSiteId.frozenBasin,
-      journeyCell[MiningSiteId.frozenBasin]!,
-    ),
+  final frozenDeploy = await controller.deployRig(
+    DockBayId.b2,
+    MiningSiteId.frozenBasin,
+    journeyCell[MiningSiteId.frozenBasin]!,
+  );
+  expect(frozenDeploy.isSuccess, isTrue);
+  expect(
+    frozenDeploy.masteredPlanetId,
+    isNull,
+    reason: 'Frozen Basin is not the Lunar Frontier mastery site',
   );
   debugPrint('SEQUENCE Lunar merge t1+t1->t2; deploy Frozen Basin');
   _expectGoal(
@@ -727,7 +767,11 @@ _playRun(JourneyPlayer player, Duration cadence) async {
     'unlock Helium Mare',
     controller.unlockSite(MiningSiteId.heliumMare),
   );
-  await _commission(player, MiningSiteId.heliumMare);
+  await _commission(
+    player,
+    MiningSiteId.heliumMare,
+    masteredPlanetId: MiningPlanetId.lunarFrontier,
+  );
   expect(
     content.isPlanetMastered(
       MiningPlanetId.lunarFrontier,
@@ -795,6 +839,11 @@ _playRun(JourneyPlayer player, Duration cadence) async {
   );
   expect(redeploy.isSuccess, isTrue);
   expect(redeploy.message, isNull);
+  expect(
+    redeploy.masteredPlanetId,
+    isNull,
+    reason: 'the final planet was already mastered before the redeploy',
+  );
   expect(controller.state.cash, cashAfterMastery);
 
   return (opening: opening, mars: mars, ceres: ceres, io: io);

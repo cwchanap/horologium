@@ -9,12 +9,16 @@ import 'package:horologium/mining/mining_simulation.dart';
 import 'package:horologium/mining/mining_state.dart';
 
 class MiningActionResult {
-  const MiningActionResult.success({this.message, this.dockBayId})
-    : isSuccess = true;
+  const MiningActionResult.success({
+    this.message,
+    this.dockBayId,
+    this.masteredPlanetId,
+  }) : isSuccess = true;
 
   const MiningActionResult.failure(this.message)
     : isSuccess = false,
-      dockBayId = null;
+      dockBayId = null,
+      masteredPlanetId = null;
 
   final bool isSuccess;
   final String? message;
@@ -22,6 +26,10 @@ class MiningActionResult {
   /// The dock bay a successful [spawnRig] filled; null for every other
   /// action and for failures.
   final DockBayId? dockBayId;
+
+  /// The planet a successful [deployRig] just mastered; null for every other
+  /// action, for failures, and for deploys on an already-mastered planet.
+  final MiningPlanetId? masteredPlanetId;
 }
 
 class MiningSaleResult {
@@ -343,6 +351,7 @@ class MiningController {
           ? '${planet.name.split(' ').first} mastered — '
                 '+${formatMiningCash(planet.masteryRewardCash)} cash.'
           : null,
+      masteredPlanetId: !wasMastered && isMastered ? planetId : null,
     );
   });
 

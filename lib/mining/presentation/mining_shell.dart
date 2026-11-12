@@ -21,6 +21,7 @@ import 'package:horologium/mining/presentation/mining_settings_sheet.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/offline_return_sheet.dart';
+import 'package:horologium/mining/presentation/planet_mastered_card.dart';
 import 'package:horologium/mining/presentation/relaunch_sheet.dart';
 import 'package:horologium/mining/presentation/site_deck_screen.dart';
 import 'package:horologium/mining/presentation/stellar_map_screen.dart';
@@ -253,6 +254,7 @@ class _MiningShellState extends State<MiningShell>
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black26,
       constraints: const BoxConstraints(maxWidth: double.infinity),
+      sheetAnimationStyle: _reducedMotion ? AnimationStyle.noAnimation : null,
       builder: (_) => child,
     );
     if (mounted) unawaited(_audioManager.playSound(GameSound.tap));
@@ -276,6 +278,7 @@ class _MiningShellState extends State<MiningShell>
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black26,
       constraints: const BoxConstraints(maxWidth: double.infinity),
+      sheetAnimationStyle: _reducedMotion ? AnimationStyle.noAnimation : null,
       builder: (sheetContext) {
         return ValueListenableBuilder<MiningSave>(
           valueListenable: _displayNotifier,
@@ -374,6 +377,46 @@ class _MiningShellState extends State<MiningShell>
       () => _controller.switchPlanet(id),
       successMessage: 'Traveled to ${_content.planet(id).name}.',
       sound: GameSound.travel,
+    );
+  }
+
+  /// Relays the next frontier's already-projected Stellar Map gates so the
+  /// card never recalculates mastery, surveying, or cash itself.
+  Future<void> _showPlanetMastered(MiningPlanetId planetId) {
+    final planet = _content.planet(planetId);
+    final isFinal = planetId == _content.finalPlanetId;
+    MiningPlanetDefinition? successor;
+    if (!isFinal) {
+      for (final candidate in _content.planets.values) {
+        if (candidate.unlockRequiredMasteryPlanetId == planetId) {
+          successor = candidate;
+          break;
+        }
+      }
+    }
+    final successorView = successor == null
+        ? null
+        : StellarMapView.from(
+            state: _controller.state,
+            content: _content,
+          ).planet(successor.id);
+    return _showModalSheet(
+      PlanetMasteredCard(
+        masteredPlanet: planet,
+        isFinal: isFinal,
+        successorName: successorView?.name,
+        requirements: successorView?.requirements ?? const [],
+        rewardCash: planet.masteryRewardCash,
+        onContinue: () => Navigator.of(context).pop(),
+        onOpenMap: () {
+          Navigator.of(context).pop();
+          _handleNavigation(MiningNavigationDestination.stellarMap);
+        },
+        onRelaunch: () {
+          Navigator.of(context).pop();
+          _openRelaunchSheet();
+        },
+      ),
     );
   }
 
@@ -661,9 +704,14 @@ class _MiningShellState extends State<MiningShell>
         unawaited(
           _audioManager.playSound(commissioned ? GameSound.milestone : sound),
         );
-        final message = result.message ?? successMessage;
-        if (message != null) {
-          _showResult(message);
+        final masteredPlanetId = result.masteredPlanetId;
+        if (masteredPlanetId != null) {
+          unawaited(_showPlanetMastered(masteredPlanetId));
+        } else {
+          final message = result.message ?? successMessage;
+          if (message != null) {
+            _showResult(message);
+          }
         }
       } else {
         unawaited(_audioManager.playSound(GameSound.reject));

@@ -1807,6 +1807,7 @@ void main() {
 
           expect(result.isSuccess, isTrue, reason: planet.name);
           expect(result.message, isNull, reason: planet.name);
+          expect(result.masteredPlanetId, planet, reason: planet.name);
           expect(controller.state.cash, 50000, reason: planet.name);
           expect(
             _content.isPlanetMastered(
@@ -1861,6 +1862,7 @@ void main() {
           first.message,
           'Io mastered — +${formatMiningCash(reward)} cash.',
         );
+        expect(first.masteredPlanetId, MiningPlanetId.ioFrontier);
         expect(controller.state.cash, 50000 + reward);
 
         final recall = await controller.recallRig(
@@ -1875,9 +1877,27 @@ void main() {
         );
         expect(redeploy.isSuccess, isTrue);
         expect(redeploy.message, isNull);
+        expect(redeploy.masteredPlanetId, isNull);
         expect(controller.state.cash, 50000 + reward);
       },
     );
+
+    test('failure results never carry mastery metadata', () async {
+      final controller = await controllerOver(
+        MiningSaveRepository(),
+        seed: seededSave(clock.now, docks: docksFor(homeworld: dock())),
+      );
+
+      final result = await controller.deployRig(
+        DockBayId.b1,
+        MiningSiteId.landingBasin,
+        n1Cell,
+      );
+
+      expect(result.isSuccess, isFalse);
+      expect(result.message, 'Dock bay is empty.');
+      expect(result.masteredPlanetId, isNull);
+    });
 
     test(
       'failed save leaves rig movement unpublished and later action can proceed',
