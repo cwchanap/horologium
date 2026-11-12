@@ -59,6 +59,14 @@ MiningSave _masteredSave() => _stateWith(
   },
 );
 
+/// The shell's Material body style above the map: Orbitron metrics, matching
+/// production rather than the square test fallback font.
+const _productionBodyTextStyle = TextStyle(
+  fontFamily: 'Orbitron',
+  fontSize: 14,
+  letterSpacing: .25,
+);
+
 Future<void> _pumpMap(
   WidgetTester tester, {
   required StellarMapView view,
@@ -67,7 +75,8 @@ Future<void> _pumpMap(
   VoidCallback? onRelaunch,
   ValueChanged<MiningNavigationDestination>? onDestinationSelected,
   Size viewport = const Size(360, 640),
-  bool orbitronText = false,
+  double textScale = 1.3,
+  TextStyle? bodyTextStyle,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = viewport;
@@ -85,24 +94,56 @@ Future<void> _pumpMap(
   );
   await tester.pumpWidget(
     MediaQuery(
-      data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
+      data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
       child: MaterialApp(
         theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
-        // The shell's Material installs Orbitron metrics above the map.
-        home: orbitronText
-            ? DefaultTextStyle(
-                style: const TextStyle(
-                  fontFamily: 'Orbitron',
-                  fontSize: 14,
-                  letterSpacing: .25,
-                ),
-                child: screen,
-              )
-            : screen,
+        // The shell's Material installs this style above the map.
+        home: bodyTextStyle == null
+            ? screen
+            : DefaultTextStyle(style: bodyTextStyle, child: screen),
       ),
     ),
   );
   await tester.pump();
+}
+
+/// The displayed name paragraph must render in full and end before the
+/// planet artwork begins, and the card must keep its authored height.
+Future<void> _expectNameClearOfArt(
+  WidgetTester tester,
+  MiningPlanetId planet,
+) async {
+  final card = find.byKey(Key('mining-stellar-map-planet-${planet.name}'));
+  await tester.ensureVisible(card);
+  await tester.pump();
+
+  final name = find.descendant(
+    of: card,
+    matching: find.text(_content.planet(planet).name),
+  );
+  expect(name, findsOneWidget);
+  final paragraph = tester.renderObject<RenderParagraph>(name);
+  final art = tester.getRect(
+    find.byKey(Key('mining-stellar-map-planet-${planet.name}-art')),
+  );
+  final nameRect = tester.getRect(name);
+  expect(
+    nameRect.right,
+    lessThanOrEqualTo(art.left),
+    reason: '${_content.planet(planet).name} paints over its planet art',
+  );
+  expect(
+    paragraph.size.width,
+    greaterThanOrEqualTo(paragraph.getMaxIntrinsicWidth(double.infinity) - .5),
+    reason: '${_content.planet(planet).name} must not wrap or clip',
+  );
+  final cardRect = tester.getRect(card);
+  expect(cardRect.contains(nameRect.topLeft), isTrue);
+  expect(cardRect.contains(nameRect.bottomRight - const Offset(1, 1)), isTrue);
+  expect(
+    tester.getSize(card).height,
+    planet == MiningPlanetId.homeworld ? 264 : 290,
+  );
 }
 
 void main() {
@@ -122,7 +163,13 @@ void main() {
       state: MiningSave.initial(nowUtc: _start),
       content: _content,
     );
-    await _pumpMap(tester, view: view, viewport: const Size(402, 874));
+    await _pumpMap(
+      tester,
+      view: view,
+      viewport: const Size(402, 874),
+      textScale: 1,
+      bodyTextStyle: _productionBodyTextStyle,
+    );
 
     expect(
       tester.getRect(
@@ -1270,7 +1317,7 @@ void main() {
           tester,
           view: view,
           viewport: viewport,
-          orbitronText: true,
+          bodyTextStyle: _productionBodyTextStyle,
         );
 
         for (final planet in const [
@@ -1279,48 +1326,35 @@ void main() {
           MiningPlanetId.marsFrontier,
           MiningPlanetId.ceresFrontier,
         ]) {
-          final card = find.byKey(
-            Key('mining-stellar-map-planet-${planet.name}'),
-          );
-          await tester.ensureVisible(card);
-          await tester.pump();
-
-          final name = find.descendant(
-            of: card,
-            matching: find.text(_content.planet(planet).name),
-          );
-          expect(name, findsOneWidget);
-          final paragraph = tester.renderObject<RenderParagraph>(name);
-          final art = tester.getRect(
-            find.byKey(Key('mining-stellar-map-planet-${planet.name}-art')),
-          );
-          final nameRect = tester.getRect(name);
-          expect(
-            nameRect.right,
-            lessThanOrEqualTo(art.left),
-            reason:
-                '${_content.planet(planet).name} paints over its planet art',
-          );
-          expect(
-            paragraph.size.width,
-            greaterThanOrEqualTo(
-              paragraph.getMaxIntrinsicWidth(double.infinity) - .5,
-            ),
-            reason: '${_content.planet(planet).name} must not wrap or clip',
-          );
-          final cardRect = tester.getRect(card);
-          expect(cardRect.contains(nameRect.topLeft), isTrue);
-          expect(
-            cardRect.contains(nameRect.bottomRight - const Offset(1, 1)),
-            isTrue,
-          );
-          expect(
-            tester.getSize(card).height,
-            planet == MiningPlanetId.homeworld ? 264 : 290,
-          );
+          await _expectNameClearOfArt(tester, planet);
         }
         expect(tester.takeException(), isNull);
       });
     }
+
+    testWidgets('measures the inherited body style, not the theme style', (
+      tester,
+    ) async {
+      // 1.5px tracking is six times the production 0.25px and visibly widens
+      // the name beyond the theme's measured width.
+      const inherited = TextStyle(
+        fontFamily: 'Orbitron',
+        fontSize: 14,
+        letterSpacing: 1.5,
+      );
+      final view = StellarMapView.from(
+        state: _stateWith(unlockedPlanets: {...MiningPlanetId.values}),
+        content: _content,
+      );
+      await _pumpMap(tester, view: view, bodyTextStyle: inherited);
+
+      for (final planet in const [
+        MiningPlanetId.homeworld,
+        MiningPlanetId.lunarFrontier,
+      ]) {
+        await _expectNameClearOfArt(tester, planet);
+      }
+      expect(tester.takeException(), isNull);
+    });
   });
 }
