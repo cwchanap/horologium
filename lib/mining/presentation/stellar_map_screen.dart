@@ -496,11 +496,17 @@ class _PlanetCard extends StatelessWidget {
               right: 14,
               bottom: 10,
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (view.isActive)
+                  if (view.isActive) ...[
                     Expanded(child: _PlanetMetrics(view: view)),
-                  if (view.isActive) const SizedBox(width: 12),
-                  if (view.isActive)
+                    const SizedBox(width: 12),
+                    _PlanetAction(
+                      view: view,
+                      onUnlock: onUnlock,
+                      onTravel: onTravel,
+                    ),
+                  ] else if (view.isUnlocked)
                     _PlanetAction(
                       view: view,
                       onUnlock: onUnlock,
@@ -841,6 +847,7 @@ class _PlanetAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (view.isUnlocked) {
+      final isCurrent = view.isActive;
       return SizedBox(
         key: Key('mining-stellar-map-travel-${view.id.name}'),
         width: 54,
@@ -848,15 +855,40 @@ class _PlanetAction extends StatelessWidget {
         child: MiningHex(
           fill: MiningTheme.highlight,
           border: MiningTheme.highlight,
-          onTap: !view.isActive && !view.isBusy
-              ? () => onTravel(view.id)
-              : null,
-          semanticLabel: view.isActive ? 'Current location' : 'Travel here',
-          child: const Icon(
-            Icons.my_location_rounded,
-            color: Color(0xFF04121A),
-            size: 26,
-          ),
+          onTap: !isCurrent && !view.isBusy ? () => onTravel(view.id) : null,
+          semanticLabel: isCurrent ? 'Current location' : 'Travel here',
+          child: isCurrent
+              ? const Icon(
+                  Icons.my_location_rounded,
+                  color: Color(0xFF04121A),
+                  size: 26,
+                )
+              : const ExcludeSemantics(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.my_location_rounded,
+                          color: Color(0xFF04121A),
+                          size: 20,
+                        ),
+                        SizedBox(height: 1),
+                        Text(
+                          'TRAVEL',
+                          style: TextStyle(
+                            color: Color(0xFF04121A),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: .4,
+                            height: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
         ),
       );
     }
