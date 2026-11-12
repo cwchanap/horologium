@@ -974,7 +974,8 @@ void main() {
   ) async {
     // A legal rig below the 1x1 resource at (27,1) has its strike midpoint
     // label exactly on the rig cell's top edge, where the top-anchored chip
-    // paints. Reduced motion keeps the label still, so this is the worst case.
+    // paints. Reduced motion keeps the label still, so this is the worst case;
+    // text scale 1.3 grows the label toward the chip.
     const rigCell = MiningGridCell(27, 2);
     const damageKey = Key('landing-basin-damage-27-2');
     await warmDepositFrames(tester, MiningDepositFrames.gold);
@@ -983,34 +984,44 @@ void main() {
       surveying: 2,
       rigs: const [MiningRigPlacement(tier: RigTier.t1, cell: rigCell)],
     );
-    await _pumpMap(
-      tester,
-      view,
-      (_) {},
-      impactSequence: 0,
-      reducedMotion: true,
-    );
-    await _pumpMap(
-      tester,
-      view,
-      (_) {},
-      impactSequence: 1,
-      reducedMotion: true,
-    );
-    await tester.pump(const Duration(milliseconds: 470));
+    for (final scale in [1.0, 1.3]) {
+      // Remount so each scale starts from a clean impact timeline.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _pumpMap(
+        tester,
+        view,
+        (_) {},
+        impactSequence: 0,
+        reducedMotion: true,
+        textScale: scale,
+      );
+      await _pumpMap(
+        tester,
+        view,
+        (_) {},
+        impactSequence: 1,
+        reducedMotion: true,
+        textScale: scale,
+      );
+      await tester.pump(const Duration(milliseconds: 470));
 
-    final label = find.byKey(damageKey);
-    expect(label, findsOneWidget);
-    final chip = tester.getRect(find.byKey(_chipKey(rigCell)));
-    final damage = tester.getRect(label);
-    expect(
-      chip.overlaps(damage),
-      isFalse,
-      reason: 'chip $chip overlaps damage label $damage',
-    );
-    // The label finishes above the rig cell edge where the chip starts, so
-    // the clearance derived from the chip height keeps it clear.
-    expect(damage.bottom, lessThanOrEqualTo(chip.top));
+      final label = find.byKey(damageKey);
+      expect(label, findsOneWidget, reason: 'text scale $scale');
+      final chip = tester.getRect(find.byKey(_chipKey(rigCell)));
+      final damage = tester.getRect(label);
+      expect(
+        chip.overlaps(damage),
+        isFalse,
+        reason: 'text scale $scale: chip $chip overlaps damage label $damage',
+      );
+      // The label finishes above the rig cell edge where the chip starts, so
+      // the clearance derived from the chip height keeps it clear.
+      expect(
+        damage.bottom,
+        lessThanOrEqualTo(chip.top),
+        reason: 'text scale $scale',
+      );
+    }
   }, skip: kIsWeb);
 
   test('paints a gold upgrade ring and keeps the cyan deploy fill', () {
