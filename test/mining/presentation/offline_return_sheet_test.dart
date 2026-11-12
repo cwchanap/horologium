@@ -80,11 +80,12 @@ Future<void> _expectPortraitReportViewport(
 
   final chip = tester.getRect(find.byKey(const Key('mining-cash-chip')));
   final scroll = find.byKey(const Key('offline-return-scroll'));
+  final footer = find.byKey(const Key('offline-return-footer'));
   final viewport = tester.getRect(scroll);
-  final footer = tester.getRect(find.byKey(const Key('offline-return-footer')));
+  final openingFooter = tester.getRect(footer);
   expect(viewport.top, greaterThanOrEqualTo(chip.bottom));
-  expect(viewport.overlaps(footer), isFalse);
-  expect(footer.bottom, size.height);
+  expect(viewport.overlaps(openingFooter), isFalse);
+  expect(openingFooter.bottom, size.height);
 
   // Scroll the report list until its first card reaches the viewport top.
   final homeworld = find.byKey(const Key('offline-return-planet-homeworld'));
@@ -95,18 +96,20 @@ Future<void> _expectPortraitReportViewport(
   expect(tester.getRect(homeworld).top, lessThanOrEqualTo(viewport.top));
 
   // Every one of the five reports stays inside the viewport and above the
-  // still-pinned footer.
+  // still-pinned footer; the footer is re-measured after each scroll.
   for (final planet in MiningPlanetId.values) {
     final report = find.byKey(Key('offline-return-planet-${planet.name}'));
     await tester.ensureVisible(report);
     await tester.pump();
     final rect = tester.getRect(report);
+    final pinnedFooter = tester.getRect(footer);
     // ensureVisible top-aligns the card; the sub-pixel offset is rounding.
     expect(rect.top, greaterThanOrEqualTo(viewport.top - 0.01));
-    expect(rect.bottom, lessThanOrEqualTo(footer.top));
+    expect(rect.bottom, lessThanOrEqualTo(pinnedFooter.top));
     expect(rect.overlaps(chip), isFalse);
+    expect(pinnedFooter.bottom, size.height);
+    expect(pinnedFooter.top, greaterThanOrEqualTo(0));
   }
-  expect(footer.bottom, size.height);
   expect(
     find.byKey(const Key('offline-return-sell-all')).hitTestable(),
     findsOneWidget,
