@@ -104,6 +104,8 @@ Future<void> _pumpCard(
   WidgetTester tester, {
   required Size size,
   required PlanetMasteredCard card,
+  double textScale = 1.3,
+  EdgeInsets? insets,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -115,8 +117,8 @@ Future<void> _pumpCard(
     MediaQuery(
       data: MediaQueryData(
         size: size,
-        padding: _insetsFor(size),
-        textScaler: const TextScaler.linear(1.3),
+        padding: insets ?? _insetsFor(size),
+        textScaler: TextScaler.linear(textScale),
         disableAnimations: true,
       ),
       child: MaterialApp(
@@ -453,6 +455,101 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  for (final textScale in const [1.0, 1.3]) {
+    for (final withInsets in const [false, true]) {
+      testWidgets(
+        'short 360x640 shows the full home card at text scale $textScale '
+        '${withInsets ? 'with' : 'without'} safe insets',
+        (tester) async {
+          var continues = 0;
+          var opens = 0;
+          const size = Size(360, 640);
+          await _pumpCard(
+            tester,
+            size: size,
+            textScale: textScale,
+            insets: withInsets ? _insetsFor(size) : EdgeInsets.zero,
+            card: _nonfinalCard(
+              onContinue: () => continues++,
+              onOpenMap: () => opens++,
+            ),
+          );
+
+          _expectVisibleInBody(
+            tester,
+            find.byKey(const Key('planet-mastery-planet')),
+          );
+          if (textScale == 1.0) {
+            final body = tester.getRect(
+              find.byKey(const Key('mining-sheet-body')),
+            );
+            final art = tester.getRect(
+              find.byKey(const Key('planet-mastery-art')),
+            );
+            expect(
+              art.height,
+              greaterThanOrEqualTo(96),
+              reason: 'the compact 1.0 card keeps a substantial planet',
+            );
+            expect(art.left, lessThan(body.center.dx));
+          }
+          _expectVisibleInBody(tester, find.text('All 3 sites commissioned'));
+          _expectVisibleInBody(
+            tester,
+            find.byKey(const Key('planet-mastery-successor')),
+          );
+          for (var index = 0; index < 3; index++) {
+            final gate = find.byKey(Key('planet-mastery-requirement-$index'));
+            expect(gate, findsOneWidget);
+            _expectVisibleInBody(tester, gate);
+
+            final rowRect = tester.getRect(gate);
+            final text = find.descendant(of: gate, matching: find.byType(Text));
+            final paragraph = tester.renderObject<RenderParagraph>(text);
+            final textWidget = tester.widget<Text>(text);
+            final textRect = tester.getRect(text);
+            expect(
+              rowRect.contains(textRect.topLeft),
+              isTrue,
+              reason: 'gate $index text starts outside its row',
+            );
+            expect(
+              rowRect.contains(textRect.bottomRight - const Offset(1, 1)),
+              isTrue,
+              reason: 'gate $index text escapes its row',
+            );
+            _expectVisibleInBody(tester, text);
+            expect(textWidget.maxLines, isNull);
+            expect(textWidget.overflow, isNot(TextOverflow.ellipsis));
+            expect(
+              paragraph.size.height,
+              greaterThanOrEqualTo(
+                paragraph.getMaxIntrinsicHeight(paragraph.size.width) - .5,
+              ),
+              reason: 'gate $index loses wrapped lines',
+            );
+          }
+
+          final openMap = find.byKey(const Key('planet-mastery-open-map'));
+          final continueButton = find.byKey(
+            const Key('planet-mastery-continue'),
+          );
+          expect(openMap.hitTestable(), findsOneWidget);
+          expect(continueButton.hitTestable(), findsOneWidget);
+          expect(
+            tester.getRect(openMap).top,
+            lessThan(tester.getRect(continueButton).top),
+          );
+          await tester.tap(openMap);
+          await tester.tap(continueButton);
+          expect(opens, 1);
+          expect(continues, 1);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   }
 
   for (final (multiplier, formatted) in const [(1.5, '×1.5'), (2.0, '×2')]) {

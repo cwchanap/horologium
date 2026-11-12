@@ -37,17 +37,18 @@ class PlanetMasteredCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final landscape = size.width > size.height;
-    // Landscape panels are always short. Portrait only compacts when large
-    // text leaves too little height for the art-led stack to reach the
-    // successor. Keep the authored art-led column at normal sizes.
-    // shortcut: the 700px breakpoint covers the short-phone large-text target;
-    // move to a measured body viewport if more screen classes need it.
+    // Landscape panels are always short. Portrait compacts whenever the
+    // viewport itself is short: at 360x640 the full art-led stack cannot show
+    // all three gates even at text scale 1.0, while compact keeps the full
+    // name, gates, and both pinned actions on the first frame.
+    // shortcut: the 700px breakpoint covers the short-phone target; move to a
+    // measured body viewport if more screen classes need it.
     final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final compactPortrait = !landscape && textScale > 1 && size.height <= 700;
+    final compactPortrait = !landscape && size.height <= 700;
     final artSize = landscape
         ? const Size(104, 104)
         : compactPortrait
-        ? const Size(80, 80)
+        ? (textScale > 1 ? const Size(80, 80) : const Size(112, 112))
         : const Size(160, 132);
     return MiningSheetFrame(
       key: const Key('planet-mastery-card'),
