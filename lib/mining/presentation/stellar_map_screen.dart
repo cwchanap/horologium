@@ -848,47 +848,66 @@ class _PlanetAction extends StatelessWidget {
   Widget build(BuildContext context) {
     if (view.isUnlocked) {
       final isCurrent = view.isActive;
-      return SizedBox(
+      if (isCurrent) {
+        return SizedBox(
+          key: Key('mining-stellar-map-travel-${view.id.name}'),
+          width: 54,
+          height: 60,
+          child: MiningHex(
+            fill: MiningTheme.highlight,
+            border: MiningTheme.highlight,
+            semanticLabel: 'Current location',
+            child: const Icon(
+              Icons.my_location_rounded,
+              color: Color(0xFF04121A),
+              size: 26,
+            ),
+          ),
+        );
+      }
+      final canTravel = !view.isBusy;
+      final travel = canTravel ? () => onTravel(view.id) : null;
+      return Semantics(
         key: Key('mining-stellar-map-travel-${view.id.name}'),
-        width: 54,
-        height: 60,
-        child: MiningHex(
-          fill: MiningTheme.highlight,
-          border: MiningTheme.highlight,
-          onTap: !isCurrent && !view.isBusy ? () => onTravel(view.id) : null,
-          semanticLabel: isCurrent ? 'Current location' : 'Travel here',
-          child: isCurrent
-              ? const Icon(
-                  Icons.my_location_rounded,
-                  color: Color(0xFF04121A),
-                  size: 26,
-                )
-              : const ExcludeSemantics(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.my_location_rounded,
-                          color: Color(0xFF04121A),
-                          size: 20,
-                        ),
-                        SizedBox(height: 1),
-                        Text(
-                          'TRAVEL',
-                          style: TextStyle(
-                            color: Color(0xFF04121A),
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: .4,
-                            height: 1,
-                          ),
-                        ),
-                      ],
+        container: true,
+        button: true,
+        enabled: canTravel,
+        label: 'Travel to ${view.name}',
+        onTap: travel,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          excludeFromSemantics: true,
+          onTap: travel,
+          child: const ExcludeSemantics(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'TRAVEL',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                SizedBox(width: 8),
+                SizedBox(
+                  width: 54,
+                  height: 60,
+                  child: MiningHex(
+                    fill: MiningTheme.highlight,
+                    border: MiningTheme.highlight,
+                    child: Icon(
+                      Icons.play_arrow,
+                      size: 28,
+                      color: Color(0xFF04121A),
                     ),
                   ),
                 ),
+              ],
+            ),
+          ),
         ),
       );
     }
