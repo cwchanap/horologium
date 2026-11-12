@@ -22,19 +22,31 @@ EdgeInsets _insetsFor(Size size) => size.width > size.height
 PlanetMasteredCard _nonfinalCard({
   VoidCallback? onContinue,
   VoidCallback? onOpenMap,
-  double nextSaleMultiplier = 1.5,
-}) => PlanetMasteredCard(
-  masteredPlanet: _content.planet(MiningPlanetId.homeworld),
-  successorName: 'Lunar Frontier',
-  requirements: const [
-    StellarMapRequirementView(label: 'Homeworld mastered', isSatisfied: true),
-    StellarMapRequirementView(label: 'Surveying 3', isSatisfied: false),
-    StellarMapRequirementView(label: '200,000 cash', isSatisfied: false),
-  ],
-  nextSaleMultiplier: nextSaleMultiplier,
-  onContinue: onContinue ?? () {},
-  onOpenMap: onOpenMap ?? () {},
-);
+}) {
+  final initial = MiningSave.initial(nowUtc: _start);
+  final sites = <MiningSiteId, SiteProgress>{...initial.sites};
+  for (final site in _content.planet(MiningPlanetId.homeworld).sites) {
+    sites[site.id] = SiteProgress(
+      unlocked: true,
+      commissioned: true,
+      storedAmount: 0,
+      rigPlacements: const [],
+    );
+  }
+  final view = StellarMapView.from(
+    state: initial.copyWith(sites: sites),
+    content: _content,
+  );
+  final successor = view.planet(MiningPlanetId.lunarFrontier);
+  return PlanetMasteredCard(
+    masteredPlanet: _content.planet(MiningPlanetId.homeworld),
+    successorName: successor.name,
+    requirements: successor.requirements,
+    nextSaleMultiplier: view.nextSaleMultiplier,
+    onContinue: onContinue ?? () {},
+    onOpenMap: onOpenMap ?? () {},
+  );
+}
 
 PlanetMasteredCard _finalCard({
   VoidCallback? onContinue,
@@ -250,7 +262,7 @@ void main() {
             .data,
         'Lunar Frontier is next',
       );
-      expect(find.text('Homeworld mastered'), findsOneWidget);
+      expect(find.text('Homeworld sites 3/3'), findsOneWidget);
       expect(find.text('Surveying 3'), findsOneWidget);
       expect(find.text('200,000 cash'), findsOneWidget);
       expect(
