@@ -87,6 +87,7 @@ MineSiteView _view({
   bool withRig = true,
   double progress = 0,
   List<(RigTier, MiningGridCell)> rigs = const [],
+  int surveying = 0,
 }) {
   final placements = [
     if (rigs.isNotEmpty)
@@ -102,6 +103,7 @@ MineSiteView _view({
     0,
   );
   final state = initial.copyWith(
+    technology: TechnologyLevels(surveying: surveying),
     sites: {
       ...initial.sites,
       MiningSiteId.landingBasin: initial.sites[MiningSiteId.landingBasin]!
@@ -133,6 +135,7 @@ Future<void> _pumpLayer(
   bool reducedMotion = false,
   List<(RigTier, MiningGridCell)> rigs = const [],
   AssetBundle? assetBundle,
+  int surveying = 0,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(430, 932);
@@ -147,6 +150,7 @@ Future<void> _pumpLayer(
       withRig: withRig,
       progress: progress,
       rigs: rigs,
+      surveying: surveying,
     ),
     frames: MiningDepositFrames.gold,
     impactSequence: impactSequence,
@@ -251,6 +255,26 @@ Transform _robotArmTransform(WidgetTester tester, MiningGridCell cell) =>
     tester.widget<Transform>(
       find.byKey(Key('landing-basin-robot-arm-transform-${cell.x}-${cell.y}')),
     );
+
+/// The [Stack] directly hosting [finder]'s ancestor chain and the index of
+/// that hosted widget, so sibling paint order can be asserted.
+(Stack, int) _stackHost(WidgetTester tester, Finder finder) {
+  var element = tester.element(finder);
+  while (true) {
+    Element? parent;
+    element.visitAncestorElements((ancestor) {
+      parent = ancestor;
+      return false;
+    });
+    final host = parent;
+    if (host == null) fail('$finder is not inside a Stack');
+    if (host.widget is Stack) {
+      final stack = host.widget as Stack;
+      return (stack, stack.children.indexOf(element.widget));
+    }
+    element = host;
+  }
+}
 
 /// A commissioned view of [siteId] at [progress] with one T1 rig on the
 /// site's first legal cell at its first playable Surveying level (the first
@@ -1023,6 +1047,46 @@ void main() {
       await _pumpLayer(tester, impactSequence: 1);
       expect(_hpText(tester), '80/80');
     }, skip: kIsWeb);
+
+    testWidgets('paints HP chrome after an upper-row robot', (tester) async {
+      // Rigs directly above mined 1x1 and 3x3 resources: the oversized robot
+      // art overlaps the HP bar, so only paint order keeps the HP readable.
+      final cases = [
+        (
+          const MiningGridCell(27, 0),
+          _landing.deposits.singleWhere(
+            (deposit) => deposit.x == 27 && deposit.y == 1 && deposit.size == 1,
+          ),
+        ),
+        (
+          const MiningGridCell(6, 0),
+          _landing.deposits.singleWhere(
+            (deposit) => deposit.x == 6 && deposit.y == 1 && deposit.size == 3,
+          ),
+        ),
+      ];
+      for (final (cell, deposit) in cases) {
+        await _pumpLayer(tester, cell: cell, surveying: 2);
+        final robot = tester.getRect(find.byKey(_robotKey(cell)));
+        final hp = tester.getRect(find.byKey(_hpKey(deposit)));
+        expect(
+          robot.overlaps(hp),
+          isTrue,
+          reason: '$cell robot $robot must overlap HP $hp for order check',
+        );
+
+        final (robotStack, robotIndex) = _stackHost(
+          tester,
+          find.byKey(_robotKey(cell)),
+        );
+        final (hpStack, hpIndex) = _stackHost(
+          tester,
+          find.byKey(_hpKey(deposit)),
+        );
+        expect(identical(robotStack, hpStack), isTrue, reason: '$cell');
+        expect(hpIndex, greaterThan(robotIndex), reason: '$cell');
+      }
+    });
   });
 
   group('damage labels and break beat', () {

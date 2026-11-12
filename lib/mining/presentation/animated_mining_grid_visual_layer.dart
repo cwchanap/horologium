@@ -528,8 +528,6 @@ class _AnimatedMiningGridVisualLayerState
           staticLayer!,
           for (final deposit in widget.view.deposits)
             if (deposit.minerCount > 0) _depositNode(deposit, cell, _t),
-          for (final deposit in widget.view.deposits)
-            if (deposit.minerCount > 0) _hpChrome(deposit, cell),
           for (final rig in widget.view.rigs)
             Positioned(
               left: rig.placement.cell.x * cell,
@@ -543,6 +541,10 @@ class _AnimatedMiningGridVisualLayerState
                 child: _rigRobot(rig, _t, cell),
               ),
             ),
+          // After the robots: an upper-row robot's oversized art must not
+          // cover the HP bar or its label.
+          for (final deposit in widget.view.deposits)
+            if (deposit.minerCount > 0) _hpChrome(deposit, cell),
           for (final rig in widget.view.rigs)
             if (_damageLabel(rig, cell) case final label?) label,
         ],
