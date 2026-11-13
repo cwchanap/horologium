@@ -326,6 +326,42 @@ Future<void> deployIntoMastery(
   await pumpSheet(tester);
 }
 
+/// Opens the final mastery card at a specific viewport, safe area, and scale.
+Future<void> openFinalMasteryAt(
+  WidgetTester tester, {
+  required Size size,
+  required EdgeInsets safeArea,
+  double textScale = 1.3,
+  int relaunchCount = 1,
+}) async {
+  final repository = CountingMiningSaveRepository();
+  await repository.save(
+    nearFinalPlanetMasteryState(_start).copyWith(relaunchCount: relaunchCount),
+  );
+  await pumpShell(
+    tester,
+    repository: repository,
+    viewport: size,
+    theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+    useViewSafeArea: true,
+    safeArea: safeArea,
+    textScale: textScale,
+  );
+  if (size.width > size.height) {
+    await tester.dragUntilVisible(
+      find.byKey(Key('site-card-${MiningSiteId.osmiumCaldera.name}-enter')),
+      find.byKey(const Key('site-deck-scroll')),
+      const Offset(0, -200),
+    );
+    await tester.pump();
+  }
+  await deployIntoMastery(
+    tester,
+    MiningSiteId.osmiumCaldera,
+    _osmiumDeployCell,
+  );
+}
+
 MiningSave deployedCarbonRidgeState(DateTime now) {
   final base = MiningSave.initial(nowUtc: now);
   return base.copyWith(
@@ -4616,6 +4652,158 @@ void main() {
       expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
       expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
     });
+
+    testWidgets(
+      'final mastery at 390x720 top 47 text 1.3 keeps the close clear of the '
+      'cargo gauge and all key content visible',
+      (tester) async {
+        await openFinalMasteryAt(
+          tester,
+          size: const Size(390, 720),
+          safeArea: const EdgeInsets.only(top: 47, bottom: 34),
+        );
+
+        final gauge = tester.getRect(find.byKey(const Key('mine-site-cargo')));
+        final close = find.bySemanticsLabel('Close FINAL PLANET MASTERED');
+        final closeRect = tester.getRect(close);
+        expect(
+          closeRect.top,
+          greaterThanOrEqualTo(gauge.bottom),
+          reason: 'close $closeRect must clear gauge $gauge',
+        );
+        expect(gauge.overlaps(closeRect), isFalse);
+        expect(close.hitTestable(), findsOneWidget);
+
+        expectMasteryBodyContentVisible(tester, [
+          find.byKey(const Key('planet-mastery-planet')),
+          find.byKey(const Key('planet-mastery-reward')),
+          find.text('completion reward'),
+          find.text('RUN COMPLETE'),
+          find.byKey(const Key('planet-mastery-multiplier')),
+        ]);
+        expect(find.textContaining('×2'), findsOneWidget);
+        expect(
+          find.byKey(const Key('planet-mastery-relaunch')).hitTestable(),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('planet-mastery-continue')).hitTestable(),
+          findsOneWidget,
+        );
+
+        // The upper edge of the visible close circle is hit-testable.
+        await tester.tapAt(Offset(closeRect.center.dx, closeRect.top + 4));
+        await pumpSheet(tester);
+        expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'taps above the clamped 390x720 mastery card reach the barrier',
+      (tester) async {
+        await openFinalMasteryAt(
+          tester,
+          size: const Size(390, 720),
+          safeArea: const EdgeInsets.only(top: 47, bottom: 34),
+        );
+
+        final card = tester.getRect(
+          find.byKey(const Key('planet-mastery-card')),
+        );
+        await tester.tapAt(Offset(195, card.top - 20));
+        await pumpSheet(tester);
+        expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+        expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+      },
+    );
+
+    for (final height in const [700.0, 701.0, 720.0]) {
+      testWidgets(
+        'final mastery close clears the gauge at 390x${height.toInt()} '
+        'top 47 text 1.3',
+        (tester) async {
+          await openFinalMasteryAt(
+            tester,
+            size: Size(390, height),
+            safeArea: const EdgeInsets.only(top: 47, bottom: 34),
+          );
+
+          final gauge = tester.getRect(
+            find.byKey(const Key('mine-site-cargo')),
+          );
+          final close = find.bySemanticsLabel('Close FINAL PLANET MASTERED');
+          final closeRect = tester.getRect(close);
+          expect(
+            closeRect.top,
+            greaterThanOrEqualTo(gauge.bottom),
+            reason: 'close $closeRect must clear gauge $gauge',
+          );
+          expect(gauge.overlaps(closeRect), isFalse);
+          expect(close.hitTestable(), findsOneWidget);
+          expectMasteryBodyContentVisible(tester, [
+            find.byKey(const Key('planet-mastery-planet')),
+            find.byKey(const Key('planet-mastery-reward')),
+            find.text('completion reward'),
+            find.text('RUN COMPLETE'),
+            find.byKey(const Key('planet-mastery-multiplier')),
+          ]);
+          expect(
+            find.byKey(const Key('planet-mastery-relaunch')).hitTestable(),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const Key('planet-mastery-continue')).hitTestable(),
+            findsOneWidget,
+          );
+        },
+      );
+    }
+
+    testWidgets(
+      'mastery opened in landscape follows rotation into 390x720 top 47 '
+      'with the close clear of the gauge',
+      (tester) async {
+        await openFinalMasteryAt(
+          tester,
+          size: const Size(874, 402),
+          safeArea: const EdgeInsets.fromLTRB(44, 0, 44, 21),
+        );
+
+        expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+        tester.view.physicalSize = const Size(390, 720);
+        tester.view.padding = const FakeViewPadding(top: 47, bottom: 34);
+        tester.view.viewPadding = const FakeViewPadding(top: 47, bottom: 34);
+        await tester.pump();
+        await pumpSheet(tester);
+
+        final gauge = tester.getRect(find.byKey(const Key('mine-site-cargo')));
+        final close = find.bySemanticsLabel('Close FINAL PLANET MASTERED');
+        final closeRect = tester.getRect(close);
+        expect(
+          closeRect.top,
+          greaterThanOrEqualTo(gauge.bottom),
+          reason: 'close $closeRect must clear gauge $gauge after rotation',
+        );
+        expect(gauge.overlaps(closeRect), isFalse);
+        expect(close.hitTestable(), findsOneWidget);
+        expectMasteryBodyContentVisible(tester, [
+          find.byKey(const Key('planet-mastery-planet')),
+          find.byKey(const Key('planet-mastery-reward')),
+          find.text('completion reward'),
+          find.text('RUN COMPLETE'),
+          find.byKey(const Key('planet-mastery-multiplier')),
+        ]);
+        expect(find.textContaining('×2'), findsOneWidget);
+        expect(
+          find.byKey(const Key('planet-mastery-relaunch')).hitTestable(),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('planet-mastery-continue')).hitTestable(),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets('Open Map dismisses the mastery card before navigating', (
       tester,

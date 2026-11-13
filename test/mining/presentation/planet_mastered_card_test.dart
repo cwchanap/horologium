@@ -192,7 +192,6 @@ Future<void> _pumpCard(
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
   });
-  final roomyPortrait = size.width <= size.height && size.height > 700;
   await tester.pumpWidget(
     MediaQuery(
       data: MediaQueryData(
@@ -203,17 +202,9 @@ Future<void> _pumpCard(
       ),
       child: MaterialApp(
         theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
-        // The shell hosts this card in a bottom-anchored dialog on compact
-        // screens and a centered one in roomy portrait; mirror that so the
-        // content-sized composition is measured where it actually renders.
-        home: Scaffold(
-          body: Align(
-            alignment: roomyPortrait
-                ? Alignment.center
-                : Alignment.bottomCenter,
-            child: card,
-          ),
-        ),
+        // The shell hosts this card in a full-screen dialog; the card positions
+        // its own content-sized composition (centered roomy, bottom compact).
+        home: Scaffold(body: card),
       ),
     ),
   );
