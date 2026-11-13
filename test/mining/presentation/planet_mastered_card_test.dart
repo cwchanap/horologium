@@ -205,16 +205,18 @@ void _expectStackedActions(
 }
 
 /// Normal widths keep the centered, art-led composition. The short landscape
-/// and narrow large-text cards compact the art beside the milestone details.
-void _expectArtLayout(WidgetTester tester, Size size) {
+/// and narrow large-text cards compact the art beside the milestone details;
+/// the final card shrinks it further so the whole multiplier explanation can
+/// open above the pinned actions.
+void _expectArtLayout(WidgetTester tester, Size size, {required bool isFinal}) {
   final body = tester.getRect(find.byKey(const Key('mining-sheet-body')));
   final art = tester.getRect(find.byKey(const Key('planet-mastery-art')));
   if (size == const Size(874, 402)) {
     expect(art.left, lessThan(body.center.dx));
-    expect(art.height, greaterThanOrEqualTo(96));
+    expect(art.height, greaterThanOrEqualTo(isFinal ? 24 : 96));
   } else if (size == const Size(360, 640)) {
     expect(art.left, lessThan(body.center.dx));
-    expect(art.height, greaterThanOrEqualTo(72));
+    expect(art.height, greaterThanOrEqualTo(isFinal ? 40 : 72));
   } else {
     expect((art.center.dx - body.center.dx).abs(), lessThanOrEqualTo(8));
     expect(art.width, greaterThanOrEqualTo(120));
@@ -244,7 +246,7 @@ void main() {
         ),
       );
 
-      _expectArtLayout(tester, size);
+      _expectArtLayout(tester, size, isFinal: false);
 
       final openMap = find.byKey(const Key('planet-mastery-open-map'));
       final continueButton = find.byKey(const Key('planet-mastery-continue'));
@@ -322,7 +324,7 @@ void main() {
         ),
       );
 
-      _expectArtLayout(tester, size);
+      _expectArtLayout(tester, size, isFinal: true);
 
       final relaunch = find.byKey(const Key('planet-mastery-relaunch'));
       final continueButton = find.byKey(const Key('planet-mastery-continue'));
@@ -561,6 +563,96 @@ void main() {
           expect(tester.takeException(), isNull);
         },
       );
+    }
+  }
+
+  // The final card carries the long next-run explanation. In the compact
+  // layouts the narrow details column used to wrap it below the scrolling
+  // body's visible viewport, so the sentence could only be read after
+  // scrolling. It must open complete next to the still-visible reward and
+  // pinned actions, with no text-size reduction, ellipsis, or removed copy.
+  for (final size in const [Size(360, 640), Size(874, 402)]) {
+    for (final textScale in const [1.0, 1.3]) {
+      for (final withInsets in const [false, true]) {
+        testWidgets(
+          'final card opens with the whole multiplier explanation inside the '
+          'visible body at ${size.width.toInt()}x${size.height.toInt()} '
+          'text $textScale ${withInsets ? 'with' : 'without'} safe insets',
+          (tester) async {
+            var continues = 0;
+            var relaunches = 0;
+            await _pumpCard(
+              tester,
+              size: size,
+              textScale: textScale,
+              insets: withInsets ? _insetsFor(size) : EdgeInsets.zero,
+              card: _finalCard(
+                onContinue: () => continues++,
+                onRelaunch: () => relaunches++,
+              ),
+            );
+
+            for (final finder in [
+              find.byKey(const Key('planet-mastery-planet')),
+              find.byKey(const Key('planet-mastery-reward')),
+              find.text('completion reward'),
+              find.text('RUN COMPLETE'),
+            ]) {
+              _expectVisibleInBody(tester, finder);
+            }
+
+            final multiplier = find.byKey(
+              const Key('planet-mastery-multiplier'),
+            );
+            _expectVisibleInBody(tester, multiplier);
+            final paragraph = tester.renderObject<RenderParagraph>(multiplier);
+            expect(paragraph.didExceedMaxLines, isFalse);
+            expect(
+              paragraph.text.style?.fontFamily,
+              'IBM Plex Mono',
+              reason: 'the explanation must render in the production body font',
+            );
+            expect(
+              paragraph.size.height,
+              greaterThanOrEqualTo(
+                paragraph.getMaxIntrinsicHeight(paragraph.size.width) - .5,
+              ),
+              reason: 'the explanation must render every wrapped line',
+            );
+            final explanation = tester.widget<Text>(multiplier);
+            expect(explanation.maxLines, isNull);
+            expect(explanation.overflow, isNot(TextOverflow.ellipsis));
+            // No forced text scale and no reduced font size: the sentence
+            // renders at the card's 12px body size times the requested scale.
+            final richText = tester.widget<RichText>(
+              find.descendant(of: multiplier, matching: find.byType(RichText)),
+            );
+            expect(richText.text.style?.fontSize, 12);
+            expect(
+              richText.textScaler.scale(12),
+              closeTo(12 * textScale, .01),
+              reason: 'the explanation must honor the requested text scale',
+            );
+            expect(
+              explanation.data,
+              'Relaunch to start again with sales ×1.5. '
+              'Only your relaunch count is kept.',
+            );
+
+            final relaunch = find.byKey(const Key('planet-mastery-relaunch'));
+            final continueButton = find.byKey(
+              const Key('planet-mastery-continue'),
+            );
+            expect(relaunch.hitTestable(), findsOneWidget);
+            expect(continueButton.hitTestable(), findsOneWidget);
+            await tester.tap(relaunch);
+            await tester.tap(continueButton);
+            expect(relaunches, 1);
+            expect(continues, 1);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
     }
   }
 
