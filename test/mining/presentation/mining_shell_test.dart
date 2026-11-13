@@ -379,14 +379,34 @@ Future<void> pumpShell(
   Key? shellKey,
   int pumpCycles = 6,
   Size viewport = _viewport,
-  MediaQueryData? mediaQuery,
+  EdgeInsets safeArea = EdgeInsets.zero,
+  double textScale = 1.0,
+  bool useViewSafeArea = false,
   ThemeData? theme,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = viewport;
+  if (useViewSafeArea) {
+    tester.view.padding = FakeViewPadding(
+      left: safeArea.left,
+      top: safeArea.top,
+      right: safeArea.right,
+      bottom: safeArea.bottom,
+    );
+    tester.view.viewPadding = FakeViewPadding(
+      left: safeArea.left,
+      top: safeArea.top,
+      right: safeArea.right,
+      bottom: safeArea.bottom,
+    );
+  }
   addTearDown(() {
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
+    if (useViewSafeArea) {
+      tester.view.resetPadding();
+      tester.view.resetViewPadding();
+    }
   });
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
@@ -405,27 +425,39 @@ Future<void> pumpShell(
   // channel, mirroring the fake-backed AudioManager default above.
   final alerts =
       storageAlerts ?? StorageAlerts(platform: FakeStorageAlertPlatform());
+  final shell = MiningShell(
+    key: shellKey,
+    content: MiningContentRegistry.stellarMining(),
+    repository: repository,
+    nowUtc: testClock.call,
+    audioManager: audio,
+    storageAlerts: alerts,
+  );
   await tester.pumpWidget(
     MaterialApp(
       theme: theme,
-      // Sheet routes are siblings of `home` under the Navigator, so a
-      // caller-supplied MediaQuery must sit above the Navigator to model
-      // safe areas inside modal routes too.
-      builder: mediaQuery == null
-          ? null
-          : (context, child) => MediaQuery(data: mediaQuery, child: child!),
-      home: MediaQuery(
-        data:
-            mediaQuery ?? MediaQueryData(disableAnimations: disableAnimations),
-        child: MiningShell(
-          key: shellKey,
-          content: MiningContentRegistry.stellarMining(),
-          repository: repository,
-          nowUtc: testClock.call,
-          audioManager: audio,
-          storageAlerts: alerts,
-        ),
-      ),
+      // Sheet routes are siblings of `home` under the Navigator, so the
+      // live-metrics mode must copy the ambient MediaQuery above the
+      // Navigator; its padding then drives both the shell and the route.
+      builder: useViewSafeArea
+          ? (context, child) {
+              final media = MediaQuery.of(context);
+              return MediaQuery(
+                data: media.copyWith(
+                  textScaler: TextScaler.linear(textScale),
+                  disableAnimations:
+                      disableAnimations || media.disableAnimations,
+                ),
+                child: child!,
+              );
+            }
+          : null,
+      home: useViewSafeArea
+          ? shell
+          : MediaQuery(
+              data: MediaQueryData(disableAnimations: disableAnimations),
+              child: shell,
+            ),
     ),
   );
   for (var i = 0; i < pumpCycles; i++) {
@@ -488,22 +520,6 @@ void expectMasteryBodyContentVisible(
     expect(rect.bottom, lessThanOrEqualTo(footer.top + .5), reason: '$finder');
   }
 }
-
-/// The safe areas a real modal route sees: the shell and the sheet route both
-/// inherit the device insets from this builder-level MediaQuery, and
-/// `showModalBottomSheet` then removes the top padding from the sheet's copy.
-MediaQueryData modalRouteSafeArea({
-  required Size size,
-  required double top,
-  required double bottom,
-  required double textScale,
-}) => MediaQueryData(
-  size: size,
-  padding: EdgeInsets.only(top: top, bottom: bottom),
-  viewPadding: EdgeInsets.only(top: top, bottom: bottom),
-  textScaler: TextScaler.linear(textScale),
-  disableAnimations: true,
-);
 
 void main() {
   setUp(() {
@@ -4744,12 +4760,9 @@ void main() {
         repository: repository,
         viewport: size,
         theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
-        mediaQuery: modalRouteSafeArea(
-          size: size,
-          top: top,
-          bottom: bottom,
-          textScale: textScale,
-        ),
+        useViewSafeArea: true,
+        safeArea: EdgeInsets.only(top: top, bottom: bottom),
+        textScale: textScale,
       );
       await deployIntoMastery(
         tester,
@@ -4761,7 +4774,9 @@ void main() {
     for (final (size, top, bottom, textScale) in [
       (const Size(360, 640), 47.0, 34.0, 1.3),
       (const Size(430, 932), 59.0, 34.0, 1.3),
+      (const Size(430, 932), 59.0, 34.0, 1.0),
       (const Size(360, 640), 47.0, 34.0, 1.0),
+      (const Size(360, 640), 47.0, 0.0, 1.3),
       (const Size(360, 640), 0.0, 0.0, 1.3),
     ]) {
       final label =
@@ -4829,6 +4844,99 @@ void main() {
       );
     }
 
+    testWidgets('mastery opened in landscape follows a rotation into a notched '
+        'portrait with the close clear of the cargo gauge', (tester) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearFinalPlanetMasteryState(_start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(874, 402),
+        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+        useViewSafeArea: true,
+        safeArea: const EdgeInsets.only(left: 44, right: 44, bottom: 21),
+        textScale: 1.3,
+      );
+      await tester.dragUntilVisible(
+        find.byKey(const Key('site-card-osmiumCaldera-enter')),
+        find.byKey(const Key('site-deck-scroll')),
+        const Offset(0, -200),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('site-card-osmiumCaldera-enter')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey<String>('b1')));
+      await tester.pump();
+      await tapGridCell(tester, _osmiumDeployCell);
+      await pumpSheet(tester);
+      expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+
+      // Landscape with wide left/right insets: the card opens complete and the
+      // right-hand cargo gauge is clear of the panel's left-mounted close.
+      final landscapeGauge = tester.getRect(
+        find.byKey(const Key('mine-site-cargo')),
+      );
+      final landscapeClose = find.bySemanticsLabel(
+        'Close FINAL PLANET MASTERED',
+      );
+      expect(landscapeGauge.overlaps(tester.getRect(landscapeClose)), isFalse);
+      expectMasteryBodyContentVisible(tester, [
+        find.byKey(const Key('planet-mastery-planet')),
+        find.byKey(const Key('planet-mastery-reward')),
+        find.text('completion reward'),
+        find.text('RUN COMPLETE'),
+        find.byKey(const Key('planet-mastery-multiplier')),
+      ]);
+      expect(
+        find.byKey(const Key('planet-mastery-relaunch')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('planet-mastery-continue')).hitTestable(),
+        findsOneWidget,
+      );
+
+      // Rotate while the card is open. The route's retained builder and the
+      // inline Mine Site HUD both receive the live metrics change, so the
+      // card's top inset has to follow rather than stay at its landscape
+      // snapshot of zero.
+      tester.view.physicalSize = const Size(430, 932);
+      tester.view.padding = const FakeViewPadding(top: 59, bottom: 34);
+      tester.view.viewPadding = const FakeViewPadding(top: 59, bottom: 34);
+      await tester.pump();
+      await pumpSheet(tester);
+
+      final gauge = tester.getRect(find.byKey(const Key('mine-site-cargo')));
+      final close = find.bySemanticsLabel('Close FINAL PLANET MASTERED');
+      final closeRect = tester.getRect(close);
+      expect(
+        closeRect.top,
+        greaterThanOrEqualTo(gauge.bottom),
+        reason:
+            'the retained card $closeRect must clear the live cargo gauge '
+            '$gauge after rotation',
+      );
+      expect(gauge.overlaps(closeRect), isFalse, reason: '$gauge $closeRect');
+      expect(close.hitTestable(), findsOneWidget);
+
+      expectMasteryBodyContentVisible(tester, [
+        find.byKey(const Key('planet-mastery-planet')),
+        find.byKey(const Key('planet-mastery-reward')),
+        find.text('completion reward'),
+        find.text('RUN COMPLETE'),
+        find.byKey(const Key('planet-mastery-multiplier')),
+      ]);
+      final relaunch = find.byKey(const Key('planet-mastery-relaunch'));
+      final continueButton = find.byKey(const Key('planet-mastery-continue'));
+      expect(relaunch.hitTestable(), findsOneWidget);
+      expect(continueButton.hitTestable(), findsOneWidget);
+      expect(
+        tester.getRect(relaunch).top,
+        lessThan(tester.getRect(continueButton).top),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets(
       'nonfinal mastery keeps every Homeworld gate visible and the close '
       'clear of the cargo gauge at 360x640 top 47 text 1.3',
@@ -4839,12 +4947,9 @@ void main() {
           tester,
           repository: repository,
           theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
-          mediaQuery: modalRouteSafeArea(
-            size: _viewport,
-            top: 47,
-            bottom: 34,
-            textScale: 1.3,
-          ),
+          useViewSafeArea: true,
+          safeArea: const EdgeInsets.only(top: 47, bottom: 34),
+          textScale: 1.3,
         );
         await deployIntoMastery(
           tester,
