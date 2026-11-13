@@ -5,6 +5,11 @@ import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 
+/// The portrait sheet's fixed 160px band already clears the Mine Site's
+/// 134px top-right HUD by this much. Only a larger status-bar inset pushes
+/// that inline cargo gauge under this route's top-mounted close hex.
+const double _sceneHudClearance = 26;
+
 /// Transient feedback for a deploy that just mastered a planet. The final
 /// variant pays the authored reward on the card and relays Relaunch through
 /// the shell; the card itself never mutates or persists state.
@@ -20,6 +25,7 @@ class PlanetMasteredCard extends StatelessWidget {
     this.isFinal = false,
     this.rewardCash,
     this.onRelaunch,
+    this.topSafeArea = 0,
   });
 
   final MiningPlanetDefinition masteredPlanet;
@@ -34,6 +40,12 @@ class PlanetMasteredCard extends StatelessWidget {
   final VoidCallback onOpenMap;
   final VoidCallback? onRelaunch;
 
+  /// The top system inset of the screen under this modal route. A modal
+  /// bottom sheet removes the top padding from its own MediaQuery, so the
+  /// shell passes the inset in to keep this card's close control clear of
+  /// the inline scene HUD that did receive it.
+  final double topSafeArea;
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
@@ -46,6 +58,13 @@ class PlanetMasteredCard extends StatelessWidget {
     // measured body viewport if more screen classes need it.
     final textScale = MediaQuery.textScalerOf(context).scale(1);
     final compactPortrait = !landscape && size.height <= 700;
+    // The modal route's own MediaQuery lost the shell's top padding; the
+    // inline Mine Site HUD underneath still moved down by it, so move this
+    // sheet's top chrome down with the excess.
+    final portraitTopShift = (topSafeArea - _sceneHudClearance).clamp(
+      0.0,
+      double.infinity,
+    );
     // The final card's explanation is a long sentence. In the short layouts it
     // runs full width under the summary instead of wrapping inside the narrow
     // details column, which used to push it below the visible body. The art
@@ -65,6 +84,7 @@ class PlanetMasteredCard extends StatelessWidget {
     }
     return MiningSheetFrame(
       key: const Key('planet-mastery-card'),
+      portraitTopShift: portraitTopShift,
       title: isFinal ? 'FINAL PLANET MASTERED' : 'PLANET MASTERED',
       icon: const Icon(
         Icons.military_tech_rounded,
