@@ -650,6 +650,138 @@ void main() {
       },
     );
 
+    test('unmet successor gates project current cash and Surveying values', () {
+      final view = StellarMapView.from(
+        state: stateWith(now: now, cash: 100),
+        content: content,
+      );
+      final lunar = view.planet(MiningPlanetId.lunarFrontier);
+
+      expect(lunar.requirements.map((requirement) => requirement.label), [
+        'Homeworld sites 0/3',
+        'Surveying 3',
+        '200,000 cash',
+      ]);
+      expect(lunar.requirements.map((requirement) => requirement.isSatisfied), [
+        false,
+        false,
+        false,
+      ]);
+      expect(
+        lunar.requirements.map((requirement) => requirement.currentValue),
+        [null, 'now LV 0', '100'],
+      );
+    });
+
+    test('met successor gates project their current values', () {
+      final view = StellarMapView.from(
+        state: stateWith(
+          now: now,
+          cash: 200000,
+          technology: const TechnologyLevels(surveying: 3),
+          sites: commissionedSites(MiningPlanetId.homeworld),
+        ),
+        content: content,
+      );
+      final lunar = view.planet(MiningPlanetId.lunarFrontier);
+
+      expect(lunar.canUnlock, isTrue);
+      expect(lunar.requirements.map((requirement) => requirement.label), [
+        'Homeworld sites 3/3',
+        'Surveying 3',
+        '200,000 cash',
+      ]);
+      expect(lunar.requirements.map((requirement) => requirement.isSatisfied), [
+        true,
+        true,
+        true,
+      ]);
+      expect(
+        lunar.requirements.map((requirement) => requirement.currentValue),
+        [null, 'now LV 3', '200,000'],
+      );
+    });
+
+    test('current values follow live cash and Surveying, not thresholds', () {
+      final view = StellarMapView.from(
+        state: stateWith(
+          now: now,
+          cash: 1234567,
+          technology: const TechnologyLevels(surveying: 2),
+        ),
+        content: content,
+      );
+      final lunar = view.planet(MiningPlanetId.lunarFrontier);
+
+      expect(lunar.requirements.map((requirement) => requirement.label), [
+        'Homeworld sites 0/3',
+        'Surveying 3',
+        '200,000 cash',
+      ]);
+      expect(lunar.requirements.map((requirement) => requirement.isSatisfied), [
+        false,
+        false,
+        true,
+      ]);
+      expect(
+        lunar.requirements.map((requirement) => requirement.currentValue),
+        [null, 'now LV 2', '1.23M'],
+      );
+    });
+
+    test('unlocked planets keep their gates and project live cash', () {
+      final view = StellarMapView.from(
+        state: stateWith(
+          now: now,
+          cash: 0,
+          technology: const TechnologyLevels(surveying: 5),
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+            MiningPlanetId.marsFrontier,
+          },
+          sites: {
+            ...commissionedSites(MiningPlanetId.homeworld),
+            ...commissionedSites(MiningPlanetId.lunarFrontier),
+          },
+        ),
+        content: content,
+      );
+      final mars = view.planet(MiningPlanetId.marsFrontier);
+
+      expect(mars.isUnlocked, isTrue);
+      expect(mars.requirements.map((requirement) => requirement.label), [
+        'Lunar Frontier sites 3/3',
+        'Surveying 5',
+        '16.00M cash',
+      ]);
+      expect(mars.requirements.map((requirement) => requirement.isSatisfied), [
+        true,
+        true,
+        true,
+      ]);
+      expect(mars.requirements.map((requirement) => requirement.currentValue), [
+        null,
+        'now LV 5',
+        '0',
+      ]);
+    });
+
+    test('a zero-cost planet invents no cash gate or current value', () {
+      expect(content.planet(MiningPlanetId.homeworld).unlockCashCost, 0);
+      final view = StellarMapView.from(
+        state: MiningSave.initial(nowUtc: now),
+        content: content,
+      );
+
+      expect(view.planet(MiningPlanetId.homeworld).requirements, isEmpty);
+      const requirement = StellarMapRequirementView(
+        label: 'Homeworld sites 3/3',
+        isSatisfied: true,
+      );
+      expect(requirement.currentValue, isNull);
+    });
+
     test('relaunch reads derive from final-planet mastery and busy state', () {
       MiningSave masteredSave({int relaunchCount = 0}) => stateWith(
         now: now,

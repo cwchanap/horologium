@@ -183,10 +183,15 @@ class StellarMapRequirementView {
   const StellarMapRequirementView({
     required this.label,
     required this.isSatisfied,
+    this.currentValue,
   });
 
   final String label;
   final bool isSatisfied;
+
+  /// Live display value beside the authored threshold (current Surveying
+  /// level or cash). Null for requirements without a numeric current value.
+  final String? currentValue;
 
   bool get satisfied => isSatisfied;
 }
@@ -414,6 +419,7 @@ class StellarMapView {
           isSatisfied:
               state.technology.surveying >=
               definition.unlockRequiredSurveyingLevel,
+          currentValue: 'now LV ${state.technology.surveying}',
         ),
       );
     }
@@ -422,6 +428,7 @@ class StellarMapView {
         StellarMapRequirementView(
           label: '${formatMiningCash(definition.unlockCashCost)} cash',
           isSatisfied: isUnlocked || state.cash >= definition.unlockCashCost,
+          currentValue: formatMiningCash(state.cash),
         ),
       );
     }
