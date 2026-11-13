@@ -202,7 +202,12 @@ Future<void> _pumpCard(
       ),
       child: MaterialApp(
         theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
-        home: Scaffold(body: card),
+        // The shell hosts this card in a bottom sheet: loose height, bottom
+        // aligned. Mirror that so the card's bounded composition is measured
+        // instead of being stretched to the scaffold.
+        home: Scaffold(
+          body: Align(alignment: Alignment.bottomCenter, child: card),
+        ),
       ),
     ),
   );
@@ -297,15 +302,11 @@ void _expectActionHierarchy(
 
   final primaryRect = tester.getRect(primary);
   final secondaryRect = tester.getRect(secondary);
-  if (size.width > size.height) {
-    // Compact landscape keeps the same primary-then-secondary order in one row
-    // so both actions stay on the first frame.
-    expect(primaryRect.left, lessThan(secondaryRect.left));
-    expect((primaryRect.top - secondaryRect.top).abs(), lessThanOrEqualTo(1));
-  } else {
-    expect(primaryRect.top, lessThan(secondaryRect.top));
-    expect(primaryRect.left, closeTo(secondaryRect.left, .5));
-  }
+  // The approved mockup hierarchy stays a stack at every target size,
+  // including short landscape: primary first, secondary directly below.
+  expect(primaryRect.top, lessThan(secondaryRect.top));
+  expect(primaryRect.left, closeTo(secondaryRect.left, .5));
+  expect(primaryRect.right, closeTo(secondaryRect.right, .5));
 }
 
 /// The floating mockup composition: a centered rounded panel, planet art
@@ -338,7 +339,22 @@ void _expectFloatingComposition(
   expect(art.top, lessThan(panel.top), reason: 'the planet must overlap');
   expect(art.bottom, greaterThan(panel.top + 2));
   expect((art.center.dx - panel.center.dx).abs(), lessThanOrEqualTo(1));
-  expect(art.height, greaterThanOrEqualTo(roomy ? 110 : 44));
+  expect(
+    art.height,
+    greaterThanOrEqualTo(
+      roomy
+          ? 110
+          : landscape
+          ? 40
+          : 96,
+    ),
+    reason: 'the 1.0 compact card keeps at least the previous 96px planet',
+  );
+
+  final card = tester.getRect(find.byKey(const Key('planet-mastery-card')));
+  expect(card.top, greaterThan(safe.top));
+  expect(card.top, lessThan(panel.top));
+  expect(card.height, lessThan(size.height));
 
   final close = find.bySemanticsLabel(
     'Close ${isFinal ? 'FINAL PLANET MASTERED' : 'PLANET MASTERED'}',
@@ -347,6 +363,8 @@ void _expectFloatingComposition(
   expect(close.hitTestable(), findsOneWidget);
   final closeRect = tester.getRect(close);
   expect(closeRect.top, greaterThanOrEqualTo(safe.top));
+  expect(closeRect.top, greaterThanOrEqualTo(card.top));
+  expect(_inside(card, closeRect), isTrue, reason: '$closeRect vs $card');
   expect(closeRect.top, lessThan(panel.top));
   expect(closeRect.bottom, greaterThan(panel.top));
   expect(closeRect.right, lessThanOrEqualTo(safe.right));
@@ -430,6 +448,18 @@ void _expectGate(
   expect(labelWidget.style?.color, MiningTheme.primaryText);
   expect(labelWidget.maxLines, isNull);
   expect(labelWidget.overflow, isNot(TextOverflow.ellipsis));
+  final rowRect = tester.getRect(gate);
+  final labelRect = tester.getRect(labelText);
+  expect(
+    rowRect.contains(labelRect.topLeft),
+    isTrue,
+    reason: 'gate $index label starts outside its row',
+  );
+  expect(
+    rowRect.contains(labelRect.bottomRight - const Offset(1, 1)),
+    isTrue,
+    reason: 'gate $index label escapes its row',
+  );
   final paragraph = tester.renderObject<RenderParagraph>(labelText);
   expect(paragraph.text.style?.fontFamily, 'IBM Plex Mono');
   expect(
@@ -455,6 +485,17 @@ void _expectGate(
     final valueWidget = tester.widget<Text>(value);
     expect(valueWidget.maxLines, isNull);
     expect(valueWidget.overflow, isNot(TextOverflow.ellipsis));
+    final valueRect = tester.getRect(value);
+    expect(
+      rowRect.contains(valueRect.topLeft),
+      isTrue,
+      reason: 'gate $index current value starts outside its row',
+    );
+    expect(
+      rowRect.contains(valueRect.bottomRight - const Offset(1, 1)),
+      isTrue,
+      reason: 'gate $index current value escapes its row',
+    );
   }
 }
 
@@ -818,8 +859,8 @@ void main() {
             );
             expect(
               art.height,
-              greaterThanOrEqualTo(72),
-              reason: 'the compact 1.0 card keeps a substantial planet',
+              greaterThanOrEqualTo(96),
+              reason: 'the compact 1.0 card keeps the previous 96px planet',
             );
             expect(
               (art.center.dx - panel.center.dx).abs(),
@@ -1143,9 +1184,123 @@ void main() {
     );
   }
 
-  testWidgets('primary action takes keyboard focus and activates', (
-    tester,
-  ) async {
+  // Plan-mandated roomy first frame at 1.0: both variants must show their full
+  // key content and both stacked actions without scrolling.
+  for (final size in const [Size(390, 844), Size(430, 932)]) {
+    final label = '${size.width.toInt()}x${size.height.toInt()}';
+    testWidgets('roomy $label opens the full home card at 1.0', (tester) async {
+      var continues = 0;
+      var opens = 0;
+      await _pumpCard(
+        tester,
+        size: size,
+        textScale: 1.0,
+        card: _nonfinalCard(
+          onContinue: () => continues++,
+          onOpenMap: () => opens++,
+        ),
+      );
+
+      _expectFloatingComposition(tester, size, isFinal: false);
+      _expectVisibleInBody(
+        tester,
+        find.byKey(const Key('planet-mastery-planet')),
+      );
+      _expectVisibleInBody(tester, find.text('All 3 sites commissioned'));
+      _expectVisibleInBody(
+        tester,
+        find.byKey(const Key('planet-mastery-successor')),
+      );
+      _expectGate(
+        tester,
+        index: 0,
+        label: 'Homeworld mastered',
+        satisfied: true,
+      );
+      _expectGate(
+        tester,
+        index: 1,
+        label: 'Surveying 3',
+        satisfied: false,
+        currentValue: 'now LV 0',
+      );
+      _expectGate(
+        tester,
+        index: 2,
+        label: '200,000 cash',
+        satisfied: false,
+        currentValue: '100',
+      );
+
+      final openMap = find.byKey(const Key('planet-mastery-open-map'));
+      final continueButton = find.byKey(const Key('planet-mastery-continue'));
+      _expectActionHierarchy(
+        tester,
+        primary: openMap,
+        secondary: continueButton,
+        size: size,
+        primaryLabel: 'OPEN STELLAR MAP',
+        secondaryLabel: 'CONTINUE',
+      );
+      await tester.tap(openMap);
+      await tester.tap(continueButton);
+      expect(opens, 1);
+      expect(continues, 1);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('roomy $label opens the full Io card with ×2 at 1.0', (
+      tester,
+    ) async {
+      var continues = 0;
+      var relaunches = 0;
+      await _pumpCard(
+        tester,
+        size: size,
+        textScale: 1.0,
+        card: _finalCard(
+          nextSaleMultiplier: 2.0,
+          onContinue: () => continues++,
+          onRelaunch: () => relaunches++,
+        ),
+      );
+
+      _expectFloatingComposition(tester, size, isFinal: true);
+      for (final finder in [
+        find.byKey(const Key('planet-mastery-planet')),
+        find.byKey(const Key('planet-mastery-reward')),
+        find.text('completion reward'),
+        find.text('RUN COMPLETE'),
+        find.byKey(const Key('planet-mastery-multiplier')),
+      ]) {
+        _expectVisibleInBody(tester, finder);
+      }
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('planet-mastery-multiplier')))
+            .data,
+        contains('×2'),
+      );
+
+      final relaunch = find.byKey(const Key('planet-mastery-relaunch'));
+      final continueButton = find.byKey(const Key('planet-mastery-continue'));
+      _expectActionHierarchy(
+        tester,
+        primary: relaunch,
+        secondary: continueButton,
+        size: size,
+        primaryLabel: 'RELAUNCH',
+        secondaryLabel: 'LATER',
+      );
+      await tester.tap(relaunch);
+      await tester.tap(continueButton);
+      expect(relaunches, 1);
+      expect(continues, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('primary action is reached by Tab and activates', (tester) async {
     var opens = 0;
     await _pumpCard(
       tester,
@@ -1161,9 +1316,18 @@ void main() {
       ),
     );
     expect(focusNode.canRequestFocus, isTrue);
-    focusNode.requestFocus();
-    await tester.pump();
-    expect(focusNode.hasFocus, isTrue);
+
+    var focused = false;
+    for (var tab = 0; tab < 6 && !focused; tab++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      focused = focusNode.hasFocus;
+    }
+    expect(
+      focused,
+      isTrue,
+      reason: 'Tab traversal must reach OPEN STELLAR MAP',
+    );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();

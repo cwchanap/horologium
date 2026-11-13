@@ -283,6 +283,40 @@ class _MiningShellState extends State<MiningShell>
     if (mounted) unawaited(_audioManager.playSound(GameSound.tap));
   }
 
+  /// The floating mastery card is bottom-anchored, but a bottom sheet's
+  /// Material spans the viewport width inside its band and would swallow taps
+  /// beside the card. A dialog keeps only the card-sized child interactive, so
+  /// every outside tap above or beside it reaches the dismissible barrier.
+  Future<void> _showMasteryCardBuilder(WidgetBuilder builder) async {
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black26,
+      useRootNavigator: false,
+      transitionDuration: _reducedMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 220),
+      pageBuilder: (context, _, _) =>
+          Align(alignment: Alignment.bottomCenter, child: builder(context)),
+      transitionBuilder: (context, animation, _, child) {
+        if (_reducedMotion) return child;
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+              .animate(
+                CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                  reverseCurve: Curves.easeInCubic,
+                ),
+              ),
+          child: child,
+        );
+      },
+    );
+    if (mounted) unawaited(_audioManager.playSound(GameSound.tap));
+  }
+
   Future<void> _showMiningSceneSheet({
     required MiningNavigationDestination destination,
     required Widget Function(BuildContext context, MiningSave state) builder,
@@ -430,7 +464,7 @@ class _MiningShellState extends State<MiningShell>
     // snapshot of the shell's top inset: a rotation while the card is open
     // moves the inline HUD and this card must follow. Rebuild the card from the
     // live notifier instead.
-    return _showModalSheetBuilder(
+    return _showMasteryCardBuilder(
       (_) => ValueListenableBuilder<double>(
         valueListenable: _topSafeArea,
         builder: (context, topSafeArea, _) => PlanetMasteredCard(

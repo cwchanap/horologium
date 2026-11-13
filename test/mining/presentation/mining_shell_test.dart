@@ -4431,6 +4431,154 @@ void main() {
       expect(find.text('Rig deployed.'), findsNothing);
     });
 
+    testWidgets('taps above the floating mastery art reach the barrier', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+        useViewSafeArea: true,
+        safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+      );
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+
+      final card = tester.getRect(find.byKey(const Key('planet-mastery-card')));
+      expect(
+        card.top,
+        greaterThan(0),
+        reason: 'the sheet must be bounded around the floating card',
+      );
+      expect(card.height, lessThan(844));
+      await tester.tapAt(Offset(195, card.top - 20));
+      await pumpSheet(tester);
+
+      expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+      expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+    });
+
+    testWidgets('taps beside the floating mastery card reach the barrier', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+        useViewSafeArea: true,
+        safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+      );
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+
+      final card = tester.getRect(find.byKey(const Key('planet-mastery-card')));
+      await tester.tapAt(Offset(8, card.center.dy));
+      await pumpSheet(tester);
+
+      expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+      expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+    });
+
+    for (final (edge, atTop) in const [('upper', true), ('lower', false)]) {
+      testWidgets('mastery close dismisses from the $edge edge of its circle', (
+        tester,
+      ) async {
+        final repository = CountingMiningSaveRepository();
+        await repository.save(nearHomeworldMasteryState(_start));
+        await pumpShell(
+          tester,
+          repository: repository,
+          viewport: const Size(390, 844),
+          theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+          useViewSafeArea: true,
+          safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+        );
+
+        await deployIntoMastery(
+          tester,
+          MiningSiteId.graniteCrater,
+          _graniteCraterDeployCell,
+        );
+
+        final close = find.bySemanticsLabel('Close PLANET MASTERED');
+        expect(close, findsOneWidget);
+        final rect = tester.getRect(close);
+        final point = atTop
+            ? Offset(rect.center.dx, rect.top + 4)
+            : Offset(rect.center.dx, rect.bottom - 4);
+        await tester.tapAt(point);
+        await pumpSheet(tester);
+
+        expect(
+          find.byKey(const Key('planet-mastery-card')),
+          findsNothing,
+          reason: 'the $edge close point $point must be hit-testable',
+        );
+        expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+      });
+    }
+
+    testWidgets('mastery close is reachable by Tab and activates with Enter', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+        useViewSafeArea: true,
+        safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+      );
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+
+      final close = find.bySemanticsLabel('Close PLANET MASTERED');
+      expect(close, findsOneWidget);
+      var focused = false;
+      for (var tab = 0; tab < 6 && !focused; tab++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        final focusedContext = FocusManager.instance.primaryFocus?.context;
+        focused =
+            focusedContext != null &&
+            find
+                .descendant(
+                  of: close,
+                  matching: find.byElementPredicate(
+                    (element) => element == focusedContext,
+                  ),
+                )
+                .evaluate()
+                .isNotEmpty;
+      }
+      expect(focused, isTrue, reason: 'Tab traversal must reach the close');
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      await pumpSheet(tester);
+      expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+      expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+    });
+
     testWidgets('Open Map dismisses the mastery card before navigating', (
       tester,
     ) async {

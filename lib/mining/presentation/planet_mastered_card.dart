@@ -66,15 +66,15 @@ class PlanetMasteredCard extends StatelessWidget {
     final topInset = math.max(topSafeArea, padding.top);
 
     // Portrait keeps the mockup's art-led stack, shrinking the planet on short
-    // phones. Landscape shrinks it further; its actions sit side by side so the
-    // whole Io explanation still opens above them.
+    // phones. Landscape shrinks it further; its actions stay stacked so the
+    // approved primary-then-secondary hierarchy never changes.
     final Size artSize;
     final double overlap;
     if (landscape) {
-      artSize = const Size(56, 56);
+      artSize = const Size(40, 40);
       overlap = 20;
     } else if (compactPortrait) {
-      artSize = const Size(80, 80);
+      artSize = const Size(96, 96);
       overlap = 26;
     } else {
       artSize = const Size(130, 130);
@@ -87,13 +87,13 @@ class PlanetMasteredCard extends StatelessWidget {
     final bodyTop =
         overlap +
         (landscape
-            ? 8
+            ? 2
             : compactPortrait
             ? 6
             : 12);
     final compact = landscape || compactPortrait;
-    final topLimit = landscape
-        ? topInset + 8 + artAbovePanel
+    final panelTop = landscape
+        ? topInset + 4 + artAbovePanel
         : topInset + _portraitTopClearance;
     final horizontalInset = landscape
         ? math.max(padding.left, padding.right) + _landscapeMargin
@@ -101,51 +101,51 @@ class PlanetMasteredCard extends StatelessWidget {
     final bottomLimit = math.max(padding.bottom, landscape ? 8.0 : 12.0);
     final panelHeight = math.min(
       _panelMaxHeight,
-      math.max(120.0, size.height - topLimit - bottomLimit),
+      math.max(120.0, size.height - panelTop - bottomLimit),
     );
+    final cardWidth = math.min(
+      landscape ? _landscapeMaxWidth : _panelMaxWidth,
+      size.width - 2 * horizontalInset,
+    );
+    final compositionHeight = artAbovePanel + panelHeight;
 
+    // Only the card-plus-overlap composition is laid out inside the
+    // bottom-anchored dialog, so taps above or beside it reach the dismissible
+    // barrier. The close lives inside these bounds too, keeping its whole
+    // visible circle hit-testable.
     return Padding(
       key: const Key('planet-mastery-card'),
-      padding: EdgeInsets.fromLTRB(
-        horizontalInset,
-        topLimit,
-        horizontalInset,
-        bottomLimit,
-      ),
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: landscape ? _landscapeMaxWidth : _panelMaxWidth,
-          ),
+      padding: EdgeInsets.only(bottom: bottomLimit),
+      child: SizedBox(
+        height: compositionHeight,
+        child: Center(
           child: SizedBox(
-            height: panelHeight,
+            width: cardWidth,
+            height: compositionHeight,
             child: Stack(
-              clipBehavior: Clip.none,
               children: [
-                Positioned.fill(
+                Positioned(
+                  top: artAbovePanel,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
                   child: DefaultTextStyle.merge(
                     style: const TextStyle(
                       fontFamily: 'IBM Plex Mono',
                       fontWeight: FontWeight.w400,
                       fontSize: 12,
                     ),
-                    child: _panel(
-                      context,
-                      landscape: landscape,
-                      compact: compact,
-                      bodyTop: bodyTop,
-                    ),
+                    child: _panel(context, compact: compact, bodyTop: bodyTop),
                   ),
                 ),
                 Positioned(
-                  top: -artAbovePanel,
+                  top: 0,
                   left: 0,
                   right: 0,
                   child: Center(child: _art(artSize)),
                 ),
                 Positioned(
-                  top: -22,
+                  top: math.max(0, artAbovePanel - 22),
                   left: landscape ? 4 : null,
                   right: landscape ? null : 4,
                   child: _close(context),
@@ -160,7 +160,6 @@ class PlanetMasteredCard extends StatelessWidget {
 
   Widget _panel(
     BuildContext context, {
-    required bool landscape,
     required bool compact,
     required double bodyTop,
   }) => Container(
@@ -194,9 +193,9 @@ class PlanetMasteredCard extends StatelessWidget {
             18,
             compact ? 6 : 8,
             18,
-            compact ? 8 : 10,
+            compact ? 6 : 10,
           ),
-          child: _actions(landscape: landscape),
+          child: _actions(compact: compact),
         ),
       ],
     ),
@@ -205,7 +204,7 @@ class PlanetMasteredCard extends StatelessWidget {
   Widget _body({required bool compact}) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Center(child: _badge()),
+      Center(child: _badge(compact: compact)),
       SizedBox(height: compact ? 4 : 8),
       _planetName(),
       if (isFinal) ...[
@@ -257,9 +256,9 @@ class PlanetMasteredCard extends StatelessWidget {
     ],
   );
 
-  Widget _badge() => Container(
+  Widget _badge({required bool compact}) => Container(
     key: const Key('planet-mastery-badge'),
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+    padding: EdgeInsets.symmetric(horizontal: 8, vertical: compact ? 4 : 6),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(999),
       border: Border.all(color: MiningTheme.accent),
@@ -342,7 +341,7 @@ class PlanetMasteredCard extends StatelessWidget {
     style: const TextStyle(color: MiningTheme.secondaryText, height: 1.4),
   );
 
-  Widget _actions({required bool landscape}) {
+  Widget _actions({required bool compact}) {
     final primary = _MasteryAction(
       key: isFinal
           ? const Key('planet-mastery-relaunch')
@@ -357,21 +356,12 @@ class PlanetMasteredCard extends StatelessWidget {
       emphasized: false,
       onPressed: onContinue,
     );
-    if (!landscape) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(width: double.infinity, child: primary),
-          const SizedBox(height: 8),
-          SizedBox(width: double.infinity, child: secondary),
-        ],
-      );
-    }
-    return Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(child: primary),
-        const SizedBox(width: 10),
-        Expanded(child: secondary),
+        SizedBox(width: double.infinity, child: primary),
+        SizedBox(height: compact ? 6 : 8),
+        SizedBox(width: double.infinity, child: secondary),
       ],
     );
   }
