@@ -129,11 +129,16 @@ class PlanetMasteredCard extends StatelessWidget {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: DefaultTextStyle.merge(
+                  child: DefaultTextStyle(
+                    // Replace the MaterialApp fallback wholesale; merging it
+                    // would keep Flutter's yellow double-underline decoration
+                    // now that this route has no Material ancestor.
                     style: const TextStyle(
+                      color: MiningTheme.primaryText,
                       fontFamily: 'IBM Plex Mono',
                       fontWeight: FontWeight.w400,
                       fontSize: 12,
+                      decoration: TextDecoration.none,
                     ),
                     child: _panel(context, compact: compact, bodyTop: bodyTop),
                   ),

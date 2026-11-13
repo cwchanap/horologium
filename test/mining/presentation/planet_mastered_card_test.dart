@@ -504,151 +504,186 @@ void main() {
   tearDownAll(restoreProductionFontsInWebTests);
 
   for (final size in _sizes) {
-    final label = '${size.width.toInt()}x${size.height.toInt()}';
+    for (final textScale in const [1.0, 1.3]) {
+      final label =
+          '${size.width.toInt()}x${size.height.toInt()} text $textScale';
 
-    testWidgets('nonfinal card keeps both actions tappable at $label', (
-      tester,
-    ) async {
-      final semantics = tester.ensureSemantics();
-      var continues = 0;
-      var opens = 0;
-      final card = _nonfinalCard(
-        onContinue: () => continues++,
-        onOpenMap: () => opens++,
-      );
-      await _pumpCard(tester, size: size, card: card);
-
-      _expectFloatingComposition(tester, size, isFinal: false);
-      _expectOutlinedBadge(tester, size, isFinal: false);
-
-      final openMap = find.byKey(const Key('planet-mastery-open-map'));
-      final continueButton = find.byKey(const Key('planet-mastery-continue'));
-      _expectActionHierarchy(
+      testWidgets('nonfinal card keeps both actions tappable at $label', (
         tester,
-        primary: openMap,
-        secondary: continueButton,
-        size: size,
-        primaryLabel: 'OPEN STELLAR MAP',
-        secondaryLabel: 'CONTINUE',
-      );
-
-      expect(find.text('All 3 sites commissioned'), findsOneWidget);
-      expect(
-        tester
-            .widget<Text>(find.byKey(const Key('planet-mastery-successor')))
-            .data,
-        'NEXT · LUNAR FRONTIER',
-      );
-
-      // The card's mastery wording is presentation-only: the shared Stellar
-      // Map projection keeps its authored `Homeworld sites 3/3` label.
-      expect(card.requirements.first.label, 'Homeworld sites 3/3');
-      expect(find.text('Homeworld sites 3/3'), findsNothing);
-      _expectGate(
-        tester,
-        index: 0,
-        label: 'Homeworld mastered',
-        satisfied: true,
-      );
-      _expectGate(
-        tester,
-        index: 1,
-        label: 'Surveying 3',
-        satisfied: false,
-        currentValue: 'now LV 0',
-      );
-      _expectGate(
-        tester,
-        index: 2,
-        label: '200,000 cash',
-        satisfied: false,
-        currentValue: '100',
-      );
-
-      // Only the body scrolls; the pinned actions above were tapped first.
-      await tester.ensureVisible(
-        find.byKey(const Key('planet-mastery-requirement-1')),
-      );
-      await tester.pump();
-      expect(
-        find.bySemanticsLabel(RegExp('^Surveying 3, required')),
-        findsOneWidget,
-      );
-      expect(
-        find.bySemanticsLabel(RegExp('^Homeworld mastered, satisfied')),
-        findsOneWidget,
-      );
-      await tester.tap(openMap);
-      await tester.tap(continueButton);
-      expect(opens, 1);
-      expect(continues, 1);
-      expect(tester.takeException(), isNull);
-      semantics.dispose();
-    });
-
-    testWidgets('final card keeps both actions tappable at $label', (
-      tester,
-    ) async {
-      final semantics = tester.ensureSemantics();
-      var continues = 0;
-      var relaunches = 0;
-      await _pumpCard(
-        tester,
-        size: size,
-        card: _finalCard(
+      ) async {
+        final semantics = tester.ensureSemantics();
+        var continues = 0;
+        var opens = 0;
+        final card = _nonfinalCard(
           onContinue: () => continues++,
-          onRelaunch: () => relaunches++,
-        ),
-      );
+          onOpenMap: () => opens++,
+        );
+        await _pumpCard(tester, size: size, textScale: textScale, card: card);
 
-      _expectFloatingComposition(tester, size, isFinal: true);
-      _expectOutlinedBadge(tester, size, isFinal: true);
+        _expectFloatingComposition(tester, size, isFinal: false);
+        _expectOutlinedBadge(tester, size, isFinal: false);
 
-      final relaunch = find.byKey(const Key('planet-mastery-relaunch'));
-      final continueButton = find.byKey(const Key('planet-mastery-continue'));
-      _expectActionHierarchy(
+        final openMap = find.byKey(const Key('planet-mastery-open-map'));
+        final continueButton = find.byKey(const Key('planet-mastery-continue'));
+        _expectActionHierarchy(
+          tester,
+          primary: openMap,
+          secondary: continueButton,
+          size: size,
+          primaryLabel: 'OPEN STELLAR MAP',
+          secondaryLabel: 'CONTINUE',
+        );
+
+        _expectVisibleInBody(
+          tester,
+          find.byKey(const Key('planet-mastery-planet')),
+        );
+        _expectVisibleInBody(tester, find.text('All 3 sites commissioned'));
+        _expectVisibleInBody(
+          tester,
+          find.byKey(const Key('planet-mastery-successor')),
+        );
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('planet-mastery-successor')))
+              .data,
+          'NEXT · LUNAR FRONTIER',
+        );
+
+        // The card's mastery wording is presentation-only: the shared Stellar
+        // Map projection keeps its authored `Homeworld sites 3/3` label.
+        expect(card.requirements.first.label, 'Homeworld sites 3/3');
+        expect(find.text('Homeworld sites 3/3'), findsNothing);
+        _expectGate(
+          tester,
+          index: 0,
+          label: 'Homeworld mastered',
+          satisfied: true,
+        );
+        _expectGate(
+          tester,
+          index: 1,
+          label: 'Surveying 3',
+          satisfied: false,
+          currentValue: 'now LV 0',
+        );
+        _expectGate(
+          tester,
+          index: 2,
+          label: '200,000 cash',
+          satisfied: false,
+          currentValue: '100',
+        );
+
+        // Only the body scrolls; the pinned actions above were tapped first.
+        await tester.ensureVisible(
+          find.byKey(const Key('planet-mastery-requirement-1')),
+        );
+        await tester.pump();
+        expect(
+          find.bySemanticsLabel(RegExp('^Surveying 3, required')),
+          findsOneWidget,
+        );
+        expect(
+          find.bySemanticsLabel(RegExp('^Homeworld mastered, satisfied')),
+          findsOneWidget,
+        );
+        await tester.tap(openMap);
+        await tester.tap(continueButton);
+        expect(opens, 1);
+        expect(continues, 1);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      });
+
+      testWidgets('final card keeps both actions tappable at $label', (
         tester,
-        primary: relaunch,
-        secondary: continueButton,
-        size: size,
-        primaryLabel: 'RELAUNCH',
-        secondaryLabel: 'LATER',
-      );
+      ) async {
+        final semantics = tester.ensureSemantics();
+        var continues = 0;
+        var relaunches = 0;
+        await _pumpCard(
+          tester,
+          size: size,
+          textScale: textScale,
+          card: _finalCard(
+            onContinue: () => continues++,
+            onRelaunch: () => relaunches++,
+          ),
+        );
 
-      final reward = _content.planet(_content.finalPlanetId).masteryRewardCash;
-      expect(
-        tester
-            .widget<Text>(find.byKey(const Key('planet-mastery-reward')))
-            .data,
-        '+${formatMiningCash(reward)}',
-      );
-      expect(find.text('completion reward'), findsOneWidget);
-      expect(find.text('RUN COMPLETE'), findsOneWidget);
+        _expectFloatingComposition(tester, size, isFinal: true);
+        _expectOutlinedBadge(tester, size, isFinal: true);
 
-      // The heading stays a single production-font line, never clipped.
-      final heading = tester.renderObject<RenderParagraph>(
-        find.text('FINAL PLANET MASTERED'),
-      );
-      expect(
-        heading.size.width,
-        greaterThanOrEqualTo(
-          heading.getMaxIntrinsicWidth(double.infinity) - .5,
-        ),
-      );
-      expect(
-        heading.size.height,
-        greaterThanOrEqualTo(
-          heading.getMaxIntrinsicHeight(heading.size.width) - .5,
-        ),
-      );
+        final relaunch = find.byKey(const Key('planet-mastery-relaunch'));
+        final continueButton = find.byKey(const Key('planet-mastery-continue'));
+        _expectActionHierarchy(
+          tester,
+          primary: relaunch,
+          secondary: continueButton,
+          size: size,
+          primaryLabel: 'RELAUNCH',
+          secondaryLabel: 'LATER',
+        );
 
-      await tester.tap(relaunch);
-      await tester.tap(continueButton);
-      expect(relaunches, 1);
-      expect(continues, 1);
-      expect(tester.takeException(), isNull);
-      semantics.dispose();
-    });
+        final reward = _content
+            .planet(_content.finalPlanetId)
+            .masteryRewardCash;
+        final multiplier = find.byKey(const Key('planet-mastery-multiplier'));
+        for (final finder in [
+          find.byKey(const Key('planet-mastery-planet')),
+          find.byKey(const Key('planet-mastery-reward')),
+          find.text('completion reward'),
+          find.text('RUN COMPLETE'),
+          multiplier,
+        ]) {
+          _expectVisibleInBody(tester, finder);
+        }
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('planet-mastery-reward')))
+              .data,
+          '+${formatMiningCash(reward)}',
+        );
+        expect(
+          tester.widget<Text>(multiplier).data,
+          'Relaunch to start again with sales ×1.5. '
+          'Only your relaunch count is kept.',
+        );
+        final explanation = tester.renderObject<RenderParagraph>(multiplier);
+        expect(explanation.didExceedMaxLines, isFalse);
+        expect(
+          explanation.size.height,
+          greaterThanOrEqualTo(
+            explanation.getMaxIntrinsicHeight(explanation.size.width) - .5,
+          ),
+        );
+
+        // The heading stays a single production-font line, never clipped.
+        final heading = tester.renderObject<RenderParagraph>(
+          find.text('FINAL PLANET MASTERED'),
+        );
+        expect(
+          heading.size.width,
+          greaterThanOrEqualTo(
+            heading.getMaxIntrinsicWidth(double.infinity) - .5,
+          ),
+        );
+        expect(
+          heading.size.height,
+          greaterThanOrEqualTo(
+            heading.getMaxIntrinsicHeight(heading.size.width) - .5,
+          ),
+        );
+
+        await tester.tap(relaunch);
+        await tester.tap(continueButton);
+        expect(relaunches, 1);
+        expect(continues, 1);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      });
+    }
   }
 
   testWidgets(
@@ -1059,10 +1094,28 @@ void main() {
         card: _finalCard(nextSaleMultiplier: multiplier),
       );
 
-      final text = tester.widget<Text>(
-        find.byKey(const Key('planet-mastery-multiplier')),
+      final multiplierFinder = find.byKey(
+        const Key('planet-mastery-multiplier'),
       );
+      for (final finder in [
+        find.byKey(const Key('planet-mastery-planet')),
+        find.byKey(const Key('planet-mastery-reward')),
+        find.text('completion reward'),
+        find.text('RUN COMPLETE'),
+        multiplierFinder,
+      ]) {
+        _expectVisibleInBody(tester, finder);
+      }
+      final text = tester.widget<Text>(multiplierFinder);
       expect(text.data, contains(formatted));
+      final paragraph = tester.renderObject<RenderParagraph>(multiplierFinder);
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(
+        paragraph.size.height,
+        greaterThanOrEqualTo(
+          paragraph.getMaxIntrinsicHeight(paragraph.size.width) - .5,
+        ),
+      );
       expect(tester.takeException(), isNull);
     });
   }

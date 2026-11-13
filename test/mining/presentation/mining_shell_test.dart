@@ -4431,6 +4431,44 @@ void main() {
       expect(find.text('Rig deployed.'), findsNothing);
     });
 
+    testWidgets('mastery card text uses the production default text style', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(tester, repository: repository);
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+
+      for (final finder in [
+        find.text('All 3 sites commissioned'),
+        find.text('Homeworld mastered'),
+      ]) {
+        final richText = tester.widget<RichText>(
+          find.descendant(of: finder, matching: find.byType(RichText)),
+        );
+        final style = richText.text.style!;
+        expect(
+          style.decoration ?? TextDecoration.none,
+          TextDecoration.none,
+          reason: 'the dialog must not inherit the fallback underline',
+        );
+        expect(
+          style.decorationStyle,
+          isNot(TextDecorationStyle.double),
+          reason: 'the dialog must not inherit the yellow double underline',
+        );
+        expect(style.decorationColor, isNot(const Color(0xFFFFFF00)));
+        expect(style.fontFamily, 'IBM Plex Mono');
+        expect(style.fontSize, 12);
+        expect(richText.textScaler.scale(12), 12);
+      }
+    });
+
     testWidgets('taps above the floating mastery art reach the barrier', (
       tester,
     ) async {
