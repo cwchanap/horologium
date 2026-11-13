@@ -5,9 +5,10 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 
-/// The floating card starts this far below the live top inset in portrait so
+/// The floating panel starts this far below the live top inset in portrait so
 /// its top-mounted close control clears the inline cargo gauge (84px tall at
-/// 50px down) that the modal route's removed top padding hides from it.
+/// 50px down). Compact portrait fills from this floor; roomy portrait uses it
+/// as the minimum panel top while sizing and centering the content.
 const double _portraitTopClearance = 168;
 
 const double _portraitMargin = 20;
@@ -49,10 +50,9 @@ class PlanetMasteredCard extends StatelessWidget {
   final VoidCallback onOpenMap;
   final VoidCallback? onRelaunch;
 
-  /// The top system inset of the screen under this modal route. A modal
-  /// bottom sheet removes the top padding from its own MediaQuery, so the
-  /// shell passes the inset in to keep this card's close control clear of
-  /// the inline scene HUD that did receive it.
+  /// The shell's live top system inset. The retained mastery dialog route
+  /// follows rotation and inset changes through this value; the card uses the
+  /// larger of it and the route's own top padding.
   final double topSafeArea;
 
   String get _title => isFinal ? 'FINAL PLANET MASTERED' : 'PLANET MASTERED';
@@ -99,7 +99,7 @@ class PlanetMasteredCard extends StatelessWidget {
         ? math.max(padding.left, padding.right) + _landscapeMargin
         : math.max(_portraitMargin, math.max(padding.left, padding.right) + 8);
     final bottomLimit = math.max(padding.bottom, landscape ? 8.0 : 12.0);
-    final panelHeight = math.min(
+    final availablePanelHeight = math.min(
       _panelMaxHeight,
       math.max(120.0, size.height - panelTop - bottomLimit),
     );
@@ -107,56 +107,71 @@ class PlanetMasteredCard extends StatelessWidget {
       landscape ? _landscapeMaxWidth : _panelMaxWidth,
       size.width - 2 * horizontalInset,
     );
-    final compositionHeight = artAbovePanel + panelHeight;
+    final roomyPortrait = !landscape && !compactPortrait;
+    final panel = roomyPortrait
+        ? ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: availablePanelHeight),
+            child: _panel(
+              context,
+              compact: compact,
+              bodyTop: bodyTop,
+              contentSized: true,
+            ),
+          )
+        : SizedBox(
+            height: availablePanelHeight,
+            child: _panel(
+              context,
+              compact: compact,
+              bodyTop: bodyTop,
+              contentSized: false,
+            ),
+          );
 
-    // Only the card-plus-overlap composition is laid out inside the
-    // bottom-anchored dialog, so taps above or beside it reach the dismissible
-    // barrier. The close lives inside these bounds too, keeping its whole
-    // visible circle hit-testable.
+    // Only the card-plus-overlap composition is laid out inside the mastery
+    // dialog, so taps above or beside it reach the dismissible barrier. The
+    // close lives inside these bounds too, keeping its whole visible circle
+    // hit-testable. Roomy portrait content-sizes the panel and the dialog
+    // centers it; compact layouts fill the available height and bottom-anchor.
     return Padding(
       key: const Key('planet-mastery-card'),
       padding: EdgeInsets.only(bottom: bottomLimit),
-      child: SizedBox(
-        height: compositionHeight,
-        child: Center(
-          child: SizedBox(
-            width: cardWidth,
-            height: compositionHeight,
-            child: Stack(
-              children: [
-                Positioned(
-                  top: artAbovePanel,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: DefaultTextStyle(
-                    // Replace the MaterialApp fallback wholesale; merging it
-                    // would keep Flutter's yellow double-underline decoration
-                    // now that this route has no Material ancestor.
-                    style: const TextStyle(
-                      color: MiningTheme.primaryText,
-                      fontFamily: 'IBM Plex Mono',
-                      fontWeight: FontWeight.w400,
-                      fontSize: 12,
-                      decoration: TextDecoration.none,
-                    ),
-                    child: _panel(context, compact: compact, bodyTop: bodyTop),
+      child: Align(
+        alignment: Alignment.topCenter,
+        heightFactor: 1,
+        child: SizedBox(
+          width: cardWidth,
+          child: Stack(
+            children: [
+              Padding(
+                padding: EdgeInsets.only(top: artAbovePanel),
+                child: DefaultTextStyle(
+                  // Replace the MaterialApp fallback wholesale; merging it
+                  // would keep Flutter's yellow double-underline decoration
+                  // now that this route has no Material ancestor.
+                  style: const TextStyle(
+                    color: MiningTheme.primaryText,
+                    fontFamily: 'IBM Plex Mono',
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
+                    decoration: TextDecoration.none,
                   ),
+                  child: panel,
                 ),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: Center(child: _art(artSize)),
-                ),
-                Positioned(
-                  top: math.max(0, artAbovePanel - 22),
-                  left: landscape ? 4 : null,
-                  right: landscape ? null : 4,
-                  child: _close(context),
-                ),
-              ],
-            ),
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Center(child: _art(artSize)),
+              ),
+              Positioned(
+                top: math.max(0, artAbovePanel - 22),
+                left: landscape ? 4 : null,
+                right: landscape ? null : 4,
+                child: _close(context),
+              ),
+            ],
           ),
         ),
       ),
@@ -167,6 +182,7 @@ class PlanetMasteredCard extends StatelessWidget {
     BuildContext context, {
     required bool compact,
     required double bodyTop,
+    required bool contentSized,
   }) => Container(
     key: const Key('planet-mastery-panel'),
     decoration: BoxDecoration(
@@ -177,21 +193,17 @@ class PlanetMasteredCard extends StatelessWidget {
     ),
     clipBehavior: Clip.antiAlias,
     child: Column(
+      mainAxisSize: contentSized ? MainAxisSize.min : MainAxisSize.max,
       children: [
-        Expanded(
-          child: ScrollConfiguration(
-            // A desktop scrollbar would inset the body by 12px and push the
-            // mockup's centered badge off the card's centre line.
-            behavior: ScrollConfiguration.of(
-              context,
-            ).copyWith(scrollbars: false),
-            child: SingleChildScrollView(
-              key: const Key('mining-sheet-body'),
-              padding: EdgeInsets.fromLTRB(18, bodyTop, 18, 4),
-              child: _body(compact: compact),
-            ),
+        if (contentSized)
+          Flexible(
+            fit: FlexFit.loose,
+            child: _scrollBody(context, compact: compact, bodyTop: bodyTop),
+          )
+        else
+          Expanded(
+            child: _scrollBody(context, compact: compact, bodyTop: bodyTop),
           ),
-        ),
         Padding(
           key: const Key('mining-sheet-pinned-footer'),
           padding: EdgeInsets.fromLTRB(
@@ -203,6 +215,21 @@ class PlanetMasteredCard extends StatelessWidget {
           child: _actions(compact: compact),
         ),
       ],
+    ),
+  );
+
+  Widget _scrollBody(
+    BuildContext context, {
+    required bool compact,
+    required double bodyTop,
+  }) => ScrollConfiguration(
+    // A desktop scrollbar would inset the body by 12px and push the mockup's
+    // centered badge off the card's centre line.
+    behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+    child: SingleChildScrollView(
+      key: const Key('mining-sheet-body'),
+      padding: EdgeInsets.fromLTRB(18, bodyTop, 18, 4),
+      child: _body(compact: compact),
     ),
   );
 

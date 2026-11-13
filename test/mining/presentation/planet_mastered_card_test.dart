@@ -192,6 +192,7 @@ Future<void> _pumpCard(
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
   });
+  final roomyPortrait = size.width <= size.height && size.height > 700;
   await tester.pumpWidget(
     MediaQuery(
       data: MediaQueryData(
@@ -202,11 +203,16 @@ Future<void> _pumpCard(
       ),
       child: MaterialApp(
         theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
-        // The shell hosts this card in a bottom sheet: loose height, bottom
-        // aligned. Mirror that so the card's bounded composition is measured
-        // instead of being stretched to the scaffold.
+        // The shell hosts this card in a bottom-anchored dialog on compact
+        // screens and a centered one in roomy portrait; mirror that so the
+        // content-sized composition is measured where it actually renders.
         home: Scaffold(
-          body: Align(alignment: Alignment.bottomCenter, child: card),
+          body: Align(
+            alignment: roomyPortrait
+                ? Alignment.center
+                : Alignment.bottomCenter,
+            child: card,
+          ),
         ),
       ),
     ),
@@ -329,7 +335,13 @@ void _expectFloatingComposition(
   expect(panel.right, lessThanOrEqualTo(safe.right - 12 + .5));
   expect(panel.top, greaterThanOrEqualTo(safe.top));
   expect(panel.bottom, lessThanOrEqualTo(safe.bottom + .5));
-  expect(panel.bottom, greaterThan(safe.bottom - 24));
+  if (roomy) {
+    // Roomy portrait floats the content-sized card vertically centered.
+    expect(panel.top, greaterThan(safe.top));
+    expect(panel.bottom, lessThan(safe.bottom));
+  } else {
+    expect(panel.bottom, greaterThan(safe.bottom - 24));
+  }
   if (landscape) {
     expect(panel.width, lessThanOrEqualTo(560));
   } else {
@@ -497,6 +509,30 @@ void _expectGate(
       reason: 'gate $index current value escapes its row',
     );
   }
+}
+
+/// The first action must sit near the last detail in roomy portrait, not at
+/// the bottom of a stretched panel.
+void _expectPrimaryNearLastDetail(
+  WidgetTester tester, {
+  required Finder primary,
+  required Finder lastDetail,
+}) {
+  final primaryRect = tester.getRect(primary);
+  final detailRect = tester.getRect(lastDetail);
+  final gap = primaryRect.top - detailRect.bottom;
+  expect(
+    gap,
+    greaterThanOrEqualTo(0),
+    reason: 'primary $primaryRect overlaps last detail $detailRect',
+  );
+  expect(
+    gap,
+    lessThanOrEqualTo(32),
+    reason:
+        'primary $primaryRect must start within 32px of the last detail '
+        '$detailRect, not after stretched blank space',
+  );
 }
 
 void main() {
@@ -1352,6 +1388,113 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  // Roomy portrait is content-sized: the primary action must sit directly
+  // below the last detail, not at the bottom of a stretched panel.
+  for (final size in const [Size(390, 844), Size(430, 932)]) {
+    final insets = size.width == 430
+        ? const EdgeInsets.fromLTRB(0, 59, 0, 34)
+        : const EdgeInsets.fromLTRB(0, 24, 0, 24);
+    for (final textScale in const [1.0, 1.3]) {
+      final label =
+          '${size.width.toInt()}x${size.height.toInt()} text $textScale';
+
+      testWidgets(
+        'roomy $label keeps Homeworld actions within 32px of the last gate',
+        (tester) async {
+          final card = _nonfinalCard();
+          await _pumpCard(
+            tester,
+            size: size,
+            textScale: textScale,
+            insets: insets,
+            card: card,
+          );
+
+          final lastGate = find.byKey(
+            const Key('planet-mastery-requirement-2'),
+          );
+          final primary = find.byKey(const Key('planet-mastery-open-map'));
+          _expectVisibleInBody(tester, lastGate);
+          _expectPrimaryNearLastDetail(
+            tester,
+            primary: primary,
+            lastDetail: lastGate,
+          );
+          expect(primary.hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      testWidgets(
+        'roomy $label keeps Io actions within 32px of the explanation',
+        (tester) async {
+          await _pumpCard(
+            tester,
+            size: size,
+            textScale: textScale,
+            insets: insets,
+            card: _finalCard(nextSaleMultiplier: 2.0),
+          );
+
+          final lastDetail = find.byKey(const Key('planet-mastery-multiplier'));
+          final primary = find.byKey(const Key('planet-mastery-relaunch'));
+          _expectVisibleInBody(tester, lastDetail);
+          _expectPrimaryNearLastDetail(
+            tester,
+            primary: primary,
+            lastDetail: lastDetail,
+          );
+          expect(primary.hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'roomy 390x844 text 1.3 keeps the long Ceres gates complete and the '
+    'primary action near the last gate',
+    (tester) async {
+      const size = Size(390, 844);
+      await _pumpCard(
+        tester,
+        size: size,
+        textScale: 1.3,
+        insets: const EdgeInsets.fromLTRB(0, 24, 0, 24),
+        card: _projectedCeresCard(),
+      );
+
+      _expectGate(
+        tester,
+        index: 0,
+        label: 'Ceres Frontier mastered',
+        satisfied: true,
+      );
+      _expectGate(
+        tester,
+        index: 1,
+        label: 'Surveying 5',
+        satisfied: false,
+        currentValue: 'now LV 4',
+      );
+      _expectGate(
+        tester,
+        index: 2,
+        label: '90.00M cash',
+        satisfied: false,
+        currentValue: '12.35M',
+      );
+      final primary = find.byKey(const Key('planet-mastery-open-map'));
+      _expectPrimaryNearLastDetail(
+        tester,
+        primary: primary,
+        lastDetail: find.byKey(const Key('planet-mastery-requirement-2')),
+      );
+      expect(primary.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('primary action is reached by Tab and activates', (tester) async {
     var opens = 0;
