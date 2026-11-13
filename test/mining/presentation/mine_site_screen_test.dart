@@ -1535,10 +1535,7 @@ void main() {
       view: _siteView(state, selectedBayId: DockBayId.b1),
       dock: _dockView(state, selectedBayId: DockBayId.b1),
     );
-    expect(
-      find.text('CELL: DEPLOY · RIG: UPGRADE · BAY: MERGE'),
-      findsOneWidget,
-    );
+    expect(find.text('DEPLOY · UPGRADE · MERGE'), findsOneWidget);
   });
 
   testWidgets(
@@ -2115,10 +2112,7 @@ void main() {
       );
 
       final hint = find.byKey(const Key('fleet-dock-hint'));
-      expect(
-        tester.widget<Text>(hint).data,
-        'CELL: DEPLOY · RIG: UPGRADE · BAY: MERGE',
-      );
+      expect(tester.widget<Text>(hint).data, 'DEPLOY · UPGRADE · MERGE');
       final render = tester.renderObject<RenderParagraph>(hint);
       expect(
         render.text.style?.fontFamily,
@@ -2128,12 +2122,26 @@ void main() {
       expect(
         render.didExceedMaxLines,
         isFalse,
-        reason: 'textScale $textScale fits the hint lines without truncation',
+        reason: 'textScale $textScale must not truncate the hint',
       );
       if (!kIsWeb) {
+        final text = render.text.toPlainText();
+        final lineTops = render
+            .getBoxesForSelection(
+              TextSelection(baseOffset: 0, extentOffset: text.length),
+            )
+            .map((box) => box.top)
+            .toSet();
+        expect(
+          lineTops.length,
+          1,
+          reason:
+              'shipped Orbitron keeps the hint on one line at 360 px '
+              '(textScale $textScale)',
+        );
         expect(
           render.getMaxIntrinsicWidth(double.infinity),
-          closeTo(textScale == 1.0 ? 257.594482421875 : 327.6728515625, 4),
+          closeTo(textScale == 1.0 ? 166.0935821533203 : 211.6016845703125, 4),
           reason: 'textScale $textScale must measure shipped Orbitron widths',
         );
       }
@@ -2150,7 +2158,7 @@ void main() {
       );
       expect(
         bounds.height,
-        greaterThanOrEqualTo(20),
+        greaterThanOrEqualTo(10),
         reason: 'textScale $textScale transformed height ${bounds.height}',
       );
       if (textScale == 1.3) {

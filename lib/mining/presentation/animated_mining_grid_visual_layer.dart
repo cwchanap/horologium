@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/mine_site_view.dart';
@@ -422,13 +423,29 @@ class _AnimatedMiningGridVisualLayerState
           cell,
     );
     final drift = widget.reducedMotion ? 0.0 : tail * 18;
+    // A rig below its resource anchors this label on the shared cell edge,
+    // exactly where the map paints the rig's top-anchored tier chip. Lift it
+    // above that chip so the chip never covers the damage value. A rig beside
+    // its 1x1 resource anchors only 28px below its own cell top, so the same
+    // upward drift would enter the chip band late in the tail; hold that drift
+    // below the chip instead.
+    final targetAbove = rig.target.y + rig.target.size == rig.placement.cell.y;
+    final top = targetAbove
+        ? math.min(
+            anchor.dy - drift,
+            rig.placement.cell.y * cell - miningRigChipClearance,
+          )
+        : math.max(
+            anchor.dy - drift,
+            rig.placement.cell.y * cell + miningRigChipClearance,
+          );
     return Positioned(
       key: Key(
         '$_keyPrefix-damage-'
         '${rig.placement.cell.x}-${rig.placement.cell.y}',
       ),
       left: anchor.dx - 24,
-      top: anchor.dy - drift,
+      top: top,
       width: 48,
       child: ExcludeSemantics(
         child: Opacity(
@@ -528,8 +545,6 @@ class _AnimatedMiningGridVisualLayerState
           staticLayer!,
           for (final deposit in widget.view.deposits)
             if (deposit.minerCount > 0) _depositNode(deposit, cell, _t),
-          for (final deposit in widget.view.deposits)
-            if (deposit.minerCount > 0) _hpChrome(deposit, cell),
           for (final rig in widget.view.rigs)
             Positioned(
               left: rig.placement.cell.x * cell,
@@ -543,6 +558,10 @@ class _AnimatedMiningGridVisualLayerState
                 child: _rigRobot(rig, _t, cell),
               ),
             ),
+          // After the robots: an upper-row robot's oversized art must not
+          // cover the HP bar or its label.
+          for (final deposit in widget.view.deposits)
+            if (deposit.minerCount > 0) _hpChrome(deposit, cell),
           for (final rig in widget.view.rigs)
             if (_damageLabel(rig, cell) case final label?) label,
         ],

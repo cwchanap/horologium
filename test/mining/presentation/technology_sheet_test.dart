@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -71,8 +73,8 @@ Future<void> _pumpSheet(
   });
 
   await tester.pumpWidget(
-    MaterialApp(
-      home: Scaffold(
+    _app(
+      Scaffold(
         body: TechnologySheet(
           view: _view(),
           onPurchase: (_) {},
@@ -90,7 +92,41 @@ String _trackDisplayName(TechnologyTrack track) => switch (track) {
   TechnologyTrack.surveying => 'Surveying',
 };
 
+/// Production typography: the inherited text styles only use Orbitron when
+/// the theme selects it, so loading the font alone is not enough.
+MaterialApp _app(Widget home) => MaterialApp(
+  theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+  home: home,
+);
+
 void main() {
+  // Real Orbitron metrics: the test font's square glyphs understate line
+  // height, hiding footer clipping on the small viewports.
+  setUpAll(() async {
+    if (kIsWeb) return;
+    final loader = FontLoader('Orbitron')
+      ..addFont(
+        File(
+          'assets/fonts/Orbitron-Variable.ttf',
+        ).readAsBytes().then(ByteData.sublistView),
+      );
+    await loader.load();
+  });
+
+  testWidgets('the viewport harness inherits production Orbitron typography', (
+    tester,
+  ) async {
+    await _pumpSheet(tester, const Size(360, 640));
+
+    final title = tester.widget<RichText>(
+      find.descendant(
+        of: find.text('Technology'),
+        matching: find.byType(RichText),
+      ),
+    );
+    expect((title.text as TextSpan).style?.fontFamily, 'Orbitron');
+  });
+
   for (final viewport in _viewports) {
     testWidgets('renders track affordances from the view at $viewport', (
       tester,
@@ -148,6 +184,123 @@ void main() {
       }
     });
   }
+
+  for (final viewport in const [
+    Size(360, 640),
+    Size(390, 844),
+    Size(874, 402),
+  ]) {
+    testWidgets('pins the selected track details and buy action at $viewport', (
+      tester,
+    ) async {
+      await _pumpSheet(tester, viewport);
+
+      final body = find.byKey(const Key('mining-sheet-body'));
+      final footer = find.byKey(const Key('mining-sheet-pinned-footer'));
+      expect(body, findsOneWidget);
+      expect(footer, findsOneWidget);
+      // Scroll viewport and fixed footer never share pixels.
+      expect(
+        tester.getRect(body).bottom,
+        lessThanOrEqualTo(tester.getRect(footer).top),
+      );
+
+      final buy = find.byKey(const Key('mining-technology-buy-extraction'));
+      expect(buy.hitTestable(), findsOneWidget);
+      final buyRect = tester.getRect(buy);
+      expect(buyRect.top, greaterThanOrEqualTo(0));
+      expect(buyRect.bottom, lessThanOrEqualTo(viewport.height));
+
+      // Scrolling the level nodes leaves the details and action pinned.
+      final footerBefore = tester.getRect(footer);
+      await tester.drag(
+        viewport.width > viewport.height
+            ? find.byType(SingleChildScrollView).last
+            : body,
+        viewport.width > viewport.height
+            ? const Offset(-120, 0)
+            : const Offset(0, -140),
+      );
+      await tester.pump();
+      expect(tester.getRect(footer), footerBefore);
+      expect(buy.hitTestable(), findsOneWidget);
+
+      // Switching tracks re-targets the pinned details and action.
+      await tester.ensureVisible(
+        find.byKey(const Key('technology-track-logistics')),
+      );
+      await tester.tap(find.byKey(const Key('technology-track-logistics')));
+      await tester.pump();
+      final logistics = find.byKey(
+        const Key('mining-technology-buy-logistics'),
+      );
+      expect(logistics.hitTestable(), findsOneWidget);
+      expect(find.text('Commission Landing Basin'), findsOneWidget);
+      expect(
+        tester.getRect(logistics).bottom,
+        lessThanOrEqualTo(viewport.height),
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('technology-track-surveying')),
+      );
+      await tester.tap(find.byKey(const Key('technology-track-surveying')));
+      await tester.pump();
+      expect(
+        find.byKey(const Key('mining-technology-buy-surveying')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(find.text('Max Level'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('the pinned buy action updates cost and level after a purchase', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 640);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final live = ValueNotifier<TechnologySheetView>(_view());
+    addTearDown(live.dispose);
+    await tester.pumpWidget(
+      _app(
+        Scaffold(
+          body: ValueListenableBuilder<TechnologySheetView>(
+            valueListenable: live,
+            builder: (context, view, _) => TechnologySheet(
+              view: view,
+              onPurchase: (_) => live.value = _purchasedView(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('300'), findsOneWidget);
+    final buy = find.byKey(const Key('mining-technology-buy-extraction'));
+    expect(buy.hitTestable(), findsOneWidget);
+
+    await tester.tap(buy);
+    await tester.pump();
+
+    expect(find.text('700'), findsOneWidget);
+    final ownedNode = tester.widget<Semantics>(
+      find
+          .descendant(
+            of: find.byKey(const Key('technology-node-extraction-1')),
+            matching: find.byType(Semantics),
+          )
+          .first,
+    );
+    expect(ownedNode.properties.label, 'Extraction level 1, owned');
+    expect(buy.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('portrait upgrade action fits without scrolling', (tester) async {
     await _pumpSheet(tester, const Size(402, 874));
@@ -210,8 +363,8 @@ void main() {
     final purchases = <TechnologyTrack>[];
     Future<void> openSheet() async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
+        _app(
+          Scaffold(
             body: Builder(
               builder: (context) => Center(
                 child: ElevatedButton(
@@ -285,8 +438,8 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      _app(
+        Scaffold(
           body: TechnologySheet(
             view: _view(),
             onPurchase: (_) {},
@@ -313,8 +466,8 @@ void main() {
     'purchase buttons fall back to a cash icon without the asset',
     (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: DefaultAssetBundle(
+        _app(
+          DefaultAssetBundle(
             bundle: _MissingCashIconBundle(),
             child: Scaffold(
               body: TechnologySheet(view: _highCostView(), onPurchase: (_) {}),
@@ -366,8 +519,8 @@ void main() {
     final live = ValueNotifier<TechnologySheetView>(_view());
     addTearDown(live.dispose);
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      _app(
+        Scaffold(
           body: ValueListenableBuilder<TechnologySheetView>(
             valueListenable: live,
             builder: (context, view, _) =>
@@ -432,8 +585,8 @@ void main() {
     });
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: MediaQuery(
+      _app(
+        MediaQuery(
           data: const MediaQueryData(
             size: viewport,
             textScaler: TextScaler.linear(1.3),
@@ -450,6 +603,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 }
+
+TechnologySheetView _purchasedView() => TechnologySheetView(
+  tracks: [
+    const TechnologyTrackView(
+      track: TechnologyTrack.extraction,
+      name: 'Extraction',
+      level: 1,
+      currentEffect: 'Mining rate ×1.10',
+      nextEffect: 'Mining rate ×1.21',
+      cost: 700,
+      gateSiteName: 'Landing Basin',
+      isGateSatisfied: true,
+      isAffordable: true,
+      isMaxLevel: false,
+      disabledReason: null,
+    ),
+    _view().tracks[1],
+    _view().tracks[2],
+  ],
+);
 
 TechnologySheetView _highCostView() => TechnologySheetView(
   tracks: [

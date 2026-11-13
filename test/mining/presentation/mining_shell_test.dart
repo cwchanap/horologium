@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/audio_manager.dart';
@@ -9,6 +10,7 @@ import 'package:horologium/game/storage_alerts.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_controller.dart';
 import 'package:horologium/mining/mining_grid.dart';
+import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_grid_map.dart';
@@ -26,6 +28,7 @@ import '../../support/fake_background_music_player.dart';
 import '../../support/fake_storage_alert_platform.dart';
 import '../../support/mining_grid_fixtures.dart';
 import '../../support/mining_visual_frames.dart';
+import '../../support/test_fonts.dart';
 
 class CountingMiningSaveRepository extends MiningSaveRepository {
   var saveCount = 0;
@@ -172,6 +175,42 @@ MiningSave finalPlanetMasteredState(DateTime now) {
   );
 }
 
+/// Homeworld's last site is unlocked but uncommissioned: one deploy masters
+/// Homeworld and surfaces the next-frontier mastery card.
+MiningSave nearHomeworldMasteryState(DateTime now) {
+  final base = homeworldMasteredState(now);
+  return base.copyWith(
+    sites: {
+      ...base.sites,
+      MiningSiteId.graniteCrater: base.sites[MiningSiteId.graniteCrater]!
+          .copyWith(commissioned: false, rigPlacements: []),
+    },
+  );
+}
+
+/// Every planet unlocked and every site commissioned except Io's last site:
+/// one deploy masters the final planet.
+MiningSave nearFinalPlanetMasteryState(DateTime now) {
+  final base = finalPlanetMasteredState(now);
+  return base.copyWith(
+    technology: const TechnologyLevels(surveying: 5),
+    docks: {
+      ...base.docks,
+      MiningPlanetId.ioFrontier: {
+        DockBayId.b1: RigTier.t1,
+        DockBayId.b2: RigTier.t1,
+        DockBayId.b3: null,
+        DockBayId.b4: null,
+      },
+    },
+    sites: {
+      ...base.sites,
+      MiningSiteId.osmiumCaldera: base.sites[MiningSiteId.osmiumCaldera]!
+          .copyWith(commissioned: false, rigPlacements: []),
+    },
+  );
+}
+
 Finder _inGoalStrip(Finder matching) => find.descendant(
   of: find.byKey(const Key('site-deck-next-goal')),
   matching: matching,
@@ -255,6 +294,75 @@ final _carbonRidgeCell = deployableMiningCells(
   MiningContentRegistry.stellarMining().site(MiningSiteId.carbonRidge),
 ).first;
 
+/// Legal deploy cell for each planet's last authored site, whose deploy
+/// masters that planet on the near-mastery fixtures.
+final _graniteCraterDeployCell = deployableMiningCells(
+  MiningContentRegistry.stellarMining().site(MiningSiteId.graniteCrater),
+).first;
+final _osmiumDeployCell = firstPlayableCell(
+  MiningContentRegistry.stellarMining().site(MiningSiteId.osmiumCaldera),
+);
+
+/// Pumps the frame that starts a modal sheet route, then its animation.
+Future<void> pumpSheet(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
+/// Enters [siteId] with the first Homeworld/active-planet dock bay selected
+/// and taps [cell], the deploy that masters a near-mastery fixture.
+Future<void> deployIntoMastery(
+  WidgetTester tester,
+  MiningSiteId siteId,
+  MiningGridCell cell,
+) async {
+  final enter = find.byKey(Key('site-card-${siteId.name}-enter'));
+  await tester.ensureVisible(enter);
+  await tester.pump();
+  await tester.tap(enter);
+  await tester.pump();
+  await tester.tap(find.byKey(const ValueKey<String>('b1')));
+  await tester.pump();
+  await tapGridCell(tester, cell);
+  await pumpSheet(tester);
+}
+
+/// Opens the final mastery card at a specific viewport, safe area, and scale.
+Future<void> openFinalMasteryAt(
+  WidgetTester tester, {
+  required Size size,
+  required EdgeInsets safeArea,
+  double textScale = 1.3,
+  int relaunchCount = 1,
+}) async {
+  final repository = CountingMiningSaveRepository();
+  await repository.save(
+    nearFinalPlanetMasteryState(_start).copyWith(relaunchCount: relaunchCount),
+  );
+  await pumpShell(
+    tester,
+    repository: repository,
+    viewport: size,
+    theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+    useViewSafeArea: true,
+    safeArea: safeArea,
+    textScale: textScale,
+  );
+  if (size.width > size.height) {
+    await tester.dragUntilVisible(
+      find.byKey(Key('site-card-${MiningSiteId.osmiumCaldera.name}-enter')),
+      find.byKey(const Key('site-deck-scroll')),
+      const Offset(0, -200),
+    );
+    await tester.pump();
+  }
+  await deployIntoMastery(
+    tester,
+    MiningSiteId.osmiumCaldera,
+    _osmiumDeployCell,
+  );
+}
+
 MiningSave deployedCarbonRidgeState(DateTime now) {
   final base = MiningSave.initial(nowUtc: now);
   return base.copyWith(
@@ -307,12 +415,35 @@ Future<void> pumpShell(
   bool disableAnimations = false,
   Key? shellKey,
   int pumpCycles = 6,
+  Size viewport = _viewport,
+  EdgeInsets safeArea = EdgeInsets.zero,
+  double textScale = 1.0,
+  bool useViewSafeArea = false,
+  ThemeData? theme,
 }) async {
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = _viewport;
+  tester.view.physicalSize = viewport;
+  if (useViewSafeArea) {
+    tester.view.padding = FakeViewPadding(
+      left: safeArea.left,
+      top: safeArea.top,
+      right: safeArea.right,
+      bottom: safeArea.bottom,
+    );
+    tester.view.viewPadding = FakeViewPadding(
+      left: safeArea.left,
+      top: safeArea.top,
+      right: safeArea.right,
+      bottom: safeArea.bottom,
+    );
+  }
   addTearDown(() {
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
+    if (useViewSafeArea) {
+      tester.view.resetPadding();
+      tester.view.resetViewPadding();
+    }
   });
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
@@ -331,19 +462,39 @@ Future<void> pumpShell(
   // channel, mirroring the fake-backed AudioManager default above.
   final alerts =
       storageAlerts ?? StorageAlerts(platform: FakeStorageAlertPlatform());
+  final shell = MiningShell(
+    key: shellKey,
+    content: MiningContentRegistry.stellarMining(),
+    repository: repository,
+    nowUtc: testClock.call,
+    audioManager: audio,
+    storageAlerts: alerts,
+  );
   await tester.pumpWidget(
     MaterialApp(
-      home: MediaQuery(
-        data: MediaQueryData(disableAnimations: disableAnimations),
-        child: MiningShell(
-          key: shellKey,
-          content: MiningContentRegistry.stellarMining(),
-          repository: repository,
-          nowUtc: testClock.call,
-          audioManager: audio,
-          storageAlerts: alerts,
-        ),
-      ),
+      theme: theme,
+      // Sheet routes are siblings of `home` under the Navigator, so the
+      // live-metrics mode must copy the ambient MediaQuery above the
+      // Navigator; its padding then drives both the shell and the route.
+      builder: useViewSafeArea
+          ? (context, child) {
+              final media = MediaQuery.of(context);
+              return MediaQuery(
+                data: media.copyWith(
+                  textScaler: TextScaler.linear(textScale),
+                  disableAnimations:
+                      disableAnimations || media.disableAnimations,
+                ),
+                child: child!,
+              );
+            }
+          : null,
+      home: useViewSafeArea
+          ? shell
+          : MediaQuery(
+              data: MediaQueryData(disableAnimations: disableAnimations),
+              child: shell,
+            ),
     ),
   );
   for (var i = 0; i < pumpCycles; i++) {
@@ -363,6 +514,49 @@ Future<void> pumpMiningTick(
 
 MiningShellHandles shellHandles(WidgetTester tester) =>
     tester.state(find.byType(MiningShell)) as MiningShellHandles;
+
+/// Asserts the single visible SnackBar carries the authored dark style.
+void expectThemedSnackBar(WidgetTester tester, Finder message) {
+  expect(message, findsOneWidget);
+  final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+  expect(snackBar.backgroundColor, MiningTheme.panel);
+  expect(snackBar.behavior, SnackBarBehavior.floating);
+  final shape = snackBar.shape;
+  expect(shape, isA<RoundedRectangleBorder>());
+  final bordered = shape! as RoundedRectangleBorder;
+  expect(bordered.borderRadius, BorderRadius.circular(12));
+  expect(bordered.side.color, MiningTheme.accent);
+  final text = snackBar.content as Text;
+  expect(text.style?.fontFamily, 'Orbitron');
+  expect(text.style?.color, MiningTheme.primaryText);
+  expect(text.style?.fontWeight, FontWeight.w600);
+}
+
+/// A mastery card's text and art must open inside the scrolling body's visible
+/// viewport and above the pinned actions.
+void expectMasteryBodyContentVisible(
+  WidgetTester tester,
+  Iterable<Finder> finders,
+) {
+  final body = tester.getRect(find.byKey(const Key('mining-sheet-body')));
+  final footer = tester.getRect(
+    find.byKey(const Key('mining-sheet-pinned-footer')),
+  );
+  for (final finder in finders) {
+    final rect = tester.getRect(finder);
+    expect(
+      body.contains(rect.topLeft),
+      isTrue,
+      reason: '$finder $rect vs $body',
+    );
+    expect(
+      body.contains(rect.bottomRight - const Offset(1, 1)),
+      isTrue,
+      reason: '$finder $rect vs $body',
+    );
+    expect(rect.bottom, lessThanOrEqualTo(footer.top + .5), reason: '$finder');
+  }
+}
 
 void main() {
   setUp(() {
@@ -1061,6 +1255,7 @@ void main() {
       ),
     );
     expect(find.text('Rig deployed.'), findsOneWidget);
+    expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
   });
 
   testWidgets('merge keeps the combined rig selected so it deploys directly', (
@@ -1688,6 +1883,70 @@ void main() {
       Duration.zero,
     );
   });
+
+  for (final size in const [Size(360, 640), Size(390, 844)]) {
+    final label = '${size.width.toInt()}x${size.height.toInt()}';
+
+    testWidgets('success feedback is a dark themed SnackBar at $label', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start, cargo: 10));
+      await pumpShell(tester, repository: repository, viewport: size);
+
+      await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('mine-site-sell')));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expectThemedSnackBar(tester, find.textContaining('Sold'));
+    });
+
+    testWidgets('rejection guidance is a dark themed SnackBar at $label', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(MiningSave.initial(nowUtc: _start));
+      await pumpShell(tester, repository: repository, viewport: size);
+
+      await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+      await tester.pump();
+      // The keyed Container is clipped inside the bay's MiningHex, so tap the
+      // InkWell ancestor that actually receives the gesture.
+      final emptyBay = find.ancestor(
+        of: find.byKey(const ValueKey<String>('b3')),
+        matching: find.byType(InkWell),
+      );
+      await tester.tap(emptyBay);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expectThemedSnackBar(tester, find.text('Select an occupied rig bay.'));
+    });
+
+    testWidgets('recovery notice is a dark themed SnackBar at $label', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        MiningSaveRepository.saveKey: '{ malformed mining json',
+      });
+      final repository = CountingMiningSaveRepository();
+
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: size,
+        pumpCycles: 12,
+      );
+
+      expectThemedSnackBar(
+        tester,
+        find.text(
+          'Mining progress could not be loaded, so a fresh mining save was '
+          'started.',
+        ),
+      );
+    });
+  }
 
   testWidgets('Site Deck unlocks an eligible site through the controller', (
     tester,
@@ -4102,6 +4361,1161 @@ void main() {
         expect(secondPlatform.scheduleCount, 0);
         expect(secondPlatform.cancelAllCount, 1);
         expect(eventLog, ['A cancel', 'A schedule', 'B cancel']);
+      },
+    );
+  });
+
+  /// The nearest enclosing route scope, the node a screen reader selects as
+  /// the current route.
+  SemanticsNode? routeScopeOf(SemanticsNode node) {
+    for (
+      SemanticsNode? current = node;
+      current != null;
+      current = current.parent
+    ) {
+      if (current.getSemanticsData().flagsCollection.scopesRoute) {
+        return current;
+      }
+    }
+    return null;
+  }
+
+  /// The announced route name: the first non-empty `namesRoute` label in
+  /// depth-first paint order inside [scope], matching the engine's documented
+  /// `scopesRoute` selection.
+  SemanticsNode? announcedRouteName(SemanticsNode scope) {
+    SemanticsNode? found;
+    void search(SemanticsNode node) {
+      if (found != null) return;
+      final data = node.getSemanticsData();
+      if (data.flagsCollection.namesRoute && data.label.isNotEmpty) {
+        found = node;
+        return;
+      }
+      node.visitChildren((child) {
+        search(child);
+        return found == null;
+      });
+    }
+
+    search(scope);
+    return found;
+  }
+
+  /// A mastery card route must announce the milestone title that the badge
+  /// already presents as a heading, on both variants.
+  void expectMilestoneRouteAnnouncement(
+    WidgetTester tester, {
+    required String title,
+  }) {
+    expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+    expect(
+      ModalRoute.of(
+        tester.element(find.byKey(const Key('planet-mastery-card'))),
+      ),
+      isA<RawDialogRoute<void>>(),
+      reason: 'the card is hosted by the real shell dialog route',
+    );
+
+    final titleNode = tester.getSemantics(find.text(title));
+    final scope = routeScopeOf(titleNode);
+    expect(scope, isNotNull, reason: 'the card sits inside a route scope');
+    final routeName = announcedRouteName(scope!);
+    expect(routeName, isNotNull, reason: 'the route announces a name');
+    expect(routeName!.getSemanticsData().label, title);
+
+    final titleData = titleNode.getSemanticsData();
+    expect(titleData.flagsCollection.isHeader, isTrue);
+    expect(titleData.label, title);
+  }
+
+  group('planet mastery feedback', () {
+    testWidgets('nonfinal mastery shows the projected next-frontier gates', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(tester, repository: repository);
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+
+      expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+      expect(find.text('PLANET MASTERED'), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('planet-mastery-planet')))
+            .data,
+        'Homeworld',
+      );
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('planet-mastery-successor')))
+            .data,
+        'NEXT · LUNAR FRONTIER',
+      );
+      expect(find.text('Rig deployed.'), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+
+      final after = shellHandles(tester).controller.state;
+      final requirements = StellarMapView.from(
+        state: after,
+        content: MiningContentRegistry.stellarMining(),
+      ).planet(MiningPlanetId.lunarFrontier).requirements;
+      expect(requirements, isNotEmpty);
+      expect(requirements.any((gate) => gate.isSatisfied), isTrue);
+      expect(requirements.any((gate) => !gate.isSatisfied), isTrue);
+      // The Stellar Map projection keeps its authored labels; only the card
+      // uses the mockup's mastery wording.
+      expect(requirements.first.label, 'Homeworld sites 3/3');
+      for (var i = 0; i < requirements.length; i++) {
+        final gate = requirements[i];
+        final displayLabel = i == 0 ? 'Homeworld mastered' : gate.label;
+        final row = find.byKey(Key('planet-mastery-requirement-$i'));
+        expect(row, findsOneWidget, reason: gate.label);
+        expect(
+          find.descendant(of: row, matching: find.text(displayLabel)),
+          findsOneWidget,
+          reason: gate.label,
+        );
+        if (i == 0) {
+          expect(
+            find.descendant(
+              of: row,
+              matching: find.text('Homeworld sites 3/3'),
+            ),
+            findsNothing,
+          );
+        }
+        if (gate.currentValue != null) {
+          expect(
+            find.descendant(
+              of: row,
+              matching: find.text('· ${gate.currentValue}'),
+            ),
+            findsOneWidget,
+            reason: gate.label,
+          );
+        }
+        expect(
+          find.descendant(
+            of: row,
+            matching: find.byIcon(gate.isSatisfied ? Icons.check : Icons.close),
+          ),
+          findsOneWidget,
+          reason: gate.label,
+        );
+        expect(
+          find.bySemanticsLabel(
+            RegExp(
+              '^${RegExp.escape(displayLabel)}, '
+              '${gate.isSatisfied ? 'satisfied' : 'required'}',
+            ),
+          ),
+          findsOneWidget,
+        );
+      }
+
+      await tester.ensureVisible(
+        find.byKey(const Key('planet-mastery-continue')),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('planet-mastery-continue')));
+      await pumpSheet(tester);
+
+      expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+      expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+      expect(find.byKey(const Key('stellar-map-screen')), findsNothing);
+      expect(find.text('Rig deployed.'), findsNothing);
+    });
+
+    testWidgets('mastery card text uses the production default text style', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(tester, repository: repository);
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+
+      for (final finder in [
+        find.text('All 3 sites commissioned'),
+        find.text('Homeworld mastered'),
+      ]) {
+        final richText = tester.widget<RichText>(
+          find.descendant(of: finder, matching: find.byType(RichText)),
+        );
+        final style = richText.text.style!;
+        expect(
+          style.decoration ?? TextDecoration.none,
+          TextDecoration.none,
+          reason: 'the dialog must not inherit the fallback underline',
+        );
+        expect(
+          style.decorationStyle,
+          isNot(TextDecorationStyle.double),
+          reason: 'the dialog must not inherit the yellow double underline',
+        );
+        expect(style.decorationColor, isNot(const Color(0xFFFFFF00)));
+        expect(style.fontFamily, 'IBM Plex Mono');
+        expect(style.fontSize, 12);
+        expect(richText.textScaler.scale(12), 12);
+      }
+    });
+
+    testWidgets('taps above the floating mastery art reach the barrier', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+        useViewSafeArea: true,
+        safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+      );
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+
+      final card = tester.getRect(find.byKey(const Key('planet-mastery-card')));
+      expect(
+        card.top,
+        greaterThan(0),
+        reason: 'the sheet must be bounded around the floating card',
+      );
+      expect(card.height, lessThan(844));
+      await tester.tapAt(Offset(195, card.top - 20));
+      await pumpSheet(tester);
+
+      expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+      expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+    });
+
+    testWidgets('taps beside the floating mastery card reach the barrier', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+        useViewSafeArea: true,
+        safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+      );
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+
+      final card = tester.getRect(find.byKey(const Key('planet-mastery-card')));
+      await tester.tapAt(Offset(8, card.center.dy));
+      await pumpSheet(tester);
+
+      expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+      expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+    });
+
+    for (final (edge, atTop) in const [('upper', true), ('lower', false)]) {
+      testWidgets('mastery close dismisses from the $edge edge of its circle', (
+        tester,
+      ) async {
+        final repository = CountingMiningSaveRepository();
+        await repository.save(nearHomeworldMasteryState(_start));
+        await pumpShell(
+          tester,
+          repository: repository,
+          viewport: const Size(390, 844),
+          theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+          useViewSafeArea: true,
+          safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+        );
+
+        await deployIntoMastery(
+          tester,
+          MiningSiteId.graniteCrater,
+          _graniteCraterDeployCell,
+        );
+
+        final close = find.bySemanticsLabel('Close PLANET MASTERED');
+        expect(close, findsOneWidget);
+        final rect = tester.getRect(close);
+        final point = atTop
+            ? Offset(rect.center.dx, rect.top + 4)
+            : Offset(rect.center.dx, rect.bottom - 4);
+        await tester.tapAt(point);
+        await pumpSheet(tester);
+
+        expect(
+          find.byKey(const Key('planet-mastery-card')),
+          findsNothing,
+          reason: 'the $edge close point $point must be hit-testable',
+        );
+        expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+      });
+    }
+
+    testWidgets('mastery close is reachable by Tab and activates with Enter', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+        useViewSafeArea: true,
+        safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+      );
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+
+      final close = find.bySemanticsLabel('Close PLANET MASTERED');
+      expect(close, findsOneWidget);
+      var focused = false;
+      for (var tab = 0; tab < 6 && !focused; tab++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        final focusedContext = FocusManager.instance.primaryFocus?.context;
+        focused =
+            focusedContext != null &&
+            find
+                .descendant(
+                  of: close,
+                  matching: find.byElementPredicate(
+                    (element) => element == focusedContext,
+                  ),
+                )
+                .evaluate()
+                .isNotEmpty;
+      }
+      expect(focused, isTrue, reason: 'Tab traversal must reach the close');
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      await pumpSheet(tester);
+      expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+      expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+    });
+
+    // The clamping geometry assertions depend on the production font bytes,
+    // not just ThemeData.fontFamily.
+    group('mastery HUD-safe clamping', () {
+      setUpAll(loadProductionTestFonts);
+      tearDownAll(restoreProductionFontsInWebTests);
+
+      testWidgets('production font bytes are loaded for the clamping layout', (
+        tester,
+      ) async {
+        final loaded = TextPainter(
+          text: const TextSpan(
+            text: 'Relaunch to start again',
+            style: TextStyle(fontFamily: 'IBM Plex Mono', fontSize: 12),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        final missing = TextPainter(
+          text: const TextSpan(
+            text: 'Relaunch to start again',
+            style: TextStyle(fontFamily: 'No Such Test Font', fontSize: 12),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        expect(loaded.width, greaterThan(0));
+        expect(
+          loaded.width,
+          isNot(closeTo(missing.width, .5)),
+          reason: 'production font bytes must differ from the fallback font',
+        );
+        loaded.dispose();
+        missing.dispose();
+      });
+
+      testWidgets(
+        'final mastery at 390x720 top 47 text 1.3 keeps the close clear of the '
+        'cargo gauge and all key content visible',
+        (tester) async {
+          await openFinalMasteryAt(
+            tester,
+            size: const Size(390, 720),
+            safeArea: const EdgeInsets.only(top: 47, bottom: 34),
+          );
+
+          final gauge = tester.getRect(
+            find.byKey(const Key('mine-site-cargo')),
+          );
+          final close = find.bySemanticsLabel('Close FINAL PLANET MASTERED');
+          final closeRect = tester.getRect(close);
+          expect(
+            closeRect.top,
+            greaterThanOrEqualTo(gauge.bottom),
+            reason: 'close $closeRect must clear gauge $gauge',
+          );
+          expect(gauge.overlaps(closeRect), isFalse);
+          expect(close.hitTestable(), findsOneWidget);
+
+          expectMasteryBodyContentVisible(tester, [
+            find.byKey(const Key('planet-mastery-planet')),
+            find.byKey(const Key('planet-mastery-reward')),
+            find.text('completion reward'),
+            find.text('RUN COMPLETE'),
+            find.byKey(const Key('planet-mastery-multiplier')),
+          ]);
+          expect(find.textContaining('×2'), findsOneWidget);
+          expect(
+            find.byKey(const Key('planet-mastery-relaunch')).hitTestable(),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const Key('planet-mastery-continue')).hitTestable(),
+            findsOneWidget,
+          );
+
+          // The upper edge of the visible close circle is hit-testable.
+          await tester.tapAt(Offset(closeRect.center.dx, closeRect.top + 4));
+          await pumpSheet(tester);
+          expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'taps above the clamped 390x720 mastery card reach the barrier',
+        (tester) async {
+          await openFinalMasteryAt(
+            tester,
+            size: const Size(390, 720),
+            safeArea: const EdgeInsets.only(top: 47, bottom: 34),
+          );
+
+          final card = tester.getRect(
+            find.byKey(const Key('planet-mastery-card')),
+          );
+          await tester.tapAt(Offset(195, card.top - 20));
+          await pumpSheet(tester);
+          expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+          expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+        },
+      );
+
+      for (final height in const [700.0, 701.0, 720.0]) {
+        testWidgets(
+          'final mastery close clears the gauge at 390x${height.toInt()} '
+          'top 47 text 1.3',
+          (tester) async {
+            await openFinalMasteryAt(
+              tester,
+              size: Size(390, height),
+              safeArea: const EdgeInsets.only(top: 47, bottom: 34),
+            );
+
+            final gauge = tester.getRect(
+              find.byKey(const Key('mine-site-cargo')),
+            );
+            final close = find.bySemanticsLabel('Close FINAL PLANET MASTERED');
+            final closeRect = tester.getRect(close);
+            expect(
+              closeRect.top,
+              greaterThanOrEqualTo(gauge.bottom),
+              reason: 'close $closeRect must clear gauge $gauge',
+            );
+            expect(gauge.overlaps(closeRect), isFalse);
+            expect(close.hitTestable(), findsOneWidget);
+            expectMasteryBodyContentVisible(tester, [
+              find.byKey(const Key('planet-mastery-planet')),
+              find.byKey(const Key('planet-mastery-reward')),
+              find.text('completion reward'),
+              find.text('RUN COMPLETE'),
+              find.byKey(const Key('planet-mastery-multiplier')),
+            ]);
+            expect(
+              find.byKey(const Key('planet-mastery-relaunch')).hitTestable(),
+              findsOneWidget,
+            );
+            expect(
+              find.byKey(const Key('planet-mastery-continue')).hitTestable(),
+              findsOneWidget,
+            );
+          },
+        );
+      }
+
+      testWidgets(
+        'mastery opened in landscape follows rotation into 390x720 top 47 '
+        'with the close clear of the gauge',
+        (tester) async {
+          await openFinalMasteryAt(
+            tester,
+            size: const Size(874, 402),
+            safeArea: const EdgeInsets.fromLTRB(44, 0, 44, 21),
+          );
+
+          expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+          tester.view.physicalSize = const Size(390, 720);
+          tester.view.padding = const FakeViewPadding(top: 47, bottom: 34);
+          tester.view.viewPadding = const FakeViewPadding(top: 47, bottom: 34);
+          await tester.pump();
+          await pumpSheet(tester);
+
+          final gauge = tester.getRect(
+            find.byKey(const Key('mine-site-cargo')),
+          );
+          final close = find.bySemanticsLabel('Close FINAL PLANET MASTERED');
+          final closeRect = tester.getRect(close);
+          expect(
+            closeRect.top,
+            greaterThanOrEqualTo(gauge.bottom),
+            reason: 'close $closeRect must clear gauge $gauge after rotation',
+          );
+          expect(gauge.overlaps(closeRect), isFalse);
+          expect(close.hitTestable(), findsOneWidget);
+          expectMasteryBodyContentVisible(tester, [
+            find.byKey(const Key('planet-mastery-planet')),
+            find.byKey(const Key('planet-mastery-reward')),
+            find.text('completion reward'),
+            find.text('RUN COMPLETE'),
+            find.byKey(const Key('planet-mastery-multiplier')),
+          ]);
+          expect(find.textContaining('×2'), findsOneWidget);
+          expect(
+            find.byKey(const Key('planet-mastery-relaunch')).hitTestable(),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const Key('planet-mastery-continue')).hitTestable(),
+            findsOneWidget,
+          );
+        },
+      );
+    });
+
+    testWidgets('Open Map dismisses the mastery card before navigating', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(tester, repository: repository);
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('planet-mastery-open-map')),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('planet-mastery-open-map')));
+      await pumpSheet(tester);
+
+      expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+      expect(find.byKey(const Key('stellar-map-screen')), findsOneWidget);
+    });
+
+    testWidgets('failed mastery persistence never shows the mastery card', (
+      tester,
+    ) async {
+      final repository = DelayedMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(tester, repository: repository);
+
+      final enter = find.byKey(const Key('site-card-graniteCrater-enter'));
+      await tester.ensureVisible(enter);
+      await tester.pump();
+      await tester.tap(enter);
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey<String>('b1')));
+      await tester.pump();
+      repository.delayNextSave = true;
+      await tapGridCell(tester, _graniteCraterDeployCell);
+      await tester.pump();
+      repository.allowSave.completeError(StateError('save failed'));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+      expect(find.text('Action failed.'), findsOneWidget);
+      expect(
+        shellHandles(
+          tester,
+        ).controller.state.sites[MiningSiteId.graniteCrater]!.commissioned,
+        isFalse,
+      );
+    });
+
+    testWidgets(
+      'final mastery pays once and relays Relaunch through the card',
+      (tester) async {
+        final repository = CountingMiningSaveRepository();
+        await repository.save(nearFinalPlanetMasteryState(_start));
+        await pumpShell(tester, repository: repository);
+
+        await deployIntoMastery(
+          tester,
+          MiningSiteId.osmiumCaldera,
+          _osmiumDeployCell,
+        );
+
+        final controller = shellHandles(tester).controller;
+        final reward = MiningContentRegistry.stellarMining()
+            .planet(MiningPlanetId.ioFrontier)
+            .masteryRewardCash;
+        expect(controller.state.cash, 1_000_000 + reward);
+        expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+        expect(find.text('FINAL PLANET MASTERED'), findsOneWidget);
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('planet-mastery-reward')))
+              .data,
+          '+${formatMiningCash(reward)}',
+        );
+        expect(find.textContaining('Io mastered'), findsNothing);
+
+        await tester.ensureVisible(
+          find.byKey(const Key('planet-mastery-relaunch')),
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('planet-mastery-relaunch')));
+        await pumpSheet(tester);
+
+        expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+        expect(find.byKey(const Key('mining-relaunch-sheet')), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('relaunch-cancel')));
+        await pumpSheet(tester);
+        expect(controller.state.relaunchCount, 0);
+        expect(controller.state.cash, 1_000_000 + reward);
+        expect(
+          controller.state.sites[MiningSiteId.osmiumCaldera]!.commissioned,
+          isTrue,
+        );
+
+        // Recall and redeploy after mastery: no second reward, no second card.
+        await tapGridCell(tester, _osmiumDeployCell);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(
+          controller.state.sites[MiningSiteId.osmiumCaldera]!.rigPlacements,
+          isEmpty,
+        );
+        await tester.tap(find.byKey(const ValueKey<String>('b2')));
+        await tester.pump();
+        await tapGridCell(tester, _osmiumDeployCell);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+        expect(controller.state.cash, 1_000_000 + reward);
+
+        // Confirm still follows the existing relaunch reset path.
+        await tester.tap(find.byKey(const Key('mining-nav-stellarMap')));
+        await tester.pump();
+        final relaunchAction = find.byKey(
+          const Key('stellar-map-relaunch-action'),
+        );
+        await tester.ensureVisible(relaunchAction);
+        await tester.pump();
+        await tester.tap(relaunchAction);
+        await pumpSheet(tester);
+        await tester.tap(find.byKey(const Key('relaunch-confirm')));
+        await pumpSheet(tester);
+
+        expect(controller.state.relaunchCount, 1);
+        expect(controller.state.cash, 100);
+        expect(
+          controller.state.sites[MiningSiteId.osmiumCaldera]!.commissioned,
+          isFalse,
+        );
+        expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'final mastery after a relaunch projects the next run multiplier',
+      (tester) async {
+        final repository = CountingMiningSaveRepository();
+        await repository.save(
+          nearFinalPlanetMasteryState(_start).copyWith(relaunchCount: 1),
+        );
+        await pumpShell(tester, repository: repository);
+
+        await deployIntoMastery(
+          tester,
+          MiningSiteId.osmiumCaldera,
+          _osmiumDeployCell,
+        );
+
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('planet-mastery-multiplier')))
+              .data,
+          contains('×2'),
+        );
+      },
+    );
+
+    testWidgets('reduced motion removes sheet transitions through relaunch', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearFinalPlanetMasteryState(_start));
+      await pumpShell(tester, repository: repository, disableAnimations: true);
+
+      shellHandles(tester).openTechnology();
+      await tester.pump();
+      final technologyRoute = ModalRoute.of(
+        tester.element(find.byKey(const Key('mining-technology-sheet'))),
+      );
+      expect(technologyRoute!.transitionDuration, Duration.zero);
+      expect(technologyRoute.reverseTransitionDuration, Duration.zero);
+      await tester.tap(find.bySemanticsLabel('Close Technology'));
+      await tester.pump();
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.osmiumCaldera,
+        _osmiumDeployCell,
+      );
+      expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+      final cardRoute = ModalRoute.of(
+        tester.element(find.byKey(const Key('planet-mastery-card'))),
+      );
+      expect(cardRoute!.transitionDuration, Duration.zero);
+      expect(cardRoute.reverseTransitionDuration, Duration.zero);
+
+      await tester.ensureVisible(
+        find.byKey(const Key('planet-mastery-relaunch')),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('planet-mastery-relaunch')));
+      await tester.pump();
+      expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+      final relaunchRoute = ModalRoute.of(
+        tester.element(find.byKey(const Key('mining-relaunch-sheet'))),
+      );
+      expect(relaunchRoute!.transitionDuration, Duration.zero);
+      expect(relaunchRoute.reverseTransitionDuration, Duration.zero);
+
+      await tester.tap(find.byKey(const Key('relaunch-cancel')));
+      await tester.pump();
+      expect(find.byKey(const Key('mining-relaunch-sheet')), findsNothing);
+    });
+
+    testWidgets('mastery title is announced as a heading', (tester) async {
+      final handle = tester.ensureSemantics();
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(tester, repository: repository);
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+
+      expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+      expect(
+        tester
+            .getSemantics(find.text('PLANET MASTERED'))
+            .getSemanticsData()
+            .flagsCollection
+            .isHeader,
+        isTrue,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('nonfinal mastery route announces the milestone title', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(tester, repository: repository);
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+
+      expectMilestoneRouteAnnouncement(tester, title: 'PLANET MASTERED');
+      handle.dispose();
+    });
+
+    testWidgets('final mastery route announces the milestone title', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearFinalPlanetMasteryState(_start));
+      await pumpShell(tester, repository: repository);
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.osmiumCaldera,
+        _osmiumDeployCell,
+      );
+
+      expectMilestoneRouteAnnouncement(tester, title: 'FINAL PLANET MASTERED');
+      handle.dispose();
+    });
+
+    testWidgets('Open Map unwinds a sheet opened while mastery was saving', (
+      tester,
+    ) async {
+      final repository = DelayedMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(tester, repository: repository);
+
+      final enter = find.byKey(const Key('site-card-graniteCrater-enter'));
+      await tester.ensureVisible(enter);
+      await tester.pump();
+      await tester.tap(enter);
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey<String>('b1')));
+      await tester.pump();
+      repository.delayNextSave = true;
+      await tapGridCell(tester, _graniteCraterDeployCell);
+      await tester.pump();
+      await repository.saveStarted.future;
+
+      // The player opens Technology while the mastering deploy persists.
+      shellHandles(tester).openTechnology();
+      await pumpSheet(tester);
+      expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+
+      repository.allowSave.complete();
+      await tester.pump();
+      await pumpSheet(tester);
+      expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+      expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+
+      await tester.ensureVisible(
+        find.byKey(const Key('planet-mastery-open-map')),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('planet-mastery-open-map')));
+      await pumpSheet(tester);
+
+      expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+      expect(find.byKey(const Key('mining-technology-sheet')), findsNothing);
+      expect(find.byKey(const Key('stellar-map-screen')), findsOneWidget);
+      final shellRoute = ModalRoute.of(
+        tester.element(find.byKey(const Key('stellar-map-screen'))),
+      );
+      expect(shellRoute!.isCurrent, isTrue);
+    });
+
+    testWidgets(
+      'Relaunch unwinds a sheet opened while final mastery was saving',
+      (tester) async {
+        final repository = DelayedMiningSaveRepository();
+        await repository.save(nearFinalPlanetMasteryState(_start));
+        await pumpShell(tester, repository: repository);
+
+        final enter = find.byKey(const Key('site-card-osmiumCaldera-enter'));
+        await tester.ensureVisible(enter);
+        await tester.pump();
+        await tester.tap(enter);
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey<String>('b1')));
+        await tester.pump();
+        repository.delayNextSave = true;
+        await tapGridCell(tester, _osmiumDeployCell);
+        await tester.pump();
+        await repository.saveStarted.future;
+
+        // The player opens Settings while the mastering deploy persists.
+        shellHandles(tester).openSettings();
+        await pumpSheet(tester);
+        expect(find.byKey(const Key('mining-settings-sheet')), findsOneWidget);
+
+        repository.allowSave.complete();
+        await tester.pump();
+        await pumpSheet(tester);
+        expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+        expect(find.byKey(const Key('mining-settings-sheet')), findsOneWidget);
+
+        await tester.ensureVisible(
+          find.byKey(const Key('planet-mastery-relaunch')),
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('planet-mastery-relaunch')));
+        await pumpSheet(tester);
+
+        expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+        expect(find.byKey(const Key('mining-settings-sheet')), findsNothing);
+        expect(find.byKey(const Key('mining-relaunch-sheet')), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('relaunch-confirm')));
+        await pumpSheet(tester);
+
+        expect(find.byKey(const Key('mining-relaunch-sheet')), findsNothing);
+        expect(find.byKey(const Key('mining-settings-sheet')), findsNothing);
+        expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+        expect(
+          shellHandles(tester).controller.state.relaunchCount,
+          1,
+          reason: 'confirmation still resets the run once',
+        );
+      },
+    );
+  });
+
+  group('mastery card safe-area clearance', () {
+    setUpAll(loadProductionTestFonts);
+    tearDownAll(restoreProductionFontsInWebTests);
+
+    Future<void> openFinalMastery(
+      WidgetTester tester, {
+      required Size size,
+      required double top,
+      required double bottom,
+      required double textScale,
+    }) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearFinalPlanetMasteryState(_start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: size,
+        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+        useViewSafeArea: true,
+        safeArea: EdgeInsets.only(top: top, bottom: bottom),
+        textScale: textScale,
+      );
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.osmiumCaldera,
+        _osmiumDeployCell,
+      );
+    }
+
+    for (final (size, top, bottom, textScale) in [
+      (const Size(360, 640), 47.0, 34.0, 1.3),
+      (const Size(430, 932), 59.0, 34.0, 1.3),
+      (const Size(430, 932), 59.0, 34.0, 1.0),
+      (const Size(360, 640), 47.0, 34.0, 1.0),
+      (const Size(360, 640), 47.0, 0.0, 1.3),
+      (const Size(360, 640), 0.0, 0.0, 1.3),
+    ]) {
+      final label =
+          '${size.width.toInt()}x${size.height.toInt()} top $top '
+          'bottom $bottom text $textScale';
+      testWidgets(
+        'final mastery close never covers the cargo gauge at $label',
+        (tester) async {
+          await openFinalMastery(
+            tester,
+            size: size,
+            top: top,
+            bottom: bottom,
+            textScale: textScale,
+          );
+
+          final gauge = tester.getRect(
+            find.byKey(const Key('mine-site-cargo')),
+          );
+          final close = find.bySemanticsLabel('Close FINAL PLANET MASTERED');
+          final closeRect = tester.getRect(close);
+          expect(
+            closeRect.top,
+            greaterThanOrEqualTo(gauge.bottom),
+            reason:
+                'the close hex $closeRect must clear the inline cargo gauge '
+                '$gauge at $label',
+          );
+          expect(
+            gauge.overlaps(closeRect),
+            isFalse,
+            reason: '$gauge $closeRect',
+          );
+          expect(close.hitTestable(), findsOneWidget);
+
+          // The whole Io summary and the pinned actions stay on the first
+          // frame; the card never asks the player to scroll to understand
+          // the reward or relaunch.
+          expectMasteryBodyContentVisible(tester, [
+            find.byKey(const Key('planet-mastery-planet')),
+            find.byKey(const Key('planet-mastery-reward')),
+            find.text('completion reward'),
+            find.text('RUN COMPLETE'),
+            find.byKey(const Key('planet-mastery-multiplier')),
+          ]);
+          final relaunch = find.byKey(const Key('planet-mastery-relaunch'));
+          final continueButton = find.byKey(
+            const Key('planet-mastery-continue'),
+          );
+          expect(relaunch.hitTestable(), findsOneWidget);
+          expect(continueButton.hitTestable(), findsOneWidget);
+          expect(
+            tester.getRect(relaunch).top,
+            lessThan(tester.getRect(continueButton).top),
+          );
+
+          // The close control still dismisses the card onto the live site.
+          await tester.tap(close);
+          await pumpSheet(tester);
+          expect(find.byKey(const Key('planet-mastery-card')), findsNothing);
+          expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+          expect(find.byKey(const Key('mine-site-cargo')), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets('mastery opened in landscape follows a rotation into a notched '
+        'portrait with the close clear of the cargo gauge', (tester) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearFinalPlanetMasteryState(_start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(874, 402),
+        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+        useViewSafeArea: true,
+        safeArea: const EdgeInsets.only(left: 44, right: 44, bottom: 21),
+        textScale: 1.3,
+      );
+      await tester.dragUntilVisible(
+        find.byKey(const Key('site-card-osmiumCaldera-enter')),
+        find.byKey(const Key('site-deck-scroll')),
+        const Offset(0, -200),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('site-card-osmiumCaldera-enter')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey<String>('b1')));
+      await tester.pump();
+      await tapGridCell(tester, _osmiumDeployCell);
+      await pumpSheet(tester);
+      expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+
+      // Landscape with wide left/right insets: the card opens complete and the
+      // right-hand cargo gauge is clear of the panel's left-mounted close.
+      final landscapeGauge = tester.getRect(
+        find.byKey(const Key('mine-site-cargo')),
+      );
+      final landscapeClose = find.bySemanticsLabel(
+        'Close FINAL PLANET MASTERED',
+      );
+      expect(landscapeGauge.overlaps(tester.getRect(landscapeClose)), isFalse);
+      expectMasteryBodyContentVisible(tester, [
+        find.byKey(const Key('planet-mastery-planet')),
+        find.byKey(const Key('planet-mastery-reward')),
+        find.text('completion reward'),
+        find.text('RUN COMPLETE'),
+        find.byKey(const Key('planet-mastery-multiplier')),
+      ]);
+      expect(
+        find.byKey(const Key('planet-mastery-relaunch')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('planet-mastery-continue')).hitTestable(),
+        findsOneWidget,
+      );
+
+      // Rotate while the card is open. The route's retained builder and the
+      // inline Mine Site HUD both receive the live metrics change, so the
+      // card's top inset has to follow rather than stay at its landscape
+      // snapshot of zero.
+      tester.view.physicalSize = const Size(430, 932);
+      tester.view.padding = const FakeViewPadding(top: 59, bottom: 34);
+      tester.view.viewPadding = const FakeViewPadding(top: 59, bottom: 34);
+      await tester.pump();
+      await pumpSheet(tester);
+
+      final gauge = tester.getRect(find.byKey(const Key('mine-site-cargo')));
+      final close = find.bySemanticsLabel('Close FINAL PLANET MASTERED');
+      final closeRect = tester.getRect(close);
+      expect(
+        closeRect.top,
+        greaterThanOrEqualTo(gauge.bottom),
+        reason:
+            'the retained card $closeRect must clear the live cargo gauge '
+            '$gauge after rotation',
+      );
+      expect(gauge.overlaps(closeRect), isFalse, reason: '$gauge $closeRect');
+      expect(close.hitTestable(), findsOneWidget);
+
+      expectMasteryBodyContentVisible(tester, [
+        find.byKey(const Key('planet-mastery-planet')),
+        find.byKey(const Key('planet-mastery-reward')),
+        find.text('completion reward'),
+        find.text('RUN COMPLETE'),
+        find.byKey(const Key('planet-mastery-multiplier')),
+      ]);
+      final relaunch = find.byKey(const Key('planet-mastery-relaunch'));
+      final continueButton = find.byKey(const Key('planet-mastery-continue'));
+      expect(relaunch.hitTestable(), findsOneWidget);
+      expect(continueButton.hitTestable(), findsOneWidget);
+      expect(
+        tester.getRect(relaunch).top,
+        lessThan(tester.getRect(continueButton).top),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'nonfinal mastery keeps every Homeworld gate visible and the close '
+      'clear of the cargo gauge at 360x640 top 47 text 1.3',
+      (tester) async {
+        final repository = CountingMiningSaveRepository();
+        await repository.save(nearHomeworldMasteryState(_start));
+        await pumpShell(
+          tester,
+          repository: repository,
+          theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+          useViewSafeArea: true,
+          safeArea: const EdgeInsets.only(top: 47, bottom: 34),
+          textScale: 1.3,
+        );
+        await deployIntoMastery(
+          tester,
+          MiningSiteId.graniteCrater,
+          _graniteCraterDeployCell,
+        );
+
+        final gauge = tester.getRect(find.byKey(const Key('mine-site-cargo')));
+        final close = find.bySemanticsLabel('Close PLANET MASTERED');
+        final closeRect = tester.getRect(close);
+        expect(closeRect.top, greaterThanOrEqualTo(gauge.bottom));
+        expect(gauge.overlaps(closeRect), isFalse);
+        expect(close.hitTestable(), findsOneWidget);
+
+        expectMasteryBodyContentVisible(tester, [
+          find.byKey(const Key('planet-mastery-planet')),
+          find.text('All 3 sites commissioned'),
+          find.byKey(const Key('planet-mastery-successor')),
+          for (var index = 0; index < 3; index++)
+            find.byKey(Key('planet-mastery-requirement-$index')),
+        ]);
+        expect(
+          find.byKey(const Key('planet-mastery-open-map')).hitTestable(),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('planet-mastery-continue')).hitTestable(),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
       },
     );
   });

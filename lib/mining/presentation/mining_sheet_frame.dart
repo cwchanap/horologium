@@ -14,6 +14,8 @@ class MiningSheetFrame extends StatelessWidget {
     this.trailing,
     this.portraitHeight,
     this.portraitTabOnRight = false,
+    this.pinnedFooter,
+    this.portraitTopShift = 0,
   });
   final String title;
   final Widget icon;
@@ -22,20 +24,48 @@ class MiningSheetFrame extends StatelessWidget {
   final double? portraitHeight;
   final bool portraitTabOnRight;
 
+  /// Lowers the portrait sheet by this many pixels. A transparent sheet over
+  /// a scene whose own top chrome is offset by the safe area needs the same
+  /// offset so its top-mounted close control cannot cover that chrome.
+  /// `showModalBottomSheet` removes this route's top padding, so callers
+  /// supply the offset measured from the shell's MediaQuery.
+  final double portraitTopShift;
+
+  /// When supplied, the panel fills the available height with this fixed
+  /// footer below a scrolling body instead of one content-sized scroll view.
+  final Widget? pinnedFooter;
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final landscape = size.width > size.height;
     final pad = MediaQuery.paddingOf(context);
+    // Reclaim the shift from the pinned footer's bottom spacing and the body's
+    // top inset, keeping the short-phone body's visible height unchanged.
+    final topShift = landscape || portraitTopShift <= 0
+        ? 0.0
+        : portraitTopShift;
+    final footerBottom = topShift == 0
+        ? 20.0
+        : (20 - topShift).clamp(0.0, 20.0).toDouble();
+    final bodyTop = topShift == 0
+        ? 12.0
+        : (12 - topShift).clamp(8.0, 12.0).toDouble();
+    final maxHeight = landscape
+        ? size.height
+        : (size.height - 160 - topShift).clamp(180.0, double.infinity);
+    final panelHeight = landscape
+        ? size.height
+        : pinnedFooter == null
+        ? portraitHeight
+        : (maxHeight - 30).clamp(120.0, double.infinity);
     return Align(
       alignment: Alignment.bottomRight,
       heightFactor: 1,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: landscape ? 556 : double.infinity,
-          maxHeight: landscape
-              ? size.height
-              : (size.height - 160).clamp(180, double.infinity),
+          maxHeight: maxHeight,
         ),
         child: Stack(
           children: [
@@ -46,7 +76,7 @@ class MiningSheetFrame extends StatelessWidget {
               ),
               child: Container(
                 key: const Key('mining-sheet-panel'),
-                height: landscape ? size.height : portraitHeight,
+                height: panelHeight,
                 decoration: BoxDecoration(
                   color: MiningTheme.panel,
                   borderRadius: landscape
@@ -59,51 +89,59 @@ class MiningSheetFrame extends StatelessWidget {
                 ),
                 child: SafeArea(
                   top: false,
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(
-                      landscape ? 30 : 14,
-                      landscape ? 52 : 26,
-                      landscape ? 16 : 14,
-                      landscape ? 14 : 20,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          height: landscape ? 46 : null,
-                          child: Padding(
-                            padding: EdgeInsets.only(right: landscape ? 60 : 0),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    title,
-                                    style: TextStyle(
-                                      color: MiningTheme.accent,
-                                      fontSize: landscape ? 21 : 23,
-                                      height: 1.1,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                if (trailing != null) trailing!,
-                              ],
+                  child: pinnedFooter == null
+                      ? SingleChildScrollView(
+                          padding: EdgeInsets.fromLTRB(
+                            landscape ? 30 : 14,
+                            landscape ? 52 : 26,
+                            landscape ? 16 : 14,
+                            landscape ? 14 : 20,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _header(landscape),
+                              const SizedBox(height: 12),
+                              _bodyText(child),
+                            ],
+                          ),
+                        )
+                      : Column(
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                landscape ? 30 : 14,
+                                landscape ? 52 : 26,
+                                landscape ? 16 : 14,
+                                0,
+                              ),
+                              child: _header(landscape),
                             ),
-                          ),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                key: const Key('mining-sheet-body'),
+                                padding: EdgeInsets.fromLTRB(
+                                  landscape ? 30 : 14,
+                                  bodyTop,
+                                  landscape ? 16 : 14,
+                                  landscape ? 14 : 20,
+                                ),
+                                child: _bodyText(child),
+                              ),
+                            ),
+                            Padding(
+                              key: const Key('mining-sheet-pinned-footer'),
+                              padding: EdgeInsets.fromLTRB(
+                                landscape ? 30 : 14,
+                                0,
+                                landscape ? 16 : 14,
+                                landscape ? 14 : footerBottom,
+                              ),
+                              child: _bodyText(pinnedFooter!),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        DefaultTextStyle.merge(
-                          style: const TextStyle(
-                            fontFamily: 'IBM Plex Mono',
-                            fontWeight: FontWeight.w400,
-                            fontSize: 12,
-                          ),
-                          child: child,
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               ),
             ),
@@ -169,6 +207,48 @@ class MiningSheetFrame extends StatelessWidget {
       ),
     );
   }
+
+  Widget _header(bool landscape) => ConstrainedBox(
+    // A title that owns the row takes its natural wrapped height. A trailing
+    // widget claims its intrinsic width first, so at large text scales a
+    // squeezed title can wrap into a tall column; cap that legacy single-line
+    // row at the fixed header height so it cannot grow the fixed panel.
+    constraints: BoxConstraints(
+      minHeight: landscape ? 46 : 0,
+      maxHeight: landscape && trailing != null ? 46 : double.infinity,
+    ),
+    child: Padding(
+      padding: EdgeInsets.only(right: landscape ? 60 : 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Semantics(
+              header: true,
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: MiningTheme.accent,
+                  fontSize: landscape ? 21 : 23,
+                  height: 1.1,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          if (trailing != null) trailing!,
+        ],
+      ),
+    ),
+  );
+
+  Widget _bodyText(Widget content) => DefaultTextStyle.merge(
+    style: const TextStyle(
+      fontFamily: 'IBM Plex Mono',
+      fontWeight: FontWeight.w400,
+      fontSize: 12,
+    ),
+    child: content,
+  );
 }
 
 /// Scene artwork and HUD stay separate from the sheet and its dimming layer.

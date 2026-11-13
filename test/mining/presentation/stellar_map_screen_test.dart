@@ -1,12 +1,19 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/mining_state.dart';
+import 'package:horologium/mining/presentation/mining_hex.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
+import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/stellar_map_screen.dart';
+
+import '../../support/test_fonts.dart';
 
 final _content = MiningContentRegistry.stellarMining();
 final _start = DateTime.utc(2026, 8, 27, 12);
@@ -52,6 +59,14 @@ MiningSave _masteredSave() => _stateWith(
   },
 );
 
+/// The shell's Material body style above the map: Orbitron metrics, matching
+/// production rather than the square test fallback font.
+const _productionBodyTextStyle = TextStyle(
+  fontFamily: 'Orbitron',
+  fontSize: 14,
+  letterSpacing: .25,
+);
+
 Future<void> _pumpMap(
   WidgetTester tester, {
   required StellarMapView view,
@@ -60,6 +75,9 @@ Future<void> _pumpMap(
   VoidCallback? onRelaunch,
   ValueChanged<MiningNavigationDestination>? onDestinationSelected,
   Size viewport = const Size(360, 640),
+  EdgeInsets padding = EdgeInsets.zero,
+  TextStyle? bodyTextStyle,
+  bool materialShell = false,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = viewport;
@@ -67,26 +85,81 @@ Future<void> _pumpMap(
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
   });
+  final screen = StellarMapScreen(
+    view: view,
+    content: _content,
+    onUnlock: onUnlock ?? (_) {},
+    onTravel: onTravel ?? (_) {},
+    onRelaunch: onRelaunch ?? () {},
+    onDestinationSelected: onDestinationSelected ?? (_) {},
+  );
+  final Widget home;
+  if (materialShell) {
+    home = Scaffold(body: screen);
+  } else if (bodyTextStyle != null) {
+    home = DefaultTextStyle(style: bodyTextStyle, child: screen);
+  } else {
+    home = screen;
+  }
   await tester.pumpWidget(
     MediaQuery(
-      data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
+      data: MediaQueryData(
+        textScaler: const TextScaler.linear(1.3),
+        padding: padding,
+      ),
       child: MaterialApp(
         theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
-        home: StellarMapScreen(
-          view: view,
-          content: _content,
-          onUnlock: onUnlock ?? (_) {},
-          onTravel: onTravel ?? (_) {},
-          onRelaunch: onRelaunch ?? () {},
-          onDestinationSelected: onDestinationSelected ?? (_) {},
-        ),
+        // The shell's Material supplies the production body text style.
+        home: home,
       ),
     ),
   );
   await tester.pump();
 }
 
+/// The displayed name paragraph must render in full and end before the
+/// planet artwork begins, and the card must keep its authored height.
+Future<void> _expectNameClearOfArt(
+  WidgetTester tester,
+  MiningPlanetId planet,
+) async {
+  final card = find.byKey(Key('mining-stellar-map-planet-${planet.name}'));
+  await tester.ensureVisible(card);
+  await tester.pump();
+
+  final name = find.descendant(
+    of: card,
+    matching: find.text(_content.planet(planet).name),
+  );
+  expect(name, findsOneWidget);
+  final paragraph = tester.renderObject<RenderParagraph>(name);
+  final art = tester.getRect(
+    find.byKey(Key('mining-stellar-map-planet-${planet.name}-art')),
+  );
+  final nameRect = tester.getRect(name);
+  expect(
+    nameRect.right,
+    lessThanOrEqualTo(art.left),
+    reason: '${_content.planet(planet).name} paints over its planet art',
+  );
+  expect(
+    paragraph.size.width,
+    greaterThanOrEqualTo(paragraph.getMaxIntrinsicWidth(double.infinity) - .5),
+    reason: '${_content.planet(planet).name} must not wrap or clip',
+  );
+  final cardRect = tester.getRect(card);
+  expect(cardRect.contains(nameRect.topLeft), isTrue);
+  expect(cardRect.contains(nameRect.bottomRight - const Offset(1, 1)), isTrue);
+  expect(
+    tester.getSize(card).height,
+    planet == MiningPlanetId.homeworld ? 264 : 290,
+  );
+}
+
 void main() {
+  setUpAll(loadProductionTestFonts);
+  tearDownAll(restoreProductionFontsInWebTests);
+
   testWidgets('matches the authored 402x874 Stellar Map composition', (
     tester,
   ) async {
@@ -94,7 +167,12 @@ void main() {
       state: MiningSave.initial(nowUtc: _start),
       content: _content,
     );
-    await _pumpMap(tester, view: view, viewport: const Size(402, 874));
+    await _pumpMap(
+      tester,
+      view: view,
+      viewport: const Size(402, 874),
+      materialShell: true,
+    );
 
     expect(
       tester.getRect(
@@ -435,6 +513,387 @@ void main() {
 
     expect(unlocked, [MiningPlanetId.marsFrontier]);
     expect(traveled, [MiningPlanetId.lunarFrontier]);
+  });
+
+  for (final viewport in const [Size(360, 640), Size(390, 844)]) {
+    testWidgets(
+      'unlocked non-current planets pair a TRAVEL label beside a play-arrow '
+      'hex at ${viewport.width.toInt()}x${viewport.height.toInt()}',
+      (tester) async {
+        final view = StellarMapView.from(
+          state: _stateWith(
+            unlockedPlanets: {
+              MiningPlanetId.homeworld,
+              MiningPlanetId.lunarFrontier,
+            },
+          ),
+          content: _content,
+        );
+        await _pumpMap(tester, view: view, viewport: viewport);
+
+        final homeworldCard = tester.getRect(
+          find.byKey(const Key('mining-stellar-map-planet-homeworld')),
+        );
+        final lunarCard = tester.getRect(
+          find.byKey(const Key('mining-stellar-map-planet-lunarFrontier')),
+        );
+        final activeTravel = find.byKey(
+          const Key('mining-stellar-map-travel-homeworld'),
+        );
+        final lunarTravel = find.byKey(
+          const Key('mining-stellar-map-travel-lunarFrontier'),
+        );
+        await tester.ensureVisible(lunarTravel);
+        await tester.pump();
+
+        // The unlocked non-current action pairs a readable label with the
+        // cyan play-arrow hex instead of putting the label inside it.
+        final label = find.descendant(
+          of: lunarTravel,
+          matching: find.text('TRAVEL'),
+        );
+        final hex = find.descendant(
+          of: lunarTravel,
+          matching: find.byType(MiningHex),
+        );
+        expect(label, findsOneWidget);
+        expect(hex, findsOneWidget);
+        final labelRect = tester.getRect(label);
+        final hexRect = tester.getRect(hex);
+        expect(labelRect.right, lessThanOrEqualTo(hexRect.left));
+        expect(hexRect.contains(labelRect.center), isFalse);
+        expect(
+          find.descendant(of: hex, matching: find.byIcon(Icons.play_arrow)),
+          findsOneWidget,
+        );
+        expect(tester.widget<MiningHex>(hex).fill, MiningTheme.highlight);
+        expect(tester.getSize(lunarTravel).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(lunarTravel).height, greaterThanOrEqualTo(48));
+        expect(
+          tester.getSize(lunarTravel).width,
+          greaterThan(tester.getSize(activeTravel).width),
+        );
+        expect(
+          tester.getRect(lunarTravel).right,
+          greaterThan(lunarCard.right - 20),
+        );
+
+        // The current planet keeps its unchanged disabled hex and no label.
+        expect(
+          find.descendant(of: activeTravel, matching: find.text('TRAVEL')),
+          findsNothing,
+        );
+        expect(
+          tester
+              .widget<MiningHex>(
+                find.descendant(
+                  of: activeTravel,
+                  matching: find.byType(MiningHex),
+                ),
+              )
+              .onTap,
+          isNull,
+        );
+        expect(tester.getSize(activeTravel).width, 54);
+        expect(
+          tester.getRect(activeTravel).right,
+          greaterThan(homeworldCard.right - 20),
+        );
+
+        // Locked planets keep their full-width unlock affordance.
+        final marsUnlock = find.byKey(
+          const Key('mining-stellar-map-unlock-marsFrontier'),
+        );
+        await tester.ensureVisible(marsUnlock);
+        await tester.pump();
+        expect(
+          tester.getSize(marsUnlock).width,
+          greaterThan(lunarCard.width - 40),
+        );
+        expect(tester.getSize(marsUnlock).height, greaterThanOrEqualTo(48));
+        expect(
+          find.descendant(of: marsUnlock, matching: find.text('TRAVEL')),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('travel controls route their planet and stay inert on current or '
+      'busy cards', (tester) async {
+    final view = StellarMapView.from(
+      state: _stateWith(
+        unlockedPlanets: {
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+          MiningPlanetId.marsFrontier,
+        },
+      ),
+      content: _content,
+    );
+    final traveled = <MiningPlanetId>[];
+    await _pumpMap(
+      tester,
+      view: view,
+      viewport: const Size(390, 844),
+      onTravel: traveled.add,
+    );
+    final semantics = tester.ensureSemantics();
+
+    final lunarTravel = find.byKey(
+      const Key('mining-stellar-map-travel-lunarFrontier'),
+    );
+    await tester.ensureVisible(lunarTravel);
+    await tester.pump();
+
+    // The label and hex report through one enabled semantic button whose whole
+    // row is the tap target; no inner label or hex node is announced.
+    final lunarData = tester.getSemantics(lunarTravel).getSemanticsData();
+    expect(lunarData.label, 'Travel to Lunar Frontier');
+    expect(lunarData.flagsCollection.isButton, isTrue);
+    expect(lunarData.flagsCollection.isEnabled, ui.Tristate.isTrue);
+    expect(lunarData.hasAction(SemanticsAction.tap), isTrue);
+    expect(lunarData.rect.width, greaterThanOrEqualTo(48));
+    expect(lunarData.rect.height, greaterThanOrEqualTo(48));
+    expect(find.bySemanticsLabel('Travel here'), findsNothing);
+    expect(find.bySemanticsLabel('TRAVEL'), findsNothing);
+
+    await tester.tap(
+      find.descendant(of: lunarTravel, matching: find.text('TRAVEL')),
+    );
+    await tester.pump();
+    expect(traveled, [MiningPlanetId.lunarFrontier]);
+    await tester.tap(
+      find.descendant(of: lunarTravel, matching: find.byType(MiningHex)),
+    );
+    await tester.pump();
+    expect(traveled, [
+      MiningPlanetId.lunarFrontier,
+      MiningPlanetId.lunarFrontier,
+    ]);
+    tester.semantics.performAction(
+      find.semantics.byLabel('Travel to Lunar Frontier'),
+      SemanticsAction.tap,
+    );
+    await tester.pump();
+    expect(traveled, [
+      MiningPlanetId.lunarFrontier,
+      MiningPlanetId.lunarFrontier,
+      MiningPlanetId.lunarFrontier,
+    ]);
+
+    // The current planet keeps its disabled hex and never travels.
+    final activeTravel = find.byKey(
+      const Key('mining-stellar-map-travel-homeworld'),
+    );
+    await tester.ensureVisible(activeTravel);
+    await tester.pump();
+    expect(
+      find.descendant(of: activeTravel, matching: find.text('TRAVEL')),
+      findsNothing,
+    );
+    expect(
+      tester
+          .widget<MiningHex>(
+            find.descendant(of: activeTravel, matching: find.byType(MiningHex)),
+          )
+          .semanticLabel,
+      'Current location',
+    );
+    await tester.tap(activeTravel);
+    await tester.pump();
+    expect(traveled, hasLength(3));
+
+    // A busy planet still shows the label and hex, but both are inert.
+    final busyView = StellarMapView.from(
+      state: _stateWith(
+        unlockedPlanets: {
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+        },
+      ),
+      content: _content,
+      isBusy: true,
+    );
+    traveled.clear();
+    await _pumpMap(
+      tester,
+      view: busyView,
+      viewport: const Size(360, 640),
+      onTravel: traveled.add,
+    );
+    final busyTravel = find.byKey(
+      const Key('mining-stellar-map-travel-lunarFrontier'),
+    );
+    await tester.ensureVisible(busyTravel);
+    await tester.pump();
+    expect(
+      find.descendant(of: busyTravel, matching: find.text('TRAVEL')),
+      findsOneWidget,
+    );
+    final busyData = tester.getSemantics(busyTravel).getSemanticsData();
+    expect(busyData.flagsCollection.isButton, isTrue);
+    expect(busyData.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    expect(busyData.hasAction(SemanticsAction.tap), isFalse);
+    await tester.tap(
+      find.descendant(of: busyTravel, matching: find.text('TRAVEL')),
+    );
+    await tester.pump();
+    await tester.tap(
+      find.descendant(of: busyTravel, matching: find.byType(MiningHex)),
+    );
+    await tester.pump();
+    expect(traveled, isEmpty);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
+
+  testWidgets(
+    'travel control takes Tab focus and activates with Enter or Space',
+    (tester) async {
+      final view = StellarMapView.from(
+        state: _stateWith(
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+          },
+        ),
+        content: _content,
+      );
+      final traveled = <MiningPlanetId>[];
+      await _pumpMap(
+        tester,
+        view: view,
+        viewport: const Size(390, 844),
+        onTravel: traveled.add,
+      );
+
+      final travel = find.byKey(
+        const Key('mining-stellar-map-travel-lunarFrontier'),
+      );
+      await tester.ensureVisible(travel);
+      await tester.pump();
+      final focusNode = Focus.maybeOf(
+        tester.element(
+          find
+              .descendant(of: travel, matching: find.byType(GestureDetector))
+              .first,
+        ),
+      );
+      expect(focusNode, isNotNull);
+      expect(focusNode!.canRequestFocus, isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(focusNode.hasFocus, isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(traveled, [MiningPlanetId.lunarFrontier]);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pump();
+      expect(traveled, [
+        MiningPlanetId.lunarFrontier,
+        MiningPlanetId.lunarFrontier,
+      ]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('busy travel cannot take keyboard focus or activate', (
+    tester,
+  ) async {
+    final view = StellarMapView.from(
+      state: _stateWith(
+        unlockedPlanets: {
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+        },
+      ),
+      content: _content,
+      isBusy: true,
+    );
+    final traveled = <MiningPlanetId>[];
+    await _pumpMap(
+      tester,
+      view: view,
+      viewport: const Size(390, 844),
+      onTravel: traveled.add,
+    );
+
+    final travel = find.byKey(
+      const Key('mining-stellar-map-travel-lunarFrontier'),
+    );
+    await tester.ensureVisible(travel);
+    await tester.pump();
+    final focusNode = Focus.maybeOf(
+      tester.element(
+        find
+            .descendant(of: travel, matching: find.byType(GestureDetector))
+            .first,
+      ),
+    );
+    expect(focusNode, isNotNull);
+    expect(focusNode!.canRequestFocus, isFalse);
+    focusNode.requestFocus();
+    await tester.pump();
+    expect(focusNode.hasFocus, isFalse);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    expect(traveled, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('874x402 landscape keeps the travel label beside its hex at text '
+      'scale 1.3', (tester) async {
+    final view = StellarMapView.from(
+      state: _stateWith(
+        unlockedPlanets: {
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+        },
+      ),
+      content: _content,
+    );
+    final traveled = <MiningPlanetId>[];
+    await _pumpMap(
+      tester,
+      view: view,
+      viewport: const Size(874, 402),
+      onTravel: traveled.add,
+    );
+
+    final travel = find.byKey(
+      const Key('mining-stellar-map-travel-lunarFrontier'),
+    );
+    await tester.ensureVisible(travel);
+    await tester.pump();
+    final label = find.descendant(of: travel, matching: find.text('TRAVEL'));
+    final hex = find.descendant(of: travel, matching: find.byType(MiningHex));
+    expect(label, findsOneWidget);
+    expect(hex, findsOneWidget);
+    expect(
+      tester.getRect(label).right,
+      lessThanOrEqualTo(tester.getRect(hex).left),
+    );
+    expect(
+      find.descendant(of: hex, matching: find.byIcon(Icons.play_arrow)),
+      findsOneWidget,
+    );
+    expect(tester.getSize(travel).height, greaterThanOrEqualTo(48));
+    final card = tester.getRect(
+      find.byKey(const Key('mining-stellar-map-planet-lunarFrontier')),
+    );
+    expect(card.contains(tester.getRect(label).center), isTrue);
+    expect(card.contains(tester.getRect(hex).center), isTrue);
+    await tester.tap(label);
+    await tester.pump();
+    expect(traveled, [MiningPlanetId.lunarFrontier]);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('fresh map teases Ceres behind Mars', (tester) async {
@@ -844,4 +1303,190 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  group('planet names stay clear of the planet art', () {
+    for (final viewport in const [Size(360, 640), Size(390, 844)]) {
+      testWidgets('at ${viewport.width.toInt()}x${viewport.height.toInt()} '
+          'text scale 1.3', (tester) async {
+        final view = StellarMapView.from(
+          state: _stateWith(
+            // Every planet unlocked avoids the authored locked-card gate
+            // column, which is not what this name/art regression measures.
+            unlockedPlanets: {...MiningPlanetId.values},
+          ),
+          content: _content,
+        );
+        await _pumpMap(
+          tester,
+          view: view,
+          viewport: viewport,
+          bodyTextStyle: _productionBodyTextStyle,
+        );
+
+        for (final planet in const [
+          MiningPlanetId.homeworld,
+          MiningPlanetId.lunarFrontier,
+          MiningPlanetId.marsFrontier,
+          MiningPlanetId.ceresFrontier,
+        ]) {
+          await _expectNameClearOfArt(tester, planet);
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('measures the inherited body style, not the theme style', (
+      tester,
+    ) async {
+      // 1.5px tracking is six times the production 0.25px and visibly widens
+      // the name beyond the theme's measured width.
+      const inherited = TextStyle(
+        fontFamily: 'Orbitron',
+        fontSize: 14,
+        letterSpacing: 1.5,
+      );
+      final view = StellarMapView.from(
+        state: _stateWith(unlockedPlanets: {...MiningPlanetId.values}),
+        content: _content,
+      );
+      await _pumpMap(tester, view: view, bodyTextStyle: inherited);
+
+      for (final planet in const [
+        MiningPlanetId.homeworld,
+        MiningPlanetId.lunarFrontier,
+      ]) {
+        await _expectNameClearOfArt(tester, planet);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('locked planet requirements fit at text scale 1.3', () {
+    final cases = <(MiningPlanetId, MiningSave)>[
+      (MiningPlanetId.lunarFrontier, MiningSave.initial(nowUtc: _start)),
+      (
+        MiningPlanetId.ioFrontier,
+        _stateWith(
+          unlockedPlanets: {
+            MiningPlanetId.homeworld,
+            MiningPlanetId.lunarFrontier,
+            MiningPlanetId.marsFrontier,
+            MiningPlanetId.ceresFrontier,
+          },
+        ),
+      ),
+    ];
+
+    for (final viewport in const [Size(360, 640), Size(402, 874)]) {
+      for (final (id, state) in cases) {
+        final name = _content.planet(id).name;
+        testWidgets(
+          '$name at ${viewport.width.toInt()}x${viewport.height.toInt()}',
+          (tester) async {
+            final semantics = tester.ensureSemantics();
+            final view = StellarMapView.from(state: state, content: _content);
+            await _pumpMap(
+              tester,
+              view: view,
+              viewport: viewport,
+              padding: const EdgeInsets.fromLTRB(0, 24, 0, 24),
+              materialShell: true,
+            );
+            expect(
+              tester.takeException(),
+              isNull,
+              reason: 'opening the map must not overflow',
+            );
+
+            final card = find.byKey(
+              Key('mining-stellar-map-planet-${id.name}'),
+            );
+            await tester.ensureVisible(card);
+            await tester.pump();
+            expect(
+              tester.takeException(),
+              isNull,
+              reason: '$name requirements overflow their fixed card',
+            );
+
+            final cardRect = tester.getRect(card);
+            expect(cardRect.height, 191);
+            expect(
+              tester.getSemantics(card).label,
+              startsWith('$name, locked planet'),
+            );
+            expect(
+              find.ancestor(
+                of: card,
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Semantics &&
+                      widget.properties.label == '$name, locked planet',
+                ),
+              ),
+              findsOneWidget,
+            );
+
+            final action = find.byKey(
+              Key('mining-stellar-map-unlock-${id.name}'),
+            );
+            final actionRect = tester.getRect(action);
+            expect(actionRect.height, 48);
+            expect(cardRect.contains(actionRect.topLeft), isTrue);
+            expect(
+              cardRect.contains(actionRect.bottomRight - const Offset(1, 1)),
+              isTrue,
+            );
+
+            final requirements = view.planet(id).requirements;
+            expect(requirements, hasLength(3));
+            for (final requirement in requirements) {
+              final label =
+                  '${requirement.label}, '
+                  '${requirement.isSatisfied ? 'satisfied' : 'required'}';
+              final row = find.descendant(
+                of: card,
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Semantics && widget.properties.label == label,
+                ),
+              );
+              expect(row, findsOneWidget);
+              final rowRect = tester.getRect(row);
+              expect(
+                cardRect.contains(rowRect.topLeft),
+                isTrue,
+                reason: '$label is outside the card',
+              );
+              expect(
+                cardRect.contains(rowRect.bottomRight - const Offset(1, 1)),
+                isTrue,
+                reason: '$label is clipped by the card',
+              );
+              expect(
+                rowRect.bottom,
+                lessThanOrEqualTo(actionRect.top),
+                reason: '$label is hidden behind the unlock action',
+              );
+
+              final value = find.descendant(
+                of: row,
+                matching: find.byType(Text),
+              );
+              expect(value, findsOneWidget);
+              final paragraph = tester.renderObject<RenderParagraph>(value);
+              expect(
+                paragraph.size.width,
+                greaterThanOrEqualTo(
+                  paragraph.getMaxIntrinsicWidth(double.infinity) - .5,
+                ),
+                reason: '$label value is wrapped or clipped',
+              );
+            }
+            semantics.dispose();
+          },
+        );
+      }
+    }
+  });
 }

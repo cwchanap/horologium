@@ -7,6 +7,7 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/animated_mining_grid_visual_layer.dart';
+import 'package:horologium/mining/presentation/mining_grid_map.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 import '../../support/mining_grid_fixtures.dart';
@@ -28,6 +29,21 @@ final _minedDeposit = _landing.deposits.singleWhere(
 final _unminedDeposit = _landing.deposits[1];
 
 final _deployableCells = deployableMiningCells(_landing);
+
+/// A legal rig cell directly beside an authored 1x1 resource, where the strike
+/// midpoint sits only half a cell below the rig cell's top edge — the exact
+/// geometry that drifts a damage label up into the top-anchored tier chip.
+MiningGridCell _sideRigCell({required bool targetOnRight}) =>
+    deployableMiningCells(_landing, surveyingLevel: 2).firstWhere((cell) {
+      final target = uniqueAdjacentDeposit(
+        deposits: _landing.deposits,
+        cell: cell,
+      );
+      return target != null &&
+          target.size == 1 &&
+          target.y == cell.y &&
+          (targetOnRight ? cell.x == target.x - 1 : cell.x == target.x + 1);
+    });
 
 Key _depositKey(MiningDepositDefinition deposit) =>
     Key('landing-basin-deposit-${deposit.x}-${deposit.y}-${deposit.size}');
@@ -87,6 +103,7 @@ MineSiteView _view({
   bool withRig = true,
   double progress = 0,
   List<(RigTier, MiningGridCell)> rigs = const [],
+  int surveying = 0,
 }) {
   final placements = [
     if (rigs.isNotEmpty)
@@ -102,6 +119,7 @@ MineSiteView _view({
     0,
   );
   final state = initial.copyWith(
+    technology: TechnologyLevels(surveying: surveying),
     sites: {
       ...initial.sites,
       MiningSiteId.landingBasin: initial.sites[MiningSiteId.landingBasin]!
@@ -133,6 +151,8 @@ Future<void> _pumpLayer(
   bool reducedMotion = false,
   List<(RigTier, MiningGridCell)> rigs = const [],
   AssetBundle? assetBundle,
+  int surveying = 0,
+  double textScale = 1,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(430, 932);
@@ -147,6 +167,7 @@ Future<void> _pumpLayer(
       withRig: withRig,
       progress: progress,
       rigs: rigs,
+      surveying: surveying,
     ),
     frames: MiningDepositFrames.gold,
     impactSequence: impactSequence,
@@ -157,7 +178,17 @@ Future<void> _pumpLayer(
   if (assetBundle != null) {
     home = DefaultAssetBundle(bundle: assetBundle, child: home);
   }
-  await tester.pumpWidget(MaterialApp(home: home));
+  await tester.pumpWidget(
+    MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
+      home: home,
+    ),
+  );
   await tester.pump();
 }
 
@@ -251,6 +282,26 @@ Transform _robotArmTransform(WidgetTester tester, MiningGridCell cell) =>
     tester.widget<Transform>(
       find.byKey(Key('landing-basin-robot-arm-transform-${cell.x}-${cell.y}')),
     );
+
+/// The [Stack] directly hosting [finder]'s ancestor chain and the index of
+/// that hosted widget, so sibling paint order can be asserted.
+(Stack, int) _stackHost(WidgetTester tester, Finder finder) {
+  var element = tester.element(finder);
+  while (true) {
+    Element? parent;
+    element.visitAncestorElements((ancestor) {
+      parent = ancestor;
+      return false;
+    });
+    final host = parent;
+    if (host == null) fail('$finder is not inside a Stack');
+    if (host.widget is Stack) {
+      final stack = host.widget as Stack;
+      return (stack, stack.children.indexOf(element.widget));
+    }
+    element = host;
+  }
+}
 
 /// A commissioned view of [siteId] at [progress] with one T1 rig on the
 /// site's first legal cell at its first playable Surveying level (the first
@@ -1023,6 +1074,46 @@ void main() {
       await _pumpLayer(tester, impactSequence: 1);
       expect(_hpText(tester), '80/80');
     }, skip: kIsWeb);
+
+    testWidgets('paints HP chrome after an upper-row robot', (tester) async {
+      // Rigs directly above mined 1x1 and 3x3 resources: the oversized robot
+      // art overlaps the HP bar, so only paint order keeps the HP readable.
+      final cases = [
+        (
+          const MiningGridCell(27, 0),
+          _landing.deposits.singleWhere(
+            (deposit) => deposit.x == 27 && deposit.y == 1 && deposit.size == 1,
+          ),
+        ),
+        (
+          const MiningGridCell(6, 0),
+          _landing.deposits.singleWhere(
+            (deposit) => deposit.x == 6 && deposit.y == 1 && deposit.size == 3,
+          ),
+        ),
+      ];
+      for (final (cell, deposit) in cases) {
+        await _pumpLayer(tester, cell: cell, surveying: 2);
+        final robot = tester.getRect(find.byKey(_robotKey(cell)));
+        final hp = tester.getRect(find.byKey(_hpKey(deposit)));
+        expect(
+          robot.overlaps(hp),
+          isTrue,
+          reason: '$cell robot $robot must overlap HP $hp for order check',
+        );
+
+        final (robotStack, robotIndex) = _stackHost(
+          tester,
+          find.byKey(_robotKey(cell)),
+        );
+        final (hpStack, hpIndex) = _stackHost(
+          tester,
+          find.byKey(_hpKey(deposit)),
+        );
+        expect(identical(robotStack, hpStack), isTrue, reason: '$cell');
+        expect(hpIndex, greaterThan(robotIndex), reason: '$cell');
+      }
+    });
   });
 
   group('damage labels and break beat', () {
@@ -1079,6 +1170,89 @@ void main() {
       },
       skip: kIsWeb,
     );
+
+    testWidgets('keeps a below-resource label above the rig chip clearance', (
+      tester,
+    ) async {
+      // The default rig at (2,3) mines the 2x2 at (1,1): the strike
+      // midpoint sits on the rig cell's top edge, where the map paints the
+      // top-anchored chip. Reduced motion keeps the label still.
+      await warmDepositFrames(tester, MiningDepositFrames.gold);
+      await _pumpLayer(tester, impactSequence: 0, reducedMotion: true);
+      await _pumpLayer(tester, impactSequence: 1, reducedMotion: true);
+      await tester.pump(const Duration(milliseconds: 470));
+
+      final label = find.byKey(_damageKey(_defaultCell));
+      expect(label, findsOneWidget);
+      final rect = tester.getRect(label);
+      expect(
+        rect.top,
+        _defaultCell.y * miningGridCellSize - miningRigChipClearance,
+      );
+      expect(
+        rect.bottom,
+        lessThanOrEqualTo(_defaultCell.y * miningGridCellSize),
+      );
+    }, skip: kIsWeb);
+
+    for (final textScale in const [1.0, 1.3]) {
+      testWidgets('sideways labels stay below the rig chip through the tail at '
+          'text $textScale', (tester) async {
+        // A rig beside a 1x1 resource anchors its label at the shared row's
+        // centre, only 28px below the rig cell top, then drifts up 18px —
+        // straight into the 18px top-anchored chip band. Both sides must
+        // stay below the chip for the whole visible tail.
+        final targetOnRight = _sideRigCell(targetOnRight: true);
+        final targetOnLeft = _sideRigCell(targetOnRight: false);
+        final rigs = [(RigTier.t1, targetOnRight), (RigTier.t1, targetOnLeft)];
+        await warmDepositFrames(tester, MiningDepositFrames.gold);
+        await _pumpLayer(
+          tester,
+          rigs: rigs,
+          impactSequence: 0,
+          surveying: 2,
+          textScale: textScale,
+        );
+        await _pumpLayer(
+          tester,
+          rigs: rigs,
+          impactSequence: 1,
+          surveying: 2,
+          textScale: textScale,
+        );
+
+        var elapsed = 0;
+        for (final step in const [470, 100, 100, 100, 100, 80]) {
+          await tester.pump(Duration(milliseconds: step));
+          elapsed += step;
+          for (final cell in [targetOnRight, targetOnLeft]) {
+            final label = find.byKey(_damageKey(cell));
+            expect(label, findsOneWidget, reason: 'at ${elapsed}ms $cell');
+            final labelRect = tester.getRect(label);
+            final chipRect = Rect.fromLTWH(
+              cell.x * miningGridCellSize,
+              cell.y * miningGridCellSize,
+              miningGridCellSize,
+              miningRigChipHeight,
+            );
+            expect(
+              labelRect.overlaps(chipRect),
+              isFalse,
+              reason:
+                  'damage label $cell $labelRect drifts into the rig chip '
+                  '$chipRect at ${elapsed}ms',
+            );
+            expect(
+              labelRect.top,
+              greaterThanOrEqualTo(chipRect.bottom),
+              reason:
+                  'damage label $cell must sit below the chip at '
+                  '${elapsed}ms',
+            );
+          }
+        }
+      }, skip: kIsWeb);
+    }
 
     testWidgets('a breaking hit shows visible zero then the fresh max at end', (
       tester,

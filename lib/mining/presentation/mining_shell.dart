@@ -18,9 +18,11 @@ import 'package:horologium/mining/next_goal_view.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_settings_sheet.dart';
+import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
 import 'package:horologium/mining/presentation/offline_return_sheet.dart';
+import 'package:horologium/mining/presentation/planet_mastered_card.dart';
 import 'package:horologium/mining/presentation/relaunch_sheet.dart';
 import 'package:horologium/mining/presentation/site_deck_screen.dart';
 import 'package:horologium/mining/presentation/stellar_map_screen.dart';
@@ -74,6 +76,12 @@ class _MiningShellState extends State<MiningShell>
   late final StorageAlerts _storageAlerts;
   late MiningSave _displayState;
   late final _MiningDisplayNotifier _displayNotifier;
+
+  /// The shell's live top inset. The retained mastery dialog route listens to
+  /// this value instead of capturing the inset once when it opens, so
+  /// orientation and inset changes keep the card's close clear of the scene
+  /// HUD. Changes refresh through [didChangeDependencies].
+  final ValueNotifier<double> _topSafeArea = ValueNotifier<double>(0);
   Timer? _refreshTimer;
   bool _initialized = false;
   // Set by the first paused/hidden event and cleared on resume: the only
@@ -246,14 +254,66 @@ class _MiningShellState extends State<MiningShell>
     );
   }
 
-  Future<void> _showModalSheet(Widget child) async {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final topSafeArea = MediaQuery.paddingOf(context).top;
+    if (_topSafeArea.value == topSafeArea) return;
+    // The modal route listens to this notifier; notifying during the shell's
+    // dependency build would mark that route dirty mid-build. Refresh after the
+    // current frame instead, so a rotation lands on the next frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _topSafeArea.value = topSafeArea;
+    });
+  }
+
+  Future<void> _showModalSheet(Widget child) =>
+      _showModalSheetBuilder((_) => child);
+
+  Future<void> _showModalSheetBuilder(WidgetBuilder builder) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black26,
       constraints: const BoxConstraints(maxWidth: double.infinity),
-      builder: (_) => child,
+      sheetAnimationStyle: _reducedMotion ? AnimationStyle.noAnimation : null,
+      builder: builder,
+    );
+    if (mounted) unawaited(_audioManager.playSound(GameSound.tap));
+  }
+
+  /// The floating mastery card is presented as a dialog rather than a bottom
+  /// sheet. A bottom sheet's Material spans the viewport width inside its band
+  /// and would swallow taps beside the card. The dialog keeps only the
+  /// composition-sized child interactive, so every outside tap above or beside
+  /// it reaches the dismissible barrier. The card itself centers roomy portrait
+  /// content above a HUD-safe floor and bottom-anchors compact layouts.
+  Future<void> _showMasteryCardBuilder(WidgetBuilder builder) async {
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black26,
+      useRootNavigator: false,
+      transitionDuration: _reducedMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 220),
+      pageBuilder: (context, _, _) => builder(context),
+      transitionBuilder: (context, animation, _, child) {
+        if (_reducedMotion) return child;
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+              .animate(
+                CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                  reverseCurve: Curves.easeInCubic,
+                ),
+              ),
+          child: child,
+        );
+      },
     );
     if (mounted) unawaited(_audioManager.playSound(GameSound.tap));
   }
@@ -276,6 +336,7 @@ class _MiningShellState extends State<MiningShell>
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black26,
       constraints: const BoxConstraints(maxWidth: double.infinity),
+      sheetAnimationStyle: _reducedMotion ? AnimationStyle.noAnimation : null,
       builder: (sheetContext) {
         return ValueListenableBuilder<MiningSave>(
           valueListenable: _displayNotifier,
@@ -374,6 +435,61 @@ class _MiningShellState extends State<MiningShell>
       () => _controller.switchPlanet(id),
       successMessage: 'Traveled to ${_content.planet(id).name}.',
       sound: GameSound.travel,
+    );
+  }
+
+  /// Relays the next frontier's already-projected Stellar Map gates so the
+  /// card never recalculates mastery, surveying, or cash itself.
+  Future<void> _showPlanetMastered(MiningPlanetId planetId) {
+    final planet = _content.planet(planetId);
+    final isFinal = planetId == _content.finalPlanetId;
+    // One projection for every planet, including the final one, so the card
+    // never recalculates gates or the next-run multiplier itself.
+    final mapView = StellarMapView.from(
+      state: _controller.state,
+      content: _content,
+    );
+    MiningPlanetDefinition? successor;
+    if (!isFinal) {
+      for (final candidate in _content.planets.values) {
+        if (candidate.unlockRequiredMasteryPlanetId == planetId) {
+          successor = candidate;
+          break;
+        }
+      }
+    }
+    final successorView = successor == null
+        ? null
+        : mapView.planet(successor.id);
+    // The route intentionally outlives this build, so it cannot keep a scalar
+    // snapshot of the shell's top inset: a rotation while the card is open
+    // moves the inline HUD and this card must follow. Rebuild the card from the
+    // live notifier instead.
+    return _showMasteryCardBuilder(
+      (_) => ValueListenableBuilder<double>(
+        valueListenable: _topSafeArea,
+        builder: (context, topSafeArea, _) => PlanetMasteredCard(
+          masteredPlanet: planet,
+          isFinal: isFinal,
+          successorName: successorView?.name,
+          requirements: successorView?.requirements ?? const [],
+          nextSaleMultiplier: mapView.nextSaleMultiplier,
+          rewardCash: planet.masteryRewardCash,
+          topSafeArea: topSafeArea,
+          onContinue: () => Navigator.of(context).pop(),
+          onOpenMap: () {
+            // Mastery can land while a Technology/Settings sheet opened during
+            // the pending save sits under this card; unwind every covering
+            // sheet so the map is not left behind one.
+            Navigator.of(context).popUntil((route) => route is! PopupRoute);
+            _handleNavigation(MiningNavigationDestination.stellarMap);
+          },
+          onRelaunch: () {
+            Navigator.of(context).popUntil((route) => route is! PopupRoute);
+            _openRelaunchSheet();
+          },
+        ),
+      ),
     );
   }
 
@@ -661,9 +777,14 @@ class _MiningShellState extends State<MiningShell>
         unawaited(
           _audioManager.playSound(commissioned ? GameSound.milestone : sound),
         );
-        final message = result.message ?? successMessage;
-        if (message != null) {
-          _showResult(message);
+        final masteredPlanetId = result.masteredPlanetId;
+        if (masteredPlanetId != null) {
+          unawaited(_showPlanetMastered(masteredPlanetId));
+        } else {
+          final message = result.message ?? successMessage;
+          if (message != null) {
+            _showResult(message);
+          }
         }
       } else {
         unawaited(_audioManager.playSound(GameSound.reject));
@@ -699,7 +820,23 @@ class _MiningShellState extends State<MiningShell>
     final messenger = ScaffoldMessenger.of(context);
     messenger.removeCurrentSnackBar();
     messenger.showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontFamily: 'Orbitron',
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: MiningTheme.primaryText,
+          ),
+        ),
+        backgroundColor: MiningTheme.panel,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: MiningTheme.accent),
+        ),
+      ),
       snackBarAnimationStyle: _reducedMotion
           ? AnimationStyle.noAnimation
           : null,
@@ -758,6 +895,7 @@ class _MiningShellState extends State<MiningShell>
   void dispose() {
     _refreshTimer?.cancel();
     _displayNotifier.dispose();
+    _topSafeArea.dispose();
     WidgetsBinding.instance.removeObserver(this);
     if (_initialized) {
       // Leaving the mining surface hands the alert off: the player may
