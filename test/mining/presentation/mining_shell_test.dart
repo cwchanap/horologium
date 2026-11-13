@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/audio_manager.dart';
@@ -4364,6 +4365,70 @@ void main() {
     );
   });
 
+  /// The nearest enclosing route scope, the node a screen reader selects as
+  /// the current route.
+  SemanticsNode? routeScopeOf(SemanticsNode node) {
+    for (
+      SemanticsNode? current = node;
+      current != null;
+      current = current.parent
+    ) {
+      if (current.getSemanticsData().flagsCollection.scopesRoute) {
+        return current;
+      }
+    }
+    return null;
+  }
+
+  /// The announced route name: the first non-empty `namesRoute` label in
+  /// depth-first paint order inside [scope], matching the engine's documented
+  /// `scopesRoute` selection.
+  SemanticsNode? announcedRouteName(SemanticsNode scope) {
+    SemanticsNode? found;
+    void search(SemanticsNode node) {
+      if (found != null) return;
+      final data = node.getSemanticsData();
+      if (data.flagsCollection.namesRoute && data.label.isNotEmpty) {
+        found = node;
+        return;
+      }
+      node.visitChildren((child) {
+        search(child);
+        return found == null;
+      });
+    }
+
+    search(scope);
+    return found;
+  }
+
+  /// A mastery card route must announce the milestone title that the badge
+  /// already presents as a heading, on both variants.
+  void expectMilestoneRouteAnnouncement(
+    WidgetTester tester, {
+    required String title,
+  }) {
+    expect(find.byKey(const Key('planet-mastery-card')), findsOneWidget);
+    expect(
+      ModalRoute.of(
+        tester.element(find.byKey(const Key('planet-mastery-card'))),
+      ),
+      isA<RawDialogRoute<void>>(),
+      reason: 'the card is hosted by the real shell dialog route',
+    );
+
+    final titleNode = tester.getSemantics(find.text(title));
+    final scope = routeScopeOf(titleNode);
+    expect(scope, isNotNull, reason: 'the card sits inside a route scope');
+    final routeName = announcedRouteName(scope!);
+    expect(routeName, isNotNull, reason: 'the route announces a name');
+    expect(routeName!.getSemanticsData().label, title);
+
+    final titleData = titleNode.getSemanticsData();
+    expect(titleData.flagsCollection.isHeader, isTrue);
+    expect(titleData.label, title);
+  }
+
   group('planet mastery feedback', () {
     testWidgets('nonfinal mastery shows the projected next-frontier gates', (
       tester,
@@ -5072,6 +5137,42 @@ void main() {
             .isHeader,
         isTrue,
       );
+      handle.dispose();
+    });
+
+    testWidgets('nonfinal mastery route announces the milestone title', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearHomeworldMasteryState(_start));
+      await pumpShell(tester, repository: repository);
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.graniteCrater,
+        _graniteCraterDeployCell,
+      );
+
+      expectMilestoneRouteAnnouncement(tester, title: 'PLANET MASTERED');
+      handle.dispose();
+    });
+
+    testWidgets('final mastery route announces the milestone title', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      final repository = CountingMiningSaveRepository();
+      await repository.save(nearFinalPlanetMasteryState(_start));
+      await pumpShell(tester, repository: repository);
+
+      await deployIntoMastery(
+        tester,
+        MiningSiteId.osmiumCaldera,
+        _osmiumDeployCell,
+      );
+
+      expectMilestoneRouteAnnouncement(tester, title: 'FINAL PLANET MASTERED');
       handle.dispose();
     });
 
