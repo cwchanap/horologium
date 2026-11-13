@@ -128,18 +128,21 @@ class PlanetMasteredCard extends StatelessWidget {
             ),
           );
 
-    // Only the card-plus-overlap composition is laid out inside the mastery
-    // dialog, so taps above or beside it reach the dismissible barrier. The
-    // close lives inside these bounds too, keeping its whole visible circle
-    // hit-testable. Roomy portrait content-sizes the panel and the dialog
-    // centers it; compact layouts fill the available height and bottom-anchor.
-    return Padding(
-      key: const Key('planet-mastery-card'),
-      padding: EdgeInsets.only(bottom: bottomLimit),
-      child: Align(
-        alignment: Alignment.topCenter,
-        heightFactor: 1,
+    // Only the card-plus-overlap composition is interactive, so taps above or
+    // beside it reach the dismissible barrier. The close lives inside these
+    // bounds too, keeping its whole visible circle hit-testable. Roomy portrait
+    // centers the content-sized card but clamps it to the HUD-safe top floor;
+    // compact layouts bottom-anchor the fill-available panel.
+    return CustomSingleChildLayout(
+      delegate: _MasteryCardLayout(
+        roomyPortrait: roomyPortrait,
+        topInset: topInset,
+        artAbovePanel: artAbovePanel,
+      ),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomLimit),
         child: SizedBox(
+          key: const Key('planet-mastery-card'),
           width: cardWidth,
           child: Stack(
             children: [
@@ -430,6 +433,41 @@ class PlanetMasteredCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _MasteryCardLayout extends SingleChildLayoutDelegate {
+  const _MasteryCardLayout({
+    required this.roomyPortrait,
+    required this.topInset,
+    required this.artAbovePanel,
+  });
+
+  final bool roomyPortrait;
+  final double topInset;
+  final double artAbovePanel;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) =>
+      constraints.loosen();
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    final x = (size.width - childSize.width) / 2;
+    if (!roomyPortrait) {
+      return Offset(x, size.height - childSize.height);
+    }
+    // Center the content-sized card, but never above the floor that keeps the
+    // close control below the inline cargo gauge.
+    final centered = (size.height - childSize.height) / 2;
+    final hudSafeFloor = topInset + _portraitTopClearance - artAbovePanel;
+    return Offset(x, math.max(centered, hudSafeFloor));
+  }
+
+  @override
+  bool shouldRelayout(_MasteryCardLayout oldDelegate) =>
+      roomyPortrait != oldDelegate.roomyPortrait ||
+      topInset != oldDelegate.topInset ||
+      artAbovePanel != oldDelegate.artAbovePanel;
 }
 
 class _MasteryRequirement extends StatelessWidget {

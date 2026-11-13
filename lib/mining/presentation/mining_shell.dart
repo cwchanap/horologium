@@ -287,8 +287,8 @@ class _MiningShellState extends State<MiningShell>
   /// sheet. A bottom sheet's Material spans the viewport width inside its band
   /// and would swallow taps beside the card. The dialog keeps only the
   /// composition-sized child interactive, so every outside tap above or beside
-  /// it reaches the dismissible barrier. Roomy portrait centers the
-  /// content-sized card; compact layouts bottom-anchor it.
+  /// it reaches the dismissible barrier. The card itself centers roomy portrait
+  /// content above a HUD-safe floor and bottom-anchors compact layouts.
   Future<void> _showMasteryCardBuilder(WidgetBuilder builder) async {
     await showGeneralDialog<void>(
       context: context,
@@ -299,18 +299,7 @@ class _MiningShellState extends State<MiningShell>
       transitionDuration: _reducedMotion
           ? Duration.zero
           : const Duration(milliseconds: 220),
-      pageBuilder: (context, _, _) => Builder(
-        builder: (context) {
-          final size = MediaQuery.sizeOf(context);
-          final roomyPortrait = size.width <= size.height && size.height > 700;
-          return Align(
-            alignment: roomyPortrait
-                ? Alignment.center
-                : Alignment.bottomCenter,
-            child: builder(context),
-          );
-        },
-      ),
+      pageBuilder: (context, _, _) => builder(context),
       transitionBuilder: (context, animation, _, child) {
         if (_reducedMotion) return child;
         return SlideTransition(
