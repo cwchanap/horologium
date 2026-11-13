@@ -112,6 +112,14 @@ bool _inside(Rect outer, Rect inner) =>
     outer.contains(inner.topLeft) &&
     outer.contains(inner.bottomRight - const Offset(1, 1));
 
+/// Labels in accessibility traversal order: the order assistive technologies
+/// follow, which differs from paint order when `OrdinalSortKey`s reorder the
+/// compact final card's packed summary.
+List<String> _traversalLabels(WidgetTester tester) => [
+  for (final node in tester.semantics.simulatedAccessibilityTraversal())
+    if (node.getSemanticsData().label.isNotEmpty) node.getSemanticsData().label,
+];
+
 Future<void> _pumpCard(
   WidgetTester tester, {
   required Size size,
@@ -654,6 +662,62 @@ void main() {
         );
       }
     }
+  }
+
+  // The compact landscape card packs the status label beside the name and the
+  // caption beside the reward. Sort keys must keep the reading order logical
+  // for assistive technologies even when paint order differs.
+  for (final size in const [Size(360, 640), Size(874, 402)]) {
+    testWidgets(
+      'final card reads planet, reward, caption, status, explanation in '
+      'accessibility order at ${size.width.toInt()}x${size.height.toInt()}',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await _pumpCard(tester, size: size, card: _finalCard());
+
+        final labels = _traversalLabels(tester);
+        int indexOf(String label) =>
+            labels.indexWhere((candidate) => candidate == label);
+        final planet = indexOf('Io Frontier');
+        final reward = indexOf('+90.00M cash');
+        final caption = indexOf('completion reward');
+        final status = indexOf('RUN COMPLETE');
+        final explanation = labels.indexWhere(
+          (candidate) =>
+              candidate.contains('Relaunch to start again with sales ×1.5.'),
+        );
+        for (final (name, index) in [
+          ('planet', planet),
+          ('reward', reward),
+          ('caption', caption),
+          ('status', status),
+          ('explanation', explanation),
+        ]) {
+          expect(index, isNonNegative, reason: '$name missing in $labels');
+        }
+        expect(planet, lessThan(reward), reason: 'in $labels');
+        expect(reward, lessThan(caption), reason: 'in $labels');
+        expect(caption, lessThan(status), reason: 'in $labels');
+        expect(status, lessThan(explanation), reason: 'in $labels');
+
+        if (size.width > size.height) {
+          // Keep the caption visually attached to the reward amount it
+          // describes instead of parking it beside the planet name.
+          final rewardRect = tester.getRect(
+            find.byKey(const Key('planet-mastery-reward')),
+          );
+          final captionRect = tester.getRect(find.text('completion reward'));
+          expect(
+            (captionRect.center.dy - rewardRect.center.dy).abs(),
+            lessThan(24),
+            reason: 'the caption must share the reward row',
+          );
+          expect(captionRect.left, greaterThan(rewardRect.left));
+        }
+
+        semantics.dispose();
+      },
+    );
   }
 
   for (final (multiplier, formatted) in const [(1.5, '×1.5'), (2.0, '×2')]) {
