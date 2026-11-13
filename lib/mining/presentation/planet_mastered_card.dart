@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
@@ -111,9 +112,9 @@ class PlanetMasteredCard extends StatelessWidget {
   }) {
     if (isFinal && landscape) {
       // Short landscape cannot stack the summary and the explanation. The
-      // summary packs two label rows so it stays short: the name shares a line
-      // with the caption, the reward with the status. The explanation keeps the
-      // full body width beneath them.
+      // status shares the name's line and the reward keeps its caption
+      // beside it; sort keys keep the reading order planet, reward, caption,
+      // status, explanation instead of the visual packing order.
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -128,25 +129,44 @@ class PlanetMasteredCard extends StatelessWidget {
                   runSpacing: 2,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    _planetName(textAlign: TextAlign.start, tight: true),
-                    _completionReward(),
+                    Semantics(
+                      sortKey: const OrdinalSortKey(1),
+                      child: _planetName(
+                        textAlign: TextAlign.start,
+                        tight: true,
+                      ),
+                    ),
+                    Semantics(
+                      sortKey: const OrdinalSortKey(4),
+                      child: _runComplete(),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 2),
-          Wrap(
-            spacing: 8,
-            runSpacing: 2,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          Row(
             children: [
-              _reward(textAlign: TextAlign.start),
-              _runComplete(),
+              Flexible(
+                flex: 2,
+                child: Semantics(
+                  sortKey: const OrdinalSortKey(2),
+                  child: _reward(textAlign: TextAlign.start),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 1,
+                child: Semantics(
+                  sortKey: const OrdinalSortKey(3),
+                  child: _completionReward(),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 2),
-          _explanation(),
+          Semantics(sortKey: const OrdinalSortKey(5), child: _explanation()),
         ],
       );
     }
