@@ -45,11 +45,23 @@ class PlanetMasteredCard extends StatelessWidget {
     // measured body viewport if more screen classes need it.
     final textScale = MediaQuery.textScalerOf(context).scale(1);
     final compactPortrait = !landscape && size.height <= 700;
-    final artSize = landscape
-        ? const Size(104, 104)
-        : compactPortrait
-        ? (textScale > 1 ? const Size(80, 80) : const Size(112, 112))
-        : const Size(160, 132);
+    // The final card's explanation is a long sentence. In the short layouts it
+    // runs full width under the summary instead of wrapping inside the narrow
+    // details column, which used to push it below the visible body. The art
+    // shrinks in those layouts so the reward and the explanation keep their
+    // measured first-frame widths.
+    final Size artSize;
+    if (landscape) {
+      artSize = isFinal
+          ? (textScale > 1 ? const Size(28, 28) : const Size(40, 40))
+          : const Size(104, 104);
+    } else if (compactPortrait) {
+      artSize = isFinal
+          ? (textScale > 1 ? const Size(48, 48) : const Size(112, 112))
+          : (textScale > 1 ? const Size(80, 80) : const Size(112, 112));
+    } else {
+      artSize = const Size(160, 132);
+    }
     return MiningSheetFrame(
       key: const Key('planet-mastery-card'),
       title: isFinal ? 'FINAL PLANET MASTERED' : 'PLANET MASTERED',
@@ -97,6 +109,60 @@ class PlanetMasteredCard extends StatelessWidget {
     required bool compactPortrait,
     required Size artSize,
   }) {
+    if (isFinal && landscape) {
+      // Short landscape cannot stack the summary and the explanation. The
+      // summary packs two label rows so it stays short: the name shares a line
+      // with the caption, the reward with the status. The explanation keeps the
+      // full body width beneath them.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _art(artSize),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _planetName(textAlign: TextAlign.start, tight: true),
+                    _completionReward(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Wrap(
+            spacing: 8,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _reward(textAlign: TextAlign.start),
+              _runComplete(),
+            ],
+          ),
+          const SizedBox(height: 2),
+          _explanation(),
+        ],
+      );
+    }
+    if (isFinal && compactPortrait) {
+      // Portrait has the width for the caption and status on one line; the
+      // explanation still spans the body beneath the summary instead of
+      // wrapping inside the narrow column beside the art.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _finalSummary(artSize),
+          const SizedBox(height: 2),
+          _explanation(),
+        ],
+      );
+    }
     // Short landscape has room for a wider composition: the art and
     // milestone summary share a row, and the complete gates sit in one
     // wrapping row underneath instead of a tall stacked column.
@@ -150,6 +216,84 @@ class PlanetMasteredCard extends StatelessWidget {
     );
   }
 
+  /// The short final card's compact summary. The art shares the name's line so
+  /// every line above the explanation stays at its natural height. The caption
+  /// and status share a run where the column is wide enough.
+  Widget _finalSummary(Size artSize) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _art(artSize),
+          const SizedBox(width: 8),
+          Expanded(child: _planetName(textAlign: TextAlign.start, tight: true)),
+        ],
+      ),
+      const SizedBox(height: 2),
+      _reward(textAlign: TextAlign.start),
+      const SizedBox(height: 2),
+      Wrap(
+        spacing: 8,
+        runSpacing: 2,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [_completionReward(), _runComplete()],
+      ),
+    ],
+  );
+
+  /// [tight] trims the inherited 1.4 leading so a short card's single-line
+  /// name stays inside the first-frame body budget.
+  Widget _planetName({required TextAlign textAlign, bool tight = false}) =>
+      Text(
+        masteredPlanet.name,
+        key: const Key('planet-mastery-planet'),
+        textAlign: textAlign,
+        style: TextStyle(
+          color: MiningTheme.highlight,
+          fontFamily: 'Orbitron',
+          fontSize: 26,
+          fontWeight: FontWeight.w800,
+          height: tight ? 1.1 : null,
+        ),
+      );
+
+  Widget _reward({TextAlign textAlign = TextAlign.center}) => Text(
+    '+${formatMiningCash(rewardCash ?? 0)} cash',
+    key: const Key('planet-mastery-reward'),
+    textAlign: textAlign,
+    style: const TextStyle(
+      color: MiningTheme.warning,
+      fontFamily: 'Orbitron',
+      fontSize: 24,
+      fontWeight: FontWeight.w800,
+    ),
+  );
+
+  Widget _completionReward() => const Text(
+    'completion reward',
+    textAlign: TextAlign.center,
+    style: TextStyle(color: MiningTheme.secondaryText, fontSize: 11),
+  );
+
+  Widget _runComplete() => const Text(
+    'RUN COMPLETE',
+    style: TextStyle(
+      color: MiningTheme.accent,
+      fontSize: 11,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 1.4,
+    ),
+  );
+
+  Widget _explanation() => Text(
+    'Relaunch to start again with sales '
+    '${formatSaleMultiplier(nextSaleMultiplier)}. '
+    'Only your relaunch count is kept.',
+    key: const Key('planet-mastery-multiplier'),
+    style: const TextStyle(color: MiningTheme.secondaryText, height: 1.4),
+  );
+
   Widget _art(Size size) => Image.asset(
     masteredPlanet.planetAsset,
     key: const Key('planet-mastery-art'),
@@ -166,54 +310,16 @@ class PlanetMasteredCard extends StatelessWidget {
   Widget _details({required bool compact, bool includeGates = true}) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Text(
-        masteredPlanet.name,
-        key: const Key('planet-mastery-planet'),
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: MiningTheme.highlight,
-          fontFamily: 'Orbitron',
-          fontSize: 26,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
+      _planetName(textAlign: TextAlign.center),
       if (isFinal) ...[
         const SizedBox(height: 4),
-        Text(
-          '+${formatMiningCash(rewardCash ?? 0)} cash',
-          key: const Key('planet-mastery-reward'),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: MiningTheme.warning,
-            fontFamily: 'Orbitron',
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
+        _reward(),
         const SizedBox(height: 2),
-        const Text(
-          'completion reward',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: MiningTheme.secondaryText, fontSize: 11),
-        ),
+        _completionReward(),
         SizedBox(height: compact ? 10 : 16),
-        const Text(
-          'RUN COMPLETE',
-          style: TextStyle(
-            color: MiningTheme.accent,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.4,
-          ),
-        ),
+        _runComplete(),
         const SizedBox(height: 4),
-        Text(
-          'Relaunch to start again with sales '
-          '${formatSaleMultiplier(nextSaleMultiplier)}. '
-          'Only your relaunch count is kept.',
-          key: const Key('planet-mastery-multiplier'),
-          style: const TextStyle(color: MiningTheme.secondaryText, height: 1.4),
-        ),
+        _explanation(),
       ] else ...[
         const SizedBox(height: 2),
         Text(
