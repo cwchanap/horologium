@@ -54,5 +54,6 @@
 **Files:** no production changes unless a defect is found.
 
 - [ ] Capture real Flutter rendering with actual assets/fonts for both cards at the four target sizes, including 1.3 and safe-area variants, and compare against the HPA-855 mockup. Report physical-device, pinch and synthetic-harness limits honestly.
+- [ ] At 390×844 and 430×932, text 1.0 and 1.3, verify the roomy portrait Homeworld and Io cards place the first action within 32 logical pixels below the last detail when all content fits; use a content-sized floating card rather than expanding the empty body. Preserve the compact/landscape first-frame and interaction matrix.
 - [ ] Run format, fatal-info analysis, full VM and Chrome suites, coverage, public-action journey, Android debug, web and iOS simulator debug builds.
 - [ ] Review the complete follow-up, push the existing branch and update draft PR #55 with verification and visual limitations.
