@@ -300,6 +300,9 @@ class PlanetMasteredCard extends StatelessWidget {
     ),
     child: Semantics(
       header: true,
+      // The card's dialog route supplies the route scope but no name; this
+      // title node is the milestone route name a screen reader announces.
+      namesRoute: true,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
