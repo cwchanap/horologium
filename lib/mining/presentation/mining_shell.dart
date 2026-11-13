@@ -412,6 +412,7 @@ class _MiningShellState extends State<MiningShell>
         requirements: successorView?.requirements ?? const [],
         nextSaleMultiplier: mapView.nextSaleMultiplier,
         rewardCash: planet.masteryRewardCash,
+        topSafeArea: MediaQuery.paddingOf(context).top,
         onContinue: () => Navigator.of(context).pop(),
         onOpenMap: () {
           // Mastery can land while a Technology/Settings sheet opened during
