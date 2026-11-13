@@ -1,14 +1,23 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
-import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 
-/// The portrait sheet's fixed 160px band already clears the Mine Site's
-/// 134px top-right HUD by this much. Only a larger status-bar inset pushes
-/// that inline cargo gauge under this route's top-mounted close hex.
-const double _sceneHudClearance = 26;
+/// The floating card starts this far below the live top inset in portrait so
+/// its top-mounted close control clears the inline cargo gauge (84px tall at
+/// 50px down) that the modal route's removed top padding hides from it.
+const double _portraitTopClearance = 168;
+
+const double _portraitMargin = 20;
+const double _landscapeMargin = 12;
+const double _panelMaxWidth = 440;
+const double _landscapeMaxWidth = 560;
+const double _panelMaxHeight = 760;
+const double _panelRadius = 20;
+const double _actionRadius = 12;
+const double _closeSize = 48;
 
 /// Transient feedback for a deploy that just mastered a planet. The final
 /// variant pays the authored reward on the card and relays Relaunch through
@@ -46,262 +55,261 @@ class PlanetMasteredCard extends StatelessWidget {
   /// the inline scene HUD that did receive it.
   final double topSafeArea;
 
+  String get _title => isFinal ? 'FINAL PLANET MASTERED' : 'PLANET MASTERED';
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+    final padding = MediaQuery.paddingOf(context);
     final landscape = size.width > size.height;
-    // Landscape panels are always short. Portrait compacts whenever the
-    // viewport itself is short: at 360x640 the full art-led stack cannot show
-    // all three gates even at text scale 1.0, while compact keeps the full
-    // name, gates, and both pinned actions on the first frame.
-    // shortcut: the 700px breakpoint covers the short-phone target; move to a
-    // measured body viewport if more screen classes need it.
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
     final compactPortrait = !landscape && size.height <= 700;
-    // The modal route's own MediaQuery lost the shell's top padding; the
-    // inline Mine Site HUD underneath still moved down by it, so move this
-    // sheet's top chrome down with the excess.
-    final portraitTopShift = (topSafeArea - _sceneHudClearance).clamp(
-      0.0,
-      double.infinity,
-    );
-    // The final card's explanation is a long sentence. In the short layouts it
-    // runs full width under the summary instead of wrapping inside the narrow
-    // details column, which used to push it below the visible body. The art
-    // shrinks in those layouts so the reward and the explanation keep their
-    // measured first-frame widths.
+    final topInset = math.max(topSafeArea, padding.top);
+
+    // Portrait keeps the mockup's art-led stack, shrinking the planet on short
+    // phones. Landscape shrinks it further; its actions sit side by side so the
+    // whole Io explanation still opens above them.
     final Size artSize;
+    final double overlap;
     if (landscape) {
-      artSize = isFinal
-          ? (textScale > 1 ? const Size(28, 28) : const Size(40, 40))
-          : const Size(104, 104);
+      artSize = const Size(56, 56);
+      overlap = 20;
     } else if (compactPortrait) {
-      artSize = isFinal
-          ? (textScale > 1 ? const Size(48, 48) : const Size(112, 112))
-          : (textScale > 1 ? const Size(80, 80) : const Size(112, 112));
+      artSize = const Size(80, 80);
+      overlap = 26;
     } else {
-      artSize = const Size(160, 132);
+      artSize = const Size(130, 130);
+      overlap = 46;
     }
-    return MiningSheetFrame(
+
+    // The planet paints above the panel. Outside the panel, its top half needs
+    // its own space; in portrait the close also needs the fixed HUD clearance.
+    final artAbovePanel = artSize.height - overlap;
+    final bodyTop =
+        overlap +
+        (landscape
+            ? 8
+            : compactPortrait
+            ? 6
+            : 12);
+    final compact = landscape || compactPortrait;
+    final topLimit = landscape
+        ? topInset + 8 + artAbovePanel
+        : topInset + _portraitTopClearance;
+    final horizontalInset = landscape
+        ? math.max(padding.left, padding.right) + _landscapeMargin
+        : math.max(_portraitMargin, math.max(padding.left, padding.right) + 8);
+    final bottomLimit = math.max(padding.bottom, landscape ? 8.0 : 12.0);
+    final panelHeight = math.min(
+      _panelMaxHeight,
+      math.max(120.0, size.height - topLimit - bottomLimit),
+    );
+
+    return Padding(
       key: const Key('planet-mastery-card'),
-      portraitTopShift: portraitTopShift,
-      title: isFinal ? 'FINAL PLANET MASTERED' : 'PLANET MASTERED',
-      icon: const Icon(
-        Icons.military_tech_rounded,
-        color: MiningTheme.highlight,
-        size: 28,
+      padding: EdgeInsets.fromLTRB(
+        horizontalInset,
+        topLimit,
+        horizontalInset,
+        bottomLimit,
       ),
-      pinnedFooter: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: double.infinity,
-            child: _MasteryAction(
-              key: isFinal
-                  ? const Key('planet-mastery-relaunch')
-                  : const Key('planet-mastery-open-map'),
-              label: isFinal ? 'RELAUNCH' : 'Open Map',
-              emphasized: true,
-              onPressed: isFinal ? onRelaunch! : onOpenMap,
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: landscape ? _landscapeMaxWidth : _panelMaxWidth,
+          ),
+          child: SizedBox(
+            height: panelHeight,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(
+                  child: DefaultTextStyle.merge(
+                    style: const TextStyle(
+                      fontFamily: 'IBM Plex Mono',
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                    ),
+                    child: _panel(
+                      context,
+                      landscape: landscape,
+                      compact: compact,
+                      bodyTop: bodyTop,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: -artAbovePanel,
+                  left: 0,
+                  right: 0,
+                  child: Center(child: _art(artSize)),
+                ),
+                Positioned(
+                  top: -22,
+                  left: landscape ? 4 : null,
+                  right: landscape ? null : 4,
+                  child: _close(context),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: _MasteryAction(
-              key: const Key('planet-mastery-continue'),
-              label: 'Continue',
-              emphasized: false,
-              onPressed: onContinue,
-            ),
-          ),
-        ],
-      ),
-      child: _body(
-        landscape: landscape,
-        compactPortrait: compactPortrait,
-        artSize: artSize,
+        ),
       ),
     );
   }
 
-  Widget _body({
+  Widget _panel(
+    BuildContext context, {
     required bool landscape,
-    required bool compactPortrait,
-    required Size artSize,
-  }) {
-    if (isFinal && landscape) {
-      // Short landscape cannot stack the summary and the explanation. The
-      // status shares the name's line and the reward keeps its caption
-      // beside it; sort keys keep the reading order planet, reward, caption,
-      // status, explanation instead of the visual packing order.
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _art(artSize),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 2,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Semantics(
-                      sortKey: const OrdinalSortKey(1),
-                      child: _planetName(
-                        textAlign: TextAlign.start,
-                        tight: true,
-                      ),
-                    ),
-                    Semantics(
-                      sortKey: const OrdinalSortKey(4),
-                      child: _runComplete(),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              Flexible(
-                flex: 2,
-                child: Semantics(
-                  sortKey: const OrdinalSortKey(2),
-                  child: _reward(textAlign: TextAlign.start),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 1,
-                child: Semantics(
-                  sortKey: const OrdinalSortKey(3),
-                  child: _completionReward(),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Semantics(sortKey: const OrdinalSortKey(5), child: _explanation()),
-        ],
-      );
-    }
-    if (isFinal && compactPortrait) {
-      // Portrait has the width for the caption and status on one line; the
-      // explanation still spans the body beneath the summary instead of
-      // wrapping inside the narrow column beside the art.
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _finalSummary(artSize),
-          const SizedBox(height: 2),
-          _explanation(),
-        ],
-      );
-    }
-    // Short landscape has room for a wider composition: the art and
-    // milestone summary share a row, and the complete gates sit in one
-    // wrapping row underneath instead of a tall stacked column.
-    if (landscape && !isFinal) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _art(const Size(96, 96)),
-              const SizedBox(width: 12),
-              Expanded(child: _details(compact: true, includeGates: false)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            spacing: 8,
-            runSpacing: 2,
-            children: [
-              for (final (index, requirement) in requirements.indexed)
-                _MasteryRequirement(
-                  key: Key('planet-mastery-requirement-$index'),
-                  requirement: requirement,
-                  compact: true,
-                  intrinsicWidth: true,
-                ),
-            ],
-          ),
-        ],
-      );
-    }
-    if (landscape || compactPortrait) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _art(artSize),
-          const SizedBox(width: 12),
-          Expanded(child: _details(compact: true)),
-        ],
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    required bool compact,
+    required double bodyTop,
+  }) => Container(
+    key: const Key('planet-mastery-panel'),
+    decoration: BoxDecoration(
+      color: MiningTheme.panel,
+      borderRadius: BorderRadius.circular(_panelRadius),
+      border: Border.all(color: MiningTheme.accent.withAlpha(100)),
+      boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 32)],
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
       children: [
-        Center(child: _art(artSize)),
-        const SizedBox(height: 8),
-        _details(compact: false),
+        Expanded(
+          child: ScrollConfiguration(
+            // A desktop scrollbar would inset the body by 12px and push the
+            // mockup's centered badge off the card's centre line.
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(scrollbars: false),
+            child: SingleChildScrollView(
+              key: const Key('mining-sheet-body'),
+              padding: EdgeInsets.fromLTRB(18, bodyTop, 18, 4),
+              child: _body(compact: compact),
+            ),
+          ),
+        ),
+        Padding(
+          key: const Key('mining-sheet-pinned-footer'),
+          padding: EdgeInsets.fromLTRB(
+            18,
+            compact ? 6 : 8,
+            18,
+            compact ? 8 : 10,
+          ),
+          child: _actions(landscape: landscape),
+        ),
       ],
-    );
-  }
+    ),
+  );
 
-  /// The short final card's compact summary. The art shares the name's line so
-  /// every line above the explanation stays at its natural height. The caption
-  /// and status share a run where the column is wide enough.
-  Widget _finalSummary(Size artSize) => Column(
+  Widget _body({required bool compact}) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _art(artSize),
-          const SizedBox(width: 8),
-          Expanded(child: _planetName(textAlign: TextAlign.start, tight: true)),
-        ],
-      ),
-      const SizedBox(height: 2),
-      _reward(textAlign: TextAlign.start),
-      const SizedBox(height: 2),
-      Wrap(
-        spacing: 8,
-        runSpacing: 2,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [_completionReward(), _runComplete()],
-      ),
+      Center(child: _badge()),
+      SizedBox(height: compact ? 4 : 8),
+      _planetName(),
+      if (isFinal) ...[
+        const SizedBox(height: 2),
+        _reward(),
+        _completionReward(),
+        SizedBox(height: compact ? 6 : 10),
+        Align(alignment: Alignment.centerLeft, child: _runComplete()),
+        const SizedBox(height: 2),
+        _explanation(),
+      ] else ...[
+        const SizedBox(height: 2),
+        Text(
+          'All ${masteredPlanet.sites.length} sites commissioned',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: MiningTheme.secondaryText,
+            fontSize: 12,
+          ),
+        ),
+        SizedBox(height: compact ? 4 : 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'NEXT · ${(successorName ?? 'The next frontier').toUpperCase()}',
+            key: const Key('planet-mastery-successor'),
+            style: const TextStyle(
+              color: MiningTheme.accent,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: .8,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        for (final (index, requirement) in requirements.indexed)
+          _MasteryRequirement(
+            key: Key('planet-mastery-requirement-$index'),
+            // The first projected successor gate is its mastery requirement.
+            // The card uses the mockup's wording; the shared Stellar Map
+            // projection keeps its own `sites 3/3` label.
+            label: !isFinal && index == 0
+                ? '${masteredPlanet.name} mastered'
+                : requirement.label,
+            requirement: requirement,
+            compact: compact,
+          ),
+      ],
     ],
   );
 
-  /// [tight] trims the inherited 1.4 leading so a short card's single-line
-  /// name stays inside the first-frame body budget.
-  Widget _planetName({required TextAlign textAlign, bool tight = false}) =>
-      Text(
-        masteredPlanet.name,
-        key: const Key('planet-mastery-planet'),
-        textAlign: textAlign,
-        style: TextStyle(
-          color: MiningTheme.highlight,
-          fontFamily: 'Orbitron',
-          fontSize: 26,
-          fontWeight: FontWeight.w800,
-          height: tight ? 1.1 : null,
-        ),
-      );
+  Widget _badge() => Container(
+    key: const Key('planet-mastery-badge'),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(color: MiningTheme.accent),
+    ),
+    child: Semantics(
+      header: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: const BoxDecoration(
+              color: MiningTheme.accent,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            _title,
+            style: const TextStyle(
+              color: MiningTheme.accent,
+              fontFamily: 'Orbitron',
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: .2,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 
-  Widget _reward({TextAlign textAlign = TextAlign.center}) => Text(
-    '+${formatMiningCash(rewardCash ?? 0)} cash',
+  Widget _planetName() => Text(
+    masteredPlanet.name,
+    key: const Key('planet-mastery-planet'),
+    textAlign: TextAlign.center,
+    style: const TextStyle(
+      color: MiningTheme.primaryText,
+      fontFamily: 'Orbitron',
+      fontSize: 26,
+      fontWeight: FontWeight.w800,
+      height: 1.1,
+    ),
+  );
+
+  Widget _reward() => Text(
+    '+${formatMiningCash(rewardCash ?? 0)}',
     key: const Key('planet-mastery-reward'),
-    textAlign: textAlign,
+    textAlign: TextAlign.center,
     style: const TextStyle(
       color: MiningTheme.warning,
       fontFamily: 'Orbitron',
@@ -334,6 +342,40 @@ class PlanetMasteredCard extends StatelessWidget {
     style: const TextStyle(color: MiningTheme.secondaryText, height: 1.4),
   );
 
+  Widget _actions({required bool landscape}) {
+    final primary = _MasteryAction(
+      key: isFinal
+          ? const Key('planet-mastery-relaunch')
+          : const Key('planet-mastery-open-map'),
+      label: isFinal ? 'RELAUNCH' : 'OPEN STELLAR MAP',
+      emphasized: true,
+      onPressed: isFinal ? onRelaunch! : onOpenMap,
+    );
+    final secondary = _MasteryAction(
+      key: const Key('planet-mastery-continue'),
+      label: isFinal ? 'LATER' : 'CONTINUE',
+      emphasized: false,
+      onPressed: onContinue,
+    );
+    if (!landscape) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(width: double.infinity, child: primary),
+          const SizedBox(height: 8),
+          SizedBox(width: double.infinity, child: secondary),
+        ],
+      );
+    }
+    return Row(
+      children: [
+        Expanded(child: primary),
+        const SizedBox(width: 10),
+        Expanded(child: secondary),
+      ],
+    );
+  }
+
   Widget _art(Size size) => Image.asset(
     masteredPlanet.planetAsset,
     key: const Key('planet-mastery-art'),
@@ -347,96 +389,89 @@ class PlanetMasteredCard extends StatelessWidget {
     ),
   );
 
-  Widget _details({required bool compact, bool includeGates = true}) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      _planetName(textAlign: TextAlign.center),
-      if (isFinal) ...[
-        const SizedBox(height: 4),
-        _reward(),
-        const SizedBox(height: 2),
-        _completionReward(),
-        SizedBox(height: compact ? 10 : 16),
-        _runComplete(),
-        const SizedBox(height: 4),
-        _explanation(),
-      ] else ...[
-        const SizedBox(height: 2),
-        Text(
-          'All ${masteredPlanet.sites.length} sites commissioned',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: MiningTheme.secondaryText,
-            fontSize: 12,
-          ),
+  Widget _close(BuildContext context) => Semantics(
+    label: 'Close $_title',
+    button: true,
+    child: Material(
+      color: const Color(0xFF060A10),
+      shape: CircleBorder(
+        side: BorderSide(color: MiningTheme.accent.withAlpha(100)),
+      ),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => Navigator.of(context).maybePop(),
+        child: const SizedBox(
+          width: _closeSize,
+          height: _closeSize,
+          child: Icon(Icons.close, color: Colors.white60, size: 20),
         ),
-        SizedBox(height: compact ? 2 : 16),
-        Text(
-          '${successorName ?? 'The next frontier'} is next',
-          key: const Key('planet-mastery-successor'),
-          style: const TextStyle(
-            color: MiningTheme.accent,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            letterSpacing: .8,
-          ),
-        ),
-        if (includeGates) ...[
-          const SizedBox(height: 6),
-          for (final (index, requirement) in requirements.indexed)
-            _MasteryRequirement(
-              key: Key('planet-mastery-requirement-$index'),
-              requirement: requirement,
-              compact: compact,
-            ),
-        ],
-      ],
-    ],
+      ),
+    ),
   );
 }
 
 class _MasteryRequirement extends StatelessWidget {
   const _MasteryRequirement({
     super.key,
+    required this.label,
     required this.requirement,
     this.compact = false,
-    this.intrinsicWidth = false,
   });
 
+  /// The card-facing wording for the projected gate; the model's own label is
+  /// untouched so the Stellar Map keeps its existing copy.
+  final String label;
   final StellarMapRequirementView requirement;
 
-  /// Tightens the padding for the compact card.
+  /// Tightens the row for the short landscape card.
   final bool compact;
-
-  /// The landscape gate Wrap sizes rows to their text so gates can share a
-  /// run; every other layout keeps the text flexible and wrapping.
-  final bool intrinsicWidth;
 
   @override
   Widget build(BuildContext context) {
-    final color = requirement.isSatisfied
+    final statusColor = requirement.isSatisfied
         ? MiningTheme.accent
         : MiningTheme.gate;
-    final label = Text(
-      requirement.label,
-      style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
-    );
     return Semantics(
-      label:
-          '${requirement.label}, '
-          '${requirement.isSatisfied ? 'satisfied' : 'required'}',
+      label: [
+        label,
+        requirement.isSatisfied ? 'satisfied' : 'required',
+        if (requirement.currentValue != null) requirement.currentValue!,
+      ].join(', '),
       child: Padding(
-        padding: EdgeInsets.symmetric(vertical: compact ? 0 : 3),
+        padding: EdgeInsets.symmetric(vertical: compact ? 1 : 2),
         child: Row(
-          mainAxisSize: intrinsicWidth ? MainAxisSize.min : MainAxisSize.max,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
               requirement.isSatisfied ? Icons.check : Icons.close,
-              color: color,
+              color: statusColor,
               size: 16,
             ),
-            SizedBox(width: compact ? 6 : 8),
-            if (intrinsicWidth) label else Expanded(child: label),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Wrap(
+                spacing: 4,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: MiningTheme.primaryText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (requirement.currentValue != null)
+                    Text(
+                      '· ${requirement.currentValue}',
+                      style: const TextStyle(
+                        color: MiningTheme.secondaryText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -458,19 +493,25 @@ class _MasteryAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const textStyle = TextStyle(
+    final textStyle = const TextStyle(
       fontFamily: 'Orbitron',
       fontSize: 13,
       fontWeight: FontWeight.w800,
+      letterSpacing: .8,
+    );
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(_actionRadius),
     );
     if (!emphasized) {
       return OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(48, 48),
-          foregroundColor: Colors.white70,
-          side: const BorderSide(color: Colors.white24),
-          shape: const StadiumBorder(),
+          tapTargetSize: MaterialTapTargetSize.padded,
+          visualDensity: VisualDensity.standard,
+          foregroundColor: Colors.white,
+          side: BorderSide(color: MiningTheme.accent.withAlpha(120)),
+          shape: shape,
           textStyle: textStyle,
         ),
         child: Text(label),
@@ -480,9 +521,11 @@ class _MasteryAction extends StatelessWidget {
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
         minimumSize: const Size(48, 48),
+        tapTargetSize: MaterialTapTargetSize.padded,
+        visualDensity: VisualDensity.standard,
         backgroundColor: MiningTheme.highlight,
         foregroundColor: const Color(0xFF04121A),
-        shape: const StadiumBorder(),
+        shape: shape,
         textStyle: textStyle,
       ),
       child: Text(label),

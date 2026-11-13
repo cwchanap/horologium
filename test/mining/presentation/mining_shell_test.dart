@@ -4354,7 +4354,7 @@ void main() {
         tester
             .widget<Text>(find.byKey(const Key('planet-mastery-successor')))
             .data,
-        'Lunar Frontier is next',
+        'NEXT · LUNAR FRONTIER',
       );
       expect(find.text('Rig deployed.'), findsNothing);
       expect(find.byType(SnackBar), findsNothing);
@@ -4367,15 +4367,38 @@ void main() {
       expect(requirements, isNotEmpty);
       expect(requirements.any((gate) => gate.isSatisfied), isTrue);
       expect(requirements.any((gate) => !gate.isSatisfied), isTrue);
+      // The Stellar Map projection keeps its authored labels; only the card
+      // uses the mockup's mastery wording.
+      expect(requirements.first.label, 'Homeworld sites 3/3');
       for (var i = 0; i < requirements.length; i++) {
         final gate = requirements[i];
+        final displayLabel = i == 0 ? 'Homeworld mastered' : gate.label;
         final row = find.byKey(Key('planet-mastery-requirement-$i'));
         expect(row, findsOneWidget, reason: gate.label);
         expect(
-          find.descendant(of: row, matching: find.text(gate.label)),
+          find.descendant(of: row, matching: find.text(displayLabel)),
           findsOneWidget,
           reason: gate.label,
         );
+        if (i == 0) {
+          expect(
+            find.descendant(
+              of: row,
+              matching: find.text('Homeworld sites 3/3'),
+            ),
+            findsNothing,
+          );
+        }
+        if (gate.currentValue != null) {
+          expect(
+            find.descendant(
+              of: row,
+              matching: find.text('· ${gate.currentValue}'),
+            ),
+            findsOneWidget,
+            reason: gate.label,
+          );
+        }
         expect(
           find.descendant(
             of: row,
@@ -4387,7 +4410,7 @@ void main() {
         expect(
           find.bySemanticsLabel(
             RegExp(
-              '^${RegExp.escape(gate.label)}, '
+              '^${RegExp.escape(displayLabel)}, '
               '${gate.isSatisfied ? 'satisfied' : 'required'}',
             ),
           ),
@@ -4485,7 +4508,7 @@ void main() {
           tester
               .widget<Text>(find.byKey(const Key('planet-mastery-reward')))
               .data,
-          '+${formatMiningCash(reward)} cash',
+          '+${formatMiningCash(reward)}',
         );
         expect(find.textContaining('Io mastered'), findsNothing);
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
@@ -15,9 +16,18 @@ final _start = DateTime.utc(2026, 8, 27, 12);
 /// The mockup review sizes: three portrait phones and one short landscape.
 const _sizes = [Size(360, 640), Size(390, 844), Size(430, 932), Size(874, 402)];
 
+const _actionRadius = 12.0;
+
 EdgeInsets _insetsFor(Size size) => size.width > size.height
     ? const EdgeInsets.fromLTRB(44, 0, 44, 21)
     : const EdgeInsets.fromLTRB(0, 24, 0, 24);
+
+Rect _safeRect(Size size, EdgeInsets insets) => Rect.fromLTRB(
+  insets.left,
+  insets.top,
+  size.width - insets.right,
+  size.height - insets.bottom,
+);
 
 PlanetMasteredCard _nonfinalCard({
   VoidCallback? onContinue,
@@ -108,13 +118,62 @@ PlanetMasteredCard _projectedLaterCard({
   );
 }
 
+/// The longest authored successor gates: mastering Ceres projects Io's
+/// `Ceres Frontier sites 3/3`, `Surveying 5`, and `90.00M cash` rows.
+PlanetMasteredCard _projectedCeresCard({
+  VoidCallback? onContinue,
+  VoidCallback? onOpenMap,
+}) {
+  final initial = MiningSave.initial(nowUtc: _start);
+  final sites = <MiningSiteId, SiteProgress>{...initial.sites};
+  for (final planet in const [
+    MiningPlanetId.homeworld,
+    MiningPlanetId.lunarFrontier,
+    MiningPlanetId.marsFrontier,
+    MiningPlanetId.ceresFrontier,
+  ]) {
+    for (final site in _content.planet(planet).sites) {
+      sites[site.id] = SiteProgress(
+        unlocked: true,
+        commissioned: true,
+        storedAmount: 0,
+        rigPlacements: const [],
+      );
+    }
+  }
+  final view = StellarMapView.from(
+    state: initial.copyWith(
+      cash: 12350000,
+      technology: const TechnologyLevels(surveying: 4),
+      unlockedPlanetIds: const {
+        MiningPlanetId.homeworld,
+        MiningPlanetId.lunarFrontier,
+        MiningPlanetId.marsFrontier,
+        MiningPlanetId.ceresFrontier,
+      },
+      activePlanetId: MiningPlanetId.ceresFrontier,
+      sites: sites,
+    ),
+    content: _content,
+  );
+  final successor = view.planet(MiningPlanetId.ioFrontier);
+  return PlanetMasteredCard(
+    masteredPlanet: _content.planet(MiningPlanetId.ceresFrontier),
+    successorName: successor.name,
+    requirements: successor.requirements,
+    nextSaleMultiplier: view.nextSaleMultiplier,
+    onContinue: onContinue ?? () {},
+    onOpenMap: onOpenMap ?? () {},
+  );
+}
+
 bool _inside(Rect outer, Rect inner) =>
     outer.contains(inner.topLeft) &&
     outer.contains(inner.bottomRight - const Offset(1, 1));
 
 /// Labels in accessibility traversal order: the order assistive technologies
-/// follow, which differs from paint order when `OrdinalSortKey`s reorder the
-/// compact final card's packed summary.
+/// follow, which differs from paint order when `OrdinalSortKey`s reorder a
+/// packed summary.
 List<String> _traversalLabels(WidgetTester tester) => [
   for (final node in tester.semantics.simulatedAccessibilityTraversal())
     if (node.getSemanticsData().label.isNotEmpty) node.getSemanticsData().label,
@@ -167,23 +226,51 @@ void _expectVisibleInBody(WidgetTester tester, Finder finder) {
   expect(rect.bottom, lessThanOrEqualTo(footer.top), reason: '$finder $rect');
 }
 
-/// The mockup's action stack: a filled cyan primary above the outlined
-/// secondary, both already inside the safe area without scrolling.
-void _expectStackedActions(
+void _expectRoundedShape<T extends ButtonStyleButton>(
+  WidgetTester tester,
+  Finder finder,
+) {
+  final button = tester.widget<T>(finder);
+  final shape = button.style!.shape!.resolve(const <WidgetState>{});
+  expect(shape, isA<RoundedRectangleBorder>(), reason: '$finder');
+  expect(
+    (shape! as RoundedRectangleBorder).borderRadius,
+    BorderRadius.circular(_actionRadius),
+    reason: '$finder',
+  );
+}
+
+/// The mockup's rounded-rectangle action hierarchy: one filled cyan primary
+/// and one outlined secondary, both with the mockup copy and immediately
+/// tappable inside the safe area.
+void _expectActionHierarchy(
   WidgetTester tester, {
   required Finder primary,
   required Finder secondary,
   required Size size,
+  required String primaryLabel,
+  required String secondaryLabel,
 }) {
   final primaryButton = find.descendant(
     of: primary,
     matching: find.byType(ElevatedButton),
   );
+  final secondaryButton = find.descendant(
+    of: secondary,
+    matching: find.byType(OutlinedButton),
+  );
   expect(primaryButton, findsOneWidget);
+  expect(secondaryButton, findsOneWidget);
   expect(
-    find.descendant(of: secondary, matching: find.byType(OutlinedButton)),
+    find.descendant(of: primary, matching: find.text(primaryLabel)),
     findsOneWidget,
   );
+  expect(
+    find.descendant(of: secondary, matching: find.text(secondaryLabel)),
+    findsOneWidget,
+  );
+  _expectRoundedShape<ElevatedButton>(tester, primaryButton);
+  _expectRoundedShape<OutlinedButton>(tester, secondaryButton);
   expect(
     tester
         .widget<ElevatedButton>(primaryButton)
@@ -192,15 +279,9 @@ void _expectStackedActions(
         .resolve(const <WidgetState>{}),
     MiningTheme.highlight,
   );
-  expect(tester.getRect(primary).top, lessThan(tester.getRect(secondary).top));
 
-  final insets = _insetsFor(size);
-  final safe = Rect.fromLTRB(
-    insets.left,
-    insets.top,
-    size.width - insets.right,
-    size.height - insets.bottom,
-  );
+  final safe = _safeRect(size, _insetsFor(size));
+  final panel = tester.getRect(find.byKey(const Key('planet-mastery-panel')));
   for (final finder in [primary, secondary]) {
     final rect = tester.getRect(finder);
     expect(safe.contains(rect.topLeft), isTrue, reason: '$finder $rect');
@@ -209,26 +290,171 @@ void _expectStackedActions(
       isTrue,
       reason: '$finder $rect',
     );
+    expect(_inside(panel, rect), isTrue, reason: '$finder $rect vs $panel');
+    expect(finder.hitTestable(), findsOneWidget);
+    expect(rect.height, greaterThanOrEqualTo(48));
+  }
+
+  final primaryRect = tester.getRect(primary);
+  final secondaryRect = tester.getRect(secondary);
+  if (size.width > size.height) {
+    // Compact landscape keeps the same primary-then-secondary order in one row
+    // so both actions stay on the first frame.
+    expect(primaryRect.left, lessThan(secondaryRect.left));
+    expect((primaryRect.top - secondaryRect.top).abs(), lessThanOrEqualTo(1));
+  } else {
+    expect(primaryRect.top, lessThan(secondaryRect.top));
+    expect(primaryRect.left, closeTo(secondaryRect.left, .5));
   }
 }
 
-/// Normal widths keep the centered, art-led composition. The short landscape
-/// and narrow large-text cards compact the art beside the milestone details;
-/// the final card shrinks it further so the whole multiplier explanation can
-/// open above the pinned actions.
-void _expectArtLayout(WidgetTester tester, Size size, {required bool isFinal}) {
-  final body = tester.getRect(find.byKey(const Key('mining-sheet-body')));
+/// The floating mockup composition: a centered rounded panel, planet art
+/// straddling its top edge, and a close control straddling the same edge while
+/// staying inside the live safe area.
+void _expectFloatingComposition(
+  WidgetTester tester,
+  Size size, {
+  required bool isFinal,
+}) {
+  final insets = _insetsFor(size);
+  final safe = _safeRect(size, insets);
+  final panel = tester.getRect(find.byKey(const Key('planet-mastery-panel')));
   final art = tester.getRect(find.byKey(const Key('planet-mastery-art')));
-  if (size == const Size(874, 402)) {
-    expect(art.left, lessThan(body.center.dx));
-    expect(art.height, greaterThanOrEqualTo(isFinal ? 24 : 96));
-  } else if (size == const Size(360, 640)) {
-    expect(art.left, lessThan(body.center.dx));
-    expect(art.height, greaterThanOrEqualTo(isFinal ? 40 : 72));
+  final landscape = size.width > size.height;
+  final roomy = !landscape && size.height > 700;
+
+  expect((panel.center.dx - size.width / 2).abs(), lessThanOrEqualTo(1));
+  expect(panel.left, greaterThanOrEqualTo(safe.left + 12));
+  expect(panel.right, lessThanOrEqualTo(safe.right - 12 + .5));
+  expect(panel.top, greaterThanOrEqualTo(safe.top));
+  expect(panel.bottom, lessThanOrEqualTo(safe.bottom + .5));
+  expect(panel.bottom, greaterThan(safe.bottom - 24));
+  if (landscape) {
+    expect(panel.width, lessThanOrEqualTo(560));
   } else {
-    expect((art.center.dx - body.center.dx).abs(), lessThanOrEqualTo(8));
-    expect(art.width, greaterThanOrEqualTo(120));
-    expect(art.height, greaterThanOrEqualTo(120));
+    expect(panel.width, lessThanOrEqualTo(440));
+  }
+
+  expect(art.top, lessThan(panel.top), reason: 'the planet must overlap');
+  expect(art.bottom, greaterThan(panel.top + 2));
+  expect((art.center.dx - panel.center.dx).abs(), lessThanOrEqualTo(1));
+  expect(art.height, greaterThanOrEqualTo(roomy ? 110 : 44));
+
+  final close = find.bySemanticsLabel(
+    'Close ${isFinal ? 'FINAL PLANET MASTERED' : 'PLANET MASTERED'}',
+  );
+  expect(close, findsOneWidget);
+  expect(close.hitTestable(), findsOneWidget);
+  final closeRect = tester.getRect(close);
+  expect(closeRect.top, greaterThanOrEqualTo(safe.top));
+  expect(closeRect.top, lessThan(panel.top));
+  expect(closeRect.bottom, greaterThan(panel.top));
+  expect(closeRect.right, lessThanOrEqualTo(safe.right));
+
+  final body = tester.getRect(find.byKey(const Key('mining-sheet-body')));
+  final footer = tester.getRect(
+    find.byKey(const Key('mining-sheet-pinned-footer')),
+  );
+  expect(_inside(panel, body), isTrue, reason: '$body vs $panel');
+  expect(_inside(panel, footer), isTrue, reason: '$footer vs $panel');
+  expect(body.bottom, lessThanOrEqualTo(footer.top + .5));
+}
+
+void _expectOutlinedBadge(
+  WidgetTester tester,
+  Size size, {
+  required bool isFinal,
+}) {
+  final title = isFinal ? 'FINAL PLANET MASTERED' : 'PLANET MASTERED';
+  final badge = find.byKey(const Key('planet-mastery-badge'));
+  expect(badge, findsOneWidget);
+  final container = tester.widget<Container>(badge);
+  final decoration = container.decoration! as BoxDecoration;
+  final border = decoration.border! as Border;
+  expect(border.top.color, MiningTheme.accent);
+  final radius = decoration.borderRadius! as BorderRadius;
+  expect(radius.topLeft.x, greaterThanOrEqualTo(999));
+
+  final panel = tester.getRect(find.byKey(const Key('planet-mastery-panel')));
+  final badgeRect = tester.getRect(badge);
+  final titleRect = tester.getRect(find.text(title));
+  expect((badgeRect.center.dx - panel.center.dx).abs(), lessThanOrEqualTo(1));
+  // The leading dot offsets the title inside the pill; both must stay inside it.
+  expect(titleRect.left, greaterThan(badgeRect.left));
+  expect(titleRect.right, lessThan(badgeRect.right));
+  expect(badgeRect.width, lessThan(panel.width - 24));
+  expect(
+    tester
+        .getSemantics(find.text(title))
+        .getSemanticsData()
+        .flagsCollection
+        .isHeader,
+    isTrue,
+  );
+}
+
+void _expectGate(
+  WidgetTester tester, {
+  required int index,
+  required String label,
+  required bool satisfied,
+  String? currentValue,
+}) {
+  final gate = find.byKey(Key('planet-mastery-requirement-$index'));
+  expect(gate, findsOneWidget, reason: 'gate $index');
+  _expectVisibleInBody(tester, gate);
+  expect(
+    find.descendant(
+      of: gate,
+      matching: find.byIcon(satisfied ? Icons.check : Icons.close),
+    ),
+    findsOneWidget,
+    reason: 'gate $index',
+  );
+  expect(
+    tester
+        .widget<Icon>(
+          find.descendant(
+            of: gate,
+            matching: find.byIcon(satisfied ? Icons.check : Icons.close),
+          ),
+        )
+        .color,
+    satisfied ? MiningTheme.accent : MiningTheme.gate,
+  );
+
+  final labelText = find.descendant(of: gate, matching: find.text(label));
+  expect(labelText, findsOneWidget, reason: 'gate $index: $label');
+  _expectVisibleInBody(tester, labelText);
+  final labelWidget = tester.widget<Text>(labelText);
+  expect(labelWidget.style?.color, MiningTheme.primaryText);
+  expect(labelWidget.maxLines, isNull);
+  expect(labelWidget.overflow, isNot(TextOverflow.ellipsis));
+  final paragraph = tester.renderObject<RenderParagraph>(labelText);
+  expect(paragraph.text.style?.fontFamily, 'IBM Plex Mono');
+  expect(
+    paragraph.size.width,
+    greaterThanOrEqualTo(paragraph.getMaxIntrinsicWidth(double.infinity) - .5),
+    reason: 'gate $index "$label" must not wrap or clip',
+  );
+  expect(
+    paragraph.size.height,
+    greaterThanOrEqualTo(
+      paragraph.getMaxIntrinsicHeight(paragraph.size.width) - .5,
+    ),
+    reason: 'gate $index "$label" loses wrapped lines',
+  );
+
+  if (currentValue != null) {
+    final value = find.descendant(
+      of: gate,
+      matching: find.text('· $currentValue'),
+    );
+    expect(value, findsOneWidget, reason: 'gate $index current value');
+    _expectVisibleInBody(tester, value);
+    final valueWidget = tester.widget<Text>(value);
+    expect(valueWidget.maxLines, isNull);
+    expect(valueWidget.overflow, isNot(TextOverflow.ellipsis));
   }
 }
 
@@ -245,24 +471,24 @@ void main() {
       final semantics = tester.ensureSemantics();
       var continues = 0;
       var opens = 0;
-      await _pumpCard(
-        tester,
-        size: size,
-        card: _nonfinalCard(
-          onContinue: () => continues++,
-          onOpenMap: () => opens++,
-        ),
+      final card = _nonfinalCard(
+        onContinue: () => continues++,
+        onOpenMap: () => opens++,
       );
+      await _pumpCard(tester, size: size, card: card);
 
-      _expectArtLayout(tester, size, isFinal: false);
+      _expectFloatingComposition(tester, size, isFinal: false);
+      _expectOutlinedBadge(tester, size, isFinal: false);
 
       final openMap = find.byKey(const Key('planet-mastery-open-map'));
       final continueButton = find.byKey(const Key('planet-mastery-continue'));
-      _expectStackedActions(
+      _expectActionHierarchy(
         tester,
         primary: openMap,
         secondary: continueButton,
         size: size,
+        primaryLabel: 'OPEN STELLAR MAP',
+        secondaryLabel: 'CONTINUE',
       );
 
       expect(find.text('All 3 sites commissioned'), findsOneWidget);
@@ -270,33 +496,35 @@ void main() {
         tester
             .widget<Text>(find.byKey(const Key('planet-mastery-successor')))
             .data,
-        'Lunar Frontier is next',
+        'NEXT · LUNAR FRONTIER',
       );
-      expect(find.text('Homeworld sites 3/3'), findsOneWidget);
-      expect(find.text('Surveying 3'), findsOneWidget);
-      expect(find.text('200,000 cash'), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('planet-mastery-requirement-0')),
-          matching: find.byIcon(Icons.check),
-        ),
-        findsOneWidget,
-      );
-      for (final index in const [1, 2]) {
-        expect(
-          find.descendant(
-            of: find.byKey(Key('planet-mastery-requirement-$index')),
-            matching: find.byIcon(Icons.close),
-          ),
-          findsOneWidget,
-        );
-      }
-      await tester.tap(openMap);
-      await tester.tap(continueButton);
-      expect(opens, 1);
-      expect(continues, 1);
 
-      // Only the body scrolls; the actions above were tapped before this.
+      // The card's mastery wording is presentation-only: the shared Stellar
+      // Map projection keeps its authored `Homeworld sites 3/3` label.
+      expect(card.requirements.first.label, 'Homeworld sites 3/3');
+      expect(find.text('Homeworld sites 3/3'), findsNothing);
+      _expectGate(
+        tester,
+        index: 0,
+        label: 'Homeworld mastered',
+        satisfied: true,
+      );
+      _expectGate(
+        tester,
+        index: 1,
+        label: 'Surveying 3',
+        satisfied: false,
+        currentValue: 'now LV 0',
+      );
+      _expectGate(
+        tester,
+        index: 2,
+        label: '200,000 cash',
+        satisfied: false,
+        currentValue: '100',
+      );
+
+      // Only the body scrolls; the pinned actions above were tapped first.
       await tester.ensureVisible(
         find.byKey(const Key('planet-mastery-requirement-1')),
       );
@@ -306,13 +534,13 @@ void main() {
         findsOneWidget,
       );
       expect(
-        tester
-            .getSemantics(find.text('PLANET MASTERED'))
-            .getSemanticsData()
-            .flagsCollection
-            .isHeader,
-        isTrue,
+        find.bySemanticsLabel(RegExp('^Homeworld mastered, satisfied')),
+        findsOneWidget,
       );
+      await tester.tap(openMap);
+      await tester.tap(continueButton);
+      expect(opens, 1);
+      expect(continues, 1);
       expect(tester.takeException(), isNull);
       semantics.dispose();
     });
@@ -332,29 +560,18 @@ void main() {
         ),
       );
 
-      _expectArtLayout(tester, size, isFinal: true);
+      _expectFloatingComposition(tester, size, isFinal: true);
+      _expectOutlinedBadge(tester, size, isFinal: true);
 
       final relaunch = find.byKey(const Key('planet-mastery-relaunch'));
       final continueButton = find.byKey(const Key('planet-mastery-continue'));
-      _expectStackedActions(
+      _expectActionHierarchy(
         tester,
         primary: relaunch,
         secondary: continueButton,
         size: size,
-      );
-      // Both pinned actions stay tappable without scrolling the body.
-      expect(relaunch.hitTestable(), findsOneWidget);
-      expect(continueButton.hitTestable(), findsOneWidget);
-
-      // The heading wraps at this size and text scale; its box must grow with
-      // the wrapped lines instead of clipping the second one.
-      final heading = tester.renderObject<RenderParagraph>(
-        find.text('FINAL PLANET MASTERED'),
-      );
-      expect(
-        heading.size.height,
-        greaterThanOrEqualTo(heading.getMaxIntrinsicHeight(heading.size.width)),
-        reason: 'the milestone heading must render both wrapped lines',
+        primaryLabel: 'RELAUNCH',
+        secondaryLabel: 'LATER',
       );
 
       final reward = _content.planet(_content.finalPlanetId).masteryRewardCash;
@@ -362,17 +579,26 @@ void main() {
         tester
             .widget<Text>(find.byKey(const Key('planet-mastery-reward')))
             .data,
-        '+${formatMiningCash(reward)} cash',
+        '+${formatMiningCash(reward)}',
       );
       expect(find.text('completion reward'), findsOneWidget);
       expect(find.text('RUN COMPLETE'), findsOneWidget);
+
+      // The heading stays a single production-font line, never clipped.
+      final heading = tester.renderObject<RenderParagraph>(
+        find.text('FINAL PLANET MASTERED'),
+      );
       expect(
-        tester
-            .getSemantics(find.text('FINAL PLANET MASTERED'))
-            .getSemanticsData()
-            .flagsCollection
-            .isHeader,
-        isTrue,
+        heading.size.width,
+        greaterThanOrEqualTo(
+          heading.getMaxIntrinsicWidth(double.infinity) - .5,
+        ),
+      );
+      expect(
+        heading.size.height,
+        greaterThanOrEqualTo(
+          heading.getMaxIntrinsicHeight(heading.size.width) - .5,
+        ),
       );
 
       await tester.tap(relaunch);
@@ -383,6 +609,85 @@ void main() {
       semantics.dispose();
     });
   }
+
+  testWidgets(
+    'roomy 390x844 floats a centered card with overlapping planet, outlined '
+    'badge, white name, and rounded mockup actions',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      var continues = 0;
+      var opens = 0;
+      await _pumpCard(
+        tester,
+        size: const Size(390, 844),
+        textScale: 1.0,
+        card: _nonfinalCard(
+          onContinue: () => continues++,
+          onOpenMap: () => opens++,
+        ),
+      );
+
+      _expectFloatingComposition(tester, const Size(390, 844), isFinal: false);
+      _expectOutlinedBadge(tester, const Size(390, 844), isFinal: false);
+
+      final panel = tester.getRect(
+        find.byKey(const Key('planet-mastery-panel')),
+      );
+      expect(panel.top, greaterThan(_insetsFor(const Size(390, 844)).top + 80));
+      expect(panel.top, lessThan(844 / 2));
+
+      final name = tester.widget<Text>(
+        find.byKey(const Key('planet-mastery-planet')),
+      );
+      expect(name.data, 'Homeworld');
+      expect(name.textAlign, TextAlign.center);
+      expect(name.style?.color, Colors.white);
+      expect(name.style?.fontFamily, 'Orbitron');
+      expect(
+        (tester
+                    .getRect(find.byKey(const Key('planet-mastery-planet')))
+                    .center
+                    .dx -
+                panel.center.dx)
+            .abs(),
+        lessThanOrEqualTo(1),
+      );
+
+      _expectActionHierarchy(
+        tester,
+        primary: find.byKey(const Key('planet-mastery-open-map')),
+        secondary: find.byKey(const Key('planet-mastery-continue')),
+        size: const Size(390, 844),
+        primaryLabel: 'OPEN STELLAR MAP',
+        secondaryLabel: 'CONTINUE',
+      );
+
+      await tester.tap(find.byKey(const Key('planet-mastery-open-map')));
+      await tester.tap(find.byKey(const Key('planet-mastery-continue')));
+      expect(opens, 1);
+      expect(continues, 1);
+
+      // The final variant uses the same composition with the Relaunch copy.
+      await _pumpCard(
+        tester,
+        size: const Size(390, 844),
+        textScale: 1.0,
+        card: _finalCard(),
+      );
+      _expectFloatingComposition(tester, const Size(390, 844), isFinal: true);
+      _expectOutlinedBadge(tester, const Size(390, 844), isFinal: true);
+      _expectActionHierarchy(
+        tester,
+        primary: find.byKey(const Key('planet-mastery-relaunch')),
+        secondary: find.byKey(const Key('planet-mastery-continue')),
+        size: const Size(390, 844),
+        primaryLabel: 'RELAUNCH',
+        secondaryLabel: 'LATER',
+      );
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
 
   for (final size in const [Size(874, 402), Size(360, 640)]) {
     final label = '${size.width.toInt()}x${size.height.toInt()}';
@@ -423,8 +728,8 @@ void main() {
     );
 
     testWidgets(
-      'opens with the planet, successor, and all gates above the actions '
-      'at $label',
+      'opens with the planet, successor, and every full gate and current '
+      'value above the actions at $label',
       (tester) async {
         var continues = 0;
         var opens = 0;
@@ -446,25 +751,26 @@ void main() {
           tester,
           find.byKey(const Key('planet-mastery-successor')),
         );
-        for (var index = 0; index < 3; index++) {
-          final gate = find.byKey(Key('planet-mastery-requirement-$index'));
-          expect(gate, findsOneWidget);
-          _expectVisibleInBody(tester, gate);
-          final text = find.descendant(of: gate, matching: find.byType(Text));
-          final paragraph = tester.renderObject<RenderParagraph>(text);
-          expect(
-            paragraph.text.style?.fontFamily,
-            'IBM Plex Mono',
-            reason: 'the gate must render in the production body font',
-          );
-          expect(
-            paragraph.size.width,
-            greaterThanOrEqualTo(
-              paragraph.getMaxIntrinsicWidth(double.infinity) - .5,
-            ),
-            reason: 'gate $index must not wrap or clip',
-          );
-        }
+        _expectGate(
+          tester,
+          index: 0,
+          label: 'Homeworld mastered',
+          satisfied: true,
+        );
+        _expectGate(
+          tester,
+          index: 1,
+          label: 'Surveying 3',
+          satisfied: false,
+          currentValue: 'now LV 0',
+        );
+        _expectGate(
+          tester,
+          index: 2,
+          label: '200,000 cash',
+          satisfied: false,
+          currentValue: '100',
+        );
 
         final openMap = find.byKey(const Key('planet-mastery-open-map'));
         final continueButton = find.byKey(const Key('planet-mastery-continue'));
@@ -504,55 +810,47 @@ void main() {
             find.byKey(const Key('planet-mastery-planet')),
           );
           if (textScale == 1.0) {
-            final body = tester.getRect(
-              find.byKey(const Key('mining-sheet-body')),
+            final panel = tester.getRect(
+              find.byKey(const Key('planet-mastery-panel')),
             );
             final art = tester.getRect(
               find.byKey(const Key('planet-mastery-art')),
             );
             expect(
               art.height,
-              greaterThanOrEqualTo(96),
+              greaterThanOrEqualTo(72),
               reason: 'the compact 1.0 card keeps a substantial planet',
             );
-            expect(art.left, lessThan(body.center.dx));
+            expect(
+              (art.center.dx - panel.center.dx).abs(),
+              lessThanOrEqualTo(1),
+            );
           }
           _expectVisibleInBody(tester, find.text('All 3 sites commissioned'));
           _expectVisibleInBody(
             tester,
             find.byKey(const Key('planet-mastery-successor')),
           );
-          for (var index = 0; index < 3; index++) {
-            final gate = find.byKey(Key('planet-mastery-requirement-$index'));
-            expect(gate, findsOneWidget);
-            _expectVisibleInBody(tester, gate);
-
-            final rowRect = tester.getRect(gate);
-            final text = find.descendant(of: gate, matching: find.byType(Text));
-            final paragraph = tester.renderObject<RenderParagraph>(text);
-            final textWidget = tester.widget<Text>(text);
-            final textRect = tester.getRect(text);
-            expect(
-              rowRect.contains(textRect.topLeft),
-              isTrue,
-              reason: 'gate $index text starts outside its row',
-            );
-            expect(
-              rowRect.contains(textRect.bottomRight - const Offset(1, 1)),
-              isTrue,
-              reason: 'gate $index text escapes its row',
-            );
-            _expectVisibleInBody(tester, text);
-            expect(textWidget.maxLines, isNull);
-            expect(textWidget.overflow, isNot(TextOverflow.ellipsis));
-            expect(
-              paragraph.size.height,
-              greaterThanOrEqualTo(
-                paragraph.getMaxIntrinsicHeight(paragraph.size.width) - .5,
-              ),
-              reason: 'gate $index loses wrapped lines',
-            );
-          }
+          _expectGate(
+            tester,
+            index: 0,
+            label: 'Homeworld mastered',
+            satisfied: true,
+          );
+          _expectGate(
+            tester,
+            index: 1,
+            label: 'Surveying 3',
+            satisfied: false,
+            currentValue: 'now LV 0',
+          );
+          _expectGate(
+            tester,
+            index: 2,
+            label: '200,000 cash',
+            satisfied: false,
+            currentValue: '100',
+          );
 
           final openMap = find.byKey(const Key('planet-mastery-open-map'));
           final continueButton = find.byKey(
@@ -574,11 +872,9 @@ void main() {
     }
   }
 
-  // The final card carries the long next-run explanation. In the compact
-  // layouts the narrow details column used to wrap it below the scrolling
-  // body's visible viewport, so the sentence could only be read after
-  // scrolling. It must open complete next to the still-visible reward and
-  // pinned actions, with no text-size reduction, ellipsis, or removed copy.
+  // The final card carries the long next-run explanation. It must open complete
+  // next to the still-visible reward and pinned actions, with no text-size
+  // reduction, ellipsis, or removed copy.
   for (final size in const [Size(360, 640), Size(874, 402)]) {
     for (final textScale in const [1.0, 1.3]) {
       for (final withInsets in const [false, true]) {
@@ -664,9 +960,6 @@ void main() {
     }
   }
 
-  // The compact landscape card packs the status label beside the name and the
-  // caption beside the reward. Sort keys must keep the reading order logical
-  // for assistive technologies even when paint order differs.
   for (final size in const [Size(360, 640), Size(874, 402)]) {
     testWidgets(
       'final card reads planet, reward, caption, status, explanation in '
@@ -679,7 +972,7 @@ void main() {
         int indexOf(String label) =>
             labels.indexWhere((candidate) => candidate == label);
         final planet = indexOf('Io Frontier');
-        final reward = indexOf('+90.00M cash');
+        final reward = indexOf('+90.00M');
         final caption = indexOf('completion reward');
         final status = indexOf('RUN COMPLETE');
         final explanation = labels.indexWhere(
@@ -700,20 +993,17 @@ void main() {
         expect(caption, lessThan(status), reason: 'in $labels');
         expect(status, lessThan(explanation), reason: 'in $labels');
 
-        if (size.width > size.height) {
-          // Keep the caption visually attached to the reward amount it
-          // describes instead of parking it beside the planet name.
-          final rewardRect = tester.getRect(
-            find.byKey(const Key('planet-mastery-reward')),
-          );
-          final captionRect = tester.getRect(find.text('completion reward'));
-          expect(
-            (captionRect.center.dy - rewardRect.center.dy).abs(),
-            lessThan(24),
-            reason: 'the caption must share the reward row',
-          );
-          expect(captionRect.left, greaterThan(rewardRect.left));
-        }
+        // Keep the caption visually attached below the reward amount it
+        // describes instead of parking it beside the planet name.
+        final rewardRect = tester.getRect(
+          find.byKey(const Key('planet-mastery-reward')),
+        );
+        final captionRect = tester.getRect(find.text('completion reward'));
+        expect(
+          (captionRect.center.dx - rewardRect.center.dx).abs(),
+          lessThanOrEqualTo(1),
+        );
+        expect(captionRect.top, greaterThanOrEqualTo(rewardRect.bottom - .5));
 
         semantics.dispose();
       },
@@ -757,9 +1047,29 @@ void main() {
       expect(openMap.hitTestable(), findsOneWidget);
       expect(continueButton.hitTestable(), findsOneWidget);
 
+      _expectGate(
+        tester,
+        index: 0,
+        label: 'Lunar Frontier mastered',
+        satisfied: true,
+      );
+      _expectGate(
+        tester,
+        index: 1,
+        label: 'Surveying 5',
+        satisfied: false,
+        currentValue: 'now LV 3',
+      );
+      _expectGate(
+        tester,
+        index: 2,
+        label: '16.00M cash',
+        satisfied: false,
+        currentValue: '100',
+      );
+
       for (var index = 0; index < card.requirements.length; index++) {
         final gate = find.byKey(Key('planet-mastery-requirement-$index'));
-        expect(gate, findsOneWidget);
         final rowRect = tester.getRect(gate);
         expect(
           rowRect.left,
@@ -770,22 +1080,6 @@ void main() {
           rowRect.right,
           lessThanOrEqualTo(body.right + .5),
           reason: 'gate $index overflows the body horizontally',
-        );
-
-        final text = find.descendant(of: gate, matching: find.byType(Text));
-        final paragraph = tester.renderObject<RenderParagraph>(text);
-        final textWidget = tester.widget<Text>(text);
-        final textRect = tester.getRect(text);
-        expect(textRect.left, greaterThanOrEqualTo(rowRect.left - .5));
-        expect(textRect.right, lessThanOrEqualTo(rowRect.right + .5));
-        expect(textWidget.maxLines, isNull);
-        expect(textWidget.overflow, isNot(TextOverflow.ellipsis));
-        expect(
-          paragraph.size.height,
-          greaterThanOrEqualTo(
-            paragraph.getMaxIntrinsicHeight(paragraph.size.width) - .5,
-          ),
-          reason: 'gate $index loses wrapped lines',
         );
 
         if (!_inside(body, rowRect)) {
@@ -804,4 +1098,79 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  for (final size in const [Size(360, 640), Size(874, 402)]) {
+    testWidgets(
+      'Ceres mastery shows its full long Io gates and actual current values at '
+      '${size.width.toInt()}x${size.height.toInt()}',
+      (tester) async {
+        final card = _projectedCeresCard();
+        await _pumpCard(tester, size: size, card: card);
+
+        expect(card.requirements.map((requirement) => requirement.label), [
+          'Ceres Frontier sites 3/3',
+          'Surveying 5',
+          '90.00M cash',
+        ]);
+        expect(find.text('Ceres Frontier sites 3/3'), findsNothing);
+        _expectGate(
+          tester,
+          index: 0,
+          label: 'Ceres Frontier mastered',
+          satisfied: true,
+        );
+        _expectGate(
+          tester,
+          index: 1,
+          label: 'Surveying 5',
+          satisfied: false,
+          currentValue: 'now LV 4',
+        );
+        _expectGate(
+          tester,
+          index: 2,
+          label: '90.00M cash',
+          satisfied: false,
+          currentValue: '12.35M',
+        );
+
+        final openMap = find.byKey(const Key('planet-mastery-open-map'));
+        final continueButton = find.byKey(const Key('planet-mastery-continue'));
+        expect(openMap.hitTestable(), findsOneWidget);
+        expect(continueButton.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('primary action takes keyboard focus and activates', (
+    tester,
+  ) async {
+    var opens = 0;
+    await _pumpCard(
+      tester,
+      size: const Size(390, 844),
+      textScale: 1.0,
+      card: _nonfinalCard(onOpenMap: () => opens++),
+    );
+
+    final openMap = find.byKey(const Key('planet-mastery-open-map'));
+    final focusNode = Focus.of(
+      tester.element(
+        find.descendant(of: openMap, matching: find.byType(GestureDetector)),
+      ),
+    );
+    expect(focusNode.canRequestFocus, isTrue);
+    focusNode.requestFocus();
+    await tester.pump();
+    expect(focusNode.hasFocus, isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(opens, 1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    expect(opens, 2);
+    expect(tester.takeException(), isNull);
+  });
 }
