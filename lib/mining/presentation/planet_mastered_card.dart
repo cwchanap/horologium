@@ -20,6 +20,10 @@ const double _panelRadius = 20;
 const double _actionRadius = 12;
 const double _closeSize = 48;
 
+/// The mockup's primary-action fill: a softer cyan than the neon game
+/// highlight, matching the approved floating-card art direction.
+const Color masteryPrimaryFill = Color(0xFF3FE3F2);
+
 /// Transient feedback for a deploy that just mastered a planet. The final
 /// variant pays the authored reward on the card and relays Relaunch through
 /// the shell; the card itself never mutates or persists state.
@@ -67,7 +71,8 @@ class PlanetMasteredCard extends StatelessWidget {
 
     // Portrait keeps the mockup's art-led stack, shrinking the planet on short
     // phones. Landscape shrinks it further; its actions stay stacked so the
-    // approved primary-then-secondary hierarchy never changes.
+    // approved primary-then-secondary hierarchy never changes. Roomy portrait
+    // grows the planet toward the mockup's disc.
     final Size artSize;
     final double overlap;
     if (landscape) {
@@ -77,8 +82,8 @@ class PlanetMasteredCard extends StatelessWidget {
       artSize = const Size(96, 96);
       overlap = 26;
     } else {
-      artSize = const Size(130, 130);
-      overlap = 46;
+      artSize = const Size(150, 150);
+      overlap = 58;
     }
 
     // The planet paints above the panel. Outside the panel, its top half needs
@@ -191,8 +196,15 @@ class PlanetMasteredCard extends StatelessWidget {
     decoration: BoxDecoration(
       color: MiningTheme.panel,
       borderRadius: BorderRadius.circular(_panelRadius),
-      border: Border.all(color: MiningTheme.accent.withAlpha(100)),
-      boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 32)],
+      border: Border.all(color: MiningTheme.accent.withAlpha(150)),
+      boxShadow: [
+        const BoxShadow(color: Colors.black54, blurRadius: 32),
+        BoxShadow(
+          color: MiningTheme.accent.withAlpha(70),
+          blurRadius: 28,
+          spreadRadius: 1,
+        ),
+      ],
     ),
     clipBehavior: Clip.antiAlias,
     child: Column(
@@ -241,10 +253,10 @@ class PlanetMasteredCard extends StatelessWidget {
     children: [
       Center(child: _badge(compact: compact)),
       SizedBox(height: compact ? 4 : 8),
-      _planetName(),
+      _planetName(compact: compact),
       if (isFinal) ...[
         const SizedBox(height: 2),
-        _reward(),
+        _reward(compact: compact),
         _completionReward(),
         SizedBox(height: compact ? 6 : 10),
         Align(alignment: Alignment.centerLeft, child: _runComplete()),
@@ -317,10 +329,10 @@ class PlanetMasteredCard extends StatelessWidget {
           const SizedBox(width: 7),
           Text(
             _title,
-            style: const TextStyle(
+            style: TextStyle(
               color: MiningTheme.accent,
               fontFamily: 'Orbitron',
-              fontSize: 10,
+              fontSize: compact ? 10 : 13,
               fontWeight: FontWeight.w800,
               letterSpacing: .2,
             ),
@@ -330,27 +342,27 @@ class PlanetMasteredCard extends StatelessWidget {
     ),
   );
 
-  Widget _planetName() => Text(
+  Widget _planetName({required bool compact}) => Text(
     masteredPlanet.name,
     key: const Key('planet-mastery-planet'),
     textAlign: TextAlign.center,
-    style: const TextStyle(
+    style: TextStyle(
       color: MiningTheme.primaryText,
       fontFamily: 'Orbitron',
-      fontSize: 26,
+      fontSize: compact ? 26 : 30,
       fontWeight: FontWeight.w800,
       height: 1.1,
     ),
   );
 
-  Widget _reward() => Text(
+  Widget _reward({required bool compact}) => Text(
     '+${formatMiningCash(rewardCash ?? 0)}',
     key: const Key('planet-mastery-reward'),
     textAlign: TextAlign.center,
-    style: const TextStyle(
+    style: TextStyle(
       color: MiningTheme.warning,
       fontFamily: 'Orbitron',
-      fontSize: 24,
+      fontSize: compact ? 24 : 30,
       fontWeight: FontWeight.w800,
     ),
   );
@@ -505,10 +517,24 @@ class _MasteryRequirement extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              requirement.isSatisfied ? Icons.check : Icons.close,
-              color: statusColor,
-              size: 16,
+            // The mockup marks an unmet gate with a small hollow orange circle
+            // instead of a cross; the row keeps the same 16px indicator slot.
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: Center(
+                child: requirement.isSatisfied
+                    ? Icon(Icons.check, color: statusColor, size: 16)
+                    : Container(
+                        key: const Key('planet-mastery-gate-unmet'),
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: statusColor, width: 1.2),
+                        ),
+                      ),
+              ),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -583,10 +609,10 @@ class _MasteryAction extends StatelessWidget {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        minimumSize: const Size(48, 48),
+        minimumSize: const Size(48, 52),
         tapTargetSize: MaterialTapTargetSize.padded,
         visualDensity: VisualDensity.standard,
-        backgroundColor: MiningTheme.highlight,
+        backgroundColor: masteryPrimaryFill,
         foregroundColor: const Color(0xFF04121A),
         shape: shape,
         textStyle: textStyle,

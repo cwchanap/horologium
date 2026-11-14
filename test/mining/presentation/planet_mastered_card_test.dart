@@ -279,7 +279,7 @@ void _expectActionHierarchy(
         .style!
         .backgroundColor!
         .resolve(const <WidgetState>{}),
-    MiningTheme.highlight,
+    masteryPrimaryFill,
   );
 
   final safe = _safeRect(size, _insetsFor(size));
@@ -296,6 +296,12 @@ void _expectActionHierarchy(
     expect(finder.hitTestable(), findsOneWidget);
     expect(rect.height, greaterThanOrEqualTo(48));
   }
+  // The mockup's primary action is taller than the secondary one.
+  expect(
+    tester.getRect(primary).height,
+    greaterThanOrEqualTo(52),
+    reason: 'the mockup primary action is a 52px tall fill',
+  );
 
   final primaryRect = tester.getRect(primary);
   final secondaryRect = tester.getRect(secondary);
@@ -424,25 +430,45 @@ void _expectGate(
   final gate = find.byKey(Key('planet-mastery-requirement-$index'));
   expect(gate, findsOneWidget, reason: 'gate $index');
   _expectVisibleInBody(tester, gate);
-  expect(
-    find.descendant(
+  if (satisfied) {
+    final check = find.descendant(of: gate, matching: find.byIcon(Icons.check));
+    expect(check, findsOneWidget, reason: 'gate $index');
+    expect(tester.widget<Icon>(check).color, MiningTheme.accent);
+    expect(
+      find.descendant(of: gate, matching: find.byIcon(Icons.close)),
+      findsNothing,
+      reason: 'a satisfied gate never shows the unmet circle',
+    );
+  } else {
+    // The approved mockup marks an unmet gate with a small hollow orange
+    // circle instead of the previous orange cross.
+    expect(
+      find.descendant(of: gate, matching: find.byIcon(Icons.close)),
+      findsNothing,
+      reason: 'gate $index must use the mockup circle, not a cross',
+    );
+    final indicator = find.descendant(
       of: gate,
-      matching: find.byIcon(satisfied ? Icons.check : Icons.close),
-    ),
-    findsOneWidget,
-    reason: 'gate $index',
-  );
-  expect(
-    tester
-        .widget<Icon>(
-          find.descendant(
-            of: gate,
-            matching: find.byIcon(satisfied ? Icons.check : Icons.close),
-          ),
-        )
-        .color,
-    satisfied ? MiningTheme.accent : MiningTheme.gate,
-  );
+      matching: find.byKey(const Key('planet-mastery-gate-unmet')),
+    );
+    expect(indicator, findsOneWidget, reason: 'gate $index');
+    final decoration =
+        tester.widget<Container>(indicator).decoration! as BoxDecoration;
+    expect(decoration.shape, BoxShape.circle, reason: 'gate $index');
+    expect(
+      (decoration.border! as Border).top.color,
+      MiningTheme.gate,
+      reason: 'gate $index',
+    );
+    final indicatorRect = tester.getRect(indicator);
+    expect(indicatorRect.width, lessThanOrEqualTo(12), reason: 'gate $index');
+    expect(indicatorRect.height, lessThanOrEqualTo(12), reason: 'gate $index');
+    expect(
+      indicatorRect.width,
+      closeTo(indicatorRect.height, .5),
+      reason: 'gate $index',
+    );
+  }
 
   final labelText = find.descendant(of: gate, matching: find.text(label));
   expect(labelText, findsOneWidget, reason: 'gate $index: $label');
@@ -524,6 +550,50 @@ void _expectPrimaryNearLastDetail(
         'primary $primaryRect must start within 32px of the last detail '
         '$detailRect, not after stretched blank space',
   );
+}
+
+/// The approved mockup follow-up grows the planet and the milestone type in
+/// roomy portrait while every string still renders in full at the requested
+/// text scale.
+void _expectMockupScale(
+  WidgetTester tester, {
+  required double textScale,
+  required bool isFinal,
+}) {
+  final panel = tester.getRect(find.byKey(const Key('planet-mastery-panel')));
+  final art = tester.getRect(find.byKey(const Key('planet-mastery-art')));
+  expect(
+    art.height,
+    greaterThanOrEqualTo(150),
+    reason: 'the roomy mockup planet is larger than the compact 96px planet',
+  );
+  expect((art.center.dx - panel.center.dx).abs(), lessThanOrEqualTo(1));
+
+  void expectEnlarged(Finder finder, double minimum) {
+    final fontSize = tester.widget<Text>(finder).style!.fontSize!;
+    expect(fontSize, greaterThanOrEqualTo(minimum), reason: '$finder');
+    final paragraph = tester.renderObject<RenderParagraph>(finder);
+    expect(
+      paragraph.didExceedMaxLines,
+      isFalse,
+      reason: '$finder must render every line',
+    );
+    expect(
+      paragraph.textScaler.scale(fontSize),
+      closeTo(fontSize * textScale, .01),
+      reason: '$finder must honor the requested text scale',
+    );
+    _expectVisibleInBody(tester, finder);
+  }
+
+  expectEnlarged(
+    find.text(isFinal ? 'FINAL PLANET MASTERED' : 'PLANET MASTERED'),
+    13,
+  );
+  expectEnlarged(find.byKey(const Key('planet-mastery-planet')), 30);
+  if (isFinal) {
+    expectEnlarged(find.byKey(const Key('planet-mastery-reward')), 30);
+  }
 }
 
 void main() {
@@ -1379,6 +1449,87 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  // Approved mockup follow-up: roomy portrait grows the planet, milestone
+  // badge, planet name, and Io reward toward the mockup's scale.
+  for (final size in const [Size(390, 844), Size(430, 932)]) {
+    final label = '${size.width.toInt()}x${size.height.toInt()}';
+    for (final textScale in const [1.0, 1.3]) {
+      testWidgets('roomy $label text $textScale uses the mockup planet and '
+          'milestone type scale', (tester) async {
+        await _pumpCard(
+          tester,
+          size: size,
+          textScale: textScale,
+          card: _nonfinalCard(),
+        );
+        _expectMockupScale(tester, textScale: textScale, isFinal: false);
+
+        await _pumpCard(
+          tester,
+          size: size,
+          textScale: textScale,
+          card: _finalCard(nextSaleMultiplier: 2),
+        );
+        _expectMockupScale(tester, textScale: textScale, isFinal: true);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('panel carries the mockup cyan border and glow', (tester) async {
+    await _pumpCard(
+      tester,
+      size: const Size(390, 844),
+      textScale: 1.0,
+      card: _nonfinalCard(),
+    );
+
+    final container = tester.widget<Container>(
+      find.byKey(const Key('planet-mastery-panel')),
+    );
+    final decoration = container.decoration! as BoxDecoration;
+    final border = (decoration.border! as Border).top;
+    expect(
+      border.color.a,
+      greaterThan(0.5),
+      reason: 'the mockup border is stronger than the previous 39% cyan',
+    );
+    expect(border.width, greaterThanOrEqualTo(1));
+    expect(
+      decoration.boxShadow!.any(
+        (shadow) =>
+            shadow.blurRadius >= 16 &&
+            shadow.color.a > 0 &&
+            shadow.color.g > shadow.color.r &&
+            shadow.color.b > shadow.color.r,
+      ),
+      isTrue,
+      reason: 'the mockup panel carries a cyan glow behind its dark shadow',
+    );
+  });
+
+  testWidgets('primary action uses the mockup fill and height', (tester) async {
+    await _pumpCard(
+      tester,
+      size: const Size(390, 844),
+      textScale: 1.0,
+      card: _nonfinalCard(),
+    );
+
+    final primary = find.byKey(const Key('planet-mastery-open-map'));
+    final button = tester.widget<ElevatedButton>(
+      find.descendant(of: primary, matching: find.byType(ElevatedButton)),
+    );
+    final fill = button.style!.backgroundColor!.resolve(const <WidgetState>{});
+    expect(fill, masteryPrimaryFill);
+    expect(
+      fill,
+      isNot(MiningTheme.highlight),
+      reason: 'the mockup fill is softer than the neon game highlight',
+    );
+    expect(tester.getRect(primary).height, greaterThanOrEqualTo(52));
+  });
 
   // Roomy portrait is content-sized: the primary action must sit directly
   // below the last detail, not at the bottom of a stretched panel.
