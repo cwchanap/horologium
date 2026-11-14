@@ -4500,14 +4500,50 @@ void main() {
             reason: gate.label,
           );
         }
-        expect(
-          find.descendant(
+        if (gate.isSatisfied) {
+          expect(
+            find.descendant(of: row, matching: find.byIcon(Icons.check)),
+            findsOneWidget,
+            reason: gate.label,
+          );
+          expect(
+            find.descendant(of: row, matching: find.byIcon(Icons.close)),
+            findsNothing,
+            reason: gate.label,
+          );
+        } else {
+          // The approved mockup marks unmet gates with a small hollow orange
+          // circle instead of the previous orange cross.
+          expect(
+            find.descendant(of: row, matching: find.byIcon(Icons.close)),
+            findsNothing,
+            reason: gate.label,
+          );
+          final indicator = find.descendant(
             of: row,
-            matching: find.byIcon(gate.isSatisfied ? Icons.check : Icons.close),
-          ),
-          findsOneWidget,
-          reason: gate.label,
-        );
+            matching: find.byKey(const Key('planet-mastery-gate-unmet')),
+          );
+          expect(indicator, findsOneWidget, reason: gate.label);
+          final decoration =
+              tester.widget<Container>(indicator).decoration! as BoxDecoration;
+          expect(decoration.shape, BoxShape.circle, reason: gate.label);
+          expect(
+            (decoration.border! as Border).top.color,
+            MiningTheme.gate,
+            reason: gate.label,
+          );
+          final indicatorRect = tester.getRect(indicator);
+          expect(
+            indicatorRect.width,
+            lessThanOrEqualTo(12),
+            reason: gate.label,
+          );
+          expect(
+            indicatorRect.height,
+            lessThanOrEqualTo(12),
+            reason: gate.label,
+          );
+        }
         expect(
           find.bySemanticsLabel(
             RegExp(
