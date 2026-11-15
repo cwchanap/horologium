@@ -121,8 +121,9 @@ Future<void> _pumpMap(
 /// planet artwork begins, and the card must keep its authored height.
 Future<void> _expectNameClearOfArt(
   WidgetTester tester,
-  MiningPlanetId planet,
-) async {
+  MiningPlanetId planet, {
+  bool? isActive,
+}) async {
   final card = find.byKey(Key('mining-stellar-map-planet-${planet.name}'));
   await tester.ensureVisible(card);
   await tester.pump();
@@ -138,8 +139,8 @@ Future<void> _expectNameClearOfArt(
   );
   final nameRect = tester.getRect(name);
   expect(
-    nameRect.right,
-    lessThanOrEqualTo(art.left),
+    nameRect.overlaps(art),
+    isFalse,
     reason: '${_content.planet(planet).name} paints over its planet art',
   );
   expect(
@@ -152,7 +153,7 @@ Future<void> _expectNameClearOfArt(
   expect(cardRect.contains(nameRect.bottomRight - const Offset(1, 1)), isTrue);
   expect(
     tester.getSize(card).height,
-    planet == MiningPlanetId.homeworld ? 264 : 290,
+    (isActive ?? planet == MiningPlanetId.homeworld) ? 264 : 290,
   );
 }
 
@@ -1359,6 +1360,49 @@ void main() {
       }
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets(
+      'active long-named planet uses vertical clearance on narrow phones',
+      (tester) async {
+        final view = StellarMapView.from(
+          state: _stateWith(
+            unlockedPlanets: {...MiningPlanetId.values},
+            activePlanet: MiningPlanetId.lunarFrontier,
+          ),
+          content: _content,
+        );
+        await _pumpMap(
+          tester,
+          view: view,
+          viewport: const Size(360, 640),
+          bodyTextStyle: _productionBodyTextStyle,
+        );
+
+        await _expectNameClearOfArt(
+          tester,
+          MiningPlanetId.lunarFrontier,
+          isActive: true,
+        );
+        final card = tester.getRect(
+          find.byKey(const Key('mining-stellar-map-planet-lunarFrontier')),
+        );
+        final art = tester.getRect(
+          find.byKey(const Key('mining-stellar-map-planet-lunarFrontier-art')),
+        );
+        final chip = tester.getRect(
+          find.descendant(
+            of: find.byKey(
+              const Key('mining-stellar-map-planet-lunarFrontier'),
+            ),
+            matching: find.text('ACTIVE'),
+          ),
+        );
+        expect(art.height, greaterThanOrEqualTo(99));
+        expect(art.bottom - card.top, greaterThanOrEqualTo(56));
+        expect(chip.overlaps(art), isFalse);
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 
   group('locked planet requirements fit at text scale 1.3', () {
