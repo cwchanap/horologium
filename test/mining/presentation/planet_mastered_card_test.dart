@@ -496,7 +496,11 @@ void _expectGate(
     reason: 'gate $index label escapes its row',
   );
   final paragraph = tester.renderObject<RenderParagraph>(labelText);
-  expect(paragraph.text.style?.fontFamily, 'IBM Plex Mono');
+  expect(
+    paragraph.text.style?.fontFamily,
+    'Orbitron',
+    reason: 'gate $index "$label" uses the mockup geometric face',
+  );
   if (fontSize != null) {
     expect(
       labelWidget.style?.fontSize,
@@ -532,6 +536,19 @@ void _expectGate(
     final valueWidget = tester.widget<Text>(value);
     expect(valueWidget.maxLines, isNull);
     expect(valueWidget.overflow, isNot(TextOverflow.ellipsis));
+    final valueParagraph = tester.renderObject<RenderParagraph>(value);
+    expect(
+      valueParagraph.text.style?.fontFamily,
+      'Orbitron',
+      reason: 'gate $index current value uses the mockup geometric face',
+    );
+    expect(
+      valueParagraph.size.width,
+      greaterThanOrEqualTo(
+        valueParagraph.getMaxIntrinsicWidth(double.infinity) - .5,
+      ),
+      reason: 'gate $index current value must not wrap or clip',
+    );
     if (fontSize != null) {
       expect(
         valueWidget.style?.fontSize,
@@ -1648,6 +1665,157 @@ void main() {
       isTrue,
       reason: 'the mockup panel carries a cyan glow behind its dark shadow',
     );
+  });
+
+  // Approved rim/type follow-up: the mockup's planet sits in a darker disc with
+  // a dark rim and a stronger halo, and the planet is inset inside it. The
+  // treatment must stay inside the existing art block so the card's layout and
+  // hit geometry do not grow.
+  for (final size in const [Size(360, 640), Size(390, 844), Size(874, 402)]) {
+    final label = '${size.width.toInt()}x${size.height.toInt()}';
+    testWidgets('mastery art draws the mockup dark disc, rim, and halo at '
+        '$label', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await _pumpCard(
+        tester,
+        size: size,
+        textScale: 1.0,
+        card: _nonfinalCard(),
+      );
+
+      final art = find.byKey(const Key('planet-mastery-art'));
+      final container = tester.widget<Container>(art);
+      final decoration = container.decoration! as BoxDecoration;
+      expect(decoration.shape, BoxShape.circle, reason: 'the art is a disc');
+      final fill = decoration.color;
+      expect(fill, isNotNull, reason: 'the disc needs its own dark fill');
+      expect(fill!.a, 1, reason: 'the disc fill is opaque');
+      expect(
+        fill.computeLuminance(),
+        lessThan(MiningTheme.panel.computeLuminance()),
+        reason: 'the mockup disc is darker than the card panel',
+      );
+
+      final border = decoration.border! as Border;
+      expect(
+        border.top.color.a,
+        lessThanOrEqualTo(.3),
+        reason:
+            'the mockup rim is darker than the panel border, not a neon '
+            'ring',
+      );
+      expect(
+        border.top.color.b,
+        greaterThan(border.top.color.r),
+        reason: 'the rim keeps a cool cyan tint',
+      );
+      expect(border.top.width, lessThanOrEqualTo(1.5));
+
+      final disc = tester.getRect(art);
+      final halo = decoration.boxShadow!;
+      expect(halo.length, greaterThanOrEqualTo(2), reason: 'rim + halo bloom');
+      expect(
+        halo.any(
+          (shadow) =>
+              shadow.blurRadius >= disc.width * .3 &&
+              shadow.color.a > .1 &&
+              shadow.color.b > shadow.color.r,
+        ),
+        isTrue,
+        reason: 'the mockup halo is a wider cyan bloom than the panel glow',
+      );
+      expect(
+        halo
+            .where((shadow) => shadow.color.b > shadow.color.r)
+            .map((shadow) => shadow.color.a)
+            .reduce((a, b) => a + b),
+        greaterThanOrEqualTo(.4),
+        reason: 'the mockup halo is stronger than the panel glow',
+      );
+
+      // The planet is inset so the dark rim reads, and it stays large.
+      final planet = tester.getRect(
+        find.byKey(const Key('planet-mastery-planet-image')),
+      );
+      expect(planet.width, lessThan(disc.width));
+      expect(planet.height, lessThan(disc.height));
+      expect(
+        planet.left - disc.left,
+        greaterThanOrEqualTo(disc.width * .04),
+        reason: 'the disc rim must show around the planet',
+      );
+      expect(disc.right - planet.right, greaterThanOrEqualTo(disc.width * .04));
+      expect(planet.height, greaterThanOrEqualTo(disc.height * .85));
+      expect((planet.center.dx - disc.center.dx).abs(), lessThanOrEqualTo(1));
+      expect((planet.center.dy - disc.center.dy).abs(), lessThanOrEqualTo(1));
+
+      // No layout growth: the disc is the whole art block and the composition
+      // still ends at the panel bottom.
+      final panel = tester.getRect(
+        find.byKey(const Key('planet-mastery-panel')),
+      );
+      final card = tester.getRect(find.byKey(const Key('planet-mastery-card')));
+      expect(card.top, closeTo(disc.top, .5));
+      expect(card.bottom, closeTo(panel.bottom, .5));
+      expect(
+        disc.height,
+        greaterThanOrEqualTo(
+          size.width > size.height
+              ? 40
+              : size.height <= 700
+              ? 96
+              : 150,
+        ),
+        reason: 'the art block keeps its approved size',
+      );
+      expect(
+        find.bySemanticsLabel('Close PLANET MASTERED').hitTestable(),
+        findsOneWidget,
+        reason: 'the art treatment never covers the close control',
+      );
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+  }
+
+  // The mockup's gate rows are a geometric display face, not the monospace body
+  // copy; labels and current values both use it and still render in full.
+  testWidgets('gate rows use the geometric mastery face, not IBM Plex Mono', (
+    tester,
+  ) async {
+    await _pumpCard(
+      tester,
+      size: const Size(390, 844),
+      textScale: 1.0,
+      card: _projectedCeresCard(),
+    );
+
+    for (final text in const [
+      'Ceres Frontier mastered',
+      'Surveying 5',
+      '· now LV 4',
+      '90.00M cash',
+      '· 12.35M',
+    ]) {
+      final finder = find.text(text);
+      expect(finder, findsOneWidget, reason: text);
+      final paragraph = tester.renderObject<RenderParagraph>(finder);
+      expect(paragraph.text.style?.fontFamily, 'Orbitron', reason: text);
+      expect(
+        paragraph.text.style?.fontFamily,
+        isNot('IBM Plex Mono'),
+        reason: text,
+      );
+      expect(paragraph.didExceedMaxLines, isFalse, reason: text);
+      expect(
+        paragraph.size.width,
+        greaterThanOrEqualTo(
+          paragraph.getMaxIntrinsicWidth(double.infinity) - .5,
+        ),
+        reason: '$text must stay on one line',
+      );
+    }
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('primary action uses the mockup fill and height', (tester) async {

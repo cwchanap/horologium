@@ -4581,9 +4581,10 @@ void main() {
         _graniteCraterDeployCell,
       );
 
-      for (final finder in [
-        find.text('All 3 sites commissioned'),
-        find.text('Homeworld mastered'),
+      for (final (finder, fontFamily) in [
+        (find.text('All 3 sites commissioned'), 'IBM Plex Mono'),
+        // The mockup's gate rows use the geometric display face.
+        (find.text('Homeworld mastered'), 'Orbitron'),
       ]) {
         final richText = tester.widget<RichText>(
           find.descendant(of: finder, matching: find.byType(RichText)),
@@ -4600,7 +4601,7 @@ void main() {
           reason: 'the dialog must not inherit the yellow double underline',
         );
         expect(style.decorationColor, isNot(const Color(0xFFFFFF00)));
-        expect(style.fontFamily, 'IBM Plex Mono');
+        expect(style.fontFamily, fontFamily);
         expect(style.fontSize, 12);
         expect(richText.textScaler.scale(12), 12);
       }
