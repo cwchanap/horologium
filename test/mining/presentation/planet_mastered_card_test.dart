@@ -578,6 +578,15 @@ void _expectMockupScale(
       isFalse,
       reason: '$finder must render every line',
     );
+    // `didExceedMaxLines` is blind to a height-clipped paragraph; compare the
+    // rendered height against the intrinsic height at the rendered width.
+    expect(
+      paragraph.size.height,
+      greaterThanOrEqualTo(
+        paragraph.getMaxIntrinsicHeight(paragraph.size.width) - .5,
+      ),
+      reason: '$finder loses rendered lines to a height clip',
+    );
     expect(
       paragraph.textScaler.scale(fontSize),
       closeTo(fontSize * textScale, .01),
@@ -1474,6 +1483,113 @@ void main() {
         _expectMockupScale(tester, textScale: textScale, isFinal: true);
         expect(tester.takeException(), isNull);
       });
+    }
+  }
+
+  // The enlarged roomy type must also hold for the real later-planet names and
+  // their projected gates, not only Homeworld and Io. These fixtures use the
+  // authored Lunar Frontier / Ceres Frontier mastery cards with real current
+  // values, opened without scrolling at the focus sizes.
+  for (final size in const [Size(390, 844), Size(430, 932)]) {
+    final insets = size.width == 430
+        ? const EdgeInsets.fromLTRB(0, 59, 0, 34)
+        : const EdgeInsets.fromLTRB(0, 24, 0, 24);
+    for (final textScale in const [1.0, 1.3]) {
+      for (final fixture in const ['Lunar Frontier', 'Ceres Frontier']) {
+        testWidgets('roomy ${size.width.toInt()}x${size.height.toInt()} text '
+            '$textScale keeps the real $fixture name, gates, and actions '
+            'complete on the first frame', (tester) async {
+          var continues = 0;
+          var opens = 0;
+          final lunar = fixture == 'Lunar Frontier';
+          final card = lunar
+              ? _projectedLaterCard(
+                  onContinue: () => continues++,
+                  onOpenMap: () => opens++,
+                )
+              : _projectedCeresCard(
+                  onContinue: () => continues++,
+                  onOpenMap: () => opens++,
+                );
+          await _pumpCard(
+            tester,
+            size: size,
+            textScale: textScale,
+            insets: insets,
+            card: card,
+          );
+
+          _expectMockupScale(tester, textScale: textScale, isFinal: false);
+          expect(
+            tester
+                .widget<Text>(find.byKey(const Key('planet-mastery-planet')))
+                .data,
+            fixture,
+          );
+
+          if (lunar) {
+            _expectGate(
+              tester,
+              index: 0,
+              label: 'Lunar Frontier mastered',
+              satisfied: true,
+            );
+            _expectGate(
+              tester,
+              index: 1,
+              label: 'Surveying 5',
+              satisfied: false,
+              currentValue: 'now LV 3',
+            );
+            _expectGate(
+              tester,
+              index: 2,
+              label: '16.00M cash',
+              satisfied: false,
+              currentValue: '100',
+            );
+          } else {
+            _expectGate(
+              tester,
+              index: 0,
+              label: 'Ceres Frontier mastered',
+              satisfied: true,
+            );
+            _expectGate(
+              tester,
+              index: 1,
+              label: 'Surveying 5',
+              satisfied: false,
+              currentValue: 'now LV 4',
+            );
+            _expectGate(
+              tester,
+              index: 2,
+              label: '90.00M cash',
+              satisfied: false,
+              currentValue: '12.35M',
+            );
+          }
+
+          final openMap = find.byKey(const Key('planet-mastery-open-map'));
+          final continueButton = find.byKey(
+            const Key('planet-mastery-continue'),
+          );
+          _expectActionHierarchy(
+            tester,
+            primary: openMap,
+            secondary: continueButton,
+            size: size,
+            primaryLabel: 'OPEN STELLAR MAP',
+            secondaryLabel: 'CONTINUE',
+          );
+          await tester.tap(openMap);
+          await tester.tap(continueButton);
+          expect(opens, 1);
+          expect(continues, 1);
+          expect(tester.takeException(), isNull);
+        });
+      }
     }
   }
 
