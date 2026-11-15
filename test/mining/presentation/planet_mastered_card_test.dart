@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -252,6 +254,7 @@ void _expectActionHierarchy(
   required Size size,
   required String primaryLabel,
   required String secondaryLabel,
+  EdgeInsets? insets,
 }) {
   final primaryButton = find.descendant(
     of: primary,
@@ -282,7 +285,7 @@ void _expectActionHierarchy(
     masteryPrimaryFill,
   );
 
-  final safe = _safeRect(size, _insetsFor(size));
+  final safe = _safeRect(size, insets ?? _insetsFor(size));
   final panel = tester.getRect(find.byKey(const Key('planet-mastery-panel')));
   for (final finder in [primary, secondary]) {
     final rect = tester.getRect(finder);
@@ -319,8 +322,9 @@ void _expectFloatingComposition(
   WidgetTester tester,
   Size size, {
   required bool isFinal,
+  EdgeInsets? insets,
 }) {
-  final insets = _insetsFor(size);
+  insets ??= _insetsFor(size);
   final safe = _safeRect(size, insets);
   final panel = tester.getRect(find.byKey(const Key('planet-mastery-panel')));
   final art = tester.getRect(find.byKey(const Key('planet-mastery-art')));
@@ -426,6 +430,8 @@ void _expectGate(
   required String label,
   required bool satisfied,
   String? currentValue,
+  double? fontSize,
+  double? textScale,
 }) {
   final gate = find.byKey(Key('planet-mastery-requirement-$index'));
   expect(gate, findsOneWidget, reason: 'gate $index');
@@ -491,6 +497,18 @@ void _expectGate(
   );
   final paragraph = tester.renderObject<RenderParagraph>(labelText);
   expect(paragraph.text.style?.fontFamily, 'IBM Plex Mono');
+  if (fontSize != null) {
+    expect(
+      labelWidget.style?.fontSize,
+      fontSize,
+      reason: 'gate $index "$label" body size',
+    );
+    expect(
+      paragraph.textScaler.scale(fontSize),
+      closeTo(fontSize * (textScale ?? 1), .01),
+      reason: 'gate $index must honor the requested text scale',
+    );
+  }
   expect(
     paragraph.size.width,
     greaterThanOrEqualTo(paragraph.getMaxIntrinsicWidth(double.infinity) - .5),
@@ -514,6 +532,13 @@ void _expectGate(
     final valueWidget = tester.widget<Text>(value);
     expect(valueWidget.maxLines, isNull);
     expect(valueWidget.overflow, isNot(TextOverflow.ellipsis));
+    if (fontSize != null) {
+      expect(
+        valueWidget.style?.fontSize,
+        fontSize,
+        reason: 'gate $index current value body size',
+      );
+    }
     final valueRect = tester.getRect(value);
     expect(
       rowRect.contains(valueRect.topLeft),
@@ -1750,6 +1775,282 @@ void main() {
         lastDetail: find.byKey(const Key('planet-mastery-requirement-2')),
       );
       expect(primary.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // Compact portrait and short landscape size the panel to its content so the
+  // pinned actions sit next to the details instead of at the bottom of a
+  // fill-height body, at both text scales and with/without safe insets.
+  for (final size in const [Size(360, 640), Size(874, 402)]) {
+    final label = '${size.width.toInt()}x${size.height.toInt()}';
+    for (final textScale in const [1.0, 1.3]) {
+      for (final withInsets in const [false, true]) {
+        final insets = withInsets ? _insetsFor(size) : EdgeInsets.zero;
+        for (final isFinal in const [false, true]) {
+          testWidgets(
+            '${isFinal ? 'Io' : 'Home'} panel hugs its content at $label '
+            'text $textScale ${withInsets ? 'with' : 'without'} insets',
+            (tester) async {
+              var continues = 0;
+              var primaryTaps = 0;
+              final card = isFinal
+                  ? _finalCard(
+                      onContinue: () => continues++,
+                      onRelaunch: () => primaryTaps++,
+                    )
+                  : _nonfinalCard(
+                      onContinue: () => continues++,
+                      onOpenMap: () => primaryTaps++,
+                    );
+              await _pumpCard(
+                tester,
+                size: size,
+                textScale: textScale,
+                insets: insets,
+                card: card,
+              );
+
+              _expectFloatingComposition(
+                tester,
+                size,
+                isFinal: isFinal,
+                insets: insets,
+              );
+              final primary = find.byKey(
+                isFinal
+                    ? const Key('planet-mastery-relaunch')
+                    : const Key('planet-mastery-open-map'),
+              );
+              final secondary = find.byKey(
+                const Key('planet-mastery-continue'),
+              );
+              _expectActionHierarchy(
+                tester,
+                primary: primary,
+                secondary: secondary,
+                size: size,
+                insets: insets,
+                primaryLabel: isFinal ? 'RELAUNCH' : 'OPEN STELLAR MAP',
+                secondaryLabel: isFinal ? 'LATER' : 'CONTINUE',
+              );
+
+              final lastDetail = isFinal
+                  ? find.byKey(const Key('planet-mastery-multiplier'))
+                  : find.byKey(const Key('planet-mastery-requirement-2'));
+              _expectVisibleInBody(tester, lastDetail);
+              _expectPrimaryNearLastDetail(
+                tester,
+                primary: primary,
+                lastDetail: lastDetail,
+              );
+
+              final panel = tester.getRect(
+                find.byKey(const Key('planet-mastery-panel')),
+              );
+              final bottomLimit = math.max(
+                insets.bottom,
+                size.width > size.height ? 8.0 : 12.0,
+              );
+              final fillFloor = size.width > size.height
+                  ? insets.top + 4 + 20
+                  : insets.top + 168;
+              final fillHeight = size.height - fillFloor - bottomLimit;
+              expect(
+                panel.height,
+                lessThan(fillHeight),
+                reason:
+                    'the panel must shrink to its content, not fill '
+                    '$fillHeight',
+              );
+              expect(
+                panel.top,
+                greaterThan(fillFloor),
+                reason: 'content sizing must close the empty top gap',
+              );
+              expect(panel.bottom, closeTo(size.height - bottomLimit, .5));
+
+              await tester.tap(primary);
+              await tester.tap(secondary);
+              expect(primaryTaps, 1);
+              expect(continues, 1);
+              expect(tester.takeException(), isNull);
+            },
+          );
+        }
+      }
+    }
+  }
+
+  // Approved mockup follow-up: roomy portrait gains the mockup's more generous
+  // vertical rhythm and larger gate/explanation type where the first frame has
+  // room. The tight 390x720 breakpoint keeps its existing spacing below.
+  for (final size in const [Size(390, 844), Size(430, 932)]) {
+    final label = '${size.width.toInt()}x${size.height.toInt()}';
+    final insets = size.width == 430
+        ? const EdgeInsets.fromLTRB(0, 59, 0, 34)
+        : const EdgeInsets.fromLTRB(0, 24, 0, 24);
+    for (final textScale in const [1.0, 1.3]) {
+      testWidgets(
+        'roomy $label text $textScale frames the card toward the mockup and '
+        'enlarges gate rows and the Io explanation',
+        (tester) async {
+          final maxTop = size.width == 390
+              ? (textScale == 1.0 ? 250.0 : 235.0)
+              : (textScale == 1.0 ? 290.0 : 270.0);
+          final minHeight = textScale == 1.0 ? 415.0 : 460.0;
+          final fixtures =
+              <(String, PlanetMasteredCard, List<(String, String?)>)>[
+                (
+                  'Homeworld',
+                  _nonfinalCard(),
+                  [
+                    ('Homeworld mastered', null),
+                    ('Surveying 3', 'now LV 0'),
+                    ('200,000 cash', '100'),
+                  ],
+                ),
+                (
+                  'Lunar Frontier',
+                  _projectedLaterCard(),
+                  [
+                    ('Lunar Frontier mastered', null),
+                    ('Surveying 5', 'now LV 3'),
+                    ('16.00M cash', '100'),
+                  ],
+                ),
+                (
+                  'Ceres Frontier',
+                  _projectedCeresCard(),
+                  [
+                    ('Ceres Frontier mastered', null),
+                    ('Surveying 5', 'now LV 4'),
+                    ('90.00M cash', '12.35M'),
+                  ],
+                ),
+              ];
+          for (final (name, card, gates) in fixtures) {
+            await _pumpCard(
+              tester,
+              size: size,
+              textScale: textScale,
+              insets: insets,
+              card: card,
+            );
+            final panel = tester.getRect(
+              find.byKey(const Key('planet-mastery-panel')),
+            );
+            expect(
+              panel.top,
+              lessThanOrEqualTo(maxTop),
+              reason: '$name panel $panel sits lower than the mockup framing',
+            );
+            expect(
+              panel.height,
+              greaterThanOrEqualTo(minHeight),
+              reason: '$name panel $panel is shorter than the mockup framing',
+            );
+            for (var index = 0; index < gates.length; index++) {
+              final (gateLabel, currentValue) = gates[index];
+              _expectGate(
+                tester,
+                index: index,
+                label: gateLabel,
+                satisfied: index == 0,
+                currentValue: currentValue,
+                fontSize: 13,
+                textScale: textScale,
+              );
+            }
+            _expectPrimaryNearLastDetail(
+              tester,
+              primary: find.byKey(const Key('planet-mastery-open-map')),
+              lastDetail: find.byKey(
+                Key('planet-mastery-requirement-${gates.length - 1}'),
+              ),
+            );
+          }
+
+          await _pumpCard(
+            tester,
+            size: size,
+            textScale: textScale,
+            insets: insets,
+            card: _finalCard(nextSaleMultiplier: 2),
+          );
+          final panel = tester.getRect(
+            find.byKey(const Key('planet-mastery-panel')),
+          );
+          expect(
+            panel.top,
+            lessThanOrEqualTo(maxTop),
+            reason: 'Io panel $panel sits lower than the mockup framing',
+          );
+          expect(
+            panel.height,
+            greaterThanOrEqualTo(minHeight),
+            reason: 'Io panel $panel is shorter than the mockup framing',
+          );
+          final explanation = find.byKey(
+            const Key('planet-mastery-multiplier'),
+          );
+          _expectVisibleInBody(tester, explanation);
+          final richText = tester.widget<RichText>(
+            find.descendant(of: explanation, matching: find.byType(RichText)),
+          );
+          expect(
+            richText.text.style?.fontSize,
+            13,
+            reason: 'the Io explanation must gain the mockup body size',
+          );
+          expect(richText.textScaler.scale(13), closeTo(13 * textScale, .01));
+          final paragraph = tester.renderObject<RenderParagraph>(explanation);
+          expect(paragraph.didExceedMaxLines, isFalse);
+          expect(
+            paragraph.size.height,
+            greaterThanOrEqualTo(
+              paragraph.getMaxIntrinsicHeight(paragraph.size.width) - .5,
+            ),
+            reason: 'the enlarged explanation must render every line',
+          );
+          _expectPrimaryNearLastDetail(
+            tester,
+            primary: find.byKey(const Key('planet-mastery-relaunch')),
+            lastDetail: explanation,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'roomy 390x720 text 1.3 keeps the compact roomy spacing so the full Io '
+    'card still opens without scrolling',
+    (tester) async {
+      await _pumpCard(
+        tester,
+        size: const Size(390, 720),
+        textScale: 1.3,
+        insets: const EdgeInsets.fromLTRB(0, 47, 0, 34),
+        card: _finalCard(nextSaleMultiplier: 2),
+      );
+
+      final panel = tester.getRect(
+        find.byKey(const Key('planet-mastery-panel')),
+      );
+      expect(panel.height, lessThanOrEqualTo(471));
+      final explanation = find.byKey(const Key('planet-mastery-multiplier'));
+      _expectVisibleInBody(tester, explanation);
+      final richText = tester.widget<RichText>(
+        find.descendant(of: explanation, matching: find.byType(RichText)),
+      );
+      expect(richText.text.style?.fontSize, 12);
+      _expectPrimaryNearLastDetail(
+        tester,
+        primary: find.byKey(const Key('planet-mastery-relaunch')),
+        lastDetail: explanation,
+      );
       expect(tester.takeException(), isNull);
     },
   );
