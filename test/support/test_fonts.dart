@@ -6,7 +6,8 @@ import 'test_font_source_web.dart'
     if (dart.library.io) 'test_font_source_io.dart';
 
 /// Every font family and asset declared in `pubspec.yaml`. Widget tests load
-/// all of them through the VM files or the Chrome `test/fonts` symlink.
+/// all of them from `assets/fonts/` on the VM or the `test/fonts/` copies on
+/// Chrome.
 const Map<String, List<String>> productionFontFamilies = {
   'Orbitron': ['assets/fonts/Orbitron-Variable.ttf'],
   'IBM Plex Mono': [
@@ -23,6 +24,10 @@ Iterable<String> get productionFontAssets =>
 /// every platform. Chrome tests cannot read `dart:io` files or app assets, so
 /// the web source fetches byte-identical test fixtures from `test/fonts`, which
 /// the web test server serves directly.
+///
+/// On the VM, loaded fonts cannot be unloaded within an isolate, so call this
+/// in file-level `setUpAll` of an isolated test file rather than in a subset
+/// `group`.
 Future<void> loadProductionTestFonts() async {
   allowProductionFontsInWebTests();
   for (final entry in productionFontFamilies.entries) {
