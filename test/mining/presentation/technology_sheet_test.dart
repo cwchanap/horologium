@@ -215,7 +215,10 @@ void main() {
       final footerBefore = tester.getRect(footer);
       await tester.drag(
         viewport.width > viewport.height
-            ? find.byType(SingleChildScrollView).last
+            ? find.descendant(
+                of: body,
+                matching: find.byType(SingleChildScrollView),
+              )
             : body,
         viewport.width > viewport.height
             ? const Offset(-120, 0)

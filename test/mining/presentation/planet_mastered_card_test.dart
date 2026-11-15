@@ -729,11 +729,11 @@ void main() {
         );
         await tester.pump();
         expect(
-          find.bySemanticsLabel(RegExp('^Surveying 3, required')),
+          find.bySemanticsLabel('Surveying 3, required, now LV 0'),
           findsOneWidget,
         );
         expect(
-          find.bySemanticsLabel(RegExp('^Homeworld mastered, satisfied')),
+          find.bySemanticsLabel('Homeworld mastered, satisfied'),
           findsOneWidget,
         );
         await tester.tap(openMap);
