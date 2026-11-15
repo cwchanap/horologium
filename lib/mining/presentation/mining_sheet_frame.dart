@@ -138,7 +138,17 @@ class MiningSheetFrame extends StatelessWidget {
                                 landscape ? 16 : 14,
                                 landscape ? 14 : footerBottom,
                               ),
-                              child: _bodyText(pinnedFooter!),
+                              // A footer taller than half the panel scrolls
+                              // instead of starving the body of the fixed
+                              // panel height.
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxHeight: panelHeight! / 2,
+                                ),
+                                child: SingleChildScrollView(
+                                  child: _bodyText(pinnedFooter!),
+                                ),
+                              ),
                             ),
                           ],
                         ),

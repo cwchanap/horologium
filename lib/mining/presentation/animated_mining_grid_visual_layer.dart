@@ -453,6 +453,9 @@ class _AnimatedMiningGridVisualLayerState
           child: Text(
             '-${miningStrikeDamage(rig.placement.tier)}',
             textAlign: TextAlign.center,
+            // Scene-space chrome like the chip it clears: text scale must not
+            // grow the label past the fixed clearance above the chip band.
+            textScaler: TextScaler.noScaling,
             style: const TextStyle(
               color: MiningTheme.primaryText,
               fontSize: 11,

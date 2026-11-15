@@ -336,14 +336,16 @@ class PlanetMasteredCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 7),
-          Text(
-            _title,
-            style: TextStyle(
-              color: MiningTheme.accent,
-              fontFamily: 'Orbitron',
-              fontSize: compact ? 10 : 13,
-              fontWeight: FontWeight.w800,
-              letterSpacing: .2,
+          Flexible(
+            child: Text(
+              _title,
+              style: TextStyle(
+                color: MiningTheme.accent,
+                fontFamily: 'Orbitron',
+                fontSize: compact ? 10 : 13,
+                fontWeight: FontWeight.w800,
+                letterSpacing: .2,
+              ),
             ),
           ),
         ],
@@ -564,6 +566,9 @@ class _MasteryRequirement extends StatelessWidget {
         requirement.isSatisfied ? 'satisfied' : 'required',
         if (requirement.currentValue != null) requirement.currentValue!,
       ].join(', '),
+      // The descendant Texts repeat the same words; announce the composed
+      // label once.
+      excludeSemantics: true,
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: compact ? 1 : 2 + spacious),
         child: Row(

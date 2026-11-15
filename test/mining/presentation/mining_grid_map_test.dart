@@ -975,7 +975,7 @@ void main() {
     // A legal rig below the 1x1 resource at (27,1) has its strike midpoint
     // label exactly on the rig cell's top edge, where the top-anchored chip
     // paints. Reduced motion keeps the label still, so this is the worst case;
-    // text scale 1.3 grows the label toward the chip.
+    // a text-scaled label would grow down into the chip band.
     const rigCell = MiningGridCell(27, 2);
     const damageKey = Key('landing-basin-damage-27-2');
     await warmDepositFrames(tester, MiningDepositFrames.gold);
@@ -984,7 +984,7 @@ void main() {
       surveying: 2,
       rigs: const [MiningRigPlacement(tier: RigTier.t1, cell: rigCell)],
     );
-    for (final scale in [1.0, 1.3]) {
+    for (final scale in [1.0, 1.3, 2.0]) {
       // Remount so each scale starts from a clean impact timeline.
       await tester.pumpWidget(const SizedBox.shrink());
       await _pumpMap(
