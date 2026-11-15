@@ -25,6 +25,12 @@ const double _closeSize = 48;
 /// highlight, matching the approved floating-card art direction.
 const Color masteryPrimaryFill = Color(0xFF3FE3F2);
 
+/// The mockup's planet disc: near-black navy so the rim and halo read.
+const Color masteryDiscFill = Color(0xFF070C14);
+
+/// How much of the art block the planet itself fills; the rest is the disc rim.
+const double _artPlanetScale = .9;
+
 /// Transient feedback for a deploy that just mastered a planet. The final
 /// variant pays the authored reward on the card and relays Relaunch through
 /// the shell; the card itself never mutates or persists state.
@@ -147,6 +153,9 @@ class PlanetMasteredCard extends StatelessWidget {
           key: const Key('planet-mastery-card'),
           width: cardWidth,
           child: Stack(
+            // The disc's halo blooms past the card's top edge as in the
+            // mockup; paint-only, since hit testing stays inside the Stack.
+            clipBehavior: Clip.none,
             children: [
               Padding(
                 padding: EdgeInsets.only(top: artAbovePanel),
@@ -420,18 +429,49 @@ class PlanetMasteredCard extends StatelessWidget {
     );
   }
 
-  Widget _art(Size size) => Image.asset(
-    masteredPlanet.planetAsset,
-    key: const Key('planet-mastery-art'),
-    width: size.width,
-    height: size.height,
-    fit: BoxFit.contain,
-    errorBuilder: (_, _, _) => SizedBox(
+  Widget _art(Size size) {
+    // The halo scales with the disc: a fixed bloom would swallow the landscape
+    // planet. Paint only — the disc stays exactly the art block's box.
+    return Container(
+      key: const Key('planet-mastery-art'),
       width: size.width,
       height: size.height,
-      child: const Icon(Icons.public_rounded, color: Colors.white24, size: 96),
-    ),
-  );
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: masteryDiscFill,
+        // The mockup's rim is a dark plate edge, not a neon ring: a faint cool
+        // line plus the halo's inner falloff define the disc silhouette.
+        border: Border.all(
+          color: MiningTheme.accent.withAlpha(48),
+          width: math.max(1, size.width * .008),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: MiningTheme.accent.withAlpha(80),
+            blurRadius: size.width * .1,
+          ),
+          BoxShadow(
+            color: MiningTheme.accent.withAlpha(48),
+            blurRadius: size.width * .38,
+            spreadRadius: size.width * .015,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(size.width * (1 - _artPlanetScale) / 2),
+        child: Image.asset(
+          masteredPlanet.planetAsset,
+          key: const Key('planet-mastery-planet-image'),
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => Icon(
+            Icons.public_rounded,
+            color: Colors.white24,
+            size: size.width * .5,
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _close(BuildContext context) => Semantics(
     label: 'Close $_title',
@@ -557,6 +597,7 @@ class _MasteryRequirement extends StatelessWidget {
                     label,
                     style: TextStyle(
                       color: MiningTheme.primaryText,
+                      fontFamily: 'Orbitron',
                       fontSize: fontSize,
                       fontWeight: FontWeight.w600,
                     ),
@@ -566,6 +607,10 @@ class _MasteryRequirement extends StatelessWidget {
                       '· ${requirement.currentValue}',
                       style: TextStyle(
                         color: MiningTheme.secondaryText,
+                        fontFamily: 'Orbitron',
+                        // Orbitron has no middle dot; keep the separator in
+                        // the body face instead of a platform fallback.
+                        fontFamilyFallback: const ['IBM Plex Mono'],
                         fontSize: fontSize,
                         fontWeight: FontWeight.w500,
                       ),
