@@ -423,18 +423,20 @@ class _AnimatedMiningGridVisualLayerState
           cell,
     );
     final drift = widget.reducedMotion ? 0.0 : tail * 18;
-    // A rig below its resource anchors this label on the shared cell edge,
-    // exactly where the map paints the rig's top-anchored tier chip. Lift it
-    // above that chip so the chip never covers the damage value. A rig beside
-    // its 1x1 resource anchors only 28px below its own cell top, so the same
-    // upward drift would enter the chip band late in the tail; hold that drift
-    // below the chip instead.
+    // A rig below its resource anchors this label on or near the shared cell
+    // edge, where the map paints the rig's top-anchored tier chip. Clamp its
+    // origin above that chip first so the upward drift still animates smoothly
+    // away from the chip rather than stalling against the clearance floor. A
+    // rig beside its 1x1 resource anchors only 28px below its own cell top, so
+    // the same upward drift would enter the chip band late in the tail; hold
+    // that drift below the chip instead.
     final targetAbove = rig.target.y + rig.target.size == rig.placement.cell.y;
     final top = targetAbove
         ? math.min(
-            anchor.dy - drift,
-            rig.placement.cell.y * cell - miningRigChipClearance,
-          )
+                anchor.dy,
+                rig.placement.cell.y * cell - miningRigChipClearance,
+              ) -
+              drift
         : math.max(
             anchor.dy - drift,
             rig.placement.cell.y * cell + miningRigChipClearance,

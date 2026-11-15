@@ -1195,6 +1195,48 @@ void main() {
       );
     }, skip: kIsWeb);
 
+    testWidgets(
+      'drifts a below-1x1-resource label upward above the rig chip clearance',
+      (tester) async {
+        final below1x1 = deployableMiningCells(_landing, surveyingLevel: 2)
+            .firstWhere((cell) {
+              final target = uniqueAdjacentDeposit(
+                deposits: _landing.deposits,
+                cell: cell,
+              );
+              return target != null &&
+                  target.size == 1 &&
+                  target.y + target.size == cell.y;
+            });
+        await warmDepositFrames(tester, MiningDepositFrames.gold);
+        await _pumpLayer(
+          tester,
+          cell: below1x1,
+          surveying: 2,
+          impactSequence: 0,
+        );
+        await _pumpLayer(
+          tester,
+          cell: below1x1,
+          surveying: 2,
+          impactSequence: 1,
+        );
+        await tester.pump(const Duration(milliseconds: 470));
+
+        final earlyRect = tester.getRect(find.byKey(_damageKey(below1x1)));
+        final chipTop = below1x1.y * miningGridCellSize;
+        expect(
+          earlyRect.top,
+          lessThanOrEqualTo(chipTop - miningRigChipClearance),
+        );
+
+        await tester.pump(const Duration(milliseconds: 400));
+        final lateRect = tester.getRect(find.byKey(_damageKey(below1x1)));
+        expect(lateRect.top, lessThan(earlyRect.top - 10));
+      },
+      skip: kIsWeb,
+    );
+
     for (final textScale in const [1.0, 1.3]) {
       testWidgets('sideways labels stay below the rig chip through the tail at '
           'text $textScale', (tester) async {

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
@@ -339,7 +341,7 @@ class _MapHeader extends StatelessWidget {
   );
 }
 
-class _PlanetCard extends StatelessWidget {
+class _PlanetCard extends StatefulWidget {
   const _PlanetCard({
     required this.view,
     required this.content,
@@ -353,42 +355,96 @@ class _PlanetCard extends StatelessWidget {
   final ValueChanged<MiningPlanetId> onTravel;
 
   @override
-  Widget build(BuildContext context) {
-    final definition = content.planet(view.id);
-    final stateLabel = _stateLabel(view);
-    final height = view.isActive
-        ? 264.0
-        : (view.isUnlocked ? 290.0 : (view.isBusy ? 219.0 : 191.0));
-    final nameStyle = TextStyle(
-      color: Colors.white,
-      fontSize: view.isActive ? 24 : 22,
-      fontWeight: FontWeight.w700,
-    );
+  State<_PlanetCard> createState() => _PlanetCardState();
+}
+
+class _PlanetCardState extends State<_PlanetCard> {
+  static const double _activeArtTop = -43;
+  static const double _activeNameTop = 56;
+
+  String? _measuredName;
+  TextStyle? _measuredStyle;
+  TextDirection? _measuredDirection;
+  TextScaler? _measuredTextScaler;
+  double _nameWidth = 0;
+
+  TextStyle _nameStyle(bool isActive) => TextStyle(
+    color: Colors.white,
+    fontSize: isActive ? 24 : 22,
+    fontWeight: FontWeight.w700,
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateNameWidth();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PlanetCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.view.name != widget.view.name ||
+        oldWidget.view.isActive != widget.view.isActive) {
+      _updateNameWidth();
+    }
+  }
+
+  void _updateNameWidth() {
+    final nameStyle = _nameStyle(widget.view.isActive);
     // The name Text inherits DefaultTextStyle, so measure that exact merged
     // style rather than assuming the theme's body style.
     final inheritedNameStyle = DefaultTextStyle.of(
       context,
     ).style.merge(nameStyle);
+    final textDirection = Directionality.of(context);
+    final textScaler = MediaQuery.textScalerOf(context);
+    if (_measuredName == widget.view.name &&
+        _measuredStyle == inheritedNameStyle &&
+        _measuredDirection == textDirection &&
+        _measuredTextScaler == textScaler) {
+      return;
+    }
     final namePainter = TextPainter(
-      text: TextSpan(text: view.name, style: inheritedNameStyle),
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
+      text: TextSpan(text: widget.view.name, style: inheritedNameStyle),
+      textDirection: textDirection,
+      textScaler: textScaler,
     )..layout();
-    final nameWidth = namePainter.width;
+    _nameWidth = namePainter.width;
     namePainter.dispose();
+    _measuredName = widget.view.name;
+    _measuredStyle = inheritedNameStyle;
+    _measuredDirection = textDirection;
+    _measuredTextScaler = textScaler;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final view = widget.view;
+    final definition = widget.content.planet(view.id);
+    final stateLabel = _stateLabel(view);
+    final height = view.isActive
+        ? 264.0
+        : (view.isUnlocked ? 290.0 : (view.isBusy ? 219.0 : 191.0));
+    final nameStyle = _nameStyle(view.isActive);
     return LayoutBuilder(
       builder: (context, constraints) {
         final cardWidth = constraints.maxWidth;
         final fullArtSize = view.isActive ? 172.0 : 96.0;
         final artBleed = view.isActive ? 27.0 : 8.0;
         // Shrink the art only as far as the name needs to stay clear; at
-        // normal sizes the full authored globe is unchanged.
-        // shortcut: authored names fit at the 64px globe floor; revisit if
-        // longer names or much larger text scales ship.
-        final artSize = (cardWidth + artBleed - 14 - nameWidth - 8).clamp(
-          64.0,
-          fullArtSize,
-        );
+        // normal sizes the full authored globe is unchanged. On the active
+        // card, the globe sits above the name (`_activeArtTop` vs
+        // `_activeNameTop`), so any size up to `_activeNameTop - _activeArtTop`
+        // already clears the name vertically instead of shrinking to a sliver.
+        // shortcut: authored names fit at the 64px globe floor on inactive
+        // cards; revisit if longer names or much larger text scales ship.
+        final horizontalFit = (cardWidth + artBleed - 14 - _nameWidth - 8)
+            .clamp(64.0, fullArtSize);
+        final artSize = view.isActive
+            ? math
+                  .max(horizontalFit, _activeNameTop - _activeArtTop)
+                  .clamp(64.0, fullArtSize)
+            : horizontalFit;
         return Semantics(
           container: true,
           label: '${view.name}, ${stateLabel.toLowerCase()} planet',
@@ -420,7 +476,7 @@ class _PlanetCard extends StatelessWidget {
               children: [
                 Positioned(
                   right: -artBleed,
-                  top: view.isActive ? -43 : 2,
+                  top: view.isActive ? _activeArtTop : 2,
                   child: Opacity(
                     opacity: view.isUnlocked ? 1 : .9,
                     child: _PlanetArt(definition: definition, size: artSize),
@@ -434,7 +490,7 @@ class _PlanetCard extends StatelessWidget {
                   ),
                 Positioned(
                   left: 14,
-                  top: view.isActive ? 56 : 16,
+                  top: view.isActive ? _activeNameTop : 16,
                   child: Text(view.name, style: nameStyle),
                 ),
                 if (view.isActive)
@@ -451,7 +507,7 @@ class _PlanetCard extends StatelessWidget {
                                 'stellar-map-site-${view.id.name}-${indicator.id.name}',
                               ),
                               indicator: indicator,
-                              content: content,
+                              content: widget.content,
                             ),
                           ),
                           if (indicator != view.siteIndicators.last)
@@ -499,7 +555,7 @@ class _PlanetCard extends StatelessWidget {
                                       'stellar-map-site-${view.id.name}-${indicator.id.name}',
                                     ),
                                     indicator: indicator,
-                                    content: content,
+                                    content: widget.content,
                                   ),
                                 ),
                                 if (indicator != view.siteIndicators.last)
@@ -523,21 +579,21 @@ class _PlanetCard extends StatelessWidget {
                         const SizedBox(width: 12),
                         _PlanetAction(
                           view: view,
-                          onUnlock: onUnlock,
-                          onTravel: onTravel,
+                          onUnlock: widget.onUnlock,
+                          onTravel: widget.onTravel,
                         ),
                       ] else if (view.isUnlocked)
                         _PlanetAction(
                           view: view,
-                          onUnlock: onUnlock,
-                          onTravel: onTravel,
+                          onUnlock: widget.onUnlock,
+                          onTravel: widget.onTravel,
                         )
                       else
                         Expanded(
                           child: _PlanetAction(
                             view: view,
-                            onUnlock: onUnlock,
-                            onTravel: onTravel,
+                            onUnlock: widget.onUnlock,
+                            onTravel: widget.onTravel,
                           ),
                         ),
                     ],
