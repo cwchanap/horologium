@@ -7,8 +7,9 @@ import 'package:horologium/mining/presentation/mining_theme.dart';
 
 /// The floating panel starts this far below the live top inset in portrait so
 /// its top-mounted close control clears the inline cargo gauge (84px tall at
-/// 50px down). Compact portrait fills from this floor; roomy portrait uses it
-/// as the minimum panel top while sizing and centering the content.
+/// 50px down). Every layout sizes the panel to its content and caps it at this
+/// floor's available height, so compact portrait bottom-anchors the card and
+/// roomy portrait centers it above the floor.
 const double _portraitTopClearance = 168;
 
 const double _portraitMargin = 20;
@@ -113,31 +114,27 @@ class PlanetMasteredCard extends StatelessWidget {
       size.width - 2 * horizontalInset,
     );
     final roomyPortrait = !landscape && !compactPortrait;
-    final panel = roomyPortrait
-        ? ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: availablePanelHeight),
-            child: _panel(
-              context,
-              compact: compact,
-              bodyTop: bodyTop,
-              contentSized: true,
-            ),
-          )
-        : SizedBox(
-            height: availablePanelHeight,
-            child: _panel(
-              context,
-              compact: compact,
-              bodyTop: bodyTop,
-              contentSized: false,
-            ),
-          );
+    // Roomy portrait interpolates toward the mockup's generous rhythm only as
+    // spare height grows: 390x720 at 1.3 is the tightest first frame (~16px of
+    // slack), so the full rhythm starts above it instead of adding a fixed gap.
+    final spacious = roomyPortrait
+        ? ((availablePanelHeight - 500) / 100).clamp(0.0, 1.0).toDouble()
+        : 0.0;
+    final panel = ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: availablePanelHeight),
+      child: _panel(
+        context,
+        compact: compact,
+        bodyTop: bodyTop,
+        spacious: spacious,
+      ),
+    );
 
     // Only the card-plus-overlap composition is interactive, so taps above or
     // beside it reach the dismissible barrier. The close lives inside these
     // bounds too, keeping its whole visible circle hit-testable. Roomy portrait
     // centers the content-sized card but clamps it to the HUD-safe top floor;
-    // compact layouts bottom-anchor the fill-available panel.
+    // compact layouts bottom-anchor the content-sized panel.
     return CustomSingleChildLayout(
       delegate: _MasteryCardLayout(
         roomyPortrait: roomyPortrait,
@@ -190,7 +187,7 @@ class PlanetMasteredCard extends StatelessWidget {
     BuildContext context, {
     required bool compact,
     required double bodyTop,
-    required bool contentSized,
+    required double spacious,
   }) => Container(
     key: const Key('planet-mastery-panel'),
     decoration: BoxDecoration(
@@ -208,26 +205,26 @@ class PlanetMasteredCard extends StatelessWidget {
     ),
     clipBehavior: Clip.antiAlias,
     child: Column(
-      mainAxisSize: contentSized ? MainAxisSize.min : MainAxisSize.max,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        if (contentSized)
-          Flexible(
-            fit: FlexFit.loose,
-            child: _scrollBody(context, compact: compact, bodyTop: bodyTop),
-          )
-        else
-          Expanded(
-            child: _scrollBody(context, compact: compact, bodyTop: bodyTop),
+        Flexible(
+          fit: FlexFit.loose,
+          child: _scrollBody(
+            context,
+            compact: compact,
+            bodyTop: bodyTop,
+            spacious: spacious,
           ),
+        ),
         Padding(
           key: const Key('mining-sheet-pinned-footer'),
           padding: EdgeInsets.fromLTRB(
             18,
-            compact ? 6 : 8,
+            compact ? 6 : 8 + 16 * spacious,
             18,
-            compact ? 6 : 10,
+            compact ? 6 : 10 + 4 * spacious,
           ),
-          child: _actions(compact: compact),
+          child: _actions(compact: compact, spacious: spacious),
         ),
       ],
     ),
@@ -237,6 +234,7 @@ class PlanetMasteredCard extends StatelessWidget {
     BuildContext context, {
     required bool compact,
     required double bodyTop,
+    required double spacious,
   }) => ScrollConfiguration(
     // A desktop scrollbar would inset the body by 12px and push the mockup's
     // centered badge off the card's centre line.
@@ -244,26 +242,26 @@ class PlanetMasteredCard extends StatelessWidget {
     child: SingleChildScrollView(
       key: const Key('mining-sheet-body'),
       padding: EdgeInsets.fromLTRB(18, bodyTop, 18, 4),
-      child: _body(compact: compact),
+      child: _body(compact: compact, spacious: spacious),
     ),
   );
 
-  Widget _body({required bool compact}) => Column(
+  Widget _body({required bool compact, required double spacious}) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Center(child: _badge(compact: compact)),
-      SizedBox(height: compact ? 4 : 8),
+      SizedBox(height: compact ? 4 : 8 + 4 * spacious),
       _planetName(compact: compact),
       if (isFinal) ...[
-        const SizedBox(height: 2),
+        SizedBox(height: 2 + 4 * spacious),
         _reward(compact: compact),
         _completionReward(),
-        SizedBox(height: compact ? 6 : 10),
+        SizedBox(height: compact ? 6 : 10 + 4 * spacious),
         Align(alignment: Alignment.centerLeft, child: _runComplete()),
-        const SizedBox(height: 2),
-        _explanation(),
+        SizedBox(height: 2 + 4 * spacious),
+        _explanation(fontSize: compact ? 12 : 12 + spacious),
       ] else ...[
-        const SizedBox(height: 2),
+        SizedBox(height: compact ? 2 : 2 + 4 * spacious),
         Text(
           'All ${masteredPlanet.sites.length} sites commissioned',
           textAlign: TextAlign.center,
@@ -272,7 +270,7 @@ class PlanetMasteredCard extends StatelessWidget {
             fontSize: 12,
           ),
         ),
-        SizedBox(height: compact ? 4 : 8),
+        SizedBox(height: compact ? 4 : 8 + 2 * spacious),
         Align(
           alignment: Alignment.centerLeft,
           child: Text(
@@ -286,7 +284,7 @@ class PlanetMasteredCard extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: 4 + 4 * spacious),
         for (final (index, requirement) in requirements.indexed)
           _MasteryRequirement(
             key: Key('planet-mastery-requirement-$index'),
@@ -298,6 +296,8 @@ class PlanetMasteredCard extends StatelessWidget {
                 : requirement.label,
             requirement: requirement,
             compact: compact,
+            fontSize: compact ? 12 : 12 + spacious,
+            spacious: spacious,
           ),
       ],
     ],
@@ -383,15 +383,19 @@ class PlanetMasteredCard extends StatelessWidget {
     ),
   );
 
-  Widget _explanation() => Text(
+  Widget _explanation({required double fontSize}) => Text(
     'Relaunch to start again with sales '
     '${formatSaleMultiplier(nextSaleMultiplier)}. '
     'Only your relaunch count is kept.',
     key: const Key('planet-mastery-multiplier'),
-    style: const TextStyle(color: MiningTheme.secondaryText, height: 1.4),
+    style: TextStyle(
+      color: MiningTheme.secondaryText,
+      fontSize: fontSize,
+      height: 1.4,
+    ),
   );
 
-  Widget _actions({required bool compact}) {
+  Widget _actions({required bool compact, required double spacious}) {
     final primary = _MasteryAction(
       key: isFinal
           ? const Key('planet-mastery-relaunch')
@@ -410,7 +414,7 @@ class PlanetMasteredCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(width: double.infinity, child: primary),
-        SizedBox(height: compact ? 6 : 8),
+        SizedBox(height: compact ? 6 : 8 + 4 * spacious),
         SizedBox(width: double.infinity, child: secondary),
       ],
     );
@@ -491,6 +495,8 @@ class _MasteryRequirement extends StatelessWidget {
     required this.label,
     required this.requirement,
     this.compact = false,
+    this.fontSize = 12,
+    this.spacious = 0,
   });
 
   /// The card-facing wording for the projected gate; the model's own label is
@@ -500,6 +506,12 @@ class _MasteryRequirement extends StatelessWidget {
 
   /// Tightens the row for the short landscape card.
   final bool compact;
+
+  /// The roomy mockup's larger gate copy, applied only when height permits.
+  final double fontSize;
+
+  /// Extra roomy row rhythm, interpolated from the available panel height.
+  final double spacious;
 
   @override
   Widget build(BuildContext context) {
@@ -513,7 +525,7 @@ class _MasteryRequirement extends StatelessWidget {
         if (requirement.currentValue != null) requirement.currentValue!,
       ].join(', '),
       child: Padding(
-        padding: EdgeInsets.symmetric(vertical: compact ? 1 : 2),
+        padding: EdgeInsets.symmetric(vertical: compact ? 1 : 2 + spacious),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -543,18 +555,18 @@ class _MasteryRequirement extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: MiningTheme.primaryText,
-                      fontSize: 12,
+                      fontSize: fontSize,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   if (requirement.currentValue != null)
                     Text(
                       '· ${requirement.currentValue}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: MiningTheme.secondaryText,
-                        fontSize: 12,
+                        fontSize: fontSize,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
