@@ -46,8 +46,10 @@ class PlanetMasteredCard extends StatelessWidget {
     this.isFinal = false,
     this.rewardCash,
     this.onRelaunch,
-    this.topSafeArea = 0,
-  });
+  }) : assert(
+         !isFinal || onRelaunch != null,
+         'onRelaunch is required when isFinal is true',
+       );
 
   final MiningPlanetDefinition masteredPlanet;
   final String? successorName;
@@ -61,11 +63,6 @@ class PlanetMasteredCard extends StatelessWidget {
   final VoidCallback onOpenMap;
   final VoidCallback? onRelaunch;
 
-  /// The shell's live top system inset. The retained mastery dialog route
-  /// follows rotation and inset changes through this value; the card uses the
-  /// larger of it and the route's own top padding.
-  final double topSafeArea;
-
   String get _title => isFinal ? 'FINAL PLANET MASTERED' : 'PLANET MASTERED';
 
   @override
@@ -74,7 +71,7 @@ class PlanetMasteredCard extends StatelessWidget {
     final padding = MediaQuery.paddingOf(context);
     final landscape = size.width > size.height;
     final compactPortrait = !landscape && size.height <= 700;
-    final topInset = math.max(topSafeArea, padding.top);
+    final topInset = padding.top;
 
     // Portrait keeps the mockup's art-led stack, shrinking the planet on short
     // phones. Landscape shrinks it further; its actions stay stacked so the
@@ -226,7 +223,7 @@ class PlanetMasteredCard extends StatelessWidget {
           ),
         ),
         Padding(
-          key: const Key('mining-sheet-pinned-footer'),
+          key: const Key('planet-mastery-pinned-footer'),
           padding: EdgeInsets.fromLTRB(
             18,
             compact ? 6 : 8 + 16 * spacious,
@@ -249,7 +246,7 @@ class PlanetMasteredCard extends StatelessWidget {
     // centered badge off the card's centre line.
     behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
     child: SingleChildScrollView(
-      key: const Key('mining-sheet-body'),
+      key: const Key('planet-mastery-body'),
       padding: EdgeInsets.fromLTRB(18, bodyTop, 18, 4),
       child: _body(compact: compact, spacious: spacious),
     ),
@@ -279,6 +276,11 @@ class PlanetMasteredCard extends StatelessWidget {
             fontSize: 12,
           ),
         ),
+        if ((rewardCash ?? 0) > 0) ...[
+          SizedBox(height: 2 + 4 * spacious),
+          _reward(compact: compact),
+          _completionReward(),
+        ],
         SizedBox(height: compact ? 4 : 8 + 2 * spacious),
         Align(
           alignment: Alignment.centerLeft,
@@ -297,10 +299,9 @@ class PlanetMasteredCard extends StatelessWidget {
         for (final (index, requirement) in requirements.indexed)
           _MasteryRequirement(
             key: Key('planet-mastery-requirement-$index'),
-            // The first projected successor gate is its mastery requirement.
-            // The card uses the mockup's wording; the shared Stellar Map
-            // projection keeps its own `sites 3/3` label.
-            label: !isFinal && index == 0
+            // The projected mastery gate uses the mockup's wording; the
+            // shared Stellar Map projection keeps its own `sites 3/3` label.
+            label: requirement.kind == StellarMapRequirementKind.mastery
                 ? '${masteredPlanet.name} mastered'
                 : requirement.label,
             requirement: requirement,

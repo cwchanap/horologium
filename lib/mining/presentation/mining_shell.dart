@@ -76,12 +76,6 @@ class _MiningShellState extends State<MiningShell>
   late final StorageAlerts _storageAlerts;
   late MiningSave _displayState;
   late final _MiningDisplayNotifier _displayNotifier;
-
-  /// The shell's live top inset. The retained mastery dialog route listens to
-  /// this value instead of capturing the inset once when it opens, so
-  /// orientation and inset changes keep the card's close clear of the scene
-  /// HUD. Changes refresh through [didChangeDependencies].
-  final ValueNotifier<double> _topSafeArea = ValueNotifier<double>(0);
   Timer? _refreshTimer;
   bool _initialized = false;
   // Set by the first paused/hidden event and cleared on resume: the only
@@ -254,23 +248,7 @@ class _MiningShellState extends State<MiningShell>
     );
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final topSafeArea = MediaQuery.paddingOf(context).top;
-    if (_topSafeArea.value == topSafeArea) return;
-    // The modal route listens to this notifier; notifying during the shell's
-    // dependency build would mark that route dirty mid-build. Refresh after the
-    // current frame instead, so a rotation lands on the next frame.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _topSafeArea.value = topSafeArea;
-    });
-  }
-
-  Future<void> _showModalSheet(Widget child) =>
-      _showModalSheetBuilder((_) => child);
-
-  Future<void> _showModalSheetBuilder(WidgetBuilder builder) async {
+  Future<void> _showModalSheet(Widget child) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -278,7 +256,7 @@ class _MiningShellState extends State<MiningShell>
       barrierColor: Colors.black26,
       constraints: const BoxConstraints(maxWidth: double.infinity),
       sheetAnimationStyle: _reducedMotion ? AnimationStyle.noAnimation : null,
-      builder: builder,
+      builder: (_) => child,
     );
     if (mounted) unawaited(_audioManager.playSound(GameSound.tap));
   }
@@ -449,46 +427,32 @@ class _MiningShellState extends State<MiningShell>
       state: _controller.state,
       content: _content,
     );
-    MiningPlanetDefinition? successor;
-    if (!isFinal) {
-      for (final candidate in _content.planets.values) {
-        if (candidate.unlockRequiredMasteryPlanetId == planetId) {
-          successor = candidate;
-          break;
-        }
-      }
-    }
-    final successorView = successor == null
+    final successorId = isFinal
         ? null
-        : mapView.planet(successor.id);
-    // The route intentionally outlives this build, so it cannot keep a scalar
-    // snapshot of the shell's top inset: a rotation while the card is open
-    // moves the inline HUD and this card must follow. Rebuild the card from the
-    // live notifier instead.
+        : MiningPlanetId.values[planetId.index + 1];
+    final successorView = successorId == null
+        ? null
+        : mapView.planet(successorId);
     return _showMasteryCardBuilder(
-      (_) => ValueListenableBuilder<double>(
-        valueListenable: _topSafeArea,
-        builder: (context, topSafeArea, _) => PlanetMasteredCard(
-          masteredPlanet: planet,
-          isFinal: isFinal,
-          successorName: successorView?.name,
-          requirements: successorView?.requirements ?? const [],
-          nextSaleMultiplier: mapView.nextSaleMultiplier,
-          rewardCash: planet.masteryRewardCash,
-          topSafeArea: topSafeArea,
-          onContinue: () => Navigator.of(context).pop(),
-          onOpenMap: () {
-            // Mastery can land while a Technology/Settings sheet opened during
-            // the pending save sits under this card; unwind every covering
-            // sheet so the map is not left behind one.
-            Navigator.of(context).popUntil((route) => route is! PopupRoute);
-            _handleNavigation(MiningNavigationDestination.stellarMap);
-          },
-          onRelaunch: () {
-            Navigator.of(context).popUntil((route) => route is! PopupRoute);
-            _openRelaunchSheet();
-          },
-        ),
+      (context) => PlanetMasteredCard(
+        masteredPlanet: planet,
+        isFinal: isFinal,
+        successorName: successorView?.name,
+        requirements: successorView?.requirements ?? const [],
+        nextSaleMultiplier: mapView.nextSaleMultiplier,
+        rewardCash: planet.masteryRewardCash,
+        onContinue: () => Navigator.of(context).pop(),
+        onOpenMap: () {
+          // Mastery can land while a Technology/Settings sheet opened during
+          // the pending save sits under this card; unwind every covering
+          // sheet so the map is not left behind one.
+          Navigator.of(context).popUntil((route) => route is! PopupRoute);
+          _handleNavigation(MiningNavigationDestination.stellarMap);
+        },
+        onRelaunch: () {
+          Navigator.of(context).popUntil((route) => route is! PopupRoute);
+          _openRelaunchSheet();
+        },
       ),
     );
   }
@@ -895,7 +859,6 @@ class _MiningShellState extends State<MiningShell>
   void dispose() {
     _refreshTimer?.cancel();
     _displayNotifier.dispose();
-    _topSafeArea.dispose();
     WidgetsBinding.instance.removeObserver(this);
     if (_initialized) {
       // Leaving the mining surface hands the alert off: the player may

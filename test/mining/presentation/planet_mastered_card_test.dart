@@ -216,9 +216,9 @@ Future<void> _pumpCard(
 /// A text/art rectangle must sit entirely inside the scrolling body viewport
 /// (the only clipped region) and above the pinned action footer.
 void _expectVisibleInBody(WidgetTester tester, Finder finder) {
-  final body = tester.getRect(find.byKey(const Key('mining-sheet-body')));
+  final body = tester.getRect(find.byKey(const Key('planet-mastery-body')));
   final footer = tester.getRect(
-    find.byKey(const Key('mining-sheet-pinned-footer')),
+    find.byKey(const Key('planet-mastery-pinned-footer')),
   );
   final rect = tester.getRect(finder);
   expect(body.contains(rect.topLeft), isTrue, reason: '$finder $rect vs $body');
@@ -382,9 +382,9 @@ void _expectFloatingComposition(
   expect(closeRect.bottom, greaterThan(panel.top));
   expect(closeRect.right, lessThanOrEqualTo(safe.right));
 
-  final body = tester.getRect(find.byKey(const Key('mining-sheet-body')));
+  final body = tester.getRect(find.byKey(const Key('planet-mastery-body')));
   final footer = tester.getRect(
-    find.byKey(const Key('mining-sheet-pinned-footer')),
+    find.byKey(const Key('planet-mastery-pinned-footer')),
   );
   expect(_inside(panel, body), isTrue, reason: '$body vs $panel');
   expect(_inside(panel, footer), isTrue, reason: '$footer vs $panel');
@@ -1283,7 +1283,7 @@ void main() {
         card.requirements.map((requirement) => requirement.label),
         contains('Lunar Frontier sites 3/3'),
       );
-      final body = tester.getRect(find.byKey(const Key('mining-sheet-body')));
+      final body = tester.getRect(find.byKey(const Key('planet-mastery-body')));
       final openMap = find.byKey(const Key('planet-mastery-open-map'));
       final continueButton = find.byKey(const Key('planet-mastery-continue'));
       expect(openMap.hitTestable(), findsOneWidget);
@@ -2259,5 +2259,84 @@ void main() {
     await tester.pump();
     expect(opens, 2);
     expect(tester.takeException(), isNull);
+  });
+
+  test('isFinal requires onRelaunch', () {
+    expect(
+      () => PlanetMasteredCard(
+        masteredPlanet: _content.planet(_content.finalPlanetId),
+        successorName: null,
+        requirements: const [],
+        nextSaleMultiplier: 1.5,
+        isFinal: true,
+        onContinue: () {},
+        onOpenMap: () {},
+      ),
+      throwsAssertionError,
+    );
+  });
+
+  testWidgets('rewrites mastery gate by kind regardless of list index', (
+    tester,
+  ) async {
+    await _pumpCard(
+      tester,
+      size: const Size(390, 844),
+      textScale: 1.0,
+      card: PlanetMasteredCard(
+        masteredPlanet: _content.planet(MiningPlanetId.homeworld),
+        successorName: 'Lunar Frontier',
+        requirements: const [
+          StellarMapRequirementView(
+            label: 'Surveying 3',
+            isSatisfied: false,
+            currentValue: 'now LV 1',
+            kind: StellarMapRequirementKind.surveying,
+          ),
+          StellarMapRequirementView(
+            label: 'Homeworld sites 3/3',
+            isSatisfied: true,
+            kind: StellarMapRequirementKind.mastery,
+          ),
+        ],
+        nextSaleMultiplier: 1.5,
+        onContinue: () {},
+        onOpenMap: () {},
+      ),
+    );
+
+    _expectGate(
+      tester,
+      index: 0,
+      label: 'Surveying 3',
+      satisfied: false,
+      currentValue: 'now LV 1',
+    );
+    _expectGate(tester, index: 1, label: 'Homeworld mastered', satisfied: true);
+  });
+
+  testWidgets('renders reward on a non-final card when rewardCash > 0', (
+    tester,
+  ) async {
+    await _pumpCard(
+      tester,
+      size: const Size(390, 844),
+      textScale: 1.0,
+      card: PlanetMasteredCard(
+        masteredPlanet: _content.planet(MiningPlanetId.homeworld),
+        successorName: 'Lunar Frontier',
+        requirements: const [],
+        nextSaleMultiplier: 1.5,
+        rewardCash: 500000,
+        onContinue: () {},
+        onOpenMap: () {},
+      ),
+    );
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('planet-mastery-reward'))).data,
+      '+500,000',
+    );
+    expect(find.text('completion reward'), findsOneWidget);
   });
 }

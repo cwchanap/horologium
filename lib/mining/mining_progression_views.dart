@@ -179,11 +179,14 @@ class TechnologySheetView {
   }
 }
 
+enum StellarMapRequirementKind { mastery, surveying, cash }
+
 class StellarMapRequirementView {
   const StellarMapRequirementView({
     required this.label,
     required this.isSatisfied,
     this.currentValue,
+    this.kind,
   });
 
   final String label;
@@ -192,6 +195,7 @@ class StellarMapRequirementView {
   /// Live display value beside the authored threshold (current Surveying
   /// level or cash). Null for requirements without a numeric current value.
   final String? currentValue;
+  final StellarMapRequirementKind? kind;
 
   bool get satisfied => isSatisfied;
 }
@@ -411,6 +415,7 @@ class StellarMapView {
               '${requiredPlanet.name} sites '
               '$requiredCommissioned/${requiredPlanet.sites.length}',
           isSatisfied: hasRequiredMastery,
+          kind: StellarMapRequirementKind.mastery,
         ),
       );
       requirements.add(
@@ -420,6 +425,7 @@ class StellarMapView {
               state.technology.surveying >=
               definition.unlockRequiredSurveyingLevel,
           currentValue: 'now LV ${state.technology.surveying}',
+          kind: StellarMapRequirementKind.surveying,
         ),
       );
     }
@@ -429,6 +435,7 @@ class StellarMapView {
           label: '${formatMiningCash(definition.unlockCashCost)} cash',
           isSatisfied: isUnlocked || state.cash >= definition.unlockCashCost,
           currentValue: formatMiningCash(state.cash),
+          kind: StellarMapRequirementKind.cash,
         ),
       );
     }
