@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +6,8 @@ import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 import 'package:horologium/mining/presentation/technology_sheet.dart';
+
+import '../../support/test_fonts.dart';
 
 const _viewports = [
   Size(360, 640),
@@ -100,18 +100,11 @@ MaterialApp _app(Widget home) => MaterialApp(
 );
 
 void main() {
-  // Real Orbitron metrics: the test font's square glyphs understate line
-  // height, hiding footer clipping on the small viewports.
-  setUpAll(() async {
-    if (kIsWeb) return;
-    final loader = FontLoader('Orbitron')
-      ..addFont(
-        File(
-          'assets/fonts/Orbitron-Variable.ttf',
-        ).readAsBytes().then(ByteData.sublistView),
-      );
-    await loader.load();
-  });
+  // Real Orbitron metrics on VM and Chrome: the test font's square glyphs
+  // understate line height, hiding label collision and footer clipping on the
+  // small viewports.
+  setUpAll(loadProductionTestFonts);
+  tearDownAll(restoreProductionFontsInWebTests);
 
   testWidgets('the viewport harness inherits production Orbitron typography', (
     tester,
@@ -255,6 +248,87 @@ void main() {
       expect(find.text('Max Level'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+  }
+
+  for (final scale in const [1.0, 1.3]) {
+    testWidgets(
+      'portrait track labels keep a visible gap above their first node at '
+      '360x640 and text scale $scale',
+      (tester) async {
+        const viewport = Size(360, 640);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = viewport;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        await tester.pumpWidget(
+          _app(
+            MediaQuery(
+              data: MediaQueryData(
+                size: viewport,
+                textScaler: TextScaler.linear(scale),
+              ),
+              child: Scaffold(
+                body: TechnologySheet(view: _view(), onPurchase: (_) {}),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final tree = tester.getRect(find.byKey(const Key('technology-tree')));
+        for (final track in TechnologyTrack.values) {
+          final label = tester.getRect(
+            find.text(_trackDisplayName(track).toUpperCase()),
+          );
+          expect(label.left, greaterThanOrEqualTo(0));
+          expect(label.right, lessThanOrEqualTo(viewport.width));
+          final firstNode = tester.getRect(
+            find.byKey(Key('technology-node-${track.name}-1')),
+          );
+          // Portrait node tops are 55, 127, 199, 271, 343 (step * 72 + 55)
+          // with the shared 58 node height, so the label column (icon 28 +
+          // 5 gap + scaled label) clears the first hex by a positive gap.
+          expect(
+            firstNode.top - label.bottom,
+            greaterThan(0),
+            reason:
+                '${track.name} label must clear its first node with a visible '
+                'gap at text scale $scale',
+          );
+
+          // Nodes step down 72 per level from the top, so every painter link
+          // spans the 14 px gap between one node's bottom and the next node's
+          // top; the last node bottom stays 401 and the root 427. Rects are
+          // converted back to layout bounds because the highlighted next node
+          // paints 1.12x scaled about its invariant center.
+          double layoutTop(Key key) {
+            final rect = tester.getRect(find.byKey(key));
+            final layoutHeight = tester.getSize(find.byKey(key)).height;
+            return rect.center.dy - tree.top - layoutHeight / 2;
+          }
+
+          final tops = [
+            for (var step = 0; step < 5; step++)
+              layoutTop(Key('technology-node-${track.name}-${5 - step}')),
+          ];
+          expect(tops, [55, 127, 199, 271, 343]);
+          for (var step = 0; step < 4; step++) {
+            expect(
+              tops[step + 1] - (tops[step] + 58),
+              14,
+              reason: 'link gap between level ${5 - step} and ${4 - step}',
+            );
+          }
+          expect(tops.last + 58, 401);
+        }
+        final root = tester.getRect(find.byKey(const Key('technology-root')));
+        expect(root.top - tree.top, 427);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets('the pinned buy action updates cost and level after a purchase', (
