@@ -97,13 +97,13 @@ placements, and stored cargo; each dock stores a `RigTier` or null.
 each of Homeworld, Lunar Frontier, Mars Frontier, Ceres Frontier, and Io
 Frontier. Commissioning every site on a planet is its mastery condition.
 Homeworld mastery plus Surveying 3 unlocks Lunar Frontier; Lunar mastery plus
-Surveying 5 unlocks Mars Frontier; Mars mastery plus Surveying 5 and
-30,000,000 cash unlocks Ceres Frontier; Ceres mastery plus Surveying 5 and
-90,000,000 cash unlocks Io Frontier. Io mastery grants the game's single
-90,000,000 cash completion reward once per run, always equal to its unlock
-cost; Mars and Ceres grant none. Io Frontier is the final authored planet, so
-mastering it unlocks Relaunch, and mastering it again after Relaunch pays the
-reward again; each relaunch adds +50% sale value through
+Surveying 5 and 16,000,000 cash unlocks Mars Frontier; Mars mastery plus
+Surveying 5 and 30,000,000 cash unlocks Ceres Frontier; Ceres mastery plus
+Surveying 5 and 90,000,000 cash unlocks Io Frontier. Io mastery grants the
+game's single 90,000,000 cash completion reward once per run, always equal to
+its unlock cost; Mars and Ceres grant none. Io Frontier is the final authored
+planet, so mastering it unlocks Relaunch, and mastering it again after
+Relaunch pays the reward again; each relaunch adds +50% sale value through
 `MiningContentRegistry.cargoValue` for sites and `MiningSave.saleValue` for
 floored planet totals.
 `formatSaleMultiplier` is the display contract for the current run multiplier.
