@@ -6,6 +6,11 @@ import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
+/// Portrait node geometry shared by node placement and the link painter so
+/// labels clear the first hex and every link endpoint matches its nodes.
+double _portraitNodeTop(int step) => 55.0 + step * 72.0;
+const double _portraitNodeHeight = 58;
+
 class TechnologySheet extends StatefulWidget {
   const TechnologySheet({
     super.key,
@@ -115,9 +120,9 @@ class _TechnologySheetState extends State<TechnologySheet> {
                   left: horizontal
                       ? 106 + step * 70.0
                       : width * (index + .5) / 3 - 26,
-                  top: horizontal ? 14 + index * 66.0 : 39 + step * 76.0,
+                  top: horizontal ? 14 + index * 66.0 : _portraitNodeTop(step),
                   width: horizontal ? 48 : 52,
-                  height: horizontal ? 48 : 58,
+                  height: horizontal ? 48 : _portraitNodeHeight,
                   child: _node(
                     widget.view.tracks[index],
                     horizontal ? step + 1 : 5 - step,
@@ -168,7 +173,7 @@ class _TechnologySheetState extends State<TechnologySheet> {
         scale: highlight ? (horizontal ? 1.09 : 1.12) : 1,
         child: Container(
           width: horizontal ? 48 : 52,
-          height: horizontal ? 48 : 58,
+          height: horizontal ? 48 : _portraitNodeHeight,
           decoration: highlight
               ? BoxDecoration(
                   shape: BoxShape.circle,
@@ -435,10 +440,13 @@ class _TechnologyLinks extends CustomPainter {
         line(
           horizontal
               ? Offset(152 + step * 70.0, 38 + col * 66.0)
-              : Offset(size.width * (col + .5) / 3, 97 + step * 76.0),
+              : Offset(
+                  size.width * (col + .5) / 3,
+                  _portraitNodeTop(step) + _portraitNodeHeight,
+                ),
           horizontal
               ? Offset(178 + step * 70.0, 38 + col * 66.0)
-              : Offset(size.width * (col + .5) / 3, 115 + step * 76.0),
+              : Offset(size.width * (col + .5) / 3, _portraitNodeTop(step + 1)),
           color,
           dashed: next,
         );
@@ -447,7 +455,10 @@ class _TechnologyLinks extends CustomPainter {
         line(Offset(70, 38 + col * 66.0), Offset(108, 38 + col * 66.0), base);
       } else {
         line(
-          Offset(size.width * (col + .5) / 3, 401),
+          Offset(
+            size.width * (col + .5) / 3,
+            _portraitNodeTop(4) + _portraitNodeHeight,
+          ),
           Offset(size.width * (col + .5) / 3, 420),
           base,
         );
