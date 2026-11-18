@@ -252,6 +252,34 @@ void expectThemedResultPanel(WidgetTester tester, Finder message) {
   );
 }
 
+/// Asserts the result panel renders fully opaque: any ancestor [Opacity] or
+/// [FadeTransition] that could fade it must sit at 1.0, so an entrance fade
+/// fails on the frame this helper is called in — geometry alone cannot
+/// detect a fade.
+void expectPanelFullyVisible(WidgetTester tester) {
+  for (final element
+      in find
+          .ancestor(of: _resultPanel, matching: find.byType(Opacity))
+          .evaluate()) {
+    expect(
+      element.widget as Opacity,
+      isA<Opacity>().having((o) => o.opacity, 'opacity', 1.0),
+      reason: 'result panel is faded by an ancestor Opacity',
+    );
+  }
+  for (final element
+      in find
+          .ancestor(of: _resultPanel, matching: find.byType(FadeTransition))
+          .evaluate()) {
+    final opacity = element.widget as FadeTransition;
+    expect(
+      opacity.opacity.value,
+      1.0,
+      reason: 'result panel is mid-fade in an ancestor FadeTransition',
+    );
+  }
+}
+
 /// Asserts the visible result panel's rect does not intersect [chrome].
 void expectPanelClearOf(WidgetTester tester, Finder chrome) {
   expect(chrome, findsOneWidget, reason: 'chrome $chrome must be present');
@@ -301,21 +329,32 @@ void expectDestinationReached(
 }
 
 /// Enters Landing Basin and sells its cargo so a success message is visible
-/// while the navigation is exercised.
-Future<void> showSaleFeedback(WidgetTester tester) async {
+/// while the navigation is exercised. Pass `settle: Duration.zero` to keep
+/// the caller on the panel's first rendered frame without advancing fake
+/// time, so the four-second clock starts at show time.
+Future<void> showSaleFeedback(
+  WidgetTester tester, {
+  Duration settle = const Duration(milliseconds: 300),
+}) async {
   final enter = find.byKey(const Key('site-card-landingBasin-enter'));
   await tester.ensureVisible(enter);
   await tester.pump();
   await tester.tap(enter);
   await tester.pump();
   await tester.tap(find.byKey(const Key('mine-site-sell')));
-  await tester.pump(const Duration(milliseconds: 300));
+  await tester.pump(settle);
   expect(find.textContaining('Sold'), findsOneWidget);
 }
 
 /// Enters Landing Basin and taps an empty dock bay so the rejection message
-/// is visible while the navigation is exercised.
-Future<void> showRejectionFeedback(WidgetTester tester) async {
+/// is visible while the navigation is exercised. Pass
+/// `settle: Duration.zero` to keep the caller on the panel's first rendered
+/// frame without advancing fake time, so the four-second clock starts at
+/// show time.
+Future<void> showRejectionFeedback(
+  WidgetTester tester, {
+  Duration settle = const Duration(milliseconds: 300),
+}) async {
   final enter = find.byKey(const Key('site-card-landingBasin-enter'));
   await tester.ensureVisible(enter);
   await tester.pump();
@@ -328,7 +367,7 @@ Future<void> showRejectionFeedback(WidgetTester tester) async {
     matching: find.byType(InkWell),
   );
   await tester.tap(emptyBay);
-  await tester.pump(const Duration(milliseconds: 300));
+  await tester.pump(settle);
   expect(find.text('Select an occupied rig bay.'), findsOneWidget);
 }
 
@@ -1644,18 +1683,29 @@ void main() {
       tester.ensureSemantics();
       final repository = CountingMiningSaveRepository();
       await repository.save(deployedLandingState(_start, cargo: 10));
-      await pumpShell(tester, repository: repository, disableAnimations: true);
+      await pumpShell(
+        tester,
+        repository: repository,
+        disableAnimations: true,
+        useViewSafeArea: true,
+      );
 
-      await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
-      await tester.pump();
-      await tester.tap(find.byKey(const Key('mine-site-sell')));
-      await tester.pump(const Duration(milliseconds: 300));
+      await showSaleFeedback(tester, settle: Duration.zero);
 
+      // First rendered frame: reduced motion shows the settled, fully
+      // opaque panel immediately — no fade, slide, or delayed entrance.
       expectThemedResultPanel(tester, find.textContaining('Sold'));
-      // No entrance animation: the first frame already shows the settled panel.
+      expectPanelFullyVisible(tester);
       final settled = tester.getRect(_resultPanel);
-      await tester.pump(const Duration(milliseconds: 300));
+
+      // Short intervals after the first frame: geometry and visibility never
+      // change, so no fade in either direction can be running.
+      await tester.pump(const Duration(milliseconds: 16));
       expect(tester.getRect(_resultPanel), settled);
+      expectPanelFullyVisible(tester);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.getRect(_resultPanel), settled);
+      expectPanelFullyVisible(tester);
     },
   );
 
@@ -1780,7 +1830,18 @@ void main() {
       await showRejectionFeedback(tester);
       expect(_resultPanel, findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('mine-site-back')));
+      // Linear Mockup 1: the message visually overlaps Back, so pass-through
+      // is proven by tapping inside the panel/Back intersection itself.
+      final panel = tester.getRect(_resultPanel);
+      final back = tester.getRect(find.byKey(const Key('mine-site-back')));
+      expect(
+        panel.overlaps(back),
+        isTrue,
+        reason:
+            'result panel $panel must visually overlap '
+            'mine-site-back $back for this pass-through test',
+      );
+      await tester.tapAt(panel.intersect(back).center);
       await tester.pump();
 
       expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
@@ -1979,13 +2040,16 @@ void main() {
         useViewSafeArea: true,
       );
 
-      await showRejectionFeedback(tester);
+      await showRejectionFeedback(tester, settle: Duration.zero);
       expect(_resultPanel, findsOneWidget);
 
-      await tester.pump(const Duration(seconds: 3));
+      // Still visible immediately before the four-second deadline...
+      await tester.pump(const Duration(seconds: 3, milliseconds: 999));
       expect(_resultPanel, findsOneWidget);
+      expect(find.text('Select an occupied rig bay.'), findsOneWidget);
 
-      await tester.pump(const Duration(seconds: 1, milliseconds: 200));
+      // ... and gone once four seconds have elapsed.
+      await tester.pump(const Duration(milliseconds: 10));
       expect(_resultPanel, findsNothing);
       expect(find.text('Select an occupied rig bay.'), findsNothing);
     });
@@ -2002,18 +2066,32 @@ void main() {
         useViewSafeArea: true,
       );
 
-      await showRejectionFeedback(tester);
-      expect(_resultPanel, findsOneWidget);
+      // The rejection shows, then ages half of its own four-second window.
+      await showRejectionFeedback(tester, settle: Duration.zero);
+      await tester.pump(const Duration(seconds: 2));
 
-      // The rejection is still visible: selling replaces it immediately.
+      // Selling replaces it immediately: the very next frame shows the new
+      // message, with no queue or restart delay.
       await tester.tap(find.byKey(const Key('mine-site-sell')));
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump();
       expect(_resultPanel, findsOneWidget);
       expect(find.text('Select an occupied rig bay.'), findsNothing);
       expect(find.textContaining('Sold'), findsOneWidget);
 
-      await tester.pump(const Duration(seconds: 4, milliseconds: 200));
+      // The replacement survives past the original deadline (two seconds
+      // shown plus two remaining) because its own clock restarted...
+      await tester.pump(const Duration(seconds: 2, milliseconds: 100));
+      expect(_resultPanel, findsOneWidget);
+      expect(find.textContaining('Sold'), findsOneWidget);
+
+      // ... stays up immediately before its own four-second deadline...
+      await tester.pump(const Duration(seconds: 1, milliseconds: 899));
+      expect(_resultPanel, findsOneWidget);
+
+      // ... and expires at its own deadline.
+      await tester.pump(const Duration(milliseconds: 10));
       expect(_resultPanel, findsNothing);
+      expect(find.textContaining('Sold'), findsNothing);
     });
 
     testWidgets('rotation while feedback is visible keeps clearance', (
@@ -2059,13 +2137,24 @@ void main() {
         useViewSafeArea: true,
       );
 
-      await showRejectionFeedback(tester);
-      expect(_resultPanel, findsOneWidget);
+      tester.ensureSemantics();
+      await showRejectionFeedback(tester, settle: Duration.zero);
+
+      // First rendered frame: the panel is already at its settled geometry
+      // and fully opaque — an entrance animation of any length would show a
+      // mid-flight frame here instead.
+      expectThemedResultPanel(tester, find.text('Select an occupied rig bay.'));
+      expectPanelFullyVisible(tester);
       final settled = tester.getRect(_resultPanel);
 
-      await tester.pump(const Duration(milliseconds: 250));
-      await tester.pump(const Duration(milliseconds: 250));
+      // Short subsequent intervals keep the exact settled geometry and full
+      // visibility, so no fade in either direction can be running.
+      await tester.pump(const Duration(milliseconds: 16));
       expect(tester.getRect(_resultPanel), settled);
+      expectPanelFullyVisible(tester);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.getRect(_resultPanel), settled);
+      expectPanelFullyVisible(tester);
     });
 
     testWidgets('the feedback timer is canceled on shell disposal', (
