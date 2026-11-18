@@ -211,21 +211,125 @@ Future<void> pumpMiningTick(
   await tester.pump(const Duration(seconds: 1));
 }
 
-/// Asserts the single visible SnackBar carries the authored dark style.
-void expectThemedSnackBar(WidgetTester tester, Finder message) {
-  expect(message, findsOneWidget);
-  final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
-  expect(snackBar.backgroundColor, MiningTheme.panel);
-  expect(snackBar.behavior, SnackBarBehavior.floating);
-  final shape = snackBar.shape;
-  expect(shape, isA<RoundedRectangleBorder>());
-  final bordered = shape! as RoundedRectangleBorder;
-  expect(bordered.borderRadius, BorderRadius.circular(12));
-  expect(bordered.side.color, MiningTheme.accent);
-  final text = snackBar.content as Text;
+/// The key of the shell's non-blocking result feedback panel. Task 2's
+/// implementation attaches it to the styled panel Container.
+const Key miningResultPanelKey = Key('mining-result-panel');
+
+Finder get _resultPanel => find.byKey(miningResultPanelKey);
+
+const List<Size> _feedbackViewports = [
+  Size(360, 640),
+  Size(390, 844),
+  Size(874, 402),
+];
+
+/// Asserts the visible result panel carries the authored dark style:
+/// MiningTheme.panel background with a 12px accent border, an Orbitron 13px
+/// primary-text message, and live-region semantics. Tests calling this must
+/// have enabled semantics via [WidgetTester.ensureSemantics].
+void expectThemedResultPanel(WidgetTester tester, Finder message) {
+  expect(_resultPanel, findsOneWidget);
+  expect(find.descendant(of: _resultPanel, matching: message), findsOneWidget);
+  final decoration =
+      tester.widget<Container>(_resultPanel).decoration! as BoxDecoration;
+  expect(decoration.color, MiningTheme.panel);
+  expect(decoration.borderRadius, BorderRadius.circular(12));
+  expect((decoration.border! as Border).top.color, MiningTheme.accent);
+  final text = tester.widget<Text>(
+    find.descendant(of: _resultPanel, matching: message),
+  );
   expect(text.style?.fontFamily, 'Orbitron');
-  expect(text.style?.color, MiningTheme.primaryText);
+  expect(text.style?.fontSize, 13);
   expect(text.style?.fontWeight, FontWeight.w600);
+  expect(text.style?.color, MiningTheme.primaryText);
+  expect(
+    tester
+        .getSemantics(message)
+        .getSemanticsData()
+        .flagsCollection
+        .isLiveRegion,
+    isTrue,
+  );
+}
+
+/// Asserts the visible result panel's rect does not intersect [chrome].
+void expectPanelClearOf(WidgetTester tester, Finder chrome) {
+  expect(chrome, findsOneWidget, reason: 'chrome $chrome must be present');
+  final panel = tester.getRect(_resultPanel);
+  final blocked = tester.getRect(chrome);
+  final intersects =
+      panel.left < blocked.right &&
+      panel.right > blocked.left &&
+      panel.top < blocked.bottom &&
+      panel.bottom > blocked.top;
+  expect(
+    intersects,
+    isFalse,
+    reason: 'result panel $panel overlaps $chrome at $blocked',
+  );
+}
+
+/// Taps the upper or lower quarter of a nav button so both portions of the
+/// interactive hit region are exercised during visible feedback.
+Future<void> tapNavPortion(
+  WidgetTester tester,
+  Finder navButton, {
+  required bool upper,
+}) async {
+  final rect = tester.getRect(navButton);
+  await tester.tapAt(
+    Offset(rect.center.dx, rect.top + rect.height * (upper ? .25 : .75)),
+  );
+}
+
+/// Asserts the surface or sheet for [destination] is showing.
+void expectDestinationReached(
+  WidgetTester tester,
+  MiningNavigationDestination destination,
+) {
+  switch (destination) {
+    case MiningNavigationDestination.siteDeck:
+      expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+      expect(find.byKey(const Key('mine-site-screen')), findsNothing);
+    case MiningNavigationDestination.technology:
+      expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+    case MiningNavigationDestination.stellarMap:
+      expect(find.byKey(const Key('stellar-map-screen')), findsOneWidget);
+    case MiningNavigationDestination.settings:
+      expect(find.byKey(const Key('mining-settings-sheet')), findsOneWidget);
+  }
+}
+
+/// Enters Landing Basin and sells its cargo so a success message is visible
+/// while the navigation is exercised.
+Future<void> showSaleFeedback(WidgetTester tester) async {
+  final enter = find.byKey(const Key('site-card-landingBasin-enter'));
+  await tester.ensureVisible(enter);
+  await tester.pump();
+  await tester.tap(enter);
+  await tester.pump();
+  await tester.tap(find.byKey(const Key('mine-site-sell')));
+  await tester.pump(const Duration(milliseconds: 300));
+  expect(find.textContaining('Sold'), findsOneWidget);
+}
+
+/// Enters Landing Basin and taps an empty dock bay so the rejection message
+/// is visible while the navigation is exercised.
+Future<void> showRejectionFeedback(WidgetTester tester) async {
+  final enter = find.byKey(const Key('site-card-landingBasin-enter'));
+  await tester.ensureVisible(enter);
+  await tester.pump();
+  await tester.tap(enter);
+  await tester.pump();
+  // The keyed Container is clipped inside the bay's MiningHex, so tap the
+  // InkWell ancestor that actually receives the gesture.
+  final emptyBay = find.ancestor(
+    of: find.byKey(const ValueKey<String>('b3')),
+    matching: find.byType(InkWell),
+  );
+  await tester.tap(emptyBay);
+  await tester.pump(const Duration(milliseconds: 300));
+  expect(find.text('Select an occupied rig bay.'), findsOneWidget);
 }
 
 void main() {
@@ -1534,68 +1638,73 @@ void main() {
     expect(repository.saveCount, 2);
   });
 
-  testWidgets('reduced motion makes Mine Site sale feedback settle instantly', (
-    tester,
-  ) async {
-    final repository = CountingMiningSaveRepository();
-    await repository.save(deployedLandingState(_start, cargo: 10));
-    await pumpShell(tester, repository: repository, disableAnimations: true);
-
-    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('mine-site-sell')));
-    await tester.pump(const Duration(milliseconds: 300));
-
-    final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
-    expect(snackBar.animation, isA<AnimationController>());
-    expect(
-      (snackBar.animation! as AnimationController).duration,
-      Duration.zero,
-    );
-  });
-
-  for (final size in const [Size(360, 640), Size(390, 844)]) {
-    final label = '${size.width.toInt()}x${size.height.toInt()}';
-
-    testWidgets('success feedback is a dark themed SnackBar at $label', (
-      tester,
-    ) async {
+  testWidgets(
+    'reduced motion shows Mine Site sale feedback settled instantly',
+    (tester) async {
+      tester.ensureSemantics();
       final repository = CountingMiningSaveRepository();
       await repository.save(deployedLandingState(_start, cargo: 10));
-      await pumpShell(tester, repository: repository, viewport: size);
+      await pumpShell(tester, repository: repository, disableAnimations: true);
 
       await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
       await tester.pump();
       await tester.tap(find.byKey(const Key('mine-site-sell')));
       await tester.pump(const Duration(milliseconds: 300));
 
-      expectThemedSnackBar(tester, find.textContaining('Sold'));
-    });
+      expectThemedResultPanel(tester, find.textContaining('Sold'));
+      // No entrance animation: the first frame already shows the settled panel.
+      final settled = tester.getRect(_resultPanel);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(tester.getRect(_resultPanel), settled);
+    },
+  );
 
-    testWidgets('rejection guidance is a dark themed SnackBar at $label', (
+  for (final size in const [Size(360, 640), Size(390, 844)]) {
+    final label = '${size.width.toInt()}x${size.height.toInt()}';
+
+    testWidgets('success feedback is a themed result panel at $label', (
       tester,
     ) async {
+      tester.ensureSemantics();
       final repository = CountingMiningSaveRepository();
-      await repository.save(MiningSave.initial(nowUtc: _start));
-      await pumpShell(tester, repository: repository, viewport: size);
+      await repository.save(deployedLandingState(_start, cargo: 10));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: size,
+        useViewSafeArea: true,
+      );
 
       await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
       await tester.pump();
-      // The keyed Container is clipped inside the bay's MiningHex, so tap the
-      // InkWell ancestor that actually receives the gesture.
-      final emptyBay = find.ancestor(
-        of: find.byKey(const ValueKey<String>('b3')),
-        matching: find.byType(InkWell),
-      );
-      await tester.tap(emptyBay);
+      await tester.tap(find.byKey(const Key('mine-site-sell')));
       await tester.pump(const Duration(milliseconds: 300));
 
-      expectThemedSnackBar(tester, find.text('Select an occupied rig bay.'));
+      expectThemedResultPanel(tester, find.textContaining('Sold'));
     });
 
-    testWidgets('recovery notice is a dark themed SnackBar at $label', (
+    testWidgets('rejection guidance is a themed result panel at $label', (
       tester,
     ) async {
+      tester.ensureSemantics();
+      final repository = CountingMiningSaveRepository();
+      await repository.save(MiningSave.initial(nowUtc: _start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: size,
+        useViewSafeArea: true,
+      );
+
+      await showRejectionFeedback(tester);
+
+      expectThemedResultPanel(tester, find.text('Select an occupied rig bay.'));
+    });
+
+    testWidgets('recovery notice is a themed result panel at $label', (
+      tester,
+    ) async {
+      tester.ensureSemantics();
       SharedPreferences.setMockInitialValues({
         MiningSaveRepository.saveKey: '{ malformed mining json',
       });
@@ -1605,10 +1714,11 @@ void main() {
         tester,
         repository: repository,
         viewport: size,
+        useViewSafeArea: true,
         pumpCycles: 12,
       );
 
-      expectThemedSnackBar(
+      expectThemedResultPanel(
         tester,
         find.text(
           'Mining progress could not be loaded, so a fresh mining save was '
@@ -1617,6 +1727,367 @@ void main() {
       );
     });
   }
+
+  group('non-blocking result feedback', () {
+    testWidgets(
+      'the first tap opens the Stellar Map while spawn feedback is visible '
+      'at 390x844',
+      (tester) async {
+        // HPA-1086: the old floating SnackBar covered part of the bottom
+        // nav, so tapping the lower half of the Stellar Map destination
+        // while feedback was visible swallowed the tap. The panel must pass
+        // every tap through to the nav.
+        final repository = CountingMiningSaveRepository();
+        await repository.save(MiningSave.initial(nowUtc: _start));
+        await pumpShell(
+          tester,
+          repository: repository,
+          viewport: const Size(390, 844),
+          useViewSafeArea: true,
+        );
+
+        await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
+        // Let the raised feedback bar settle over the bottom nav first.
+        await tester.pumpAndSettle();
+
+        expect(find.text('T1 rig spawned.'), findsOneWidget);
+        await tapNavPortion(
+          tester,
+          find.byKey(const Key('mining-nav-stellarMap')),
+          upper: false,
+        );
+        await tester.pump();
+
+        expect(find.byKey(const Key('stellar-map-screen')), findsOneWidget);
+        expect(find.byKey(const Key('site-deck-scroll')), findsNothing);
+      },
+    );
+
+    testWidgets('Mine Site Back receives its first tap under feedback', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(MiningSave.initial(nowUtc: _start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        useViewSafeArea: true,
+      );
+
+      await showRejectionFeedback(tester);
+      expect(_resultPanel, findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('mine-site-back')));
+      await tester.pump();
+
+      expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+      expect(find.byKey(const Key('mine-site-screen')), findsNothing);
+    });
+
+    for (final size in _feedbackViewports) {
+      final label = '${size.width.toInt()}x${size.height.toInt()}';
+
+      for (final destination in MiningNavigationDestination.values) {
+        testWidgets(
+          'feedback keeps ${destination.name} first taps working at $label',
+          (tester) async {
+            final repository = CountingMiningSaveRepository();
+            await repository.save(deployedLandingState(_start, cargo: 10));
+            await pumpShell(
+              tester,
+              repository: repository,
+              viewport: size,
+              useViewSafeArea: true,
+            );
+
+            await showSaleFeedback(tester);
+            expect(_resultPanel, findsOneWidget);
+
+            final navButton = find.byKey(Key('mining-nav-${destination.name}'));
+            await tapNavPortion(tester, navButton, upper: true);
+            await pumpSheet(tester);
+            expectDestinationReached(tester, destination);
+
+            if (destination == MiningNavigationDestination.technology ||
+                destination == MiningNavigationDestination.settings) {
+              await tester.tap(
+                find.bySemanticsLabel(
+                  destination == MiningNavigationDestination.technology
+                      ? 'Close Technology'
+                      : 'Close Settings',
+                ),
+              );
+              await pumpSheet(tester);
+            }
+
+            // The lower portion is exercised before the four-second expiry;
+            // for the already-selected destination this re-tap need not
+            // navigate.
+            await tapNavPortion(tester, navButton, upper: false);
+            await pumpSheet(tester);
+            expectDestinationReached(tester, destination);
+          },
+        );
+      }
+    }
+
+    testWidgets('feedback clears portrait Site Deck chrome', (tester) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start, cargo: 10));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        useViewSafeArea: true,
+      );
+
+      await tester.tap(find.byKey(const Key('site-deck-sell')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(_resultPanel, findsOneWidget);
+
+      for (final key in const [
+        'mining-cash-chip',
+        'mining-cargo-gauge',
+        'site-deck-sell',
+        'site-deck-next-goal',
+        'mining-bottom-navigation',
+      ]) {
+        expectPanelClearOf(tester, find.byKey(Key(key)));
+      }
+    });
+
+    testWidgets('feedback clears portrait Mine Site chrome', (tester) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(MiningSave.initial(nowUtc: _start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        useViewSafeArea: true,
+      );
+
+      await showRejectionFeedback(tester);
+      expect(_resultPanel, findsOneWidget);
+
+      for (final key in const [
+        'mining-cash-chip',
+        'mine-site-cargo',
+        'fleet-dock',
+        'mine-site-sell',
+        'mining-bottom-navigation',
+      ]) {
+        expectPanelClearOf(tester, find.byKey(Key(key)));
+      }
+    });
+
+    testWidgets('feedback clears Stellar Map chrome', (tester) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(MiningSave.initial(nowUtc: _start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        useViewSafeArea: true,
+      );
+
+      await showRejectionFeedback(tester);
+      await tapNavPortion(
+        tester,
+        find.byKey(const Key('mining-nav-stellarMap')),
+        upper: true,
+      );
+      await tester.pump();
+      expect(find.byKey(const Key('stellar-map-screen')), findsOneWidget);
+      expect(_resultPanel, findsOneWidget);
+
+      for (final key in const [
+        'mining-cash-chip',
+        'mining-cargo-gauge',
+        'mining-bottom-navigation',
+      ]) {
+        expectPanelClearOf(tester, find.byKey(Key(key)));
+      }
+    });
+
+    testWidgets(
+      'feedback clears landscape Site Deck chrome with safe-area insets',
+      (tester) async {
+        final repository = CountingMiningSaveRepository();
+        await repository.save(deployedLandingState(_start, cargo: 10));
+        await pumpShell(
+          tester,
+          repository: repository,
+          viewport: const Size(874, 402),
+          safeArea: const EdgeInsets.only(left: 44, right: 44),
+          useViewSafeArea: true,
+        );
+
+        await tester.tap(find.byKey(const Key('site-deck-sell')));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(_resultPanel, findsOneWidget);
+
+        for (final key in const [
+          'mining-cash-chip',
+          'mining-cargo-gauge',
+          'site-deck-sell',
+          'site-deck-next-goal',
+          'mining-bottom-navigation',
+        ]) {
+          expectPanelClearOf(tester, find.byKey(Key(key)));
+        }
+      },
+    );
+
+    testWidgets(
+      'feedback clears landscape Mine Site chrome with safe-area insets',
+      (tester) async {
+        final repository = CountingMiningSaveRepository();
+        await repository.save(deployedLandingState(_start, cargo: 10));
+        await pumpShell(
+          tester,
+          repository: repository,
+          viewport: const Size(874, 402),
+          safeArea: const EdgeInsets.only(left: 44, right: 44),
+          useViewSafeArea: true,
+        );
+
+        await showSaleFeedback(tester);
+        expect(_resultPanel, findsOneWidget);
+
+        for (final key in const [
+          'mining-cash-chip',
+          'mine-site-cargo',
+          'mine-site-right-rail',
+          'mine-site-sell',
+          'mining-bottom-navigation',
+        ]) {
+          expectPanelClearOf(tester, find.byKey(Key(key)));
+        }
+      },
+    );
+
+    testWidgets('feedback expires after four seconds', (tester) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(MiningSave.initial(nowUtc: _start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        useViewSafeArea: true,
+      );
+
+      await showRejectionFeedback(tester);
+      expect(_resultPanel, findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 3));
+      expect(_resultPanel, findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 1, milliseconds: 200));
+      expect(_resultPanel, findsNothing);
+      expect(find.text('Select an occupied rig bay.'), findsNothing);
+    });
+
+    testWidgets('a new message replaces the visible one without queueing', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start, cargo: 10));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        useViewSafeArea: true,
+      );
+
+      await showRejectionFeedback(tester);
+      expect(_resultPanel, findsOneWidget);
+
+      // The rejection is still visible: selling replaces it immediately.
+      await tester.tap(find.byKey(const Key('mine-site-sell')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(_resultPanel, findsOneWidget);
+      expect(find.text('Select an occupied rig bay.'), findsNothing);
+      expect(find.textContaining('Sold'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 4, milliseconds: 200));
+      expect(_resultPanel, findsNothing);
+    });
+
+    testWidgets('rotation while feedback is visible keeps clearance', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(MiningSave.initial(nowUtc: _start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        useViewSafeArea: true,
+      );
+
+      await showRejectionFeedback(tester);
+      expect(_resultPanel, findsOneWidget);
+
+      tester.view.physicalSize = const Size(874, 402);
+      await tester.pump();
+
+      expect(find.byKey(const Key('mine-site-screen')), findsOneWidget);
+      expect(find.text('Select an occupied rig bay.'), findsOneWidget);
+      expect(_resultPanel, findsOneWidget);
+      for (final key in const [
+        'mining-cash-chip',
+        'mine-site-cargo',
+        'mine-site-right-rail',
+        'mining-bottom-navigation',
+      ]) {
+        expectPanelClearOf(tester, find.byKey(Key(key)));
+      }
+    });
+
+    testWidgets('feedback appears settled with no entrance animation', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(MiningSave.initial(nowUtc: _start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        useViewSafeArea: true,
+      );
+
+      await showRejectionFeedback(tester);
+      expect(_resultPanel, findsOneWidget);
+      final settled = tester.getRect(_resultPanel);
+
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(tester.getRect(_resultPanel), settled);
+    });
+
+    testWidgets('the feedback timer is canceled on shell disposal', (
+      tester,
+    ) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(MiningSave.initial(nowUtc: _start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        useViewSafeArea: true,
+      );
+
+      await showRejectionFeedback(tester);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 5));
+
+      expect(tester.takeException(), isNull);
+      expect(_resultPanel, findsNothing);
+    });
+  });
 
   testWidgets('Site Deck unlocks an eligible site through the controller', (
     tester,
@@ -2881,8 +3352,8 @@ void main() {
       repository.allowSave.completeError(StateError('save failed'));
       await tester.pumpAndSettle();
 
-      // The covering sheet is dismissed so the failure SnackBar is visible
-      // on the shell, and the rejection plays audio without mutating.
+      // The covering sheet is dismissed so the failure panel is visible on
+      // the shell, and the rejection plays audio without mutating.
       expect(sheet, findsNothing);
       expect(find.text('Action failed.'), findsOneWidget);
       final state = shellHandles(tester).controller.state;
@@ -2914,16 +3385,18 @@ void main() {
       await tester.tap(buy);
       await tester.pumpAndSettle();
 
-      // No SnackBar toast is queued behind the modal sheet.
+      // No feedback panel is queued behind the modal sheet.
       expect(find.text('Technology upgraded.'), findsNothing);
+      expect(_resultPanel, findsNothing);
       final state = shellHandles(tester).controller.state;
       expect(state.technology.extraction, 1);
       expect(effects.playedAssets, contains('audio/upgrade.wav'));
 
-      // Dismiss the sheet and ensure no stale toast appears on the shell.
+      // Dismiss the sheet and ensure no stale feedback appears on the shell.
       await tester.tap(find.bySemanticsLabel('Close Technology'));
       await tester.pumpAndSettle();
       expect(find.text('Technology upgraded.'), findsNothing);
+      expect(_resultPanel, findsNothing);
     },
   );
 
@@ -4128,7 +4601,7 @@ void main() {
         'NEXT · LUNAR FRONTIER',
       );
       expect(find.text('Rig deployed.'), findsNothing);
-      expect(find.byType(SnackBar), findsNothing);
+      expect(_resultPanel, findsNothing);
 
       final after = shellHandles(tester).controller.state;
       final requirements = StellarMapView.from(
