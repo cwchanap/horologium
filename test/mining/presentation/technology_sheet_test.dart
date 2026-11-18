@@ -285,8 +285,10 @@ void main() {
           );
           expect(label.left, greaterThanOrEqualTo(0));
           expect(label.right, lessThanOrEqualTo(viewport.width));
+          // Portrait stacks run 5→1 top to bottom, so the first node under
+          // the label is level 5 (top 55); level 1 sits at the bottom (343).
           final firstNode = tester.getRect(
-            find.byKey(Key('technology-node-${track.name}-1')),
+            find.byKey(Key('technology-node-${track.name}-5')),
           );
           // Portrait node tops are 55, 127, 199, 271, 343 (step * 72 + 55)
           // with the shared 58 node height, so the label column (icon 28 +
