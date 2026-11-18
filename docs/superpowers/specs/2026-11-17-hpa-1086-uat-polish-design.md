@@ -37,7 +37,7 @@ Only the **portrait** layout changes. Move the first level node down from y=39 t
 
 - Share small portrait-position constants between node placement and _TechnologyLinks so lines continue to meet the nodes: first link now spans y=113 to y=127, then the same endpoints plus 72 per step.
 - Do not change landscape node positions, icon/label styling, font sizes, costs, purchase affordances, sheet frame or scrolling behavior.
-- At 360×640 with production Orbitron, assert non-overlap and a positive gap between each EX­TRACTION/LOGISTICS/SURVEYING label and the first (level-5) node at text scales 1.0 and 1.3. Check all three labels, not just the selected track. Keep existing node/root link and selectable-track checks.
+- At 360×640 with production Orbitron, assert non-overlap and a positive gap between each EXTRACTION/LOGISTICS/SURVEYING label and the first (level-5) node at text scales 1.0 and 1.3. Check all three labels, not just the selected track. Keep existing node/root link and selectable-track checks.
 
 ## Design decision 3 — correct one progression sentence
 
