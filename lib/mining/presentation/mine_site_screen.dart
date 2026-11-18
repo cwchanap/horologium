@@ -40,7 +40,10 @@ const double _landscapeToolbarLeft = 12;
 const double _landscapeToolbarBottom = 16;
 const double _landscapeToolbarWidth = 252;
 const double _landscapeToolbarHeight = MiningNavigationBar.compactHeight;
-const double _landscapeRightRailWidth = 104;
+
+/// Width of the landscape dock rail. Shared with MiningShell so the
+/// pass-through result panel keeps its rendered right edge left of the rail.
+const double landscapeRightRailWidth = 104;
 const double _landscapeSellBottom = 78;
 const double _landscapeSellHeight = 79;
 
@@ -314,7 +317,7 @@ class _LandscapeMineSite extends StatelessWidget {
           Positioned(
             left: 0,
             top: 0,
-            right: _landscapeRightRailWidth + pad.right,
+            right: landscapeRightRailWidth + pad.right,
             bottom: 0,
             child: _CavernScene(
               view: view,
@@ -351,7 +354,7 @@ class _LandscapeMineSite extends StatelessWidget {
             top: 0,
             right: pad.right,
             bottom: 0,
-            width: _landscapeRightRailWidth,
+            width: landscapeRightRailWidth,
             child: Container(
               decoration: const BoxDecoration(
                 color: Color.fromRGBO(6, 10, 16, .92),

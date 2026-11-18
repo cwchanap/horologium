@@ -747,7 +747,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('mining-relaunch-sheet')), findsNothing);
-      expect(find.text('Finishing previous action…'), findsOneWidget);
+      // The panel carries the busy message; the stellar-map planet cards
+      // legitimately render their own busy labels once the shell rebuild
+      // refreshes them with the queued save's busy state.
+      expect(
+        find.descendant(
+          of: _resultPanel,
+          matching: find.text('Finishing previous action…'),
+        ),
+        findsOneWidget,
+      );
       expect(
         effects.playedAssets.where((path) => path == 'audio/reject.wav'),
         hasLength(1),
@@ -1680,7 +1689,7 @@ void main() {
   testWidgets(
     'reduced motion shows Mine Site sale feedback settled instantly',
     (tester) async {
-      tester.ensureSemantics();
+      final handle = tester.ensureSemantics();
       final repository = CountingMiningSaveRepository();
       await repository.save(deployedLandingState(_start, cargo: 10));
       await pumpShell(
@@ -1706,6 +1715,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(tester.getRect(_resultPanel), settled);
       expectPanelFullyVisible(tester);
+      handle.dispose();
     },
   );
 
@@ -1715,7 +1725,7 @@ void main() {
     testWidgets('success feedback is a themed result panel at $label', (
       tester,
     ) async {
-      tester.ensureSemantics();
+      final handle = tester.ensureSemantics();
       final repository = CountingMiningSaveRepository();
       await repository.save(deployedLandingState(_start, cargo: 10));
       await pumpShell(
@@ -1731,12 +1741,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expectThemedResultPanel(tester, find.textContaining('Sold'));
+      handle.dispose();
     });
 
     testWidgets('rejection guidance is a themed result panel at $label', (
       tester,
     ) async {
-      tester.ensureSemantics();
+      final handle = tester.ensureSemantics();
       final repository = CountingMiningSaveRepository();
       await repository.save(MiningSave.initial(nowUtc: _start));
       await pumpShell(
@@ -1749,12 +1760,13 @@ void main() {
       await showRejectionFeedback(tester);
 
       expectThemedResultPanel(tester, find.text('Select an occupied rig bay.'));
+      handle.dispose();
     });
 
     testWidgets('recovery notice is a themed result panel at $label', (
       tester,
     ) async {
-      tester.ensureSemantics();
+      final handle = tester.ensureSemantics();
       SharedPreferences.setMockInitialValues({
         MiningSaveRepository.saveKey: '{ malformed mining json',
       });
@@ -1775,6 +1787,7 @@ void main() {
           'started.',
         ),
       );
+      handle.dispose();
     });
   }
 
@@ -2137,7 +2150,7 @@ void main() {
         useViewSafeArea: true,
       );
 
-      tester.ensureSemantics();
+      final handle = tester.ensureSemantics();
       await showRejectionFeedback(tester, settle: Duration.zero);
 
       // First rendered frame: the panel is already at its settled geometry
@@ -2155,6 +2168,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(tester.getRect(_resultPanel), settled);
       expectPanelFullyVisible(tester);
+      handle.dispose();
     });
 
     testWidgets('the feedback timer is canceled on shell disposal', (

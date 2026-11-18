@@ -77,6 +77,8 @@ class _MiningShellState extends State<MiningShell>
   late MiningSave _displayState;
   late final _MiningDisplayNotifier _displayNotifier;
   Timer? _refreshTimer;
+  String? _message;
+  Timer? _messageTimer;
   bool _initialized = false;
   // Set by the first paused/hidden event and cleared on resume: the only
   // reliable record that the app truly left the foreground, since a real
@@ -765,7 +767,7 @@ class _MiningShellState extends State<MiningShell>
     }
   }
 
-  /// A sheet route covering the shell hides the Scaffold SnackBar, so a
+  /// A sheet route covering the shell hides the shell's result panel, so a
   /// failure dismisses a covering route only when it is the sheet that
   /// initiated the action and that route is still current. Navigation that
   /// arrived after the action started — including actions launched from the
@@ -780,31 +782,22 @@ class _MiningShellState extends State<MiningShell>
     _showResult(message);
   }
 
+  /// Shows the shell's one pass-through result message. Every call replaces
+  /// the visible message and restarts its single four-second expiry timer;
+  /// there is no queue. The panel is IgnorePointer, so it never swallows a
+  /// tap, and it has no entrance/exit animation.
   void _showResult(String message) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.removeCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: const TextStyle(
-            fontFamily: 'Orbitron',
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: MiningTheme.primaryText,
-          ),
-        ),
-        backgroundColor: MiningTheme.panel,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: MiningTheme.accent),
-        ),
-      ),
-      snackBarAnimationStyle: _reducedMotion
-          ? AnimationStyle.noAnimation
-          : null,
-    );
+    if (!mounted) return;
+    _messageTimer?.cancel();
+    setState(() {
+      _message = message;
+    });
+    _messageTimer = Timer(const Duration(seconds: 4), () {
+      if (!mounted) return;
+      setState(() {
+        _message = null;
+      });
+    });
   }
 
   Future<void> _resumeMining({required bool wasBackgrounded}) async {
@@ -858,6 +851,7 @@ class _MiningShellState extends State<MiningShell>
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _messageTimer?.cancel();
     _displayNotifier.dispose();
     WidgetsBinding.instance.removeObserver(this);
     if (_initialized) {
@@ -924,9 +918,59 @@ class _MiningShellState extends State<MiningShell>
     );
   }
 
+  /// The in-tree pass-through result panel: under the top HUD (safe-area
+  /// top +160 portrait clearing Site Deck Sell through +156, +144 landscape
+  /// clearing the compact Next Goal strip through +140), at most 420px wide,
+  /// centered in the safe area with >=16px margins. In landscape Mine Site
+  /// the usable region stops left of the dock rail. IgnorePointer keeps
+  /// every tap flowing to the control beneath; the panel appears with no
+  /// transition, so reduced motion needs no extra handling.
+  Widget _buildResultPanel(MediaQueryData media) {
+    final pad = media.padding;
+    final portrait = media.size.height >= media.size.width;
+    final usableLeft = pad.left + 16;
+    var usableRight = media.size.width - pad.right - 16;
+    if (!portrait && _openSiteId != null) {
+      final railLeft = media.size.width - pad.right - landscapeRightRailWidth;
+      if (railLeft < usableRight) usableRight = railLeft;
+    }
+    var panelWidth = usableRight - usableLeft;
+    if (panelWidth > 420) panelWidth = 420;
+    if (panelWidth < 0) panelWidth = 0;
+    return Positioned(
+      left: usableLeft + (usableRight - usableLeft - panelWidth) / 2,
+      top: pad.top + (portrait ? 160.0 : 144.0),
+      width: panelWidth,
+      child: IgnorePointer(
+        child: Container(
+          key: const Key('mining-result-panel'),
+          decoration: BoxDecoration(
+            color: MiningTheme.panel,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: MiningTheme.accent),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Semantics(
+            liveRegion: true,
+            child: Text(
+              _message!,
+              style: const TextStyle(
+                fontFamily: 'Orbitron',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: MiningTheme.primaryText,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    _reducedMotion = MediaQuery.of(context).disableAnimations;
+    final media = MediaQuery.of(context);
+    _reducedMotion = media.disableAnimations;
     final Widget surface;
     if (!_initialized) {
       surface = ColoredBox(
@@ -1015,12 +1059,19 @@ class _MiningShellState extends State<MiningShell>
     }
     return Scaffold(
       backgroundColor: const Color(0xFF07111E),
-      body: Listener(
-        behavior: HitTestBehavior.opaque,
-        onPointerDown: (_) {
-          if (_initialized) unawaited(_audioManager.maybeStartBgm());
-        },
-        child: surface,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (_) {
+                if (_initialized) unawaited(_audioManager.maybeStartBgm());
+              },
+              child: surface,
+            ),
+          ),
+          if (_message != null) _buildResultPanel(media),
+        ],
       ),
     );
   }
