@@ -281,6 +281,25 @@ class _PortraitSiteDeck extends StatelessWidget {
   }
 }
 
+/// Top edge of the Site Deck's bottom chrome, which the pass-through result
+/// panel must stay above. Landscape hosts the full navigation inside the safe
+/// area; portrait pins the navigation reserve and, when [hasGoal], the
+/// next-goal strip above it.
+double siteDeckResultPanelBottomTop(
+  double height,
+  double bottomInset, {
+  required bool landscape,
+  required bool hasGoal,
+}) {
+  if (landscape) return height - bottomInset - MiningNavigationBar.height;
+  final reserved =
+      _PortraitSiteDeck._navReserve +
+      (hasGoal
+          ? _PortraitSiteDeck._goalGap + _PortraitSiteDeck._goalHeight
+          : 0);
+  return height - bottomInset - reserved;
+}
+
 class _PlanetProgress extends StatelessWidget {
   const _PlanetProgress({super.key, required this.view});
 

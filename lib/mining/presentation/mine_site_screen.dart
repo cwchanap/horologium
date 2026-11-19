@@ -46,14 +46,9 @@ const double _landscapeToolbarHeight = MiningNavigationBar.compactHeight;
 const double landscapeRightRailWidth = 104;
 const double _landscapeSellBottom = 78;
 const double _landscapeSellHeight = 79;
-
-/// Rendered height of the landscape Sell column — the 56×62 hex button, the
-/// 5px gap, and the projected-value label — used only by the shell's result
-/// panel clearance guard ([landscapeMineSellTop]). Measured with production
-/// fonts at text scale 1.0 (62 + 5 + 17); the label reaches 89 at scale 1.3,
-/// still inside the guard's 8px margin. `_landscapeSellHeight` above stays
-/// the grid viewport inset so rig placement is unaffected.
-const double landscapeMineSellGuardHeight = 84;
+const double _sellLabelGap = 5;
+const double _sellHexHeightPortrait = 70;
+const double _sellHexHeightLandscape = 62;
 
 class MineSiteScreen extends StatelessWidget {
   const MineSiteScreen({
@@ -599,7 +594,7 @@ class _SellControl extends StatelessWidget {
       children: [
         SizedBox(
           width: compact ? 56 : 64,
-          height: compact ? 62 : 70,
+          height: compact ? _sellHexHeightLandscape : _sellHexHeightPortrait,
           child: MiningHex(
             fill: const Color(0xEB060A10),
             border: MiningTheme.warning,
@@ -622,14 +617,10 @@ class _SellControl extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: _sellLabelGap),
         Text(
           '+${formatMiningCash(view.sale.projectedValue)}',
-          style: TextStyle(
-            color: MiningTheme.warning,
-            fontSize: compact ? 12 : 14,
-            fontWeight: FontWeight.w800,
-          ),
+          style: _sellLabelStyle(compact: compact),
         ),
       ],
     ),
@@ -653,19 +644,123 @@ double _landscapeX(double compact, double fraction, double cavernWidth) {
 double landscapeMineSellLeft(double cavernWidth) =>
     _landscapeX(236, .34, cavernWidth);
 
-/// Conservative rendered width of the landscape Sell control: the 56px hex
-/// plus room for the scalable projected-value label that can outgrow the hex
-/// at large text scales. Shared with MiningShell.
+/// Minimum rendered width of the landscape Sell control: the 56px hex plus
+/// room for the projected-value label. The label is measured at the current
+/// text scale because it can outgrow this width.
 const double landscapeMineSellWidth = 96;
+
+/// Style of the Sell control's projected-value label, shared by the widget and
+/// the result-panel clearance measurement so the two cannot drift.
+TextStyle _sellLabelStyle({required bool compact}) => TextStyle(
+  color: MiningTheme.warning,
+  fontSize: compact ? 12 : 14,
+  fontWeight: FontWeight.w800,
+);
+
+/// Longest label [formatMiningCash] emits for this game's cash range:
+/// `+999,999`, `+999.99M`, or `+999.99B`.
+const _worstCaseSellLabel = '+999.99M';
+
+TextPainter _sellLabelPainter({
+  required bool compact,
+  required TextScaler textScaler,
+  TextStyle? baseStyle,
+}) => TextPainter(
+  text: TextSpan(
+    text: _worstCaseSellLabel,
+    // The label inherits the ambient DefaultTextStyle; merge the authored
+    // size and weight over it exactly as the Text widget does.
+    style: (baseStyle ?? const TextStyle()).merge(
+      _sellLabelStyle(compact: compact),
+    ),
+  ),
+  textDirection: TextDirection.ltr,
+  textScaler: textScaler,
+)..layout();
+
+double _sellLabelHeight({
+  required bool compact,
+  required TextScaler textScaler,
+  TextStyle? baseStyle,
+}) {
+  final painter = _sellLabelPainter(
+    compact: compact,
+    textScaler: textScaler,
+    baseStyle: baseStyle,
+  );
+  final height = painter.height;
+  painter.dispose();
+  return height;
+}
+
+double _sellLabelWidth({
+  required bool compact,
+  required TextScaler textScaler,
+  TextStyle? baseStyle,
+}) {
+  final painter = _sellLabelPainter(
+    compact: compact,
+    textScaler: textScaler,
+    baseStyle: baseStyle,
+  );
+  final width = painter.width;
+  painter.dispose();
+  return width;
+}
+
+/// Rendered width of the landscape Sell column at [textScaler], so the result
+/// panel can step right of the label even when it outgrows the hex.
+double landscapeMineSellGuardWidth(
+  TextScaler textScaler, [
+  TextStyle? baseStyle,
+]) => math.max(
+  landscapeMineSellWidth,
+  _sellLabelWidth(compact: true, textScaler: textScaler, baseStyle: baseStyle),
+);
 
 /// Top edge of the landscape Sell control's column — its button top, hex and
 /// projected-value label included — as far as the pass-through result panel
 /// must stay clear. The control anchors to the viewport bottom without a
-/// bottom safe-area inset, so [height] is the only input. Shared with
+/// bottom safe-area inset, so [height] is the only input. The label's height
+/// scales with [textScaler], so the guard is measured, not fixed. Shared with
 /// MiningShell so the panel can step right of the Sell when a multiline
 /// message would reach it.
-double landscapeMineSellTop(double height) =>
-    height - _landscapeSellBottom - landscapeMineSellGuardHeight;
+double landscapeMineSellTop(
+  double height,
+  TextScaler textScaler, [
+  TextStyle? baseStyle,
+]) =>
+    height -
+    _landscapeSellBottom -
+    (_sellHexHeightLandscape +
+        _sellLabelGap +
+        _sellLabelHeight(
+          compact: true,
+          textScaler: textScaler,
+          baseStyle: baseStyle,
+        ));
+
+/// Top edge of the portrait Sell control's column, which sits above the dock.
+/// [bottomInset] is the safe-area bottom the control is anchored above. Shared
+/// with MiningShell so the result panel stays above the scalable label.
+double portraitMineSellTop(
+  double height,
+  double bottomInset,
+  TextScaler textScaler, [
+  TextStyle? baseStyle,
+]) =>
+    height -
+    bottomInset -
+    _portraitDockBottom -
+    _portraitDockHeight -
+    _portraitSellDockGap -
+    (_sellHexHeightPortrait +
+        _sellLabelGap +
+        _sellLabelHeight(
+          compact: false,
+          textScaler: textScaler,
+          baseStyle: baseStyle,
+        ));
 
 /// Bottom edge of the landscape cargo gauge, which pins to the cavern's
 /// right edge — inside the strip the pass-through result panel steps into.

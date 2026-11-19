@@ -57,13 +57,43 @@ class MiningShell extends StatefulWidget {
     color: MiningTheme.primaryText,
   );
 
+  /// The panel's frame, shared by the rendered Container and the clearance
+  /// measurement so its text inset cannot drift from its padding and border.
+  static const _panelPadding = EdgeInsets.symmetric(
+    horizontal: 16,
+    vertical: 14,
+  );
+  static const _panelBorderWidth = 1.0;
+
+  static double get _panelHorizontalChrome =>
+      _panelPadding.horizontal + 2 * _panelBorderWidth;
+
+  static double get _panelVerticalChrome =>
+      _panelPadding.vertical + 2 * _panelBorderWidth;
+
+  static TextPainter _messagePainter(
+    String message, {
+    required double panelWidth,
+    TextScaler textScaler = TextScaler.noScaling,
+    bool boldText = false,
+  }) => TextPainter(
+    text: TextSpan(
+      text: message,
+      style: boldText
+          ? _messageStyle.merge(const TextStyle(fontWeight: FontWeight.bold))
+          : _messageStyle,
+    ),
+    textDirection: TextDirection.ltr,
+    textScaler: textScaler,
+  )..layout(maxWidth: math.max(0, panelWidth - _panelHorizontalChrome));
+
   /// Measures [message] wrapped at [panelWidth] with production font
   /// metrics, so the landscape clearance decision uses the same text layout
   /// the panel renders. [panelWidth] is the frame width; the Text's inset is
-  /// 16px padding plus a 1px border per side, and is clamped to non-negative
-  /// so very small usable widths cannot drive negative TextPainter
-  /// constraints. [boldText] mirrors the framework's bold-text accessibility
-  /// merge on the rendered Text (w600 → w700 changes wrapping).
+  /// the frame padding plus a 1px border per side, and is clamped to
+  /// non-negative so very small usable widths cannot drive negative
+  /// TextPainter constraints. [boldText] mirrors the framework's bold-text
+  /// accessibility merge on the rendered Text (w600 → w700 changes wrapping).
   @visibleForTesting
   static double measureMessageHeight(
     String message, {
@@ -71,19 +101,34 @@ class MiningShell extends StatefulWidget {
     TextScaler textScaler = TextScaler.noScaling,
     bool boldText = false,
   }) {
-    final painter = TextPainter(
-      text: TextSpan(
-        text: message,
-        style: boldText
-            ? _messageStyle.merge(const TextStyle(fontWeight: FontWeight.bold))
-            : _messageStyle,
-      ),
-      textDirection: TextDirection.ltr,
+    final painter = _messagePainter(
+      message,
+      panelWidth: panelWidth,
       textScaler: textScaler,
-    )..layout(maxWidth: math.max(0, panelWidth - 34));
+      boldText: boldText,
+    );
     final height = painter.height;
     painter.dispose();
     return height;
+  }
+
+  /// One rendered line's height with the panel's text style, used to cap the
+  /// visible lines when the panel is shorter than the message.
+  static double _messageLineHeight(
+    String message, {
+    required double panelWidth,
+    TextScaler textScaler = TextScaler.noScaling,
+    bool boldText = false,
+  }) {
+    final painter = _messagePainter(
+      message,
+      panelWidth: panelWidth,
+      textScaler: textScaler,
+      boldText: boldText,
+    );
+    final lineHeight = painter.preferredLineHeight;
+    painter.dispose();
+    return lineHeight;
   }
 
   @override
@@ -119,6 +164,7 @@ class _MiningShellState extends State<MiningShell>
   late final _MiningDisplayNotifier _displayNotifier;
   Timer? _refreshTimer;
   String? _message;
+  int _messageSequence = 0;
   Timer? _messageTimer;
   bool _initialized = false;
   // Set by the first paused/hidden event and cleared on resume: the only
@@ -832,14 +878,16 @@ class _MiningShellState extends State<MiningShell>
     _messageTimer?.cancel();
     setState(() {
       _message = message;
+      // A repeated message keeps the same text, so re-key the live region to
+      // make screen readers announce it again.
+      _messageSequence++;
     });
     _messageTimer = Timer(const Duration(seconds: 4), () {
-      // Dispose cancels this timer, so a firing after disposal means that
-      // cancellation regressed. Fail loudly instead of silently returning,
-      // which would leave the disposal test unable to prove cancellation.
-      if (!mounted) {
-        throw StateError('result message expiry fired after shell disposal');
-      }
+      // Dispose cancels this timer, so a fire after disposal means that
+      // cancellation regressed. Assert so tests still catch it, but return
+      // instead of throwing in release: a late callback must not crash.
+      assert(mounted, 'result message expiry fired after shell disposal');
+      if (!mounted) return;
       setState(() {
         _message = null;
       });
@@ -967,28 +1015,34 @@ class _MiningShellState extends State<MiningShell>
   /// The in-tree pass-through result panel: under the top HUD (safe-area
   /// top +160 portrait clearing Site Deck Sell through +156, +144 landscape
   /// clearing the compact Next Goal strip through +140), at most 420px wide,
-  /// centered in the safe area with >=16px margins. In landscape Mine Site
-  /// the usable region stops left of the dock rail; when the message wrapped
-  /// at that centered width would reach the Sell control, the panel anchors
-  /// instead in the free region right of the Sell — the compact nav ends
-  /// left of it, so it stays clear of Sell, nav and rail at any height.
-  /// The cargo gauge caps that strip's top, so a notice that would spill
-  /// below the viewport rises only to the gauge's bottom edge; when it still
-  /// cannot fit, the wider region left of the Sell (below the cash chip,
-  /// above the nav) is used whenever it shows more of the message. Both
-  /// placements are height-bounded to their free run rather than clipping
-  /// offscreen.
+  /// centered in the safe area with >=16px margins. On every surface the
+  /// panel is height-bounded above the bottom chrome: the portrait Sell
+  /// column, the Site Deck next-goal strip, or a navigation bar. In landscape
+  /// Mine Site the usable region stops 16px left of the dock rail; when the
+  /// message wrapped at that centered width would reach the Sell control, the
+  /// panel anchors instead in the free region right of the measured Sell
+  /// column — the compact nav ends left of it, so it stays clear of Sell, nav
+  /// and rail at any height. The cargo gauge caps that strip's top, so a
+  /// notice that would spill below the viewport rises only to the gauge's
+  /// bottom edge; when it still cannot fit, the wider region left of the Sell
+  /// (below the cash chip, above the nav) is used whenever it shows more of
+  /// the message. Every placement is height-bounded to its free run; a
+  /// message that still cannot fit ends with an ellipsis instead of silently
+  /// clipping.
   /// IgnorePointer keeps every tap flowing to the control beneath; the panel
   /// appears with no transition, so reduced motion needs no extra handling.
   Widget _buildResultPanel(MediaQueryData media) {
     final pad = media.padding;
     final portrait = media.size.height >= media.size.width;
+    // Scaffold's Material sets the ambient DefaultTextStyle to bodyMedium,
+    // which the Sell label inherits; measure against that same style.
+    final ambientTextStyle = Theme.of(context).textTheme.bodyMedium!;
     var usableLeft = pad.left + 16;
     var usableRight = media.size.width - pad.right - 16;
     var stepRightOfSell = false;
     final cavernWidth = media.size.width - pad.right - landscapeRightRailWidth;
     if (!portrait && _openSiteId != null) {
-      if (cavernWidth < usableRight) usableRight = cavernWidth;
+      usableRight = math.min(usableRight, cavernWidth - 16);
       // A multiline message must never reach the landscape Sell. If the
       // panel wrapped at the centered width would touch its top edge, anchor
       // in the free region right of the Sell (still left of the rail).
@@ -1005,10 +1059,16 @@ class _MiningShellState extends State<MiningShell>
             textScaler: media.textScaler,
             boldText: media.boldText,
           ) +
-          30.0;
-      if (panelBottom > landscapeMineSellTop(media.size.height) - 8) {
+          MiningShell._panelVerticalChrome;
+      final sellTop = landscapeMineSellTop(
+        media.size.height,
+        media.textScaler,
+        ambientTextStyle,
+      );
+      if (panelBottom > sellTop - 8) {
         final sellRight =
-            landscapeMineSellLeft(cavernWidth) + landscapeMineSellWidth;
+            landscapeMineSellLeft(cavernWidth) +
+            landscapeMineSellGuardWidth(media.textScaler, ambientTextStyle);
         usableLeft = math.max(usableLeft, sellRight + 12);
         stepRightOfSell = true;
       }
@@ -1037,7 +1097,7 @@ class _MiningShellState extends State<MiningShell>
             textScaler: media.textScaler,
             boldText: media.boldText,
           ) +
-          30.0;
+          MiningShell._panelVerticalChrome;
       final fit = math.min(1.0, (bottomLimit - topLimit) / panelHeight);
       final leftWidth = math.min(
         420.0,
@@ -1057,7 +1117,7 @@ class _MiningShellState extends State<MiningShell>
               textScaler: media.textScaler,
               boldText: media.boldText,
             ) +
-            30.0;
+            MiningShell._panelVerticalChrome;
         if (leftHeight > 0 &&
             math.min(1.0, (leftBottomLimit - leftTopLimit) / leftHeight) >
                 fit) {
@@ -1070,6 +1130,35 @@ class _MiningShellState extends State<MiningShell>
       }
       top = math.max(topLimit, math.min(top, bottomLimit - panelHeight));
       maxPanelHeight = math.max(0.0, bottomLimit - top);
+    } else {
+      // Portrait and the non-Mine-Site landscape surfaces span the full
+      // height, so cap the panel above their bottom chrome (Sell column,
+      // next-goal strip, or navigation) instead of letting it cover controls.
+      final bottomChromeTop = _bottomChromeTop(media, portrait);
+      if (bottomChromeTop != null) {
+        maxPanelHeight = math.max(0.0, bottomChromeTop - 8 - top);
+      }
+    }
+    int? maxLines;
+    if (maxPanelHeight.isFinite) {
+      final available = maxPanelHeight - MiningShell._panelVerticalChrome;
+      final textHeight = MiningShell.measureMessageHeight(
+        _message!,
+        panelWidth: panelWidth,
+        textScaler: media.textScaler,
+        boldText: media.boldText,
+      );
+      if (textHeight > available + .01) {
+        final lineHeight = MiningShell._messageLineHeight(
+          _message!,
+          panelWidth: panelWidth,
+          textScaler: media.textScaler,
+          boldText: media.boldText,
+        );
+        maxLines = lineHeight <= 0
+            ? 1
+            : math.max(1, (available / lineHeight).floor());
+      }
     }
     return Positioned(
       left: left,
@@ -1083,19 +1172,56 @@ class _MiningShellState extends State<MiningShell>
             decoration: BoxDecoration(
               color: MiningTheme.panel,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: MiningTheme.accent),
+              border: Border.all(
+                color: MiningTheme.accent,
+                width: MiningShell._panelBorderWidth,
+              ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: MiningShell._panelPadding,
             child: Semantics(
+              // Re-keying replaces the live-region node so a repeated message
+              // is announced again instead of being treated as unchanged.
+              key: ValueKey(_messageSequence),
               liveRegion: true,
               child: DefaultTextStyle(
                 style: MiningShell._messageStyle,
-                child: Text(_message!, style: MiningShell._messageStyle),
+                child: Text(
+                  _message!,
+                  style: MiningShell._messageStyle,
+                  maxLines: maxLines,
+                  overflow: maxLines == null ? null : TextOverflow.ellipsis,
+                ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  /// Top edge of the active surface's bottom chrome, or null when the
+  /// landscape Mine Site placement already bounds the panel itself.
+  double? _bottomChromeTop(MediaQueryData media, bool portrait) {
+    if (_selectedDestination == MiningNavigationDestination.stellarMap) {
+      return stellarMapResultPanelBottomTop(
+        media.size.height,
+        media.padding.bottom,
+      );
+    }
+    if (_openSiteId == null) {
+      return siteDeckResultPanelBottomTop(
+        media.size.height,
+        media.padding.bottom,
+        landscape: !portrait,
+        hasGoal: true,
+      );
+    }
+    if (!portrait) return null;
+    return portraitMineSellTop(
+      media.size.height,
+      media.padding.bottom,
+      media.textScaler,
+      Theme.of(context).textTheme.bodyMedium!,
     );
   }
 

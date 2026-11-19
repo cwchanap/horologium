@@ -2269,6 +2269,43 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(_resultPanel, findsNothing);
     });
+
+    testWidgets('a repeated message re-keys its live region', (tester) async {
+      final repository = CountingMiningSaveRepository();
+      await repository.save(MiningSave.initial(nowUtc: _start));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        useViewSafeArea: true,
+      );
+
+      await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+      await tester.pump();
+      final emptyBay = find.ancestor(
+        of: find.byKey(const ValueKey<String>('b3')),
+        matching: find.byType(InkWell),
+      );
+      await tester.tap(emptyBay);
+      await tester.pump(const Duration(milliseconds: 300));
+      final firstKey = tester
+          .widget<Semantics>(
+            find.descendant(of: _resultPanel, matching: find.byType(Semantics)),
+          )
+          .key;
+
+      await tester.tap(emptyBay);
+      await tester.pump(const Duration(milliseconds: 300));
+      final secondKey = tester
+          .widget<Semantics>(
+            find.descendant(of: _resultPanel, matching: find.byType(Semantics)),
+          )
+          .key;
+
+      // Same text, new live-region identity, so screen readers announce it.
+      expect(secondKey, isNot(firstKey));
+      expect(find.text('Select an occupied rig bay.'), findsOneWidget);
+    });
   });
 
   testWidgets('Site Deck unlocks an eligible site through the controller', (

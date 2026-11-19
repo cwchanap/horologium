@@ -46,13 +46,13 @@ void main() {
   }
 
   /// Boots a recovered (malformed) save so the shell's longest authored
-  /// message is visible, then enters Landing Basin so the landscape Mine Site
-  /// chrome is on screen beneath the still-visible notice.
-  Future<void> pumpMineSiteWithRecoveryNotice(
+  /// message is visible on the current primary surface.
+  Future<void> pumpRecoveryNotice(
     WidgetTester tester, {
     required Size viewport,
     double textScale = 1.0,
     bool boldText = false,
+    EdgeInsets safeArea = const EdgeInsets.only(left: 44, right: 44),
   }) async {
     SharedPreferences.setMockInitialValues({
       MiningSaveRepository.saveKey: '{ malformed mining json',
@@ -61,11 +61,30 @@ void main() {
       tester,
       repository: CountingMiningSaveRepository(),
       viewport: viewport,
-      safeArea: const EdgeInsets.only(left: 44, right: 44),
+      safeArea: safeArea,
       useViewSafeArea: true,
       textScale: textScale,
       boldText: boldText,
       pumpCycles: 12,
+    );
+  }
+
+  /// Boots a recovered (malformed) save so the shell's longest authored
+  /// message is visible, then enters Landing Basin so the landscape Mine Site
+  /// chrome is on screen beneath the still-visible notice.
+  Future<void> pumpMineSiteWithRecoveryNotice(
+    WidgetTester tester, {
+    required Size viewport,
+    double textScale = 1.0,
+    bool boldText = false,
+    EdgeInsets safeArea = const EdgeInsets.only(left: 44, right: 44),
+  }) async {
+    await pumpRecoveryNotice(
+      tester,
+      viewport: viewport,
+      textScale: textScale,
+      boldText: boldText,
+      safeArea: safeArea,
     );
 
     final enter = find.byKey(const Key('site-card-landingBasin-enter'));
@@ -294,9 +313,16 @@ void main() {
       final sellTop = tester
           .getRect(find.byKey(const Key('mine-site-sell')))
           .top;
+      final screenContext = tester.element(
+        find.byKey(const Key('mine-site-screen')),
+      );
       // The landscape Sell anchors to the viewport bottom without a bottom
       // safe-area inset, so its top estimate takes no inset at all.
-      final estimated = landscapeMineSellTop(viewport.height);
+      final estimated = landscapeMineSellTop(
+        viewport.height,
+        MediaQuery.textScalerOf(screenContext),
+        DefaultTextStyle.of(screenContext).style,
+      );
       // The clearance guard may overestimate the Sell top by at most its
       // 8px margin; more means a centered panel could overlap the control.
       expect(
@@ -426,10 +452,105 @@ void main() {
 
     expect(find.textContaining('Sold'), findsOneWidget);
     // Safe-area top +144, centered in the 44px-inset safe area left of the
-    // dock rail: left = 44+16 + (640-44-104 - (44+16) - 420) / 2 = 66.
+    // dock rail. The rail's 16px gap shrinks the centered panel to 416px:
+    // left = 44+16 + (416-416)/2 = 60.
     final panel = tester.getRect(find.byKey(const Key('mining-result-panel')));
     expect(panel.top, closeTo(144, .5));
-    expect(panel.left, closeTo(66, .5));
+    expect(panel.left, closeTo(60, .5));
     expectPanelClearOf(tester, find.byKey(const Key('mine-site-sell')));
   });
+
+  testWidgets(
+    'recovery notice clears landscape Mine Site chrome at 874x402 text 2.0',
+    (tester) async {
+      await pumpMineSiteWithRecoveryNotice(
+        tester,
+        viewport: const Size(874, 402),
+        textScale: 2.0,
+      );
+      // The app's fixed-size HUD and dock chrome overflow at 2.0 text scale
+      // (pre-existing, outside this ticket); consume those layout exceptions
+      // so this test can assert result-panel placement.
+      while (tester.takeException() != null) {}
+      expect(find.text(recoveryMessage), findsOneWidget);
+      for (final key in const [
+        'mining-cash-chip',
+        'mine-site-cargo',
+        'mine-site-right-rail',
+        'mine-site-sell',
+        'mining-bottom-navigation',
+      ]) {
+        expectPanelClearOf(tester, find.byKey(Key(key)));
+      }
+    },
+  );
+
+  testWidgets(
+    'recovery notice stays above portrait Mine Site controls at 360x640 '
+    'text 2.0',
+    (tester) async {
+      await pumpMineSiteWithRecoveryNotice(
+        tester,
+        viewport: const Size(360, 640),
+        textScale: 2.0,
+        safeArea: EdgeInsets.zero,
+      );
+      // Fixed-size HUD and dock chrome overflow at 2.0 (pre-existing); drain
+      // those layout exceptions so the panel geometry assertion can run.
+      while (tester.takeException() != null) {}
+      expect(find.text(recoveryMessage), findsOneWidget);
+      for (final key in const [
+        'mine-site-sell',
+        'fleet-dock',
+        'mining-bottom-navigation',
+      ]) {
+        expectPanelClearOf(tester, find.byKey(Key(key)));
+      }
+      final sell = tester.getRect(find.byKey(const Key('mine-site-sell')));
+      final panel = tester.getRect(
+        find.byKey(const Key('mining-result-panel')),
+      );
+      expect(panel.bottom, lessThanOrEqualTo(sell.top - 8 + .5));
+      // The free run is shorter than the notice, so the panel must show a
+      // visible truncation cue instead of silently clipping the last lines.
+      final text = tester.widget<Text>(find.text(recoveryMessage));
+      expect(text.maxLines, isNotNull);
+      expect(text.overflow, TextOverflow.ellipsis);
+    },
+  );
+
+  testWidgets('recovery notice clears landscape Site Deck chrome at 640x360 '
+      'text 2.0', (tester) async {
+    await pumpRecoveryNotice(
+      tester,
+      viewport: const Size(640, 360),
+      textScale: 2.0,
+      safeArea: EdgeInsets.zero,
+    );
+    expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+    expectPanelClearOf(tester, find.byKey(const Key('site-deck-next-goal')));
+    expectPanelClearOf(
+      tester,
+      find.byKey(const Key('mining-bottom-navigation')),
+    );
+  });
+
+  testWidgets(
+    'recovery notice clears Stellar Map navigation at 568x320 text 1.3',
+    (tester) async {
+      await pumpRecoveryNotice(
+        tester,
+        viewport: const Size(568, 320),
+        textScale: 1.3,
+        safeArea: EdgeInsets.zero,
+      );
+      await tester.tap(find.byKey(const Key('mining-nav-stellarMap')));
+      await tester.pump();
+      expect(find.byKey(const Key('stellar-map-screen')), findsOneWidget);
+      expectPanelClearOf(
+        tester,
+        find.byKey(const Key('mining-bottom-navigation')),
+      );
+    },
+  );
 }
