@@ -52,6 +52,7 @@ void main() {
     WidgetTester tester, {
     required Size viewport,
     double textScale = 1.0,
+    bool boldText = false,
   }) async {
     SharedPreferences.setMockInitialValues({
       MiningSaveRepository.saveKey: '{ malformed mining json',
@@ -63,6 +64,7 @@ void main() {
       safeArea: const EdgeInsets.only(left: 44, right: 44),
       useViewSafeArea: true,
       textScale: textScale,
+      boldText: boldText,
       pumpCycles: 12,
     );
 
@@ -188,6 +190,60 @@ void main() {
 
   for (final textScale in const [1.0, 1.3]) {
     testWidgets(
+      'recovery notice panel stays on-screen and clears chrome at 568x320 '
+      'text $textScale',
+      (tester) async {
+        const viewport = Size(568, 320);
+        await pumpMineSiteWithRecoveryNotice(
+          tester,
+          viewport: viewport,
+          textScale: textScale,
+        );
+        expect(find.text(recoveryMessage), findsOneWidget);
+
+        final panel = tester.getRect(
+          find.byKey(const Key('mining-result-panel')),
+        );
+        expect(panel.left, greaterThanOrEqualTo(0), reason: '$panel');
+        expect(panel.top, greaterThanOrEqualTo(0), reason: '$panel');
+        expect(
+          panel.right,
+          lessThanOrEqualTo(viewport.width),
+          reason: '$panel',
+        );
+        expect(
+          panel.bottom,
+          lessThanOrEqualTo(viewport.height),
+          reason: '$panel',
+        );
+        for (final key in const [
+          'mining-cash-chip',
+          'mine-site-cargo',
+          'mine-site-right-rail',
+          'mine-site-sell',
+          'mining-bottom-navigation',
+        ]) {
+          expectPanelClearOf(tester, find.byKey(Key(key)));
+        }
+      },
+    );
+  }
+
+  testWidgets(
+    'recovery notice text stays fully on-screen at 568x320 text 1.0',
+    (tester) async {
+      const viewport = Size(568, 320);
+      await pumpMineSiteWithRecoveryNotice(tester, viewport: viewport);
+      expect(find.text(recoveryMessage), findsOneWidget);
+
+      final text = tester.getRect(find.text(recoveryMessage));
+      expect(text.top, greaterThanOrEqualTo(0), reason: '$text');
+      expect(text.bottom, lessThanOrEqualTo(viewport.height), reason: '$text');
+    },
+  );
+
+  for (final textScale in const [1.0, 1.3]) {
+    testWidgets(
       'recovery notice panel stays on-screen at 640x360 text $textScale',
       (tester) async {
         const viewport = Size(640, 360);
@@ -282,6 +338,35 @@ void main() {
       panel.height,
       closeTo(measured + 30, .5),
       reason: 'panel height ${panel.height} vs measured $measured + frame 30',
+    );
+  });
+
+  testWidgets('clearance measurement mirrors the rendered bold-text merge', (
+    tester,
+  ) async {
+    const viewport = Size(640, 360);
+    await pumpMineSiteWithRecoveryNotice(
+      tester,
+      viewport: viewport,
+      boldText: true,
+    );
+    expect(find.text(recoveryMessage), findsOneWidget);
+
+    final panel = tester.getRect(find.byKey(const Key('mining-result-panel')));
+    final rendered = tester.getSize(find.text(recoveryMessage));
+    final shellContext = tester.element(find.text(recoveryMessage));
+    final measured = MiningShell.measureMessageHeight(
+      recoveryMessage,
+      panelWidth: panel.width,
+      textScaler: MediaQuery.textScalerOf(shellContext),
+      boldText: true,
+    );
+    expect(
+      measured,
+      closeTo(rendered.height, .5),
+      reason:
+          'bold clearance measurement $measured must match the rendered '
+          'bold Text ${rendered.height} at panel width ${panel.width}',
     );
   });
 

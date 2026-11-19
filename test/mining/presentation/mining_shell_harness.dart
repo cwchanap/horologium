@@ -231,6 +231,7 @@ Future<void> pumpShell(
   Size viewport = miningShellTestViewport,
   EdgeInsets safeArea = EdgeInsets.zero,
   double textScale = 1.0,
+  bool boldText = false,
   bool useViewSafeArea = false,
   ThemeData? theme,
 }) async {
@@ -295,6 +296,7 @@ Future<void> pumpShell(
               return MediaQuery(
                 data: media.copyWith(
                   textScaler: TextScaler.linear(textScale),
+                  boldText: boldText || media.boldText,
                   disableAnimations:
                       disableAnimations || media.disableAnimations,
                 ),
