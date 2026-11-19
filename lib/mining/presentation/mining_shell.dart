@@ -46,6 +46,39 @@ class MiningShell extends StatefulWidget {
   final AudioManager? audioManager;
   final StorageAlerts? storageAlerts;
 
+  /// The result panel's authored message style. The rendered Text is pinned
+  /// to it with a [DefaultTextStyle], so panel geometry never inherits the
+  /// ambient Material text style (its line height and letter spacing differ
+  /// per platform typography and silently change wrapping).
+  static const _messageStyle = TextStyle(
+    fontFamily: 'Orbitron',
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    color: MiningTheme.primaryText,
+  );
+
+  /// Measures [message] wrapped at [panelWidth] with production font
+  /// metrics, so the landscape clearance decision uses the same text layout
+  /// the panel renders. [panelWidth] is the frame width; the Text's inset is
+  /// 16px padding plus a 1px border per side, and is clamped to non-negative
+  /// so very small usable widths cannot drive negative TextPainter
+  /// constraints.
+  @visibleForTesting
+  static double measureMessageHeight(
+    String message, {
+    required double panelWidth,
+    TextScaler textScaler = TextScaler.noScaling,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(text: message, style: _messageStyle),
+      textDirection: TextDirection.ltr,
+      textScaler: textScaler,
+    )..layout(maxWidth: math.max(0, panelWidth - 34));
+    final height = painter.height;
+    painter.dispose();
+    return height;
+  }
+
   @override
   State<MiningShell> createState() => _MiningShellState();
 }
@@ -924,29 +957,6 @@ class _MiningShellState extends State<MiningShell>
     );
   }
 
-  /// The result panel's authored message style, shared by the rendered Text
-  /// and the clearance measurement below.
-  static const _messageStyle = TextStyle(
-    fontFamily: 'Orbitron',
-    fontSize: 13,
-    fontWeight: FontWeight.w600,
-    color: MiningTheme.primaryText,
-  );
-
-  /// Measures the message wrapped at [panelWidth] with production font
-  /// metrics, so the landscape clearance decision uses the same text layout
-  /// the panel renders.
-  double _measureMessageHeight(MediaQueryData media, double panelWidth) {
-    final painter = TextPainter(
-      text: TextSpan(text: _message!, style: _messageStyle),
-      textDirection: TextDirection.ltr,
-      textScaler: media.textScaler,
-    )..layout(maxWidth: panelWidth - 32);
-    final height = painter.height;
-    painter.dispose();
-    return height;
-  }
-
   /// The in-tree pass-through result panel: under the top HUD (safe-area
   /// top +160 portrait clearing Site Deck Sell through +156, +144 landscape
   /// clearing the compact Next Goal strip through +140), at most 420px wide,
@@ -974,9 +984,15 @@ class _MiningShellState extends State<MiningShell>
         math.max(0.0, usableRight - usableLeft),
       );
       final panelBottom =
-          pad.top + 144.0 + _measureMessageHeight(media, centeredWidth) + 28.0;
-      if (panelBottom >
-          landscapeMineSellTop(media.size.height, pad.bottom) - 8) {
+          pad.top +
+          144.0 +
+          MiningShell.measureMessageHeight(
+            _message!,
+            panelWidth: centeredWidth,
+            textScaler: media.textScaler,
+          ) +
+          30.0;
+      if (panelBottom > landscapeMineSellTop(media.size.height) - 8) {
         final sellRight =
             landscapeMineSellLeft(
               media.size.width - pad.right - landscapeRightRailWidth,
@@ -1006,7 +1022,10 @@ class _MiningShellState extends State<MiningShell>
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Semantics(
             liveRegion: true,
-            child: Text(_message!, style: _messageStyle),
+            child: DefaultTextStyle(
+              style: MiningShell._messageStyle,
+              child: Text(_message!, style: MiningShell._messageStyle),
+            ),
           ),
         ),
       ),
