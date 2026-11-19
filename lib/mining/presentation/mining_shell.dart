@@ -1026,9 +1026,12 @@ class _MiningShellState extends State<MiningShell>
   /// notice that would spill below the viewport rises only to the gauge's
   /// bottom edge; when it still cannot fit, the wider region left of the Sell
   /// (below the cash chip, above the nav) is used whenever it shows more of
-  /// the message. Every placement is height-bounded to its free run; a
-  /// message that still cannot fit ends with an ellipsis instead of silently
-  /// clipping.
+  /// the message. In portrait Mine Site the same fallback applies: when the
+  /// run above the Sell column cannot hold the frame plus a text line, the
+  /// region left of the Sell — below the back button and cash chip, above
+  /// the dock — is used whenever it shows more of the message. Every
+  /// placement is height-bounded to its free run; a message that still
+  /// cannot fit ends with an ellipsis instead of silently clipping.
   /// IgnorePointer keeps every tap flowing to the control beneath; the panel
   /// appears with no transition, so reduced motion needs no extra handling.
   Widget _buildResultPanel(MediaQueryData media) {
@@ -1137,6 +1140,51 @@ class _MiningShellState extends State<MiningShell>
       final bottomChromeTop = _bottomChromeTop(media, portrait);
       if (bottomChromeTop != null) {
         maxPanelHeight = math.max(0.0, bottomChromeTop - 8 - top);
+      }
+      if (portrait && _openSiteId != null) {
+        // The portrait twin of the landscape left-of-Sell fallback: when the
+        // capped run above the Sell column cannot hold the frame plus a text
+        // line, the region left of the Sell — below the back button and cash
+        // chip, above the dock — shows more of the message. Each candidate
+        // is bounded to its free vertical run; the larger visible share wins.
+        final sellLeft = portraitMineSellLeft(
+          media.size.width,
+          media.textScaler,
+          ambientTextStyle,
+        );
+        final leftWidth = math.min(420.0, sellLeft - 12 - (pad.left + 16));
+        if (leftWidth > 0) {
+          final leftTopLimit = math.max(
+            pad.top + 8,
+            portraitMineBackBottom(pad.top) + 8,
+          );
+          final leftBottomLimit =
+              portraitMineDockTop(media.size.height, pad.bottom) - 8;
+          final panelHeight =
+              MiningShell.measureMessageHeight(
+                _message!,
+                panelWidth: panelWidth,
+                textScaler: media.textScaler,
+                boldText: media.boldText,
+              ) +
+              MiningShell._panelVerticalChrome;
+          final leftHeight =
+              MiningShell.measureMessageHeight(
+                _message!,
+                panelWidth: leftWidth,
+                textScaler: media.textScaler,
+                boldText: media.boldText,
+              ) +
+              MiningShell._panelVerticalChrome;
+          if (leftHeight > 0 &&
+              math.min(1.0, (leftBottomLimit - leftTopLimit) / leftHeight) >
+                  math.min(1.0, maxPanelHeight / panelHeight)) {
+            left = pad.left + 16;
+            panelWidth = leftWidth;
+            top = leftTopLimit;
+            maxPanelHeight = math.max(0.0, leftBottomLimit - leftTopLimit);
+          }
+        }
       }
     }
     int? maxLines;
