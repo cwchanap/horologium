@@ -133,6 +133,11 @@ class StellarMapScreen extends StatelessWidget {
   }
 }
 
+/// Top edge of the Stellar Map's bottom navigation, which the pass-through
+/// result panel must stay above.
+double stellarMapResultPanelBottomTop(double height, double bottomInset) =>
+    height - bottomInset - MiningNavigationBar.height;
+
 /// Current run status after at least one relaunch, first in the scroll.
 class _RelaunchStatusLine extends StatelessWidget {
   const _RelaunchStatusLine({required this.view});
