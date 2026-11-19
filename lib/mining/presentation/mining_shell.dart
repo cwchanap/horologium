@@ -62,15 +62,22 @@ class MiningShell extends StatefulWidget {
   /// the panel renders. [panelWidth] is the frame width; the Text's inset is
   /// 16px padding plus a 1px border per side, and is clamped to non-negative
   /// so very small usable widths cannot drive negative TextPainter
-  /// constraints.
+  /// constraints. [boldText] mirrors the framework's bold-text accessibility
+  /// merge on the rendered Text (w600 → w700 changes wrapping).
   @visibleForTesting
   static double measureMessageHeight(
     String message, {
     required double panelWidth,
     TextScaler textScaler = TextScaler.noScaling,
+    bool boldText = false,
   }) {
     final painter = TextPainter(
-      text: TextSpan(text: message, style: _messageStyle),
+      text: TextSpan(
+        text: message,
+        style: boldText
+            ? _messageStyle.merge(const TextStyle(fontWeight: FontWeight.bold))
+            : _messageStyle,
+      ),
       textDirection: TextDirection.ltr,
       textScaler: textScaler,
     )..layout(maxWidth: math.max(0, panelWidth - 34));
@@ -964,7 +971,13 @@ class _MiningShellState extends State<MiningShell>
   /// the usable region stops left of the dock rail; when the message wrapped
   /// at that centered width would reach the Sell control, the panel anchors
   /// instead in the free region right of the Sell — the compact nav ends
-  /// left of it, so any height stays clear of Sell, nav and rail.
+  /// left of it, so it stays clear of Sell, nav and rail at any height.
+  /// The cargo gauge caps that strip's top, so a notice that would spill
+  /// below the viewport rises only to the gauge's bottom edge; when it still
+  /// cannot fit, the wider region left of the Sell (below the cash chip,
+  /// above the nav) is used whenever it shows more of the message. Both
+  /// placements are height-bounded to their free run rather than clipping
+  /// offscreen.
   /// IgnorePointer keeps every tap flowing to the control beneath; the panel
   /// appears with no transition, so reduced motion needs no extra handling.
   Widget _buildResultPanel(MediaQueryData media) {
@@ -973,9 +986,9 @@ class _MiningShellState extends State<MiningShell>
     var usableLeft = pad.left + 16;
     var usableRight = media.size.width - pad.right - 16;
     var stepRightOfSell = false;
+    final cavernWidth = media.size.width - pad.right - landscapeRightRailWidth;
     if (!portrait && _openSiteId != null) {
-      final railLeft = media.size.width - pad.right - landscapeRightRailWidth;
-      if (railLeft < usableRight) usableRight = railLeft;
+      if (cavernWidth < usableRight) usableRight = cavernWidth;
       // A multiline message must never reach the landscape Sell. If the
       // panel wrapped at the centered width would touch its top edge, anchor
       // in the free region right of the Sell (still left of the rail).
@@ -990,14 +1003,12 @@ class _MiningShellState extends State<MiningShell>
             _message!,
             panelWidth: centeredWidth,
             textScaler: media.textScaler,
+            boldText: media.boldText,
           ) +
           30.0;
       if (panelBottom > landscapeMineSellTop(media.size.height) - 8) {
         final sellRight =
-            landscapeMineSellLeft(
-              media.size.width - pad.right - landscapeRightRailWidth,
-            ) +
-            landscapeMineSellWidth;
+            landscapeMineSellLeft(cavernWidth) + landscapeMineSellWidth;
         usableLeft = math.max(usableLeft, sellRight + 12);
         stepRightOfSell = true;
       }
@@ -1005,26 +1016,82 @@ class _MiningShellState extends State<MiningShell>
     var panelWidth = usableRight - usableLeft;
     if (panelWidth > 420) panelWidth = 420;
     if (panelWidth < 0) panelWidth = 0;
+    var left =
+        usableLeft +
+        (stepRightOfSell ? 0.0 : (usableRight - usableLeft - panelWidth) / 2);
+    var top = pad.top + (portrait ? 160.0 : 144.0);
+    var maxPanelHeight = double.infinity;
+    if (stepRightOfSell) {
+      // The stepped strip's only top chrome is the cargo gauge pinned to the
+      // cavern's right edge, so the panel may rise no higher than its bottom.
+      // When the notice cannot fit that run, the fallback is the region left
+      // of the Sell — below the cash chip, above the compact nav — which is
+      // wider and usually holds more of the message. Each candidate is
+      // bounded to its free vertical run; the larger visible share wins.
+      var topLimit = math.max(pad.top + 8, landscapeMineCargoBottom + 8);
+      var bottomLimit = media.size.height - pad.bottom - 8;
+      var panelHeight =
+          MiningShell.measureMessageHeight(
+            _message!,
+            panelWidth: panelWidth,
+            textScaler: media.textScaler,
+            boldText: media.boldText,
+          ) +
+          30.0;
+      final fit = math.min(1.0, (bottomLimit - topLimit) / panelHeight);
+      final leftWidth = math.min(
+        420.0,
+        landscapeMineSellLeft(cavernWidth) - 12 - (pad.left + 16),
+      );
+      if (leftWidth > 0) {
+        final leftTopLimit = math.max(
+          pad.top + 8,
+          landscapeMineCashChipBottom + 8,
+        );
+        final leftBottomLimit =
+            landscapeMineNavTop(media.size.height, pad.bottom) - 8;
+        final leftHeight =
+            MiningShell.measureMessageHeight(
+              _message!,
+              panelWidth: leftWidth,
+              textScaler: media.textScaler,
+              boldText: media.boldText,
+            ) +
+            30.0;
+        if (leftHeight > 0 &&
+            math.min(1.0, (leftBottomLimit - leftTopLimit) / leftHeight) >
+                fit) {
+          left = pad.left + 16;
+          panelWidth = leftWidth;
+          topLimit = leftTopLimit;
+          bottomLimit = leftBottomLimit;
+          panelHeight = leftHeight;
+        }
+      }
+      top = math.max(topLimit, math.min(top, bottomLimit - panelHeight));
+      maxPanelHeight = math.max(0.0, bottomLimit - top);
+    }
     return Positioned(
-      left:
-          usableLeft +
-          (stepRightOfSell ? 0.0 : (usableRight - usableLeft - panelWidth) / 2),
-      top: pad.top + (portrait ? 160.0 : 144.0),
+      left: left,
+      top: top,
       width: panelWidth,
       child: IgnorePointer(
-        child: Container(
-          key: const Key('mining-result-panel'),
-          decoration: BoxDecoration(
-            color: MiningTheme.panel,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: MiningTheme.accent),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Semantics(
-            liveRegion: true,
-            child: DefaultTextStyle(
-              style: MiningShell._messageStyle,
-              child: Text(_message!, style: MiningShell._messageStyle),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxPanelHeight),
+          child: Container(
+            key: const Key('mining-result-panel'),
+            decoration: BoxDecoration(
+              color: MiningTheme.panel,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: MiningTheme.accent),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Semantics(
+              liveRegion: true,
+              child: DefaultTextStyle(
+                style: MiningShell._messageStyle,
+                child: Text(_message!, style: MiningShell._messageStyle),
+              ),
             ),
           ),
         ),

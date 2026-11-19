@@ -667,6 +667,23 @@ const double landscapeMineSellWidth = 96;
 double landscapeMineSellTop(double height) =>
     height - _landscapeSellBottom - landscapeMineSellGuardHeight;
 
+/// Bottom edge of the landscape cargo gauge, which pins to the cavern's
+/// right edge — inside the strip the pass-through result panel steps into.
+/// Shared with MiningShell so a raised stepped panel stays below it.
+const double landscapeMineCargoBottom =
+    _landscapeCargoTop + _landscapeCargoSize;
+
+/// Bottom edge of the landscape cash chip, which pins to the safe-area left.
+/// Shared with MiningShell so a result panel anchored left of the Sell stays
+/// below it.
+const double landscapeMineCashChipBottom =
+    _landscapeCashChipTop + MiningCashChip.compactHeight;
+
+/// Top edge of the landscape compact nav toolbar. Shared with MiningShell so
+/// a result panel anchored left of the Sell stays above it.
+double landscapeMineNavTop(double height, double bottomInset) =>
+    height - bottomInset - _landscapeToolbarBottom - _landscapeToolbarHeight;
+
 class _MineChromeButton extends StatelessWidget {
   const _MineChromeButton({
     super.key,
