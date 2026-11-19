@@ -47,6 +47,14 @@ const double landscapeRightRailWidth = 104;
 const double _landscapeSellBottom = 78;
 const double _landscapeSellHeight = 79;
 
+/// Rendered height of the landscape Sell column — the 56×62 hex button, the
+/// 5px gap, and the projected-value label — used only by the shell's result
+/// panel clearance guard ([landscapeMineSellTop]). Measured with production
+/// fonts at text scale 1.0 (62 + 5 + 17); the label reaches 89 at scale 1.3,
+/// still inside the guard's 8px margin. `_landscapeSellHeight` above stays
+/// the grid viewport inset so rig placement is unaffected.
+const double landscapeMineSellGuardHeight = 84;
+
 class MineSiteScreen extends StatelessWidget {
   const MineSiteScreen({
     super.key,
@@ -650,10 +658,14 @@ double landscapeMineSellLeft(double cavernWidth) =>
 /// at large text scales. Shared with MiningShell.
 const double landscapeMineSellWidth = 96;
 
-/// Top edge of the landscape Sell control, hex and projected-value label
-/// included. Shared with MiningShell.
-double landscapeMineSellTop(double height, double bottomInset) =>
-    height - bottomInset - _landscapeSellBottom - _landscapeSellHeight;
+/// Top edge of the landscape Sell control's column — its button top, hex and
+/// projected-value label included — as far as the pass-through result panel
+/// must stay clear. The control anchors to the viewport bottom without a
+/// bottom safe-area inset, so [height] is the only input. Shared with
+/// MiningShell so the panel can step right of the Sell when a multiline
+/// message would reach it.
+double landscapeMineSellTop(double height) =>
+    height - _landscapeSellBottom - landscapeMineSellGuardHeight;
 
 class _MineChromeButton extends StatelessWidget {
   const _MineChromeButton({
