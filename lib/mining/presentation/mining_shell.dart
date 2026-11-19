@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -793,7 +794,12 @@ class _MiningShellState extends State<MiningShell>
       _message = message;
     });
     _messageTimer = Timer(const Duration(seconds: 4), () {
-      if (!mounted) return;
+      // Dispose cancels this timer, so a firing after disposal means that
+      // cancellation regressed. Fail loudly instead of silently returning,
+      // which would leave the disposal test unable to prove cancellation.
+      if (!mounted) {
+        throw StateError('result message expiry fired after shell disposal');
+      }
       setState(() {
         _message = null;
       });
@@ -918,27 +924,72 @@ class _MiningShellState extends State<MiningShell>
     );
   }
 
+  /// The result panel's authored message style, shared by the rendered Text
+  /// and the clearance measurement below.
+  static const _messageStyle = TextStyle(
+    fontFamily: 'Orbitron',
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    color: MiningTheme.primaryText,
+  );
+
+  /// Measures the message wrapped at [panelWidth] with production font
+  /// metrics, so the landscape clearance decision uses the same text layout
+  /// the panel renders.
+  double _measureMessageHeight(MediaQueryData media, double panelWidth) {
+    final painter = TextPainter(
+      text: TextSpan(text: _message!, style: _messageStyle),
+      textDirection: TextDirection.ltr,
+      textScaler: media.textScaler,
+    )..layout(maxWidth: panelWidth - 32);
+    final height = painter.height;
+    painter.dispose();
+    return height;
+  }
+
   /// The in-tree pass-through result panel: under the top HUD (safe-area
   /// top +160 portrait clearing Site Deck Sell through +156, +144 landscape
   /// clearing the compact Next Goal strip through +140), at most 420px wide,
   /// centered in the safe area with >=16px margins. In landscape Mine Site
-  /// the usable region stops left of the dock rail. IgnorePointer keeps
-  /// every tap flowing to the control beneath; the panel appears with no
-  /// transition, so reduced motion needs no extra handling.
+  /// the usable region stops left of the dock rail; when the message wrapped
+  /// at that centered width would reach the Sell control, the panel anchors
+  /// instead in the free region right of the Sell — the compact nav ends
+  /// left of it, so any height stays clear of Sell, nav and rail.
+  /// IgnorePointer keeps every tap flowing to the control beneath; the panel
+  /// appears with no transition, so reduced motion needs no extra handling.
   Widget _buildResultPanel(MediaQueryData media) {
     final pad = media.padding;
     final portrait = media.size.height >= media.size.width;
-    final usableLeft = pad.left + 16;
+    var usableLeft = pad.left + 16;
     var usableRight = media.size.width - pad.right - 16;
+    var stepRightOfSell = false;
     if (!portrait && _openSiteId != null) {
       final railLeft = media.size.width - pad.right - landscapeRightRailWidth;
       if (railLeft < usableRight) usableRight = railLeft;
+      // A multiline message must never reach the landscape Sell. If the
+      // panel wrapped at the centered width would touch its top edge, anchor
+      // in the free region right of the Sell (still left of the rail).
+      final centeredWidth = math.min(420.0, usableRight - usableLeft);
+      final panelBottom =
+          pad.top + 144.0 + _measureMessageHeight(media, centeredWidth) + 28.0;
+      if (panelBottom >
+          landscapeMineSellTop(media.size.height, pad.bottom) - 8) {
+        final sellRight =
+            landscapeMineSellLeft(
+              media.size.width - pad.right - landscapeRightRailWidth,
+            ) +
+            landscapeMineSellWidth;
+        usableLeft = math.max(usableLeft, sellRight + 12);
+        stepRightOfSell = true;
+      }
     }
     var panelWidth = usableRight - usableLeft;
     if (panelWidth > 420) panelWidth = 420;
     if (panelWidth < 0) panelWidth = 0;
     return Positioned(
-      left: usableLeft + (usableRight - usableLeft - panelWidth) / 2,
+      left:
+          usableLeft +
+          (stepRightOfSell ? 0.0 : (usableRight - usableLeft - panelWidth) / 2),
       top: pad.top + (portrait ? 160.0 : 144.0),
       width: panelWidth,
       child: IgnorePointer(
@@ -952,15 +1003,7 @@ class _MiningShellState extends State<MiningShell>
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Semantics(
             liveRegion: true,
-            child: Text(
-              _message!,
-              style: const TextStyle(
-                fontFamily: 'Orbitron',
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: MiningTheme.primaryText,
-              ),
-            ),
+            child: Text(_message!, style: _messageStyle),
           ),
         ),
       ),

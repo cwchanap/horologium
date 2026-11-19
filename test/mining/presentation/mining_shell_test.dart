@@ -211,8 +211,8 @@ Future<void> pumpMiningTick(
   await tester.pump(const Duration(seconds: 1));
 }
 
-/// The key of the shell's non-blocking result feedback panel. Task 2's
-/// implementation attaches it to the styled panel Container.
+/// The key of the shell's non-blocking result feedback panel, attached to
+/// the styled panel Container.
 const Key miningResultPanelKey = Key('mining-result-panel');
 
 Finder get _resultPanel => find.byKey(miningResultPanelKey);
@@ -1812,7 +1812,7 @@ void main() {
         await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
         await tester.pump();
         await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
-        // Let the raised feedback bar settle over the bottom nav first.
+        // Let the spawn feedback appear before exercising the nav.
         await tester.pumpAndSettle();
 
         expect(find.text('T1 rig spawned.'), findsOneWidget);
@@ -1915,6 +1915,36 @@ void main() {
         tester,
         repository: repository,
         viewport: const Size(390, 844),
+        useViewSafeArea: true,
+      );
+
+      await tester.tap(find.byKey(const Key('site-deck-sell')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(_resultPanel, findsOneWidget);
+
+      for (final key in const [
+        'mining-cash-chip',
+        'mining-cargo-gauge',
+        'site-deck-sell',
+        'site-deck-next-goal',
+        'mining-bottom-navigation',
+      ]) {
+        expectPanelClearOf(tester, find.byKey(Key(key)));
+      }
+    });
+
+    testWidgets('feedback clears portrait Site Deck chrome at 360x640', (
+      tester,
+    ) async {
+      // The narrowest specified portrait viewport: the panel is widest
+      // relative to the screen and wraps tallest, while Site Deck Sell ends
+      // only 4px above the panel's +160 top.
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start, cargo: 10));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(360, 640),
         useViewSafeArea: true,
       );
 
@@ -2107,6 +2137,53 @@ void main() {
       expect(find.textContaining('Sold'), findsNothing);
     });
 
+    testWidgets('the live region follows message changes', (tester) async {
+      final handle = tester.ensureSemantics();
+      final repository = CountingMiningSaveRepository();
+      await repository.save(deployedLandingState(_start, cargo: 10));
+      await pumpShell(
+        tester,
+        repository: repository,
+        viewport: const Size(390, 844),
+        useViewSafeArea: true,
+      );
+
+      const rejection = 'Select an occupied rig bay.';
+      await showRejectionFeedback(tester, settle: Duration.zero);
+      expect(
+        tester.getSemantics(find.text(rejection)).getSemanticsData(),
+        isA<SemanticsData>()
+            .having((d) => d.label, 'label', rejection)
+            .having(
+              (d) => d.flagsCollection.isLiveRegion,
+              'liveRegion',
+              isTrue,
+            ),
+      );
+
+      // Re-showing the identical message replaces the same live-region node
+      // rather than stacking a second announcement source.
+      final emptyBay = find.ancestor(
+        of: find.byKey(const ValueKey<String>('b3')),
+        matching: find.byType(InkWell),
+      );
+      await tester.tap(emptyBay);
+      await tester.pump();
+      expect(find.bySemanticsLabel(rejection), findsOneWidget);
+
+      // A different message changes the live-region node's label — the
+      // node change live-region announcement responds to — so the replacement
+      // is announced instead of the stale text.
+      await tester.tap(find.byKey(const Key('mine-site-sell')));
+      await tester.pump();
+      final saleData = tester
+          .getSemantics(find.textContaining('Sold'))
+          .getSemanticsData();
+      expect(saleData.label, contains('Sold'));
+      expect(saleData.flagsCollection.isLiveRegion, isTrue);
+      handle.dispose();
+    });
+
     testWidgets('rotation while feedback is visible keeps clearance', (
       tester,
     ) async {
@@ -2187,6 +2264,8 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(seconds: 5));
 
+      // The expiry callback throws if it ever fires after disposal, so an
+      // uncanceled timer surfaces here instead of passing silently.
       expect(tester.takeException(), isNull);
       expect(_resultPanel, findsNothing);
     });
@@ -2989,7 +3068,7 @@ void main() {
       await tester.tap(find.byKey(const Key('offline-return-sell-all')));
       await tester.pumpAndSettle();
 
-      // The sale feedback lives on the shell's ScaffoldMessenger, so both
+      // The sale feedback renders on the shell beneath modal routes, so both
       // stacked sheets must be gone for it to be visible.
       expect(find.byKey(const Key('offline-return-sheet')), findsNothing);
       expect(find.byKey(const Key('mining-technology-sheet')), findsNothing);

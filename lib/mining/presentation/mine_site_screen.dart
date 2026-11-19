@@ -639,6 +639,22 @@ double _landscapeX(double compact, double fraction, double cavernWidth) {
   return 14 + (cavernWidth - 14) * fraction;
 }
 
+/// Left edge of the landscape Sell control, whose cavern region spans from
+/// x=0 to the dock rail. Shared with MiningShell so the pass-through result
+/// panel can step right of the Sell when a multiline message would reach it.
+double landscapeMineSellLeft(double cavernWidth) =>
+    _landscapeX(236, .34, cavernWidth);
+
+/// Conservative rendered width of the landscape Sell control: the 56px hex
+/// plus room for the scalable projected-value label that can outgrow the hex
+/// at large text scales. Shared with MiningShell.
+const double landscapeMineSellWidth = 96;
+
+/// Top edge of the landscape Sell control, hex and projected-value label
+/// included. Shared with MiningShell.
+double landscapeMineSellTop(double height, double bottomInset) =>
+    height - bottomInset - _landscapeSellBottom - _landscapeSellHeight;
+
 class _MineChromeButton extends StatelessWidget {
   const _MineChromeButton({
     super.key,

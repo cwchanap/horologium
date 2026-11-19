@@ -20,7 +20,7 @@ class MiningSettingsSheet extends StatefulWidget {
 
 class _MiningSettingsSheetState extends State<MiningSettingsSheet> {
   // Whether the last explicit permission request was denied; rendered inline
-  // because a SnackBar on the root messenger draws under this modal sheet.
+  // because the shell's result message renders beneath this modal sheet.
   bool _storageAlertDenied = false;
   // A toggle is in-flight while its permission request is unanswered; the
   // switch is disabled meanwhile so overlapping OS requests cannot throw.
