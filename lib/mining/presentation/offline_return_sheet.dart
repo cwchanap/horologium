@@ -279,7 +279,7 @@ class OfflineReturnSheet extends StatelessWidget {
     void sellAll() {
       // Expose the shell before the sale reports: this sheet may sit over a
       // preexisting Technology/Settings sheet, and a single pop() would
-      // leave that sheet's route hiding the Scaffold SnackBar.
+      // leave that sheet's route hiding the shell's result message.
       Navigator.of(context).popUntil((route) => route is! PopupRoute);
       onSellCargo();
     }
