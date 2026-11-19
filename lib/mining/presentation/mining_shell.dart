@@ -969,7 +969,10 @@ class _MiningShellState extends State<MiningShell>
       // A multiline message must never reach the landscape Sell. If the
       // panel wrapped at the centered width would touch its top edge, anchor
       // in the free region right of the Sell (still left of the rail).
-      final centeredWidth = math.min(420.0, usableRight - usableLeft);
+      final centeredWidth = math.min(
+        420.0,
+        math.max(0.0, usableRight - usableLeft),
+      );
       final panelBottom =
           pad.top + 144.0 + _measureMessageHeight(media, centeredWidth) + 28.0;
       if (panelBottom >
