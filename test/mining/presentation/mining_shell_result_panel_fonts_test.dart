@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
@@ -43,6 +44,58 @@ void main() {
       isFalse,
       reason: 'result panel $panel overlaps $chrome at $blocked',
     );
+  }
+
+  /// Installs a filter that swallows only the pre-existing chrome
+  /// RenderFlex overflows thrown at extreme text scales or sub-500px
+  /// heights: each exception's error-causing element is walked up to a
+  /// keyed ancestor and drained only when that ancestor is fixed HUD or
+  /// surface chrome. `takeException` cannot see the source — it returns
+  /// only the summary string and bundles simultaneous exceptions — so the
+  /// check runs in `FlutterError.onError`, where the details still carry
+  /// it. Any other error — including a result-panel failure, which is a
+  /// Stack sibling of every keyed surface below — is forwarded to the
+  /// previous handler, stays pending, and fails the test.
+  void swallowOnlyChromeOverflows() {
+    const chromeKeys = {
+      'mine-site-screen',
+      'stellar-map-screen',
+      'mining-bottom-navigation',
+      'mining-shell-placeholder',
+      'site-deck-scroll',
+      'site-deck-planet-progress',
+      'site-deck-next-goal',
+      'site-deck-sell',
+      'site-deck-header-art',
+    };
+    final previous = FlutterError.onError;
+    addTearDown(() => FlutterError.onError = previous);
+    FlutterError.onError = (details) {
+      final exception = details.exception;
+      var isChromeOverflow =
+          exception is FlutterError &&
+          exception.message.startsWith('A RenderFlex overflowed by');
+      if (isChromeOverflow) {
+        var underChrome = false;
+        for (final node
+            in details.informationCollector?.call() ??
+                const <DiagnosticsNode>[]) {
+          if (node is DiagnosticsDebugCreator && node.value is DebugCreator) {
+            (node.value as DebugCreator).element.visitAncestorElements((
+              ancestor,
+            ) {
+              final key = ancestor.widget.key;
+              if (key is ValueKey<String> && chromeKeys.contains(key.value)) {
+                underChrome = true;
+              }
+              return !underChrome;
+            });
+          }
+        }
+        isChromeOverflow = underChrome;
+      }
+      if (!isChromeOverflow) previous?.call(details);
+    };
   }
 
   /// Boots a recovered (malformed) save so the shell's longest authored
@@ -463,16 +516,24 @@ void main() {
   testWidgets(
     'recovery notice clears landscape Mine Site chrome at 874x402 text 2.0',
     (tester) async {
+      // The app's fixed-size HUD and dock chrome overflow at 2.0 text scale
+      // (pre-existing, outside this ticket); swallow only exceptions whose
+      // error-causing element sits under keyed chrome so a result-panel
+      // layout failure still fails this test.
+      swallowOnlyChromeOverflows();
       await pumpMineSiteWithRecoveryNotice(
         tester,
         viewport: const Size(874, 402),
         textScale: 2.0,
       );
-      // The app's fixed-size HUD and dock chrome overflow at 2.0 text scale
-      // (pre-existing, outside this ticket); consume those layout exceptions
-      // so this test can assert result-panel placement.
-      while (tester.takeException() != null) {}
+      expect(tester.takeException(), isNull);
       expect(find.text(recoveryMessage), findsOneWidget);
+      // A collapsed (zero-height) panel clears every chrome rect below, so
+      // assert it renders with real height too.
+      final panel = tester.getRect(
+        find.byKey(const Key('mining-result-panel')),
+      );
+      expect(panel.height, greaterThan(30), reason: '$panel');
       for (final key in const [
         'mining-cash-chip',
         'mine-site-cargo',
@@ -489,15 +550,17 @@ void main() {
     'recovery notice stays above portrait Mine Site controls at 360x640 '
     'text 2.0',
     (tester) async {
+      // Fixed-size HUD and dock chrome overflow at 2.0 (pre-existing);
+      // swallow only exceptions sourced under keyed chrome so a panel
+      // layout failure still fails.
+      swallowOnlyChromeOverflows();
       await pumpMineSiteWithRecoveryNotice(
         tester,
         viewport: const Size(360, 640),
         textScale: 2.0,
         safeArea: EdgeInsets.zero,
       );
-      // Fixed-size HUD and dock chrome overflow at 2.0 (pre-existing); drain
-      // those layout exceptions so the panel geometry assertion can run.
-      while (tester.takeException() != null) {}
+      expect(tester.takeException(), isNull);
       expect(find.text(recoveryMessage), findsOneWidget);
       for (final key in const [
         'mine-site-sell',
@@ -510,12 +573,59 @@ void main() {
       final panel = tester.getRect(
         find.byKey(const Key('mining-result-panel')),
       );
+      expect(panel.height, greaterThan(30), reason: '$panel');
       expect(panel.bottom, lessThanOrEqualTo(sell.top - 8 + .5));
       // The free run is shorter than the notice, so the panel must show a
       // visible truncation cue instead of silently clipping the last lines.
       final text = tester.widget<Text>(find.text(recoveryMessage));
       expect(text.maxLines, isNotNull);
       expect(text.overflow, TextOverflow.ellipsis);
+    },
+  );
+
+  testWidgets(
+    'recovery notice keeps a visible text line at 320x480 portrait with a '
+    '20px top inset',
+    (tester) async {
+      // At this height the fixed chrome overflows (pre-existing); swallow
+      // only exceptions sourced under keyed chrome.
+      swallowOnlyChromeOverflows();
+      await pumpMineSiteWithRecoveryNotice(
+        tester,
+        viewport: const Size(320, 480),
+        safeArea: const EdgeInsets.only(top: 20),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text(recoveryMessage), findsOneWidget);
+
+      // The run above the Sell cannot hold the frame, so the panel must fall
+      // back left of the Sell (below the back button, above the dock) and
+      // still render a full text line instead of collapsing to zero height.
+      final panel = tester.getRect(
+        find.byKey(const Key('mining-result-panel')),
+      );
+      final text = tester.getRect(find.text(recoveryMessage));
+      expect(text.height, greaterThanOrEqualTo(13), reason: '$text');
+      expect(
+        text.bottom,
+        lessThanOrEqualTo(panel.bottom + .5),
+        reason: '$text vs $panel',
+      );
+      final sell = tester.getRect(find.byKey(const Key('mine-site-sell')));
+      expect(
+        panel.right,
+        lessThanOrEqualTo(sell.left - 12 + .5),
+        reason: 'panel $panel must end left of sell $sell',
+      );
+      for (final key in const [
+        'mining-cash-chip',
+        'mine-site-back',
+        'mine-site-sell',
+        'fleet-dock',
+        'mining-bottom-navigation',
+      ]) {
+        expectPanelClearOf(tester, find.byKey(Key(key)));
+      }
     },
   );
 

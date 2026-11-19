@@ -46,6 +46,8 @@ const double _landscapeToolbarHeight = MiningNavigationBar.compactHeight;
 const double landscapeRightRailWidth = 104;
 const double _landscapeSellBottom = 78;
 const double _landscapeSellHeight = 79;
+const double _portraitSellRight = 18;
+const double _portraitSellHexWidth = 64;
 const double _sellLabelGap = 5;
 const double _sellHexHeightPortrait = 70;
 const double _sellHexHeightLandscape = 62;
@@ -442,7 +444,7 @@ class _CavernScene extends StatelessWidget {
               left: landscape
                   ? _landscapeX(236, .34, constraints.maxWidth)
                   : null,
-              right: landscape ? null : 18,
+              right: landscape ? null : _portraitSellRight,
               bottom: landscape
                   ? _landscapeSellBottom
                   : MediaQuery.paddingOf(context).bottom +
@@ -593,7 +595,7 @@ class _SellControl extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          width: compact ? 56 : 64,
+          width: compact ? 56 : _portraitSellHexWidth,
           height: compact ? _sellHexHeightLandscape : _sellHexHeightPortrait,
           child: MiningHex(
             fill: const Color(0xEB060A10),
@@ -761,6 +763,38 @@ double portraitMineSellTop(
           textScaler: textScaler,
           baseStyle: baseStyle,
         ));
+
+/// Left edge of the portrait Sell column, which pins [_portraitSellRight]
+/// off the viewport's right edge and is as wide as its hex or its scaled
+/// label, whichever is wider. Shared with MiningShell so the pass-through
+/// result panel's portrait fallback stays left of the column.
+double portraitMineSellLeft(
+  double width,
+  TextScaler textScaler, [
+  TextStyle? baseStyle,
+]) =>
+    width -
+    _portraitSellRight -
+    math.max(
+      _portraitSellHexWidth,
+      _sellLabelWidth(
+        compact: false,
+        textScaler: textScaler,
+        baseStyle: baseStyle,
+      ),
+    );
+
+/// Top edge of the portrait fleet dock, which sits above the navigation
+/// bar. Shared with MiningShell so the result panel's portrait fallback
+/// stays above it.
+double portraitMineDockTop(double height, double bottomInset) =>
+    height - bottomInset - _portraitDockBottom - _portraitDockHeight;
+
+/// Bottom edge of the portrait back chrome button. Shared with MiningShell
+/// so the result panel's portrait fallback starts below it — and below the
+/// cash chip, which always ends higher (54 + 46 < 146 + 48).
+double portraitMineBackBottom(double topInset) =>
+    topInset + _portraitBackTop + _MineChromeButton.height;
 
 /// Bottom edge of the landscape cargo gauge, which pins to the cavern's
 /// right edge — inside the strip the pass-through result panel steps into.
