@@ -1895,14 +1895,53 @@ void main() {
                 ),
               );
               await pumpSheet(tester);
-            }
 
-            // The lower portion is exercised before the four-second expiry;
-            // for the already-selected destination this re-tap need not
-            // navigate.
-            await tapNavPortion(tester, navButton, upper: false);
+              // Reopening the closed sheet through the nav's lower quarter
+              // proves the tap reached the destination. Primary surfaces
+              // cover their lower halves in the fresh-shell cases below.
+              await tapNavPortion(tester, navButton, upper: false);
+              await pumpSheet(tester);
+              expectDestinationReached(tester, destination);
+            }
+          },
+        );
+      }
+    }
+
+    // A lower-quarter re-tap on an already-shown primary surface cannot
+    // prove pass-through, so each fresh shell starts on Mine Site with the
+    // sale panel up and taps only the lower half of the nav destination.
+    for (final size in const [Size(360, 640), Size(874, 402)]) {
+      final label = '${size.width.toInt()}x${size.height.toInt()}';
+      for (final destination in const [
+        MiningNavigationDestination.siteDeck,
+        MiningNavigationDestination.stellarMap,
+      ]) {
+        testWidgets(
+          'feedback keeps the ${destination.name} lower-half first tap '
+          'working at $label',
+          (tester) async {
+            final repository = CountingMiningSaveRepository();
+            await repository.save(deployedLandingState(_start, cargo: 10));
+            await pumpShell(
+              tester,
+              repository: repository,
+              viewport: size,
+              useViewSafeArea: true,
+            );
+
+            await showSaleFeedback(tester);
+            expect(_resultPanel, findsOneWidget);
+
+            await tapNavPortion(
+              tester,
+              find.byKey(Key('mining-nav-${destination.name}')),
+              upper: false,
+            );
             await pumpSheet(tester);
+
             expectDestinationReached(tester, destination);
+            expect(find.byKey(const Key('mine-site-screen')), findsNothing);
           },
         );
       }
