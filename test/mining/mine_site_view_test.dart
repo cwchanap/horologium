@@ -122,6 +122,28 @@ void main() {
     );
   });
 
+  test('ambiguous shared-adjacency cells are ordinary blocked taps', () {
+    final view = viewFor(
+      stateWith(landing: progress()),
+      selectedBayId: DockBayId.b1,
+    );
+
+    for (final cell in const [MiningGridCell(1, 20), MiningGridCell(2, 15)]) {
+      expect(
+        view.placementAt(cell).rejection,
+        MiningPlacementRejection.ambiguousAdjacentDeposit,
+        reason: '$cell',
+      );
+      final outcome = view.gridTapOutcome(cell);
+      expect(outcome.action, MineSiteGridTapAction.blocked, reason: '$cell');
+      expect(
+        outcome.message,
+        'Place the rig next to a single resource.',
+        reason: '$cell',
+      );
+    }
+  });
+
   test('deployable cells stay empty without a selected rig', () {
     final view = viewFor(stateWith(landing: progress()));
 

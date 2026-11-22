@@ -834,10 +834,10 @@ void main() {
       );
     });
 
-    test('obsolete Landing Basin placement inside a generated resource '
+    test('obsolete Landing Basin placement outside the 8x22 map '
         'resets the whole document', () async {
-      // The pre-cutover valid placement (16,2) now sits inside the fourth
-      // progression resource of the generated dense field.
+      // The pre-cutover valid placement (16,2) is now outside the 8-column
+      // compact map, so strict decoding clean-resets the whole document.
       final progressed = _progressedState(now);
       final obsolete = progressed.copyWith(
         sites: {

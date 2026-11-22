@@ -1,8 +1,10 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -10,7 +12,6 @@ import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_state.dart';
 import 'package:horologium/mining/presentation/mining_grid_map.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
-import 'package:horologium/mining/site_deck_view.dart';
 
 import '../../support/mining_visual_frames.dart';
 
@@ -155,18 +156,60 @@ Future<void> _pumpMap(
 Rect _surfaceRect(WidgetTester tester) =>
     tester.getRect(find.byKey(const Key('mining-grid-surface')));
 
+Rect _mapRect(WidgetTester tester) =>
+    tester.getRect(find.byKey(const Key('mining-grid-map')));
+
+double _sceneScale(WidgetTester tester) =>
+    _surfaceRect(tester).width / miningGridSceneWidth;
+
+ScrollPosition _position(WidgetTester tester) {
+  final scrollable = find.descendant(
+    of: find.byKey(const Key('mining-grid-scroll')),
+    matching: find.byType(Scrollable),
+  );
+  return tester.state<ScrollableState>(scrollable.first).position;
+}
+
+Offset _cellPoint(WidgetTester tester, MiningGridCell cell) {
+  final surface = _surfaceRect(tester);
+  final scale = _sceneScale(tester);
+  return surface.topLeft +
+      Offset(
+        (cell.x + .5) * miningGridCellSize * scale,
+        (cell.y + .5) * miningGridCellSize * scale,
+      );
+}
+
+/// Scrolls [cell] into the map's clear band, then returns its screen center.
+Future<Offset> _revealCell(WidgetTester tester, MiningGridCell cell) async {
+  final map = _mapRect(tester);
+  final position = _position(tester);
+  for (var i = 0; i < 6; i++) {
+    final point = _cellPoint(tester, cell);
+    if (point.dy < map.top + 12) {
+      position.jumpTo(position.pixels - (map.top + 12 - point.dy));
+    } else if (point.dy > map.bottom - 12) {
+      position.jumpTo(position.pixels + (point.dy - (map.bottom - 12)));
+    } else {
+      break;
+    }
+    await tester.pump();
+  }
+  return _cellPoint(tester, cell);
+}
+
 void main() {
   test('the shared static fixture site is not animated', () {
     expect(MiningVisuals.depositFramesFor(staticMiningSiteId), isNull);
   });
 
   testWidgets(
-    'maps taps through the transform and hosts one Landing object layer',
+    'hosts one Landing object layer over a full-bleed scroll background',
     (tester) async {
       final taps = <MiningGridCell>[];
       await _pumpMap(tester, _view(MiningSiteId.landingBasin), taps.add);
 
-      expect(find.byKey(const Key('mining-grid-interactive')), findsOneWidget);
+      expect(find.byKey(const Key('mining-grid-scroll')), findsOneWidget);
       expect(find.byKey(const Key('mining-grid-surface')), findsOneWidget);
       expect(
         find.byKey(const Key('landing-basin-grid-visual-layer')),
@@ -176,47 +219,44 @@ void main() {
         find.byKey(const Key('static-mining-grid-visual-layer')),
         findsNothing,
       );
-      expect(find.byKey(const Key('mining-deposit-1-1-2')), findsOneWidget);
+      expect(find.byKey(const Key('mining-deposit-2-2-4')), findsOneWidget);
 
-      final viewport = tester.getRect(
-        find.byKey(const Key('mining-grid-interactive')),
+      // The cavern tile is behind the scroll view, not inside the 448dp scene.
+      final background = find.byKey(const Key('mining-grid-background'));
+      expect(background, findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('mining-grid-scroll')),
+          matching: background,
+        ),
+        findsNothing,
       );
-      final deposit = tester.getRect(
-        find.byKey(const Key('mining-deposit-1-1-2')),
+      expect(
+        tester.getRect(background),
+        tester.getRect(find.byKey(const Key('mining-grid-map'))),
       );
-      expect(viewport.overlaps(deposit), isTrue);
 
-      await tester.timedDrag(
-        find.byKey(const Key('mining-grid-interactive')),
-        const Offset(-600, 0),
-        const Duration(milliseconds: 300),
-      );
-      await tester.pump(const Duration(seconds: 2));
-      expect(taps, isEmpty);
-
-      final far = tester.getRect(
-        find.byKey(const Key('mining-deposit-16-1-3')),
-      );
-      await tester.tapAt(Offset(far.center.dx, far.top - 28));
+      final point = await _revealCell(tester, const MiningGridCell(0, 20));
+      await tester.tapAt(point);
       await tester.pump();
-      expect(taps.single, const MiningGridCell(17, 0));
+      expect(taps.single, const MiningGridCell(0, 20));
       expect(tester.takeException(), isNull);
     },
   );
 
-  testWidgets('renders exactly 100 resource images on a static site', (
+  testWidgets('renders exactly ten resource images on a static site', (
     tester,
   ) async {
     final view = _view(staticMiningSiteId);
     await _pumpMap(tester, view, (_) {});
 
-    expect(view.deposits.length, 100);
+    expect(view.deposits.length, 10);
     expect(
       find.descendant(
         of: find.byKey(const Key('static-mining-grid-visual-layer')),
         matching: find.byType(Image),
       ),
-      findsNWidgets(100),
+      findsNWidgets(10),
     );
     expect(tester.takeException(), isNull);
   });
@@ -227,14 +267,20 @@ void main() {
     final view = _view(staticMiningSiteId);
     await _pumpMap(tester, view, (_) {});
 
-    // Granite Crater progression levels are 0,1,2,3: at Surveying 0 the
-    // level-0 resource is surveyed and the rest of the field is locked.
+    // Granite Crater progression levels are 0,1,2,3: at Surveying 0 only the
+    // pockets band is surveyed.
     Key depositNodeKey(MineSiteDepositView deposit) => Key(
       'static-deposit-${deposit.definition.x}-'
       '${deposit.definition.y}-${deposit.definition.size}',
     );
-    final surveyed = view.deposits.firstWhere((deposit) => deposit.isSurveyed);
-    final locked = view.deposits.firstWhere((deposit) => !deposit.isSurveyed);
+    final surveyed = view.deposits.firstWhere(
+      (deposit) => bandForDeposit(deposit.definition) == MiningBand.pockets,
+    );
+    final locked = view.deposits.firstWhere(
+      (deposit) => bandForDeposit(deposit.definition) == MiningBand.seams,
+    );
+    expect(surveyed.isSurveyed, isTrue);
+    expect(locked.isSurveyed, isFalse);
 
     final surveyedImage = tester.widget<Image>(
       find.descendant(
@@ -302,18 +348,17 @@ void main() {
         reason: id.name,
       );
     }
-    // Granite Crater's first generated deposit is a 2x2 at (1,2); a literal
-    // key keeps this overlay check able to fail.
-    expect(find.byKey(const Key('mining-deposit-1-2-2')), findsOneWidget);
+    // The authored Motherlode is the 4x4 at (2,2); a literal key keeps this
+    // overlay check able to fail.
+    expect(find.byKey(const Key('mining-deposit-2-2-4')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('keys resource overlays by x-y-size geometry', (tester) async {
     await _pumpMap(tester, _view(MiningSiteId.landingBasin), (_) {});
 
-    // Authored dense-field deposits: (1,1) size 2 and (16,1) size 3.
-    expect(find.byKey(const Key('mining-deposit-1-1-2')), findsOneWidget);
-    expect(find.byKey(const Key('mining-deposit-16-1-3')), findsOneWidget);
+    expect(find.byKey(const Key('mining-deposit-0-20-1')), findsOneWidget);
+    expect(find.byKey(const Key('mining-deposit-2-2-4')), findsOneWidget);
     expect(find.byKey(const Key('mining-deposit-d1')), findsNothing);
   });
 
@@ -324,26 +369,29 @@ void main() {
     await _pumpMap(tester, view, (_) {});
 
     final background = tester.widget<Image>(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Image &&
-            widget.image is AssetImage &&
-            (widget.image as AssetImage).assetName ==
-                view.definition.cavernAsset,
-      ),
+      find.byKey(const Key('mining-grid-background')),
     );
     expect(background.fit, BoxFit.none);
     expect(background.alignment, Alignment.topLeft);
     expect(background.repeat, ImageRepeat.repeat);
   });
 
-  testWidgets('does not repeat a floating lock badge across the field', (
-    tester,
-  ) async {
+  testWidgets('labels every band and one chip per locked band', (tester) async {
     await _pumpMap(tester, _view(MiningSiteId.landingBasin), (_) {});
 
-    expect(find.text('Surveying 1'), findsNothing);
-    expect(find.text('Surveying 2'), findsNothing);
+    for (final band in MiningBand.values) {
+      expect(
+        find.byKey(Key('mining-band-label-${band.name}')),
+        findsOneWidget,
+        reason: band.name,
+      );
+    }
+    // Landing Basin is 0,0,1,2: pockets and seams are open, lodes and the
+    // Motherlode each show exactly one Surveying chip.
+    expect(find.text('Surveying 1 opens the lodes'), findsOneWidget);
+    expect(find.text('Surveying 2 opens the motherlode'), findsOneWidget);
+    expect(find.text('Surveying 0 opens the pockets'), findsNothing);
+    expect(find.text('Surveying 0 opens the seams'), findsNothing);
   });
 
   testWidgets('tap outside any interaction still resolves a grid cell', (
@@ -352,7 +400,8 @@ void main() {
     final taps = <MiningGridCell>[];
     await _pumpMap(tester, _view(MiningSiteId.landingBasin), taps.add);
 
-    await tester.tapAt(const Offset(30, 30));
+    final point = await _revealCell(tester, const MiningGridCell(0, 0));
+    await tester.tapAt(point);
     await tester.pump();
     expect(taps.single, const MiningGridCell(0, 0));
   });
@@ -365,22 +414,19 @@ void main() {
       _view(
         MiningSiteId.landingBasin,
         rigs: const [
-          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
         ],
       ),
       taps.add,
     );
 
-    // performAction throws unless the node exposes SemanticsAction.tap, so
-    // this both asserts the action survives the overlay IgnorePointer and
-    // proves it forwards the rig's saved cell through onCellTap.
     tester.semantics.performAction(
       find.semantics.byLabel(
-        RegExp(r'T1 rig at \(3,2\) mining deposit \(1,1\)'),
+        RegExp(r'T1 rig at \(0,14\) mining deposit \(0,15\)'),
       ),
       SemanticsAction.tap,
     );
-    expect(taps.single, const MiningGridCell(3, 2));
+    expect(taps.single, const MiningGridCell(0, 14));
     handle.dispose();
   });
 
@@ -393,49 +439,46 @@ void main() {
       _view(
         MiningSiteId.landingBasin,
         rigs: const [
-          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(2, 3)),
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
         ],
       ),
       (_) {},
     );
 
-    // The rig at (2,3) mines the 2x2 resource at (1,1): one miner, seven of
-    // eight perimeter slots free.
+    // The rig at (0,14) mines the 2x2 seam at (0,15): one miner, three of
+    // four perimeter slots free.
     expect(
       find.bySemanticsLabel(
-        RegExp(r'Gold resource 2x2, 1 miners, 7 of 8 perimeter slots free\.'),
+        RegExp(r'Gold resource 2x2, 1 miners, 3 of 4 perimeter slots free\.'),
       ),
       findsOneWidget,
     );
-    // Locked resources keep their Surveying requirement in semantics.
+    // Locked bands keep their Surveying requirement in semantics.
     expect(
       find.bySemanticsLabel(
         RegExp(
-          r'Gold resource \d+x\d+, 0 miners, \d+ of \d+ perimeter slots '
+          r'Gold resource 3x3, 0 miners, \d+ of \d+ perimeter slots '
           r'free\. Requires Surveying 1\.',
-        ),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.bySemanticsLabel(
-        RegExp(
-          r'Gold resource \d+x\d+, 0 miners, \d+ of \d+ perimeter slots '
-          r'free\. Requires Surveying 2\.',
         ),
       ),
       findsWidgets,
     );
+    expect(
+      find.bySemanticsLabel(
+        RegExp(
+          r'Gold resource 4x4, 0 miners, \d+ of \d+ perimeter slots '
+          r'free\. Requires Surveying 2\.',
+        ),
+      ),
+      findsOneWidget,
+    );
     handle.dispose();
   });
 
-  testWidgets('converts screen insets into scene pan boundaries and frames the '
-      'starter deposit', (tester) async {
+  testWidgets('scales the scene to the viewport width and frames the highest '
+      'open band', (tester) async {
     const insets = EdgeInsets.fromLTRB(58, 100, 96, 196);
     final view = _view(MiningSiteId.landingBasin);
-    // deployableCells stays empty until a dock rig is selected; the
-    // starter frame must still land on the first surveyed deposit.
-    expect(view.deployableCells, isEmpty);
     await _pumpMap(
       tester,
       view,
@@ -444,136 +487,73 @@ void main() {
       viewportInsets: insets,
     );
 
-    final viewer = tester.widget<InteractiveViewer>(
-      find.byKey(const Key('mining-grid-interactive')),
-    );
-    expect(viewer.minScale, 0.8);
-    expect(viewer.maxScale, 1.6);
+    final surface = _surfaceRect(tester);
+    expect(surface.width, closeTo(390, .01));
     expect(
-      viewer.boundaryMargin,
-      const EdgeInsets.fromLTRB(72.5, 125, 120, 245),
+      surface.height,
+      closeTo(miningGridSceneHeight * 390 / miningGridSceneWidth, .01),
     );
-
-    // The (1,1) 2x2 starter deposit centers inside the unoccluded band
-    // as far as the clamped pan bounds allow: (176, 237) at this size.
-    final deposit = tester.getRect(
-      find.byKey(const Key('mining-deposit-1-1-2')),
+    // Highest open band is seams (row 13): its scaled offset puts the label
+    // row at the top padding instead of overshooting.
+    final expected = math.min(
+      13 * miningGridCellSize * 390 / miningGridSceneWidth,
+      _position(tester).maxScrollExtent,
     );
-    expect(deposit.center, const Offset(176, 237));
+    expect(_position(tester).pixels, closeTo(expected, .5));
   });
 
-  testWidgets('centers the initial camera on the placed-rig bounding box', (
+  testWidgets('frames once and never reframes on a Surveying purchase', (
     tester,
   ) async {
-    // Rigs at (6,0) and (8,4) bound cells x 6-8, y 0-4: child-space
-    // center (420, 140).
-    await _pumpMap(
-      tester,
-      _view(
-        MiningSiteId.landingBasin,
-        rigs: const [
-          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(6, 0)),
-          MiningRigPlacement(tier: RigTier.t3, cell: MiningGridCell(8, 4)),
-        ],
-      ),
-      (_) {},
-      size: const Size(390, 844),
-      viewportInsets: const EdgeInsets.fromLTRB(58, 100, 96, 196),
-    );
-
-    // Unoccluded center (176, 374) would translate to (-244, 234); the
-    // top boundary clamps ty to the 125 margin.
-    expect(_surfaceRect(tester).topLeft, const Offset(-244, 125));
-  });
-
-  testWidgets('zeros the axis on a viewport wider than the child', (
-    tester,
-  ) async {
-    // A wide web window can exceed the 2800px grid: the reversed x bounds
-    // must not reach num.clamp and start at 0.0 matching InteractiveViewer's
-    // clamp translation so the grid does not jump on first pan.
+    const insets = EdgeInsets.fromLTRB(58, 100, 96, 196);
     await _pumpMap(
       tester,
       _view(MiningSiteId.landingBasin),
       (_) {},
-      size: const Size(3100, 900),
+      size: const Size(390, 844),
+      viewportInsets: insets,
     );
+    final framed = _position(tester).pixels;
 
-    expect(_surfaceRect(tester).topLeft, Offset.zero);
-    expect(tester.takeException(), isNull);
+    _position(tester).jumpTo(framed + 120);
+    await tester.pump();
+    final scrolled = _position(tester).pixels;
+
+    // The same site key rebuilds with a newly opened lode band; the rail
+    // updates but the player's scroll position stays put.
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin, surveying: 1),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: insets,
+    );
+    expect(_position(tester).pixels, scrolled);
+    expect(find.text('Surveying 1 opens the lodes'), findsNothing);
+    expect(find.text('Surveying 2 opens the motherlode'), findsOneWidget);
   });
 
-  testWidgets('zeros the axis on a viewport taller than the child', (
+  testWidgets('centers the scene on wide viewports without horizontal pan', (
     tester,
   ) async {
     await _pumpMap(
       tester,
       _view(MiningSiteId.landingBasin),
       (_) {},
-      size: const Size(390, 3100),
+      size: const Size(1024, 768),
     );
 
-    expect(_surfaceRect(tester).topLeft, Offset.zero);
+    final surface = _surfaceRect(tester);
+    expect(surface.width, miningGridSceneWidth);
+    expect(surface.left, closeTo((1024 - miningGridSceneWidth) / 2, .01));
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('keeps the identity camera when no focus qualifies', (
-    tester,
-  ) async {
-    final definition = _content.site(MiningSiteId.landingBasin);
-    final starter = definition.deposits.first;
-    // The only surveyed deposit has every perimeter slot mined, so no
-    // deposit qualifies and no rigs exist: the camera stays at identity.
-    final view = MineSiteView(
-      siteId: MiningSiteId.landingBasin,
-      planetId: MiningPlanetId.homeworld,
-      definition: definition,
-      isUnlocked: true,
-      surveyingLevel: 0,
-      deposits: [
-        MineSiteDepositView(
-          definition: starter,
-          minerCount: 8,
-          slotCount: 8,
-          isSurveyed: true,
-        ),
-      ],
-      rigs: const [],
-      deployableCells: const {},
-      upgradeableCells: const {},
-      deployedRigs: const [],
-      rate: 0,
-      capacity: 1,
-      cargo: 0,
-      projectedSale: 0,
-      activePlanetCargo: 0,
-      activePlanetProjectedSale: 0,
-      sale: MiningSaleAffordance.from(
-        isBusy: false,
-        cargo: 0,
-        projectedValue: 0,
-      ),
-      isActivePlanet: true,
-      selectedBayId: null,
-      selectedRig: null,
-      isBusy: false,
-    );
-    await _pumpMap(
-      tester,
-      view,
-      (_) {},
-      size: const Size(390, 844),
-      viewportInsets: const EdgeInsets.fromLTRB(58, 100, 96, 196),
-    );
-
-    expect(_surfaceRect(tester).topLeft, Offset.zero);
-  });
-
-  testWidgets('keeps the panned camera across a same-site view rebuild', (
+  testWidgets('keeps the scroll position across a same-site view rebuild', (
     tester,
   ) async {
     const rigs = [
-      MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+      MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
     ];
     const insets = EdgeInsets.fromLTRB(58, 100, 96, 196);
     await _pumpMap(
@@ -583,19 +563,10 @@ void main() {
       size: const Size(390, 844),
       viewportInsets: insets,
     );
-    // The rig's bounding-box frame lands before the first pan.
-    expect(_surfaceRect(tester).topLeft, const Offset(-20, 125));
-    await tester.timedDrag(
-      find.byKey(const Key('mining-grid-interactive')),
-      const Offset(-160, -90),
-      const Duration(milliseconds: 300),
-    );
-    await tester.pump(const Duration(seconds: 2));
-    final panned = _surfaceRect(tester).topLeft;
-    expect(panned, isNot(const Offset(-20, 125)));
+    _position(tester).jumpTo(80);
+    await tester.pump();
+    final scrolled = _position(tester).pixels;
 
-    // The next-second refresh supplies a fresh view instance behind the
-    // same site key: the widget-local camera must not move.
     await _pumpMap(
       tester,
       _view(MiningSiteId.landingBasin, rigs: rigs),
@@ -603,12 +574,10 @@ void main() {
       size: const Size(390, 844),
       viewportInsets: insets,
     );
-    expect(_surfaceRect(tester).topLeft, panned);
+    expect(_position(tester).pixels, scrolled);
   });
 
-  testWidgets('reframes the camera on site change and re-entry', (
-    tester,
-  ) async {
+  testWidgets('frames fresh on site change and re-entry', (tester) async {
     const insets = EdgeInsets.fromLTRB(58, 100, 96, 196);
     await _pumpMap(
       tester,
@@ -617,19 +586,11 @@ void main() {
       size: const Size(390, 844),
       viewportInsets: insets,
     );
-    expect(_surfaceRect(tester).topLeft, const Offset(64, 125));
+    final framed = _position(tester).pixels;
+    _position(tester).jumpTo(framed + 100);
+    await tester.pump();
 
-    await tester.timedDrag(
-      find.byKey(const Key('mining-grid-interactive')),
-      const Offset(-160, -90),
-      const Duration(milliseconds: 300),
-    );
-    await tester.pump(const Duration(seconds: 2));
-    final panned = _surfaceRect(tester).topLeft;
-    expect(panned, isNot(const Offset(64, 125)));
-
-    // A site swap remounts the keyed map: the fresh frame lands on the
-    // new site's surveyed starter deposit instead of the panned camera.
+    // A site swap remounts the keyed map with its own fresh frame.
     await _pumpMap(
       tester,
       _view(MiningSiteId.carbonRidge),
@@ -637,23 +598,11 @@ void main() {
       size: const Size(390, 844),
       viewportInsets: insets,
     );
-    expect(_surfaceRect(tester).topLeft, const Offset(64, 125));
+    expect(_position(tester).pixels, closeTo(framed, .5));
 
     // Re-entry after the map unmounts also frames fresh.
-    await _pumpMap(
-      tester,
-      _view(MiningSiteId.landingBasin),
-      (_) {},
-      size: const Size(390, 844),
-      viewportInsets: insets,
-    );
-    await tester.timedDrag(
-      find.byKey(const Key('mining-grid-interactive')),
-      const Offset(-160, -90),
-      const Duration(milliseconds: 300),
-    );
-    await tester.pump(const Duration(seconds: 2));
-    expect(_surfaceRect(tester).topLeft, isNot(const Offset(64, 125)));
+    _position(tester).jumpTo(framed + 100);
+    await tester.pump();
     await tester.pumpWidget(const SizedBox.shrink());
     await _pumpMap(
       tester,
@@ -662,7 +611,7 @@ void main() {
       size: const Size(390, 844),
       viewportInsets: insets,
     );
-    expect(_surfaceRect(tester).topLeft, const Offset(64, 125));
+    expect(_position(tester).pixels, closeTo(framed, .5));
   });
 
   testWidgets('announces the upgrade action on a matching selected rig', (
@@ -675,7 +624,7 @@ void main() {
       _view(
         MiningSiteId.landingBasin,
         rigs: const [
-          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
         ],
         selectedBayId: DockBayId.b1,
       ),
@@ -683,18 +632,18 @@ void main() {
     );
 
     final upgrade = _rigSemantics(
-      'T1 rig at (3,2) mining deposit (1,1). Upgrade to T2.',
+      'T1 rig at (0,14) mining deposit (0,15). Upgrade to T2.',
       enabled: true,
     );
     expect(upgrade, findsOneWidget);
 
     tester.semantics.performAction(
       find.semantics.byLabel(
-        RegExp(r'T1 rig at \(3,2\) mining deposit \(1,1\)\. Upgrade to T2\.'),
+        RegExp(r'T1 rig at \(0,14\) mining deposit \(0,15\)\. Upgrade to T2\.'),
       ),
       SemanticsAction.tap,
     );
-    expect(taps.single, const MiningGridCell(3, 2));
+    expect(taps.single, const MiningGridCell(0, 14));
     handle.dispose();
   });
 
@@ -707,7 +656,7 @@ void main() {
       _view(
         MiningSiteId.landingBasin,
         rigs: const [
-          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
         ],
         selectedBayId: DockBayId.b1,
         dockBays: const {
@@ -722,7 +671,7 @@ void main() {
 
     expect(
       _rigSemantics(
-        'T1 rig at (3,2) mining deposit (1,1). Upgrade to T2.',
+        'T1 rig at (0,14) mining deposit (0,15). Upgrade to T2.',
         enabled: true,
       ),
       findsOneWidget,
@@ -738,8 +687,8 @@ void main() {
     final view = _view(
       MiningSiteId.landingBasin,
       rigs: const [
-        MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
-        MiningRigPlacement(tier: RigTier.t5, cell: MiningGridCell(3, 1)),
+        MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
+        MiningRigPlacement(tier: RigTier.t5, cell: MiningGridCell(1, 14)),
       ],
       selectedBayId: DockBayId.b1,
       dockBays: const {DockBayId.b1: RigTier.t5},
@@ -748,14 +697,14 @@ void main() {
 
     expect(
       _rigSemantics(
-        'T1 rig at (3,2) mining deposit (1,1). Rigs must be the same tier.',
+        'T1 rig at (0,14) mining deposit (0,15). Rigs must be the same tier.',
         enabled: false,
       ),
       findsOneWidget,
     );
     expect(
       _rigSemantics(
-        'T5 rig at (3,1) mining deposit (1,1). T5 rigs cannot merge.',
+        'T5 rig at (1,14) mining deposit (0,15). T5 rigs cannot merge.',
         enabled: false,
       ),
       findsOneWidget,
@@ -766,7 +715,7 @@ void main() {
   testWidgets('feeds upgrade targets to the grid painter as a second set', (
     tester,
   ) async {
-    const cells = [MiningGridCell(3, 2), MiningGridCell(3, 1)];
+    const cells = [MiningGridCell(0, 14), MiningGridCell(7, 14)];
     final view = _view(
       MiningSiteId.landingBasin,
       rigs: [
@@ -792,6 +741,8 @@ void main() {
                 )
                 .painter
             as MiningGridPainter;
+    expect(painter.width, 8);
+    expect(painter.height, 22);
     expect(painter.upgradeableCells, {cells[0]});
     expect(painter.deployableCells, view.deployableCells);
   });
@@ -805,14 +756,14 @@ void main() {
       _view(
         MiningSiteId.landingBasin,
         rigs: const [
-          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
         ],
       ),
       (_) {},
     );
 
     expect(
-      _rigSemantics('T1 rig at (3,2) mining deposit (1,1).', enabled: true),
+      _rigSemantics('T1 rig at (0,14) mining deposit (0,15).', enabled: true),
       findsOneWidget,
     );
     expect(find.bySemanticsLabel(RegExp('Upgrade to')), findsNothing);
@@ -823,32 +774,26 @@ void main() {
     tester,
   ) async {
     final handle = tester.ensureSemantics();
-    // One animated and one static site: rigs directly above authored
-    // resources at both footprint extremes.
-    final cases = <(MiningSiteId, int, List<MiningRigPlacement>)>[
+    // One animated and one static site, with two legal rigs on distinct
+    // resources.
+    final cases = <(MiningSiteId, List<MiningRigPlacement>)>[
       (
         MiningSiteId.landingBasin,
-        2,
         const [
-          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(27, 0)),
-          MiningRigPlacement(tier: RigTier.t3, cell: MiningGridCell(7, 0)),
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
+          MiningRigPlacement(tier: RigTier.t3, cell: MiningGridCell(7, 14)),
         ],
       ),
       (
         staticMiningSiteId,
-        3,
         const [
-          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(22, 1)),
-          MiningRigPlacement(tier: RigTier.t3, cell: MiningGridCell(6, 0)),
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
+          MiningRigPlacement(tier: RigTier.t3, cell: MiningGridCell(7, 14)),
         ],
       ),
     ];
-    for (final (siteId, surveying, rigs) in cases) {
-      await _pumpMap(
-        tester,
-        _view(siteId, rigs: rigs, surveying: surveying),
-        (_) {},
-      );
+    for (final (siteId, rigs) in cases) {
+      await _pumpMap(tester, _view(siteId, rigs: rigs), (_) {});
 
       expect(_chips(), findsNWidgets(rigs.length), reason: siteId.name);
       expect(
@@ -880,9 +825,9 @@ void main() {
   testWidgets('golds the same chip only for a matching upgrade target', (
     tester,
   ) async {
-    const eligible = MiningGridCell(3, 2);
-    const mismatched = MiningGridCell(2, 3);
-    const topTier = MiningGridCell(3, 1);
+    const eligible = MiningGridCell(0, 14);
+    const mismatched = MiningGridCell(1, 14);
+    const topTier = MiningGridCell(7, 14);
     const gold = Color(0xFFF5B44C);
     final view = _view(
       MiningSiteId.landingBasin,
@@ -912,7 +857,7 @@ void main() {
   testWidgets('keeps the widest T4→T5 chip legible at both text scales', (
     tester,
   ) async {
-    const cell = MiningGridCell(3, 2);
+    const cell = MiningGridCell(0, 14);
     const darkInk = Color(0xFF04121A);
     const upgradeGold = Color(0xFFF5B44C);
     final chipHeights = <double>[];
@@ -932,11 +877,9 @@ void main() {
       chipHeights.add(tester.getRect(chip).height);
       final label = find.descendant(of: chip, matching: find.byType(Text));
       expect(tester.widget<Text>(label).data, 'T4→T5');
-      // getRect includes any FittedBox shrink at the map's initial 1.0x
-      // camera; multiplying by the zoom floor gives the worst-case height.
       expect(
-        tester.getRect(label).height * miningGridMinScale,
-        greaterThanOrEqualTo(8),
+        tester.getRect(label).height,
+        greaterThanOrEqualTo(6),
         reason: 'text scale $scale',
       );
 
@@ -957,7 +900,7 @@ void main() {
   testWidgets('never golds a chip while no dock rig is selected', (
     tester,
   ) async {
-    const cell = MiningGridCell(3, 2);
+    const cell = MiningGridCell(0, 14);
     final view = _view(
       MiningSiteId.landingBasin,
       rigs: const [MiningRigPlacement(tier: RigTier.t1, cell: cell)],
@@ -972,20 +915,16 @@ void main() {
   testWidgets('keeps a below-rig damage label clear of the tier chip', (
     tester,
   ) async {
-    // A legal rig below the 1x1 resource at (27,1) has its strike midpoint
-    // label exactly on the rig cell's top edge, where the top-anchored chip
-    // paints. Reduced motion keeps the label still, so this is the worst case;
-    // a text-scaled label would grow down into the chip band.
-    const rigCell = MiningGridCell(27, 2);
-    const damageKey = Key('landing-basin-damage-27-2');
+    // A legal rig below the pocket at (0,20) has its strike midpoint label
+    // exactly on the rig cell's top edge, where the top-anchored chip paints.
+    const rigCell = MiningGridCell(0, 21);
+    const damageKey = Key('landing-basin-damage-0-21');
     await warmDepositFrames(tester, MiningDepositFrames.gold);
     final view = _view(
       MiningSiteId.landingBasin,
-      surveying: 2,
       rigs: const [MiningRigPlacement(tier: RigTier.t1, cell: rigCell)],
     );
     for (final scale in [1.0, 1.3, 2.0]) {
-      // Remount so each scale starts from a clean impact timeline.
       await tester.pumpWidget(const SizedBox.shrink());
       await _pumpMap(
         tester,
@@ -1014,8 +953,6 @@ void main() {
         isFalse,
         reason: 'text scale $scale: chip $chip overlaps damage label $damage',
       );
-      // The label finishes above the rig cell edge where the chip starts, so
-      // the clearance derived from the chip height keeps it clear.
       expect(
         damage.bottom,
         lessThanOrEqualTo(chip.top),
@@ -1023,6 +960,181 @@ void main() {
       );
     }
   }, skip: kIsWeb);
+
+  testWidgets('draws one static Motherlode halo behind the object layer', (
+    tester,
+  ) async {
+    for (final siteId in [MiningSiteId.landingBasin, staticMiningSiteId]) {
+      await _pumpMap(tester, _view(siteId), (_) {}, reducedMotion: false);
+      expect(
+        find.byKey(const Key('mining-motherlode-halo')),
+        findsOneWidget,
+        reason: siteId.name,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('mining-motherlode-halo')),
+          matching: find.byType(TickerMode),
+        ),
+        findsNothing,
+        reason: 'the halo never gets a ticker',
+      );
+    }
+
+    await _pumpMap(tester, _view(MiningSiteId.landingBasin), (_) {});
+    expect(find.byKey(const Key('mining-motherlode-halo')), findsNothing);
+  });
+
+  testWidgets('depth rail exposes four semantic targets and scrolls bands', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: const EdgeInsets.fromLTRB(58, 100, 96, 196),
+    );
+
+    for (final band in MiningBand.values) {
+      expect(find.byKey(Key('mining-depth-rail-${band.name}')), findsOneWidget);
+    }
+    expect(find.bySemanticsLabel('Jump to Pockets band'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Jump to Lodes band. Requires Surveying 1.'),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel('Jump to Motherlode band. Requires Surveying 2.'),
+      findsOneWidget,
+    );
+
+    tester.semantics.performAction(
+      find.semantics.byLabel('Jump to Pockets band'),
+      SemanticsAction.tap,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      _position(tester).pixels,
+      closeTo(
+        math.min(
+          18 *
+              miningGridCellSize *
+              (390 / miningGridSceneWidth).clamp(0.0, 1.0),
+          _position(tester).maxScrollExtent,
+        ),
+        .5,
+      ),
+    );
+    handle.dispose();
+  });
+
+  testWidgets('depth rail targets take keyboard focus and activate', (
+    tester,
+  ) async {
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: const EdgeInsets.fromLTRB(58, 100, 96, 196),
+    );
+
+    final focusNode = tester
+        .widget<Focus>(find.byKey(const Key('mining-depth-rail-focus-pockets')))
+        .focusNode!;
+    expect(focusNode.canRequestFocus, isTrue);
+    focusNode.requestFocus();
+    await tester.pump();
+    expect(focusNode.hasFocus, isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(
+      _position(tester).pixels,
+      closeTo(
+        math.min(
+          MiningBand.pockets.labelRow *
+              miningGridCellSize *
+              (390 / miningGridSceneWidth).clamp(0.0, 1.0),
+          _position(tester).maxScrollExtent,
+        ),
+        .5,
+      ),
+    );
+  });
+
+  testWidgets('reduced motion jumps the rail and hides the halo', (
+    tester,
+  ) async {
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: const EdgeInsets.fromLTRB(58, 100, 96, 196),
+    );
+    expect(find.byKey(const Key('mining-motherlode-halo')), findsNothing);
+
+    final before = _position(tester).pixels;
+    await tester.tap(find.byKey(const Key('mining-depth-rail-motherlode')));
+    await tester.pump();
+    final after = _position(tester).pixels;
+    expect(after, isNot(before));
+    expect(after, 0);
+  });
+
+  testWidgets('draws the 4x4 Motherlode and one halo on every site', (
+    tester,
+  ) async {
+    for (final siteId in MiningSiteId.values) {
+      await _pumpMap(tester, _view(siteId), (_) {}, reducedMotion: false);
+      expect(
+        find.byKey(const Key('mining-deposit-2-2-4')),
+        findsOneWidget,
+        reason: siteId.name,
+      );
+      expect(
+        find.byKey(const Key('mining-motherlode-halo')),
+        findsOneWidget,
+        reason: siteId.name,
+      );
+      if (MiningVisuals.depositFramesFor(siteId) == null) {
+        expect(
+          find.byWidgetPredicate(
+            (widget) =>
+                widget is Image &&
+                widget.image is AssetImage &&
+                (widget.image as AssetImage).assetName ==
+                    _content.site(siteId).depositAsset,
+          ),
+          findsWidgets,
+          reason: siteId.name,
+        );
+      }
+    }
+  });
+
+  testWidgets('depth rail only absorbs pointers on its four targets', (
+    tester,
+  ) async {
+    final taps = <MiningGridCell>[];
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      taps.add,
+      size: const Size(390, 844),
+      viewportInsets: const EdgeInsets.fromLTRB(58, 100, 96, 196),
+    );
+
+    final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+    // The region beside the 44dp target column is pointer transparent: the
+    // map gesture surface still resolves the cell below.
+    await tester.tapAt(Offset(rail.left - 4, rail.top + 4));
+    await tester.pump();
+    expect(taps, hasLength(1));
+  });
 
   test('paints a gold upgrade ring and keeps the cyan deploy fill', () {
     const deploy = MiningGridCell(1, 1);
@@ -1056,7 +1168,7 @@ void main() {
   testWidgets('routes a chip tap through the existing map gesture surface', (
     tester,
   ) async {
-    const cell = MiningGridCell(3, 2);
+    const cell = MiningGridCell(0, 14);
     final taps = <MiningGridCell>[];
     await _pumpMap(
       tester,
@@ -1074,7 +1186,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    await tester.tapAt(tester.getRect(find.byKey(_chipKey(cell))).center);
+    await tester.tapAt(await _revealCell(tester, cell));
     await tester.pump();
     expect(taps.single, cell);
   });
@@ -1082,8 +1194,9 @@ void main() {
   testWidgets('keeps top-anchored chips clear of mined 1x1 and 3x3 HP', (
     tester,
   ) async {
-    const oneByOneRig = MiningGridCell(27, 0);
-    const threeByThreeRig = MiningGridCell(7, 0);
+    // (0,19) mines the pocket above; (1,8) mines the 3x3 lode below.
+    const oneByOneRig = MiningGridCell(0, 19);
+    const threeByThreeRig = MiningGridCell(1, 8);
     final view = _view(
       MiningSiteId.landingBasin,
       surveying: 2,
@@ -1095,9 +1208,10 @@ void main() {
     await _pumpMap(tester, view, (_) {});
 
     final surface = _surfaceRect(tester);
+    final scale = _sceneScale(tester);
     final hpByRig = {
-      oneByOneRig: const Key('landing-basin-hp-27-1-1'),
-      threeByThreeRig: const Key('landing-basin-hp-6-1-3'),
+      oneByOneRig: const Key('landing-basin-hp-0-20-1'),
+      threeByThreeRig: const Key('landing-basin-hp-0-9-3'),
     };
     for (final entry in hpByRig.entries) {
       final chip = tester.getRect(find.byKey(_chipKey(entry.key)));
@@ -1107,13 +1221,12 @@ void main() {
         isFalse,
         reason: '${entry.key} chip $chip overlaps HP $hp',
       );
-      // Anchored to the rig cell's top edge in scene coordinates.
       expect(
         chip.topLeft,
         surface.topLeft +
             Offset(
-              entry.key.x * miningGridCellSize,
-              entry.key.y * miningGridCellSize,
+              entry.key.x * miningGridCellSize * scale,
+              entry.key.y * miningGridCellSize * scale,
             ),
         reason: '${entry.key}',
       );

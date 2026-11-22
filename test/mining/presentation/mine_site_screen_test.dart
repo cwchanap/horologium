@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -177,7 +178,7 @@ Future<void> _pumpMineSite(
 
 Offset _cellPoint(WidgetTester tester, MiningGridCell cell) {
   final surface = tester.getRect(find.byKey(const Key('mining-grid-surface')));
-  final scale = surface.width / (50 * miningGridCellSize);
+  final scale = surface.width / miningGridSceneWidth;
   return surface.topLeft +
       Offset(
         (cell.x + .5) * miningGridCellSize * scale,
@@ -185,12 +186,13 @@ Offset _cellPoint(WidgetTester tester, MiningGridCell cell) {
       );
 }
 
-/// Portrait cavern band the clearance insets reserve for the pannable map:
-/// back column, cash chip band, cargo gauge column, and fleet dock/nav.
-/// [top]/[bottom] mirror the screen-space insets so the same band can be
-/// checked under real safe-area padding.
-Rect _unoccludedBand(Size size, {double top = 100, double bottom = 196}) =>
-    Rect.fromLTRB(58, top, size.width - 96, size.height - bottom);
+ScrollPosition _scrollPosition(WidgetTester tester) {
+  final scrollable = find.descendant(
+    of: find.byKey(const Key('mining-grid-map')),
+    matching: find.byType(Scrollable),
+  );
+  return tester.state<ScrollableState>(scrollable.first).position;
+}
 
 /// Landscape cavern band: cash chip/cargo top band, gauge column, and the
 /// compact navigation toolbar above the left cutout and home indicator.
@@ -199,6 +201,74 @@ Rect _unoccludedLandscapeBand(
   double left = 0,
   double bottom = 70,
 }) => Rect.fromLTRB(left, 126, cavern.width - 88, cavern.height - bottom);
+
+/// Scrolls [cell] into the screen's clear band and returns the first point
+/// inside its displayed rect that is clear of the depth rail.
+Future<Offset> _scrollToCell(WidgetTester tester, MiningGridCell cell) async {
+  final map = tester.getRect(find.byKey(const Key('mining-grid-map')));
+  final cargo = find.byKey(const Key('mine-site-cargo'));
+  final sell = find.byKey(const Key('mine-site-sell'));
+  var clearTop = map.top + 8;
+  if (tester.any(cargo)) {
+    clearTop = math.max(clearTop, tester.getRect(cargo).bottom + 8);
+  }
+  var clearBottom = map.bottom - 12;
+  if (tester.any(sell)) {
+    clearBottom = math.min(clearBottom, tester.getRect(sell).top - 16);
+  }
+  final position = _scrollPosition(tester);
+  Rect currentCellRect() {
+    final surface = tester.getRect(
+      find.byKey(const Key('mining-grid-surface')),
+    );
+    final scale = surface.width / miningGridSceneWidth;
+    final size = miningGridCellSize * scale;
+    return Rect.fromLTWH(
+      surface.left + cell.x * size,
+      surface.top + cell.y * size,
+      size,
+      size,
+    );
+  }
+
+  for (var i = 0; i < 8; i++) {
+    final rect = currentCellRect();
+    if (rect.top < clearTop) {
+      position.jumpTo(position.pixels - (clearTop - rect.top));
+    } else if (rect.bottom > clearBottom) {
+      position.jumpTo(position.pixels + (rect.bottom - clearBottom));
+    } else {
+      break;
+    }
+    await tester.pump();
+  }
+
+  final surface = tester.getRect(find.byKey(const Key('mining-grid-surface')));
+  final scale = surface.width / miningGridSceneWidth;
+  final size = miningGridCellSize * scale;
+  final cellRect = Rect.fromLTWH(
+    surface.left + cell.x * size,
+    surface.top + cell.y * size,
+    size,
+    size,
+  );
+  final rail = tester.any(find.byKey(const Key('mining-depth-rail')))
+      ? tester.getRect(find.byKey(const Key('mining-depth-rail')))
+      : Rect.zero;
+  return [
+    cellRect.center,
+    Offset(cellRect.center.dx, cellRect.bottom - 4),
+    Offset(cellRect.left + 6, cellRect.center.dy),
+    Offset(cellRect.right - 6, cellRect.bottom - 4),
+  ].firstWhere(
+    (point) =>
+        map.contains(point) &&
+        !rail.contains(point) &&
+        point.dy > clearTop &&
+        point.dy <= clearBottom,
+    orElse: () => cellRect.center,
+  );
+}
 
 /// Chrome rects that must never cover a reachable grid cell or its rig/HP
 /// overlays; keys absent in the current orientation are skipped.
@@ -228,62 +298,24 @@ Rect _sellControlRect(WidgetTester tester) => tester.getRect(
       .first,
 );
 
-void _setGridScale(WidgetTester tester, double scale) {
-  tester
-      .widget<InteractiveViewer>(
-        find.byKey(const Key('mining-grid-interactive')),
-      )
-      .transformationController!
-      .value = Matrix4.diagonal3Values(
-    scale,
-    scale,
-    1,
-  );
-}
-
-/// Drags the map until [cell]'s center lands on [target] or the pan bounds
-/// stop it closer, returning the reached screen point. Timed drags keep the
-/// end-of-gesture velocity realistic so the InteractiveViewer pan and its
-/// inertia behave like a physical flick instead of a single zero-time jump.
-Future<Offset> _panCellToward(
-  WidgetTester tester,
-  MiningGridCell cell,
-  Offset target,
-) async {
-  final interactive = find.byKey(const Key('mining-grid-interactive'));
-  for (var i = 0; i < 10; i++) {
-    final point = _cellPoint(tester, cell);
-    final delta = target - point;
-    if (delta.distance < .5) break;
-    await tester.timedDrag(
-      interactive,
-      delta,
-      const Duration(milliseconds: 300),
-    );
-    await tester.pump(const Duration(seconds: 2));
-  }
-  return _cellPoint(tester, cell);
-}
-
-/// Animated-layer keys proving the (1,0)/(2,49) edge rigs and their mined
+/// Animated-layer keys proving the top and bottom edge rigs and their mined
 /// resources stay on the unobscured cavern: each rig's robot plus the HP
 /// chrome of the deposit it mines.
 final _edgeCellOverlays = <MiningGridCell, List<String>>{
-  const MiningGridCell(1, 0): const [
-    'landing-basin-robot-1-0',
-    'landing-basin-hp-1-1-2',
+  const MiningGridCell(2, 1): const [
+    'landing-basin-robot-2-1',
+    'landing-basin-hp-2-2-4',
   ],
-  const MiningGridCell(2, 49): const [
-    'landing-basin-robot-2-49',
-    'landing-basin-hp-2-48-1',
+  const MiningGridCell(7, 21): const [
+    'landing-basin-robot-7-21',
+    'landing-basin-hp-7-20-1',
   ],
 };
 
-/// For every entry in [overlays], pans the cell into [band] at the current
-/// scale, taps it, and asserts the tap produced exactly one new [cellTaps]
-/// callback carrying that cell — clearing first so a stale result from an
-/// earlier scale cannot satisfy the matcher. Each rig's robot/HP overlays
-/// must then sit inside [cavern] and outside every [hud] rect.
+/// Scrolls every entry in [overlays] into [band], taps it, and asserts the
+/// tap produced exactly one new [cellTaps] callback carrying that cell.
+/// Each rig's robot/HP overlays must then sit inside [cavern] and outside
+/// every [hud] rect.
 Future<void> _expectEdgeCellsTappable(
   WidgetTester tester, {
   required Rect band,
@@ -291,22 +323,13 @@ Future<void> _expectEdgeCellsTappable(
   required List<Rect> hud,
   required List<MiningGridCell> cellTaps,
   required Map<MiningGridCell, List<String>> overlays,
-  required double scale,
 }) async {
   for (final entry in overlays.entries) {
     final cell = entry.key;
-    final point = await _panCellToward(tester, cell, band.center);
-    expect(
-      band.contains(point),
-      isTrue,
-      reason: '$cell at $scale: $point outside $band',
-    );
+    final point = await _scrollToCell(tester, cell);
+    expect(band.contains(point), isTrue, reason: '$cell: $point outside $band');
     for (final chrome in hud) {
-      expect(
-        chrome.contains(point),
-        isFalse,
-        reason: '$cell at $scale under $chrome',
-      );
+      expect(chrome.contains(point), isFalse, reason: '$cell under $chrome');
     }
     cellTaps.clear();
     await tester.tapAt(point);
@@ -314,20 +337,20 @@ Future<void> _expectEdgeCellsTappable(
     expect(
       cellTaps,
       orderedEquals(<MiningGridCell>[cell]),
-      reason: 'tap $cell at $scale',
+      reason: 'tap $cell',
     );
     for (final overlayKey in entry.value) {
       final overlay = tester.getRect(find.byKey(Key(overlayKey)));
       expect(
         cavern.contains(overlay.center),
         isTrue,
-        reason: '$overlayKey at $scale: $overlay',
+        reason: '$overlayKey: $overlay',
       );
       for (final chrome in hud) {
         expect(
           chrome.contains(overlay.center),
           isFalse,
-          reason: '$overlayKey at $scale under $chrome',
+          reason: '$overlayKey under $chrome',
         );
       }
     }
@@ -356,8 +379,8 @@ void main() {
       final state = _stateWith(
         landing: _progress(
           commissioned: true,
-          rigs: const [
-            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          rigs: [
+            MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCells.first),
           ],
         ),
       );
@@ -373,10 +396,10 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('landing-basin-deposit-1-1-2')),
+        find.byKey(const Key('landing-basin-deposit-0-15-2')),
         findsOneWidget,
       );
-      expect(find.byKey(const Key('landing-basin-robot-3-2')), findsOneWidget);
+      expect(find.byKey(const Key('landing-basin-robot-0-14')), findsOneWidget);
 
       await _pumpMineSite(
         tester,
@@ -391,7 +414,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(
         find.descendant(
-          of: find.byKey(const Key('landing-basin-deposit-1-1-2')),
+          of: find.byKey(const Key('landing-basin-deposit-0-15-2')),
           matching: find.byWidgetPredicate(
             (widget) =>
                 widget is Image &&
@@ -530,8 +553,8 @@ void main() {
       landing: _progress(
         commissioned: true,
         storedAmount: 30,
-        rigs: const [
-          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+        rigs: [
+          MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCells.first),
         ],
       ),
     );
@@ -554,22 +577,23 @@ void main() {
       tester.getRect(find.byKey(const Key('mine-site-back'))),
       const Rect.fromLTWH(14, 146, 44, 48),
     );
-    // The fixed-node rects are replaced by the grid viewport/object contract:
-    // the pan/zoom viewport starts at the cavern origin, the initial camera
-    // centers the single-rig bounding box, and the (1,1) 2x2 resource
-    // overlay rides that frame's transform.
+    // The scroll scene scales the 448dp surface to 402dp and starts below
+    // the cash chip/cargo gauge band.
+    final surface = tester.getRect(
+      find.byKey(const Key('mining-grid-surface')),
+    );
+    expect(surface.left, closeTo(0, .01));
+    expect(surface.width, closeTo(402, .01));
     expect(
-      tester.getRect(find.byKey(const Key('mining-grid-interactive'))).topLeft,
+      tester.getRect(find.byKey(const Key('mining-grid-map'))).topLeft,
       Offset.zero,
     );
-    expect(
-      tester.getRect(find.byKey(const Key('mining-grid-surface'))).topLeft,
-      const Offset(-14, 125),
+    // The 4x4 Motherlode overlay rides the scaled scene.
+    final motherlode = tester.getRect(
+      find.byKey(const Key('mining-deposit-2-2-4')),
     );
-    expect(
-      tester.getRect(find.byKey(const Key('mining-deposit-1-1-2'))).topLeft,
-      const Offset(42, 181),
-    );
+    expect(motherlode.width, closeTo(4 * miningGridCellSize * 402 / 448, .01));
+    expect(motherlode.left, closeTo(2 * miningGridCellSize * 402 / 448, .01));
     final sell = _sellControlRect(tester);
     expect(sell.bottom, 874 - 204);
     expect(sell.right, closeTo(382, 4));
@@ -608,14 +632,14 @@ void main() {
       );
 
       await tester.tap(find.byKey(const ValueKey<String>('b1')));
-      await tester.tapAt(_cellPoint(tester, const MiningGridCell(3, 2)));
+      await tester.tapAt(_cellPoint(tester, _landingRigCells.first));
       await tester.tap(find.byKey(const Key('mine-site-sell')));
       await tester.tap(find.byKey(const Key('mine-site-back')));
       await tester.tap(find.byKey(const Key('mining-nav-settings')));
       await tester.tap(find.byKey(const Key('mining-nav-technology')));
 
       expect(bayTaps, <DockBayId>[DockBayId.b1]);
-      expect(cellTaps, <MiningGridCell>[const MiningGridCell(3, 2)]);
+      expect(cellTaps, <MiningGridCell>[_landingRigCells.first]);
       expect(sold, isTrue);
       expect(backed, isTrue);
       expect(settings, isTrue);
@@ -631,8 +655,8 @@ void main() {
     final state = _stateWith(
       landing: _progress(
         commissioned: true,
-        rigs: const [
-          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+        rigs: [
+          MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCells.first),
         ],
       ),
     );
@@ -645,16 +669,20 @@ void main() {
     expect(find.bySemanticsLabel(RegExp(r'Dock bay B1')), findsOneWidget);
     expect(
       find.bySemanticsLabel(
-        RegExp(r'Gold resource 2x2, 1 miners, 7 of 8 perimeter slots free'),
+        RegExp(r'Gold resource 2x2, 1 miners, 3 of 4 perimeter slots free'),
       ),
       findsOneWidget,
     );
-    expect(find.bySemanticsLabel(RegExp(r'T1 rig at \(3,2\)')), findsOneWidget);
-    final deposit = tester.getRect(
-      find.byKey(const Key('mining-deposit-1-1-2')),
+    expect(
+      find.bySemanticsLabel(RegExp(r'T1 rig at \(0,14\)')),
+      findsOneWidget,
     );
-    expect(deposit.width, 2 * miningGridCellSize);
-    expect(deposit.height, 2 * miningGridCellSize);
+    final deposit = tester.getRect(
+      find.byKey(const Key('mining-deposit-2-2-4')),
+    );
+    final scale = deposit.width / (2 * miningGridCellSize);
+    expect(deposit.width, closeTo(2 * miningGridCellSize * scale, .01));
+    expect(deposit.height, closeTo(2 * miningGridCellSize * scale, .01));
   });
 
   testWidgets('anchors the cash chip and cargo gauge over portrait art', (
@@ -664,8 +692,8 @@ void main() {
       landing: _progress(
         commissioned: true,
         storedAmount: 10,
-        rigs: const [
-          MiningRigPlacement(tier: RigTier.t2, cell: MiningGridCell(3, 2)),
+        rigs: [
+          MiningRigPlacement(tier: RigTier.t2, cell: _landingRigCells.first),
         ],
       ),
     );
@@ -879,7 +907,7 @@ void main() {
           commissioned: true,
           storedAmount: 6000,
           rigs: [
-            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+            MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCells.first),
             MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCells[1]),
           ],
         ),
@@ -892,7 +920,7 @@ void main() {
 
       expect(
         find.bySemanticsLabel(
-          RegExp(r'T1 rig at \(3,2\).*Sell cargo before recalling this rig'),
+          RegExp(r'T1 rig at \(0,14\).*Sell cargo before recalling this rig'),
         ),
         findsOneWidget,
       );
@@ -905,7 +933,7 @@ void main() {
               widget.properties.label!.contains(
                 'Sell cargo before recalling',
               ) &&
-              widget.properties.label!.contains('T1 rig at (3,2)'),
+              widget.properties.label!.contains('T1 rig at (0,14)'),
         ),
         findsOneWidget,
       );
@@ -918,8 +946,8 @@ void main() {
     final state = _stateWith(
       landing: _progress(
         commissioned: true,
-        rigs: const [
-          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+        rigs: [
+          MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCells.first),
         ],
       ),
     );
@@ -939,13 +967,12 @@ void main() {
       expect(tester.takeException(), isNull);
 
       final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
-      final viewport = tester.getRect(
-        find.byKey(const Key('mining-grid-interactive')),
-      );
-      expect(cavern.contains(viewport.topLeft), isTrue);
+      final map = tester.getRect(find.byKey(const Key('mining-grid-map')));
+      expect(cavern.contains(map.topLeft), isTrue);
+      expect(cavern.contains(map.bottomRight - const Offset(0.1, 0.1)), isTrue);
       expect(
-        cavern.contains(viewport.bottomRight - const Offset(0.1, 0.1)),
-        isTrue,
+        tester.getRect(find.byKey(const Key('mining-grid-surface'))).width,
+        closeTo(size.width, .01),
       );
       final dock = tester.getRect(find.byKey(const Key('fleet-dock')));
       final nav = tester.getRect(
@@ -963,8 +990,8 @@ void main() {
         landing: _progress(
           commissioned: true,
           storedAmount: 10,
-          rigs: const [
-            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          rigs: [
+            MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCells.first),
           ],
         ),
       );
@@ -1027,14 +1054,14 @@ void main() {
       dock: _dockView(state, selectedBayId: DockBayId.b1),
     );
 
-    expect(find.byKey(const Key('mining-grid-interactive')), findsOneWidget);
+    expect(find.byKey(const Key('mining-grid-scroll')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('locked resources stay legible without repeated lock badges', (
     tester,
   ) async {
-    // At Surveying 0 most of Landing Basin's dense field is locked. The field
+    // At Surveying 0 most of Landing Basin's authored bands are locked. The map
     // must not repeat a floating badge per locked resource; the dimmed
     // resources keep their Surveying requirement in semantics instead.
     final state = _stateWith(landing: _progress(commissioned: true));
@@ -1085,8 +1112,8 @@ void main() {
         landing: _progress(
           commissioned: true,
           storedAmount: 10,
-          rigs: const [
-            MiningRigPlacement(tier: RigTier.t2, cell: MiningGridCell(3, 2)),
+          rigs: [
+            MiningRigPlacement(tier: RigTier.t2, cell: _landingRigCells.first),
           ],
         ),
       );
@@ -1147,8 +1174,8 @@ void main() {
       landing: _progress(
         commissioned: true,
         storedAmount: 10,
-        rigs: const [
-          MiningRigPlacement(tier: RigTier.t2, cell: MiningGridCell(3, 2)),
+        rigs: [
+          MiningRigPlacement(tier: RigTier.t2, cell: _landingRigCells.first),
         ],
       ),
     );
@@ -1207,8 +1234,8 @@ void main() {
         landing: _progress(
           commissioned: true,
           storedAmount: 10,
-          rigs: const [
-            MiningRigPlacement(tier: RigTier.t2, cell: MiningGridCell(3, 2)),
+          rigs: [
+            MiningRigPlacement(tier: RigTier.t2, cell: _landingRigCells.first),
           ],
         ),
       );
@@ -1252,14 +1279,16 @@ void main() {
       expect(cavern.right, lessThanOrEqualTo(rail.left));
       // Cavern art stays full-bleed on the left edge.
       expect(cavern.left, 0);
-      // Cavern art stays full-bleed on the left edge, and the pannable grid
-      // viewport starts at the cavern origin: cells can be dragged clear of
-      // the cutout instead of being hard-inset like the old fixed nodes.
-      final viewport = tester.getRect(
-        find.byKey(const Key('mining-grid-interactive')),
+      // Cavern art stays full-bleed on the left edge, and the scroll map
+      // fills the cavern: the centred scene keeps every cell reachable by
+      // vertical scrolling instead of hard-insetting the grid.
+      final map = tester.getRect(find.byKey(const Key('mining-grid-map')));
+      expect(map.left, 0);
+      expect(map.left, lessThanOrEqualTo(cavern.left + 0.1));
+      expect(
+        tester.getRect(find.byKey(const Key('mining-grid-surface'))).left,
+        closeTo((cavern.width - miningGridSceneWidth) / 2, .01),
       );
-      expect(viewport.left, 0);
-      expect(viewport.left, lessThanOrEqualTo(cavern.left + 0.1));
       // The vertical fleet dock stops above the home-indicator inset: the last
       // bay (b4) must not extend into the bottom 21 px.
       final lastBay = tester.getRect(find.byKey(const ValueKey<String>('b4')));
@@ -1293,8 +1322,8 @@ void main() {
         landing: _progress(
           commissioned: true,
           storedAmount: 10,
-          rigs: const [
-            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          rigs: [
+            MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCells.first),
           ],
         ),
       );
@@ -1589,7 +1618,7 @@ void main() {
     expect(paragraph.didExceedMaxLines, isFalse);
   });
 
-  testWidgets('reserves portrait HUD clearance as scale-aware pan boundaries', (
+  testWidgets('bounds the depth rail between cargo and the Sell column', (
     tester,
   ) async {
     final state = _stateWith(landing: _progress(commissioned: true));
@@ -1600,111 +1629,142 @@ void main() {
       dock: _dockView(state),
     );
 
-    final viewer = tester.widget<InteractiveViewer>(
-      find.byKey(const Key('mining-grid-interactive')),
-    );
-    // Screen-space clearance (58/100/96/196 at zero padding) divided by
-    // the 0.8 minimum scale, so the full HUD band stays clear when the
-    // map is zoomed all the way out.
-    expect(
-      viewer.boundaryMargin,
-      const EdgeInsets.fromLTRB(72.5, 125, 120, 245),
-    );
-    final band = _unoccludedBand(const Size(390, 844));
-    for (final chrome in _hudRects(tester)) {
-      expect(band.overlaps(chrome), isFalse, reason: '$chrome');
-    }
-  });
+    final cargo = tester.getRect(find.byKey(const Key('mine-site-cargo')));
+    final sell = _sellControlRect(tester);
+    final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+    expect(rail.top, greaterThanOrEqualTo(cargo.bottom));
+    expect(rail.bottom, lessThanOrEqualTo(sell.top));
 
-  testWidgets('reserves safe-area HUD clearance in the pan boundaries', (
-    tester,
-  ) async {
-    // Direct pump so the portrait chrome reads real view padding.
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(430, 932);
-    tester.view.padding = const FakeViewPadding(
-      left: 0,
-      top: 59,
-      right: 0,
-      bottom: 34,
-    );
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-      tester.view.resetPadding();
-    });
-    final initial = MiningSave.initial(nowUtc: _start);
-    final state = initial.copyWith(
-      technology: const TechnologyLevels(surveying: 5),
-      sites: {
-        ...initial.sites,
-        MiningSiteId.landingBasin: _progress(
-          commissioned: true,
-          rigs: const [
-            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(1, 0)),
-            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(2, 49)),
-          ],
-        ),
-      },
-    );
-    final cellTaps = <MiningGridCell>[];
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
-        builder: (context, child) =>
-            Material(type: MaterialType.transparency, child: child!),
-        home: MineSiteScreen(
-          view: _siteView(state),
-          fleetDock: _dockView(state),
-          cash: 100,
-          onGridCellTap: cellTaps.add,
-          onBayTap: (_) {},
-          onSpawnRig: () {},
-          onBuildRig: (_) {},
-          onSellCargo: () {},
-          onBack: () {},
-          onSettings: () {},
-        ),
-      ),
-    );
-    await tester.pump();
-
-    final viewer = tester.widget<InteractiveViewer>(
-      find.byKey(const Key('mining-grid-interactive')),
-    );
-    // Screen-space insets (58/159/96/230) / 0.8; the top clearance keeps
-    // its full 159 px at the zoom floor instead of shrinking to 127.
-    expect(
-      viewer.boundaryMargin,
-      const EdgeInsets.fromLTRB(72.5, 198.75, 120, 287.5),
-    );
-
-    // The same clearance must keep the edge rigs tappable with their
-    // robot/HP overlays visible at both zoom extremes.
-    final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
-    final band = _unoccludedBand(
-      cavern.size,
-      top: 159,
-      bottom: 230,
-    ).shift(cavern.topLeft);
-    final hud = _hudRects(tester);
-    for (final scale in const [0.8, 1.6]) {
-      _setGridScale(tester, scale);
-      await tester.pump();
-      await _expectEdgeCellsTappable(
-        tester,
-        band: band,
-        cavern: cavern,
-        hud: hud,
-        cellTaps: cellTaps,
-        overlays: _edgeCellOverlays,
-        scale: scale,
+    final buttons = [
+      for (final band in MiningBand.values)
+        tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
+    ];
+    for (final button in buttons) {
+      expect(button.width, greaterThanOrEqualTo(44));
+      expect(button.height, greaterThanOrEqualTo(44));
+      expect(rail.contains(button.topLeft), isTrue);
+      expect(
+        rail.contains(button.bottomRight - const Offset(0.1, 0.1)),
+        isTrue,
       );
     }
+    for (var i = 0; i < buttons.length; i++) {
+      expect(buttons[i].overlaps(cargo), isFalse, reason: 'button $i vs cargo');
+      expect(buttons[i].overlaps(sell), isFalse, reason: 'button $i vs sell');
+      for (var j = i + 1; j < buttons.length; j++) {
+        expect(
+          buttons[i].overlaps(buttons[j]),
+          isFalse,
+          reason: 'buttons $i and $j overlap',
+        );
+      }
+    }
   });
 
+  for (final size in const [Size(360, 640), Size(390, 844), Size(430, 932)]) {
+    testWidgets('physically scrolls and taps (7,21) above Sell at '
+        '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      tester.view.padding = size.width == 360
+          ? const FakeViewPadding(top: 0, bottom: 24)
+          : const FakeViewPadding(top: 47, bottom: 34);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPadding();
+      });
+      final taps = <MiningGridCell>[];
+      final state = _stateWith(
+        cash: 412,
+        landing: _progress(
+          commissioned: true,
+          rigs: const [
+            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(7, 21)),
+          ],
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Orbitron'),
+          builder: (context, child) {
+            final media = MediaQuery.of(context);
+            return MediaQuery(
+              data: media.copyWith(textScaler: const TextScaler.linear(1.3)),
+              child: Material(type: MaterialType.transparency, child: child!),
+            );
+          },
+          home: MineSiteScreen(
+            view: _siteView(state),
+            fleetDock: _dockView(state),
+            cash: 412,
+            onGridCellTap: taps.add,
+            onBayTap: (_) {},
+            onSpawnRig: () {},
+            onBuildRig: (_) {},
+            onSellCargo: () {},
+            onBack: () {},
+            onSettings: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final sell = _sellControlRect(tester);
+      final cargo = tester.getRect(find.byKey(const Key('mine-site-cargo')));
+      expect(tester.takeException(), isNull);
+
+      final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+      expect(rail.top, greaterThanOrEqualTo(cargo.bottom));
+      expect(rail.bottom, lessThanOrEqualTo(sell.top));
+      for (final band in MiningBand.values) {
+        final button = tester.getRect(
+          find.byKey(Key('mining-depth-rail-${band.name}')),
+        );
+        for (final chrome in _hudRects(tester)) {
+          expect(button.overlaps(chrome), isFalse, reason: '$band vs $chrome');
+        }
+      }
+      final hud = _hudRects(tester);
+      for (var i = 0; i < hud.length; i++) {
+        for (var j = i + 1; j < hud.length; j++) {
+          expect(hud[i].overlaps(hud[j]), isFalse, reason: '$i vs $j');
+        }
+      }
+
+      // Real scroll physics to the maximum extent, then a physical tap on
+      // the bottom-right pocket rig (7,21). Scroll up first so the down drag
+      // also works when the initial frame already sits at the bottom, and
+      // stop just short of the edge so the transient overscroll stretch never
+      // distorts the scene; the final jump pins the exact extent.
+      final scroll = find.byKey(const Key('mining-grid-scroll'));
+      await tester.drag(scroll, const Offset(0, 200));
+      await tester.pump();
+      final position = _scrollPosition(tester);
+      final delta = position.maxScrollExtent - position.pixels;
+      if (delta > 48) {
+        await tester.drag(scroll, Offset(0, -(delta - 24)));
+        await tester.pump();
+      }
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pump();
+      final bottom = _cellPoint(tester, const MiningGridCell(7, 21));
+      expect(
+        bottom.dy,
+        lessThan(sell.top),
+        reason: 'the bottom row must clear Sell at maximum scroll',
+      );
+      await tester.tapAt(
+        await _scrollToCell(tester, const MiningGridCell(7, 21)),
+      );
+      await tester.pump();
+      expect(taps, <MiningGridCell>[const MiningGridCell(7, 21)]);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
-    'keeps landscape edge rigs pannable clear of the toolbar and rail',
+    'keeps landscape edge rigs scrollable clear of the toolbar and rail',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(874, 402);
@@ -1721,37 +1781,19 @@ void main() {
       });
       final initial = MiningSave.initial(nowUtc: _start);
       final state = initial.copyWith(
-        technology: const TechnologyLevels(surveying: 2),
+        technology: const TechnologyLevels(surveying: 5),
         sites: {
           ...initial.sites,
           MiningSiteId.landingBasin: _progress(
             unlocked: true,
             commissioned: true,
             rigs: const [
-              MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(1, 0)),
-              MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(2, 49)),
+              MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(2, 1)),
+              MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(7, 21)),
             ],
           ),
         },
       );
-      final placedCells = state.sites[MiningSiteId.landingBasin]!.rigPlacements
-          .map((placement) => placement.cell)
-          .toList();
-      for (final cell in placedCells) {
-        expect(
-          evaluateMiningPlacement(
-            gridWidth: _landingDefinition.gridWidth,
-            gridHeight: _landingDefinition.gridHeight,
-            deposits: _landingDefinition.deposits,
-            occupiedRigCells: placedCells.where((occupied) => occupied != cell),
-            candidate: cell,
-            surveyingLevel: state.technology.surveying,
-            maxRigCount: MiningContentRegistry.maxDeployedRigsPerSite,
-          ).isAllowed,
-          isTrue,
-          reason: '$cell',
-        );
-      }
       final cellTaps = <MiningGridCell>[];
       await tester.pumpWidget(
         MaterialApp(
@@ -1774,45 +1816,40 @@ void main() {
       );
       await tester.pump();
 
-      final viewer = tester.widget<InteractiveViewer>(
-        find.byKey(const Key('mining-grid-interactive')),
-      );
-      // Cavern-space insets (44/126/88/178) / 0.8 cover the left cutout and
-      // toolbar, the cash-chip/cargo top band, the gauge column, and the
-      // sell control over the home indicator.
-      expect(
-        viewer.boundaryMargin,
-        const EdgeInsets.fromLTRB(55, 157.5, 110, 222.5),
-      );
-
       final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
+      final cargo = tester.getRect(find.byKey(const Key('mine-site-cargo')));
+      final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+      expect(rail.top, greaterThanOrEqualTo(cargo.bottom));
+      expect(rail.bottom, lessThanOrEqualTo(402 - 21));
+      for (final band in MiningBand.values) {
+        final button = tester.getRect(
+          find.byKey(Key('mining-depth-rail-${band.name}')),
+        );
+        for (final chrome in _hudRects(tester)) {
+          expect(button.overlaps(chrome), isFalse, reason: '$band vs $chrome');
+        }
+      }
       final band = _unoccludedLandscapeBand(
         cavern.size,
         left: 44,
-        bottom: 178,
+        bottom: 157,
       ).shift(cavern.topLeft);
-      final hud = _hudRects(tester);
-      for (final scale in const [0.8, 1.6]) {
-        _setGridScale(tester, scale);
-        await tester.pump();
-        await _expectEdgeCellsTappable(
-          tester,
-          band: band,
-          cavern: cavern,
-          hud: hud,
-          cellTaps: cellTaps,
-          overlays: _edgeCellOverlays,
-          scale: scale,
-        );
-      }
+      await _expectEdgeCellsTappable(
+        tester,
+        band: band,
+        cavern: cavern,
+        hud: _hudRects(tester),
+        cellTaps: cellTaps,
+        overlays: _edgeCellOverlays,
+      );
     },
   );
 
   for (final size in const [Size(360, 640), Size(390, 844), Size(430, 932)]) {
-    testWidgets('pans top and bottom edge rigs clear of portrait HUD at '
+    testWidgets('scrolls top and bottom edge rigs clear of portrait HUD at '
         '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
       final initial = MiningSave.initial(nowUtc: _start);
-      // Surveying 5 exposes the full field; rigs on the (1,0) and (2,49)
+      // Surveying 5 exposes the full field; rigs on the top and bottom
       // perimeter-legal edge cells each mine their adjacent resource.
       final state = initial.copyWith(
         technology: const TechnologyLevels(surveying: 5),
@@ -1822,8 +1859,8 @@ void main() {
             unlocked: true,
             commissioned: true,
             rigs: const [
-              MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(1, 0)),
-              MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(2, 49)),
+              MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(2, 1)),
+              MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(7, 21)),
             ],
           ),
         },
@@ -1838,63 +1875,124 @@ void main() {
       );
 
       final cavern = tester.getRect(find.byKey(const Key('mine-site-cavern')));
-      final band = _unoccludedBand(size).shift(cavern.topLeft);
-      final hud = _hudRects(tester);
-      for (final scale in const [0.8, 1.6]) {
-        _setGridScale(tester, scale);
-        await tester.pump();
-        await _expectEdgeCellsTappable(
-          tester,
-          band: band,
-          cavern: cavern,
-          hud: hud,
-          cellTaps: cellTaps,
-          overlays: _edgeCellOverlays,
-          scale: scale,
-        );
-      }
+      final cargo = tester.getRect(find.byKey(const Key('mine-site-cargo')));
+      final sell = _sellControlRect(tester);
+      final band = Rect.fromLTRB(0, cargo.bottom + 8, size.width, sell.top);
+      await _expectEdgeCellsTappable(
+        tester,
+        band: band,
+        cavern: cavern,
+        hud: _hudRects(tester),
+        cellTaps: cellTaps,
+        overlays: _edgeCellOverlays,
+      );
     });
   }
 
-  for (final siteId in const [
-    MiningSiteId.landingBasin,
-    MiningSiteId.carbonRidge,
-  ]) {
-    testWidgets(
-      'frames the surveyed starter deposit on a fresh ${siteId.name}',
-      (tester) async {
-        final state = _stateWithTwoSites(landingCargo: 0, carbonCargo: 0);
-        final view = _siteView(state, siteId: siteId);
-        // A fresh site has no dock-bay selection, so deployableCells stays
-        // empty; the camera still lands on the first surveyed deposit.
-        expect(view.deployableCells, isEmpty);
-        await _pumpMineSite(
-          tester,
-          size: const Size(390, 844),
-          view: view,
-          dock: _dockView(state),
-        );
-
-        expect(
-          tester.getRect(find.byKey(const Key('mining-grid-surface'))).topLeft,
-          const Offset(64, 125),
-        );
-        expect(
-          tester.getRect(find.byKey(const Key('mining-deposit-1-1-2'))).center,
-          const Offset(176, 237),
-        );
-      },
+  testWidgets('frames the highest open band once per site entry', (
+    tester,
+  ) async {
+    final state = _stateWithTwoSites(landingCargo: 0, carbonCargo: 0);
+    await _pumpMineSite(
+      tester,
+      size: const Size(390, 844),
+      view: _siteView(state),
+      dock: _dockView(state),
     );
-  }
+    final scale =
+        tester.getRect(find.byKey(const Key('mining-grid-surface'))).width /
+        miningGridSceneWidth;
+    expect(
+      _scrollPosition(tester).pixels,
+      closeTo(
+        math.min(
+          MiningBand.seams.labelRow * miningGridCellSize * scale,
+          _scrollPosition(tester).maxScrollExtent,
+        ),
+        .5,
+      ),
+    );
 
-  testWidgets('keeps the panned camera across the next-second view refresh', (
+    // A fresh entry at Surveying 5 frames the all-open Motherlode instead.
+    await tester.pumpWidget(const SizedBox.shrink());
+    final surveyed = state.copyWith(
+      technology: const TechnologyLevels(surveying: 5),
+    );
+    await _pumpMineSite(
+      tester,
+      size: const Size(390, 844),
+      view: _siteView(surveyed),
+      dock: _dockView(surveyed),
+    );
+    expect(_scrollPosition(tester).pixels, 0);
+    expect(
+      tester.getRect(find.byKey(const Key('mining-band-label-motherlode'))).top,
+      closeTo(
+        tester.getRect(find.byKey(const Key('mining-grid-map'))).top + 134,
+        .5,
+      ),
+    );
+  });
+
+  testWidgets('live Surveying updates the rail without stealing the scroll', (
+    tester,
+  ) async {
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(390, 844),
+      view: _siteView(state),
+      dock: _dockView(state),
+    );
+    _scrollPosition(tester).jumpTo(_scrollPosition(tester).pixels + 120);
+    await tester.pump();
+    final scrolled = _scrollPosition(tester).pixels;
+
+    final surveyed = state.copyWith(
+      technology: const TechnologyLevels(surveying: 2),
+    );
+    await _pumpMineSite(
+      tester,
+      size: const Size(390, 844),
+      view: _siteView(surveyed),
+      dock: _dockView(surveyed),
+    );
+
+    expect(_scrollPosition(tester).pixels, scrolled);
+    expect(find.text('Surveying 1 opens the lodes'), findsNothing);
+    expect(find.text('Surveying 2 opens the motherlode'), findsNothing);
+  });
+
+  testWidgets('right-column legal cells stay tappable beside the rail', (
+    tester,
+  ) async {
+    final taps = <MiningGridCell>[];
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(360, 640),
+      view: _siteView(state),
+      dock: _dockView(state),
+      onGridCellTap: taps.add,
+    );
+
+    for (final cell in const [MiningGridCell(7, 14), MiningGridCell(7, 21)]) {
+      taps.clear();
+      await tester.tapAt(await _scrollToCell(tester, cell));
+      await tester.pump();
+      expect(taps, <MiningGridCell>[cell], reason: '$cell');
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('keeps the scroll position across the next-second view refresh', (
     tester,
   ) async {
     final state = _stateWith(
       landing: _progress(
         commissioned: true,
         rigs: const [
-          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(3, 2)),
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
         ],
       ),
     );
@@ -1904,29 +2002,29 @@ void main() {
       view: _siteView(state),
       dock: _dockView(state),
     );
-    final surface = find.byKey(const Key('mining-grid-surface'));
-    expect(tester.getRect(surface).topLeft, const Offset(-20, 125));
 
     await tester.drag(
-      find.byKey(const Key('mining-grid-interactive')),
-      const Offset(-120, -60),
+      find.byKey(const Key('mining-grid-scroll')),
+      const Offset(0, -120),
     );
     await tester.pump();
-    final panned = tester.getRect(surface).topLeft;
-    expect(panned, isNot(const Offset(-20, 125)));
+    final scrolled = _scrollPosition(tester).pixels;
+    expect(scrolled, greaterThan(0));
 
     // The one-second foreground refresh supplies a fresh view instance
-    // behind the same site key: the widget-local camera must not jump.
+    // behind the same site key: the widget-local scroll must not jump.
     await _pumpMineSite(
       tester,
       size: const Size(390, 844),
       view: _siteView(state),
       dock: _dockView(state),
     );
-    expect(tester.getRect(surface).topLeft, panned);
+    expect(_scrollPosition(tester).pixels, scrolled);
   });
 
-  testWidgets('reframes the cavern camera on site change', (tester) async {
+  testWidgets('frames a fresh scroll on site change and re-entry', (
+    tester,
+  ) async {
     final state = _stateWithTwoSites(landingCargo: 0, carbonCargo: 0);
     await _pumpMineSite(
       tester,
@@ -1934,25 +2032,113 @@ void main() {
       view: _siteView(state),
       dock: _dockView(state),
     );
-    final surface = find.byKey(const Key('mining-grid-surface'));
-    expect(tester.getRect(surface).topLeft, const Offset(64, 125));
-
-    await tester.drag(
-      find.byKey(const Key('mining-grid-interactive')),
-      const Offset(-120, -60),
-    );
+    final landingFrame = _scrollPosition(tester).pixels;
+    _scrollPosition(tester).jumpTo(landingFrame + 100);
     await tester.pump();
-    expect(tester.getRect(surface).topLeft, isNot(const Offset(64, 125)));
 
-    // The keyed map remounts on a site swap and lands on the new site's
-    // surveyed starter deposit instead of the panned Landing Basin camera.
+    // The keyed map remounts on a site swap with its own fresh frame.
     await _pumpMineSite(
       tester,
       size: const Size(390, 844),
       view: _siteView(state, siteId: MiningSiteId.carbonRidge),
       dock: _dockView(state),
     );
-    expect(tester.getRect(surface).topLeft, const Offset(64, 125));
+    expect(_scrollPosition(tester).pixels, isNot(landingFrame + 100));
+
+    // Re-entry after the map unmounts also frames fresh.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpMineSite(
+      tester,
+      size: const Size(390, 844),
+      view: _siteView(state),
+      dock: _dockView(state),
+    );
+    expect(_scrollPosition(tester).pixels, closeTo(landingFrame, .5));
+  });
+
+  testWidgets('fits the scroll map at every supported viewport', (
+    tester,
+  ) async {
+    final state = _stateWith(
+      cash: 412,
+      landing: _progress(
+        commissioned: true,
+        rigs: const [
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
+        ],
+      ),
+    );
+    for (final size in const [
+      Size(360, 640),
+      Size(390, 844),
+      Size(430, 932),
+      Size(874, 402),
+      Size(1024, 768),
+    ]) {
+      await _pumpMineSite(
+        tester,
+        size: size,
+        view: _siteView(state),
+        dock: _dockView(state),
+      );
+      expect(tester.takeException(), isNull, reason: '$size');
+
+      final map = tester.getRect(find.byKey(const Key('mining-grid-map')));
+      final background = tester.getRect(
+        find.byKey(const Key('mining-grid-background')),
+      );
+      final surface = tester.getRect(
+        find.byKey(const Key('mining-grid-surface')),
+      );
+      expect(background.size, map.size, reason: 'full-bleed $size');
+      expect(surface.width, lessThanOrEqualTo(miningGridSceneWidth + .01));
+      expect(surface.left, greaterThanOrEqualTo(map.left - .01));
+      expect(surface.right, lessThanOrEqualTo(map.right + .01));
+      expect(
+        find.byKey(const Key('mining-grid-scroll')),
+        findsOneWidget,
+        reason: 'scroll-only map $size',
+      );
+      expect(find.byKey(const Key('mining-depth-rail')), findsOneWidget);
+
+      final cell = surface.width / miningGridWidth;
+      expect(cell, lessThanOrEqualTo(miningGridCellSize + .01));
+      if (size.width == 360) {
+        expect(cell, greaterThanOrEqualTo(44), reason: '360 cell $cell');
+      }
+    }
+  });
+
+  testWidgets('band labels and lock chips are non-interactive overlays', (
+    tester,
+  ) async {
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(tester, view: _siteView(state), dock: _dockView(state));
+
+    for (final band in MiningBand.values) {
+      final label = find.byKey(Key('mining-band-label-${band.name}'));
+      expect(label, findsOneWidget);
+      expect(
+        find.descendant(of: label, matching: find.byType(IgnorePointer)),
+        findsOneWidget,
+        reason: band.name,
+      );
+    }
+    for (final band in [MiningBand.lodes, MiningBand.motherlode]) {
+      final chip = find.byKey(Key('mining-band-lock-${band.name}'));
+      expect(chip, findsOneWidget, reason: band.name);
+      expect(
+        tester
+            .widget<IgnorePointer>(
+              find
+                  .ancestor(of: chip, matching: find.byType(IgnorePointer))
+                  .first,
+            )
+            .ignoring,
+        isTrue,
+        reason: band.name,
+      );
+    }
   });
 
   testWidgets('near-square landscape window uses landscape cavern layout', (

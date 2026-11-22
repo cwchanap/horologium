@@ -103,6 +103,24 @@ Set<MiningGridCell> miningPerimeterCells({
       .toSet();
 }
 
+/// The one player-facing message for a rejected placement. Ambiguous
+/// adjacency is an authored property of the compact layout, so it reads as an
+/// ordinary blocked tap instead of a fatal authoring error.
+String miningPlacementRejectionMessage(MiningPlacementResult result) =>
+    switch (result.rejection!) {
+      MiningPlacementRejection.siteAtCapacity =>
+        'This site already has its maximum rigs.',
+      MiningPlacementRejection.outsideGrid => 'Choose a valid grid cell.',
+      MiningPlacementRejection.depositCell => 'Resources occupy this cell.',
+      MiningPlacementRejection.rigOccupied => 'Grid cell is already occupied.',
+      MiningPlacementRejection.noAdjacentDeposit =>
+        'Place the rig next to a resource.',
+      MiningPlacementRejection.ambiguousAdjacentDeposit =>
+        'Place the rig next to a single resource.',
+      MiningPlacementRejection.surveyingLocked =>
+        'Requires Surveying ${result.target!.requiredSurveyingLevel}.',
+    };
+
 MiningPlacementResult evaluateMiningPlacement({
   required int gridWidth,
   required int gridHeight,

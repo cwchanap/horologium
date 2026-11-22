@@ -182,9 +182,9 @@ void main() {
         expect(
           surveying.currentEffect,
           'Carbon Ridge revealed · Granite Crater revealed · '
-          'Surveys 4 Homeworld deposits',
+          'Surveys 15 Homeworld deposits',
         );
-        expect(surveying.nextEffect, 'Surveys 3 new Homeworld deposits');
+        expect(surveying.nextEffect, 'Surveys 8 new Homeworld deposits');
       },
     );
 
@@ -197,10 +197,10 @@ void main() {
         content: content,
       );
       final surveying = view.track(TechnologyTrack.surveying);
-      expect(surveying.currentEffect, 'Surveys 99 Homeworld deposits');
+      expect(surveying.currentEffect, 'Surveys 5 Homeworld deposits');
       expect(
         surveying.nextEffect,
-        'Surveys 194 new Homeworld deposits · Needed for Lunar Frontier',
+        'Surveys 2 new Homeworld deposits · Needed for Lunar Frontier',
       );
     });
 
@@ -222,11 +222,11 @@ void main() {
         ).track(TechnologyTrack.surveying);
         expect(
           surveying.currentEffect,
-          'Frozen Basin revealed · Surveys 2 Lunar Frontier deposits',
+          'Frozen Basin revealed · Surveys 7 Lunar Frontier deposits',
         );
         expect(
           surveying.nextEffect,
-          'Reveals Titanium Highlands · Surveys 3 new Lunar Frontier deposits',
+          'Reveals Titanium Highlands · Surveys 9 new Lunar Frontier deposits',
         );
 
         final siteUnlocked = TechnologySheetView.from(
@@ -238,7 +238,7 @@ void main() {
           ),
           content: content,
         ).track(TechnologyTrack.surveying);
-        expect(siteUnlocked.currentEffect, 'Surveys 2 Lunar Frontier deposits');
+        expect(siteUnlocked.currentEffect, 'Surveys 7 Lunar Frontier deposits');
       },
     );
 
@@ -273,7 +273,7 @@ void main() {
       final surveying = view.track(TechnologyTrack.surveying);
       expect(surveying.isMaxLevel, isTrue);
       expect(surveying.nextEffect, isNull);
-      expect(surveying.currentEffect, 'Surveys 300 Io Frontier deposits');
+      expect(surveying.currentEffect, 'Surveys 30 Io Frontier deposits');
     });
 
     test('isBusy disables track purchase and explains the pending wait', () {
