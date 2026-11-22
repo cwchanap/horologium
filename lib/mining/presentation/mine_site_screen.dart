@@ -52,8 +52,12 @@ const double _sellHexHeightPortrait = 70;
 const double _sellHexHeightLandscape = 62;
 
 /// Screen-space gap below the portrait Sell column that the map's bottom
-/// scroll padding and depth rail both clear.
-const double _portraitMapSellGap = 12;
+/// scroll padding clears.
+const double _portraitMapSellGap = 4;
+
+/// Larger gap kept between the depth rail and the portrait Sell column, so
+/// the bottom map row stays reachable below the rail at maximum scroll.
+const double _portraitRailSellGap = 12;
 
 class MineSiteScreen extends StatelessWidget {
   const MineSiteScreen({
@@ -455,7 +459,7 @@ class _CavernScene extends StatelessWidget {
                     : padding.top + _portraitCargoTop + _portraitCargoSize,
                 railBottom: landscape
                     ? constraints.maxHeight - padding.bottom
-                    : sellTop! - _portraitMapSellGap,
+                    : sellTop! - _portraitRailSellGap,
                 railRight: landscape ? 8 : padding.right + 8,
               ),
             ),
