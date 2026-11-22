@@ -1130,7 +1130,7 @@ void main() {
     expect(buttons.last.bottom, 300);
   });
 
-  testWidgets('uses four separate 44dp targets in a 2x2 grid below 176dp', (
+  testWidgets('uses one high horizontal row of 44dp targets below 176dp', (
     tester,
   ) async {
     await _pumpMap(
@@ -1141,27 +1141,49 @@ void main() {
       railTop: 134,
       railBottom: 289,
     );
+    final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
     final buttons = [
       for (final band in MiningBand.values)
         tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
     ];
 
-    // 155dp measured band: no overlap, no target shrink and no HUD growth.
-    expect(buttons.map((rect) => rect.left).toSet(), hasLength(2));
-    expect(buttons.map((rect) => rect.top).toSet(), hasLength(2));
+    // 155dp measured band: four independent 44dp targets sit high in one
+    // row, leaving the band below clear for map interaction.
+    expect(rail.top, 134);
+    expect(rail.height, 44);
+    expect(rail.width, 200);
+    expect(rail.right, lessThanOrEqualTo(390 - 8 + .01));
+    expect(buttons.map((rect) => rect.top).toSet(), hasLength(1));
+    expect(buttons.map((rect) => rect.left).toSet(), hasLength(4));
     for (var i = 0; i < buttons.length; i++) {
       expect(buttons[i].width, greaterThanOrEqualTo(44 - .01));
       expect(buttons[i].height, greaterThanOrEqualTo(44 - .01));
-      expect(buttons[i].left, greaterThanOrEqualTo(0));
-      expect(buttons[i].bottom, lessThanOrEqualTo(289 + .01));
+      expect(buttons[i].bottom, lessThanOrEqualTo(rail.bottom + .01));
       for (var j = i + 1; j < buttons.length; j++) {
         expect(
           buttons[i].overlaps(buttons[j]),
           isFalse,
-          reason: '2x2 targets $i and $j overlap',
+          reason: 'horizontal targets $i and $j overlap',
         );
       }
     }
+
+    // The measured 360x640 worst case has only 108dp: the 44dp row still
+    // leaves 64dp of clear band below it for the bottom-right cell.
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+      railTop: 181,
+      railBottom: 289,
+    );
+    final worstRail = tester.getRect(
+      find.byKey(const Key('mining-depth-rail')),
+    );
+    expect(worstRail.top, 181);
+    expect(worstRail.height, 44);
+    expect(worstRail.bottom, lessThanOrEqualTo(289 - 44));
   });
 
   testWidgets('reduced motion jumps the rail and hides the halo', (

@@ -314,7 +314,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
   /// Four depth-rail targets on the viewport's right edge. The column is
   /// sized to its buttons so the rest of the rail region is pointer
   /// transparent, and each target keeps a full 44dp hit region.
-  Widget _depthRail(double viewportHeight) {
+  Widget _depthRail(double viewportHeight, double viewportWidth) {
     final top = widget.railTop.clamp(0.0, viewportHeight);
     final requestedBottom = widget.railBottom.isFinite
         ? widget.railBottom
@@ -323,20 +323,23 @@ class _MiningGridMapState extends State<MiningGridMap> {
     final height = bottom - top;
     // Four 44dp targets need 176dp to sit in one column without overlap.
     // Above that threshold the gaps shrink from 16dp to zero first. A shorter
-    // clear band uses a compact 2x2 grid of separate 44dp targets instead of
-    // shrinking or overlapping them; both arrangements stay inside the HUD
-    // bounds and only the targets intercept pointers.
+    // clear band keeps the targets high in a horizontal row, which leaves the
+    // bottom-right cell clear; both arrangements stay inside the HUD bounds
+    // and only the targets intercept pointers.
     final vertical = height >= 176;
-    final columns = vertical ? 1 : 2;
     final gap = vertical
         ? ((height - 176) / 3).clamp(0.0, 16.0)
-        : (height >= 96 ? 8.0 : 0.0);
-    final railWidth = columns * _depthRailTargetSize + (columns - 1) * gap;
+        : (viewportWidth - widget.railRight >= 4 * _depthRailTargetSize + 3 * 8
+              ? 8.0
+              : 0.0);
+    final railWidth = vertical
+        ? _depthRailTargetSize
+        : 4 * _depthRailTargetSize + 3 * gap;
     final railHeight = vertical
         ? math.min(height, 176 + gap * 3)
-        : math.min(height, 2 * _depthRailTargetSize + gap);
-    // shortcut: below an 88dp clear band even the 2x2 grid cannot fit; no
-    // tested viewport reaches that, revisit with HPA-1244's depth rail.
+        : _depthRailTargetSize;
+    // shortcut: a clear band or viewport narrower than one 44dp row cannot
+    // fit; no tested viewport reaches that, revisit with HPA-1244's rail.
     return Positioned(
       key: const Key('mining-depth-rail'),
       top: top,
@@ -349,10 +352,8 @@ class _MiningGridMapState extends State<MiningGridMap> {
           children: [
             for (final (index, band) in MiningBand.values.indexed)
               Positioned(
-                top:
-                    (vertical ? index : index ~/ 2) *
-                    (_depthRailTargetSize + gap),
-                left: (vertical ? 0 : index % 2) * (_depthRailTargetSize + gap),
+                top: vertical ? index * (_depthRailTargetSize + gap) : 0,
+                left: vertical ? 0 : index * (_depthRailTargetSize + gap),
                 child: _depthRailButton(band),
               ),
           ],
@@ -553,7 +554,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
                 ),
               ),
             ),
-            _depthRail(constraints.maxHeight),
+            _depthRail(constraints.maxHeight, constraints.maxWidth),
           ],
         );
       },
