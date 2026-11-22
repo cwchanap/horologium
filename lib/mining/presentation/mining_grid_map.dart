@@ -321,34 +321,38 @@ class _MiningGridMapState extends State<MiningGridMap> {
         : viewportHeight;
     final bottom = requestedBottom.clamp(top, viewportHeight);
     final height = bottom - top;
-    // One vertical column: 44dp targets plus gaps up to 16dp (224dp total).
-    // A shorter clear band reduces the gaps to zero and then overlaps the
-    // targets by the small minimum needed to stay inside the HUD bounds;
-    // targets are never shrunk, wrapped, or allowed over the cargo gauge/Sell.
-    // shortcut: below a 176dp clear band the 44dp targets overlap minimally,
-    // revisit with HPA-1244's depth rail if such a screen ships.
-    final gap = ((height - _depthRailTargetSize * 4) / 3).clamp(
-      -_depthRailTargetSize,
-      16.0,
-    );
-    final railHeight = math.min(
-      height,
-      _depthRailTargetSize * 4 + math.max(0.0, gap) * 3,
-    );
+    // Four 44dp targets need 176dp to sit in one column without overlap.
+    // Above that threshold the gaps shrink from 16dp to zero first. A shorter
+    // clear band uses a compact 2x2 grid of separate 44dp targets instead of
+    // shrinking or overlapping them; both arrangements stay inside the HUD
+    // bounds and only the targets intercept pointers.
+    final vertical = height >= 176;
+    final columns = vertical ? 1 : 2;
+    final gap = vertical
+        ? ((height - 176) / 3).clamp(0.0, 16.0)
+        : (height >= 96 ? 8.0 : 0.0);
+    final railWidth = columns * _depthRailTargetSize + (columns - 1) * gap;
+    final railHeight = vertical
+        ? math.min(height, 176 + gap * 3)
+        : math.min(height, 2 * _depthRailTargetSize + gap);
+    // shortcut: below an 88dp clear band even the 2x2 grid cannot fit; no
+    // tested viewport reaches that, revisit with HPA-1244's depth rail.
     return Positioned(
       key: const Key('mining-depth-rail'),
       top: top,
       height: railHeight,
       right: widget.railRight,
       child: SizedBox(
-        width: _depthRailTargetSize,
+        width: railWidth,
         height: railHeight,
         child: Stack(
           children: [
             for (final (index, band) in MiningBand.values.indexed)
               Positioned(
-                top: index * (_depthRailTargetSize + gap),
-                left: 0,
+                top:
+                    (vertical ? index : index ~/ 2) *
+                    (_depthRailTargetSize + gap),
+                left: (vertical ? 0 : index % 2) * (_depthRailTargetSize + gap),
                 child: _depthRailButton(band),
               ),
           ],

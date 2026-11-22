@@ -1723,32 +1723,41 @@ void main() {
         for (final band in MiningBand.values)
           tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
       ];
-      expect(
-        buttons.map((rect) => rect.left).toSet(),
-        hasLength(1),
-        reason: 'the rail never wraps into a second column',
-      );
       for (final button in buttons) {
+        expect(button.width, greaterThanOrEqualTo(44 - .01));
         expect(button.height, greaterThanOrEqualTo(44 - .01));
         for (final chrome in _hudRects(tester)) {
           expect(button.overlaps(chrome), isFalse, reason: 'button vs $chrome');
         }
       }
-      final buttonStep = buttons[1].top - buttons[0].top;
-      if (rail.height < 176) {
+      for (var i = 0; i < buttons.length; i++) {
+        for (var j = i + 1; j < buttons.length; j++) {
+          expect(
+            buttons[i].overlaps(buttons[j]),
+            isFalse,
+            reason: 'rail targets $i and $j overlap at $size',
+          );
+        }
+      }
+      if (rail.height >= 176) {
+        expect(
+          buttons.map((rect) => rect.left).toSet(),
+          hasLength(1),
+          reason: 'four targets fit in one column at $size',
+        );
+        expect(buttons[1].top - buttons[0].top, greaterThanOrEqualTo(44));
+      } else {
         // Measured 360x640 / 1.3 / top 47 / bottom 34 constraint: four 44dp
-        // targets need 176dp but the clear cargo-to-Sell band is shorter, so
-        // the gaps become the small minimum overlap instead of shrinking or
-        // wrapping targets.
+        // targets need 176dp but the clear cargo-to-Sell band is only 108dp
+        // (155dp with just the bottom inset). Keep the targets separate in a
+        // 2x2 grid instead of shrinking or overlapping them.
         expect(
           176 - rail.height,
           greaterThan(0),
           reason: 'clear band ${rail.height}dp measured; 176dp required',
         );
-        expect(buttonStep, lessThan(44));
-        expect(buttonStep, greaterThan(0));
-      } else {
-        expect(buttonStep, greaterThanOrEqualTo(44));
+        expect(buttons.map((rect) => rect.left).toSet(), hasLength(2));
+        expect(buttons.map((rect) => rect.top).toSet(), hasLength(2));
       }
       final hud = _hudRects(tester);
       for (var i = 0; i < hud.length; i++) {
@@ -1781,6 +1790,19 @@ void main() {
       );
       await tester.tapAt(
         await _scrollToCell(tester, const MiningGridCell(7, 21)),
+      );
+      await tester.pump();
+      expect(taps, <MiningGridCell>[const MiningGridCell(7, 21)]);
+
+      // Right-edge physical tapping stays reachable beside the rail.
+      taps.clear();
+      final surface = tester.getRect(
+        find.byKey(const Key('mining-grid-surface')),
+      );
+      final scale = surface.width / miningGridSceneWidth;
+      final cellSize = miningGridCellSize * scale;
+      await tester.tapAt(
+        Offset(surface.left + 8 * cellSize - 2, surface.top + 21.5 * cellSize),
       );
       await tester.pump();
       expect(taps, <MiningGridCell>[const MiningGridCell(7, 21)]);
