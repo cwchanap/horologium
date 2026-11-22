@@ -3917,9 +3917,9 @@ void main() {
         );
         expect(sheet, findsOneWidget);
         expect(buySurveying, findsOneWidget);
-        expect(find.text('Surveys 4 Homeworld deposits'), findsOneWidget);
+        expect(find.text('Surveys 15 Homeworld deposits'), findsOneWidget);
         expect(
-          find.text('Next: Surveys 3 new Homeworld deposits'),
+          find.text('Next: Surveys 8 new Homeworld deposits'),
           findsOneWidget,
         );
         expect(
@@ -3971,9 +3971,9 @@ void main() {
 
         expect(sheet, findsOneWidget);
         expect(buySurveying, findsOneWidget);
-        expect(find.text('Surveys 3 Homeworld deposits'), findsOneWidget);
+        expect(find.text('Surveys 8 Homeworld deposits'), findsOneWidget);
         expect(
-          find.text('Next: Surveys 99 new Homeworld deposits'),
+          find.text('Next: Surveys 5 new Homeworld deposits'),
           findsOneWidget,
         );
         expect(
@@ -4058,11 +4058,10 @@ void main() {
 
         expect(sheet, findsOneWidget);
         expect(buySurveying, findsOneWidget);
-        expect(find.text('Surveys 99 Homeworld deposits'), findsOneWidget);
+        expect(find.text('Surveys 5 Homeworld deposits'), findsOneWidget);
         expect(
           find.text(
-            'Next: Surveys 194 new Homeworld deposits · '
-            'Needed for Lunar Frontier',
+            'Next: Surveys 2 new Homeworld deposits · Needed for Lunar Frontier',
           ),
           findsOneWidget,
         );

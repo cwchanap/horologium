@@ -29,7 +29,7 @@ MiningSave _operationalState() {
         rigPlacements: [
           MiningRigPlacement(
             tier: RigTier.t2,
-            cell: const MiningGridCell(3, 2),
+            cell: const MiningGridCell(0, 14),
           ),
         ],
       ),

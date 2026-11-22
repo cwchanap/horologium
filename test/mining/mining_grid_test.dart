@@ -120,4 +120,51 @@ void main() {
       MiningPlacementRejection.surveyingLocked,
     );
   });
+
+  test('placement rejection messages are shared and exhaustive', () {
+    const ambiguous = [
+      MiningDepositDefinition(x: 3, y: 3, size: 1, requiredSurveyingLevel: 0),
+      MiningDepositDefinition(x: 3, y: 1, size: 1, requiredSurveyingLevel: 0),
+    ];
+    const locked = MiningDepositDefinition(
+      x: 3,
+      y: 3,
+      size: 1,
+      requiredSurveyingLevel: 3,
+    );
+    final cases = <MiningPlacementResult, String>{
+      placement(
+        const MiningGridCell(3, 2),
+        occupied: const [
+          MiningGridCell(1, 1),
+          MiningGridCell(2, 1),
+          MiningGridCell(3, 1),
+          MiningGridCell(4, 1),
+        ],
+      ): 'This site already has its maximum rigs.',
+      placement(const MiningGridCell(-1, 0)): 'Choose a valid grid cell.',
+      placement(const MiningGridCell(3, 3)): 'Resources occupy this cell.',
+      placement(
+        const MiningGridCell(3, 2),
+        occupied: const [MiningGridCell(3, 2)],
+      ): 'Grid cell is already occupied.',
+      placement(const MiningGridCell(0, 0)):
+          'Place the rig next to a resource.',
+      placement(const MiningGridCell(3, 2), authored: ambiguous):
+          'Place the rig next to a single resource.',
+      placement(const MiningGridCell(3, 2), surveying: 0, authored: [locked]):
+          'Requires Surveying 3.',
+    };
+
+    expect({
+      for (final entry in cases.entries) entry.key.rejection,
+    }, MiningPlacementRejection.values.toSet());
+    for (final entry in cases.entries) {
+      expect(
+        miningPlacementRejectionMessage(entry.key),
+        entry.value,
+        reason: '${entry.key.rejection}',
+      );
+    }
+  });
 }

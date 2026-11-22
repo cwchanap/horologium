@@ -96,7 +96,7 @@ Map<DockBayId, RigTier?> dock({
 }) => {DockBayId.b1: b1, DockBayId.b2: b2, DockBayId.b3: b3, DockBayId.b4: b4};
 
 // Homeworld first-resource perimeter cells (n1/n2), derived from the cached
-// first-resource perimeter, not literals — the dense field owns geometry.
+// first-resource perimeter, not literals — the authored layout owns geometry.
 final n1Cell = _firstResourceCells[0];
 final n2Cell = _firstResourceCells[1];
 // First-deposit deploy cells for sites outside Homeworld, likewise derived
@@ -790,6 +790,55 @@ void main() {
         expect(landing.rigPlacements, [
           MiningRigPlacement(tier: RigTier.t1, cell: n1Cell),
         ]);
+      },
+    );
+
+    test(
+      'deploy rejects shared-adjacency cells without mutating the save',
+      () async {
+        final repository = CountingMiningSaveRepository();
+        final controller = await controllerOver(
+          repository,
+          seed: seededSave(
+            clock.now,
+            cash: 100,
+            docks: docksFor(homeworld: dock(b1: RigTier.t1)),
+            sites: sitesFor(landing: site(unlocked: true)),
+          ),
+        );
+        final savesBefore = repository.saveCount;
+
+        for (final cell in const [
+          MiningGridCell(1, 20),
+          MiningGridCell(2, 15),
+        ]) {
+          final result = await controller.deployRig(
+            DockBayId.b1,
+            MiningSiteId.landingBasin,
+            cell,
+          );
+
+          expect(result.isSuccess, isFalse, reason: '$cell');
+          expect(
+            result.message,
+            'Place the rig next to a single resource.',
+            reason: '$cell',
+          );
+        }
+        expect(repository.saveCount, savesBefore);
+        expect(
+          controller.state.docks[MiningPlanetId.homeworld]![DockBayId.b1],
+          RigTier.t1,
+        );
+        expect(controller.state.cash, 100);
+        expect(
+          controller.state.sites[MiningSiteId.landingBasin]!.rigPlacements,
+          isEmpty,
+        );
+        expect(
+          controller.state.sites[MiningSiteId.landingBasin]!.commissioned,
+          isFalse,
+        );
       },
     );
 

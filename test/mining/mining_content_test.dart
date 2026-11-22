@@ -4,6 +4,8 @@ import 'package:horologium/game/resources/resource_type.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
 
+import '../support/mining_grid_fixtures.dart';
+
 void main() {
   test('formats cash with separators, then truncated M and B', () {
     for (final entry in {
@@ -335,10 +337,12 @@ void main() {
       expect(site.baseRatePerSecond, values['rate']);
       expect(site.baseCapacity, values['capacity']);
       expect(site.saleValuePerUnit, values['sale']);
-      expect(
-        site.deposits.take(4).map((deposit) => deposit.requiredSurveyingLevel),
-        values['deposits'],
-      );
+      expect([
+        for (final band in MiningBand.values)
+          site.deposits
+              .firstWhere((deposit) => bandForDeposit(deposit) == band)
+              .requiredSurveyingLevel,
+      ], values['deposits']);
       expect(site.cavernAsset, startsWith('assets/images/mining/caverns/'));
       expect(site.depositAsset, startsWith('assets/images/mining/nodes/'));
       expect(site.cardAsset, startsWith('assets/images/mining/'));
@@ -683,55 +687,35 @@ void main() {
     );
   });
 
-  test('generates one dense 50x50 field of 100 unique resources per site', () {
+  test('authors one 8x22 ten-mine layout for every site', () {
     final content = MiningContentRegistry.stellarMining();
+
+    const expectedGeometry = <MiningBand, List<(int, int, int)>>{
+      MiningBand.pockets: [(0, 20, 1), (2, 20, 1), (5, 20, 1), (7, 20, 1)],
+      MiningBand.seams: [(0, 15, 2), (3, 15, 2), (6, 15, 2)],
+      MiningBand.lodes: [(0, 9, 3), (5, 9, 3)],
+      MiningBand.motherlode: [(2, 2, 4)],
+    };
+    final footprintCounts = {
+      for (final band in MiningBand.values)
+        band.footprint: expectedGeometry[band]!.length,
+    };
+    expect(footprintCounts, {1: 4, 2: 3, 3: 2, 4: 1});
 
     for (final siteId in MiningSiteId.values) {
       final site = content.site(siteId);
-      expect(site.gridWidth, 50, reason: site.name);
-      expect(site.gridHeight, 50, reason: site.name);
-      expect(site.deposits, hasLength(100), reason: site.name);
-      expect(site.deposits.toSet(), hasLength(100), reason: site.name);
-      expect(site.deposits.map((d) => d.size).toSet(), {
-        1,
-        2,
-        3,
-      }, reason: site.name);
+      expect(site.gridWidth, 8, reason: site.name);
+      expect(site.gridHeight, 22, reason: site.name);
+      expect(site.deposits, hasLength(10), reason: site.name);
+      expect(site.deposits.toSet(), hasLength(10), reason: site.name);
       expect(
-        site.perimeterCellsByDeposit.keys.toSet(),
-        site.deposits.toSet(),
+        [
+          for (final deposit in site.deposits)
+            (deposit.x, deposit.y, deposit.size),
+        ],
+        [for (final band in MiningBand.values) ...expectedGeometry[band]!],
         reason: site.name,
       );
-    }
-  });
-
-  test('pins deterministic progression tuples from the documented formula', () {
-    final content = MiningContentRegistry.stellarMining();
-
-    expect(
-      content
-          .site(MiningSiteId.landingBasin)
-          .deposits
-          .take(4)
-          .map((d) => (d.x, d.y, d.size, d.requiredSurveyingLevel)),
-      [(1, 1, 2, 0), (6, 1, 3, 0), (11, 2, 2, 1), (16, 1, 3, 2)],
-    );
-    expect(
-      content
-          .site(MiningSiteId.cobaltChasm)
-          .deposits
-          .take(4)
-          .map((d) => (d.x, d.y, d.size, d.requiredSurveyingLevel)),
-      [(1, 1, 2, 5), (6, 1, 3, 5), (11, 2, 2, 5), (16, 1, 3, 5)],
-    );
-  });
-
-  test('keeps dense fields in bounds, disjoint, and unambiguous', () {
-    final content = MiningContentRegistry.stellarMining();
-
-    for (final siteId in MiningSiteId.values) {
-      final site = content.site(siteId);
-
       for (final deposit in site.deposits) {
         expect(deposit.x, greaterThanOrEqualTo(0), reason: site.name);
         expect(deposit.y, greaterThanOrEqualTo(0), reason: site.name);
@@ -745,31 +729,166 @@ void main() {
           lessThanOrEqualTo(site.gridHeight),
           reason: site.name,
         );
+        expect(
+          deposit.requiredSurveyingLevel,
+          site.deposits
+              .firstWhere(
+                (other) => bandForDeposit(other) == bandForDeposit(deposit),
+              )
+              .requiredSurveyingLevel,
+          reason: site.name,
+        );
       }
+      expect(
+        site.perimeterCellsByDeposit.keys.toSet(),
+        site.deposits.toSet(),
+        reason: site.name,
+      );
+    }
+  });
 
-      for (var x = 0; x < site.gridWidth; x++) {
-        for (var y = 0; y < site.gridHeight; y++) {
+  test('maps each authored footprint to its one band', () {
+    expect([
+      for (final size in [1, 2, 3, 4])
+        bandForDeposit(
+          MiningDepositDefinition(
+            x: 0,
+            y: 0,
+            size: size,
+            requiredSurveyingLevel: 0,
+          ),
+        ),
+    ], MiningBand.values);
+    expect(MiningBand.pockets.label, 'Pockets');
+    expect(MiningBand.seams.label, 'Seams');
+    expect(MiningBand.lodes.label, 'Lodes');
+    expect(MiningBand.motherlode.label, 'Motherlode');
+  });
+
+  test('names the six expected shared-adjacency cells', () {
+    final expected = <MiningGridCell>{
+      MiningGridCell(1, 20),
+      MiningGridCell(6, 20),
+      MiningGridCell(2, 15),
+      MiningGridCell(2, 16),
+      MiningGridCell(5, 15),
+      MiningGridCell(5, 16),
+    };
+    final content = MiningContentRegistry.stellarMining();
+
+    for (final siteId in MiningSiteId.values) {
+      final site = content.site(siteId);
+      final ambiguous = <MiningGridCell>[];
+      for (var y = 0; y < site.gridHeight; y++) {
+        for (var x = 0; x < site.gridWidth; x++) {
           final cell = MiningGridCell(x, y);
-          final containing = site.deposits
-              .where((d) => d.contains(cell))
-              .toList();
-          expect(
-            containing.length,
-            lessThanOrEqualTo(1),
-            reason: '${site.name} $cell',
-          );
-          if (containing.isEmpty) {
-            final adjacent = site.deposits
-                .where((d) => d.isOrthogonallyAdjacent(cell))
-                .toList();
-            expect(
-              adjacent.length,
-              lessThanOrEqualTo(1),
-              reason: '${site.name} $cell',
-            );
+          if (site.deposits.any((deposit) => deposit.contains(cell))) continue;
+          if (site.deposits
+                  .where((d) => d.isOrthogonallyAdjacent(cell))
+                  .length >
+              1) {
+            ambiguous.add(cell);
           }
         }
       }
+      expect(ambiguous.toSet(), expected, reason: site.name);
+    }
+  });
+
+  test('keeps every deposit uniquely placeable and Surveying-gated', () {
+    final content = MiningContentRegistry.stellarMining();
+
+    for (final siteId in MiningSiteId.values) {
+      final site = content.site(siteId);
+      final levels = <MiningBand, int>{
+        for (final band in MiningBand.values)
+          band: site.deposits
+              .firstWhere((deposit) => bandForDeposit(deposit) == band)
+              .requiredSurveyingLevel,
+      };
+      for (final entry in site.perimeterCellsByDeposit.entries) {
+        expect(entry.value, isNotEmpty, reason: '${site.name} ${entry.key}');
+        for (final cell in entry.value) {
+          expect(
+            uniqueAdjacentDeposit(deposits: site.deposits, cell: cell),
+            entry.key,
+            reason: '${site.name} $cell',
+          );
+        }
+      }
+
+      final unlockLevel = levels[MiningBand.pockets]!;
+      final uniqueLegal = <MiningGridCell>{
+        for (final cell in deployableMiningCells(
+          site,
+          surveyingLevel: unlockLevel,
+        ))
+          cell,
+      };
+      expect(
+        uniqueLegal.length,
+        greaterThanOrEqualTo(MiningContentRegistry.maxDeployedRigsPerSite),
+        reason: '${site.name} must fill all four rigs at unlock',
+      );
+    }
+  });
+
+  test('leaves all four label rows clear of mines and legal cells', () {
+    final content = MiningContentRegistry.stellarMining();
+
+    for (final siteId in MiningSiteId.values) {
+      final site = content.site(siteId);
+      final legal = <MiningGridCell>{
+        for (final cells in site.perimeterCellsByDeposit.values) ...cells,
+      };
+      for (final band in MiningBand.values) {
+        final row = band.labelRow;
+        expect(row, inInclusiveRange(0, site.gridHeight - 1));
+        for (var x = 0; x < site.gridWidth; x++) {
+          final cell = MiningGridCell(x, row);
+          expect(
+            site.deposits.any((deposit) => deposit.contains(cell)),
+            isFalse,
+            reason: '${site.name} ${band.label} row $row',
+          );
+          expect(
+            legal.contains(cell),
+            isFalse,
+            reason: '${site.name} ${band.label} row $row',
+          );
+        }
+      }
+    }
+  });
+
+  test('the ten late sites open every band at their unlock level', () {
+    final content = MiningContentRegistry.stellarMining();
+    final lateSites = [
+      MiningSiteId.heliumMare,
+      MiningSiteId.ochreBasin,
+      MiningSiteId.silicaDunes,
+      MiningSiteId.cobaltChasm,
+      MiningSiteId.nickelShoals,
+      MiningSiteId.platinumRift,
+      MiningSiteId.iridiumSpire,
+      MiningSiteId.sulfurFlats,
+      MiningSiteId.cinnabarVents,
+      MiningSiteId.osmiumCaldera,
+    ];
+    expect(lateSites, hasLength(10));
+    for (final siteId in lateSites) {
+      final site = content.site(siteId);
+      expect(site.requiredSurveyingLevel, 5, reason: site.name);
+      expect(
+        site.deposits.map((deposit) => deposit.requiredSurveyingLevel).toSet(),
+        {5},
+        reason: site.name,
+      );
+      expect(
+        deployableMiningCells(site, surveyingLevel: 5).length,
+        greaterThanOrEqualTo(MiningContentRegistry.maxDeployedRigsPerSite),
+        reason: site.name,
+      );
     }
   });
 

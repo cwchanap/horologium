@@ -169,29 +169,9 @@ class MineSiteView {
     final placement = placementAt(cell);
     if (placement.isAllowed) return const MineSiteGridTapOutcome.deploy();
 
-    return switch (placement.rejection!) {
-      MiningPlacementRejection.siteAtCapacity =>
-        const MineSiteGridTapOutcome.blocked(
-          'This site already has its maximum rigs.',
-        ),
-      MiningPlacementRejection.outsideGrid =>
-        const MineSiteGridTapOutcome.blocked('Choose a valid grid cell.'),
-      MiningPlacementRejection.depositCell =>
-        const MineSiteGridTapOutcome.blocked('Resources occupy this cell.'),
-      MiningPlacementRejection.rigOccupied =>
-        const MineSiteGridTapOutcome.blocked('Grid cell is already occupied.'),
-      MiningPlacementRejection.noAdjacentDeposit =>
-        const MineSiteGridTapOutcome.blocked(
-          'Place the rig next to a resource.',
-        ),
-      MiningPlacementRejection.surveyingLocked =>
-        MineSiteGridTapOutcome.blocked(
-          'Requires Surveying ${placement.target!.requiredSurveyingLevel}.',
-        ),
-      MiningPlacementRejection.ambiguousAdjacentDeposit => throw StateError(
-        'Authored mining grid has ambiguous adjacency.',
-      ),
-    };
+    return MineSiteGridTapOutcome.blocked(
+      miningPlacementRejectionMessage(placement),
+    );
   }
 
   /// True while the shell is not busy and cargo remains on any unlocked

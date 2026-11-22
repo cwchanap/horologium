@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/game/audio_manager.dart';
@@ -124,41 +126,75 @@ MiningSave nearFinalPlanetMasteryState(DateTime now) {
   );
 }
 
-/// Taps the center of a grid cell through the pannable mine-site transform.
-/// The cell is first dragged toward the cavern's clear center band so the
-/// physical tap lands inside the grid surface instead of HUD chrome. Timed
-/// drags keep the end-of-gesture velocity realistic so the
-/// InteractiveViewer pan and its inertia behave like a physical flick.
+/// Taps the center of a grid cell through the vertical map scroll. The cell
+/// is first scrolled into the map's clear band (below the cargo gauge and
+/// above the Sell column), then tapped at the first point in its displayed
+/// rect that is not under the depth rail. A timed drag keeps the end-of-
+/// gesture velocity realistic so the real scroll physics handles the move.
 Future<void> tapGridCell(WidgetTester tester, MiningGridCell cell) async {
-  final interactive = find.byKey(const Key('mining-grid-interactive'));
-  Offset cellPoint() {
+  final map = find.byKey(const Key('mining-grid-map'));
+  final scrollable = find
+      .descendant(of: map, matching: find.byType(Scrollable))
+      .first;
+  final position = tester.state<ScrollableState>(scrollable).position;
+  final mapRect = tester.getRect(map);
+  final cargo = find.byKey(const Key('mine-site-cargo'));
+  final sell = find.byKey(const Key('mine-site-sell'));
+  var clearTop = mapRect.top + 8;
+  if (tester.any(cargo)) {
+    clearTop = math.max(clearTop, tester.getRect(cargo).bottom + 8);
+  }
+  var clearBottom = mapRect.bottom - 12;
+  if (tester.any(sell)) {
+    clearBottom = math.min(clearBottom, tester.getRect(sell).top - 16);
+  }
+
+  Rect cellRect() {
     final surface = tester.getRect(
       find.byKey(const Key('mining-grid-surface')),
     );
-    final scale = surface.width / (50 * miningGridCellSize);
-    return surface.topLeft +
-        Offset(
-          (cell.x + .5) * miningGridCellSize * scale,
-          (cell.y + .5) * miningGridCellSize * scale,
-        );
+    final scale = surface.width / miningGridSceneWidth;
+    final size = miningGridCellSize * scale;
+    return Rect.fromLTWH(
+      surface.left + cell.x * size,
+      surface.top + cell.y * size,
+      size,
+      size,
+    );
   }
 
-  final viewport = tester.getRect(interactive);
-  final target = Offset(
-    viewport.left + viewport.width / 2,
-    viewport.top + viewport.height * .42,
-  );
-  for (var i = 0; i < 10; i++) {
-    final delta = target - cellPoint();
-    if (delta.distance < .5) break;
-    await tester.timedDrag(
-      interactive,
-      delta,
-      const Duration(milliseconds: 300),
-    );
-    await tester.pump(const Duration(seconds: 2));
+  for (var i = 0; i < 8; i++) {
+    final rect = cellRect();
+    if (rect.top < clearTop) {
+      position.jumpTo(position.pixels - (clearTop - rect.top));
+    } else if (rect.bottom > clearBottom) {
+      position.jumpTo(position.pixels + (rect.bottom - clearBottom));
+    } else {
+      break;
+    }
+    await tester.pump();
   }
-  await tester.tapAt(cellPoint());
+
+  final railFinder = find.byKey(const Key('mining-depth-rail'));
+  final rail = tester.any(railFinder) ? tester.getRect(railFinder) : Rect.zero;
+  final rect = cellRect();
+  final candidates = <Offset>[
+    rect.center,
+    Offset(rect.center.dx, rect.bottom - 4),
+    Offset(rect.left + 6, rect.center.dy),
+    Offset(rect.right - 6, rect.bottom - 4),
+    Offset(rect.center.dx, rect.top + 4),
+  ];
+  final point = candidates.firstWhere(
+    (candidate) =>
+        mapRect.contains(candidate) &&
+        !rail.contains(candidate) &&
+        candidate.dy > clearTop &&
+        candidate.dy <= clearBottom,
+    orElse: () => rect.center,
+  );
+  await tester.tapAt(point);
+  await tester.pump();
 }
 
 /// Pumps the frame that starts a modal sheet route, then its animation.

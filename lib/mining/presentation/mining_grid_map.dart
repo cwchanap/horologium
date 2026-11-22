@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
@@ -10,8 +11,10 @@ import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 const double miningGridCellSize = 56;
-const double miningGridMinScale = 0.8;
-const double miningGridMaxScale = 1.6;
+const int miningGridWidth = 8;
+const int miningGridHeight = 22;
+const double miningGridSceneWidth = miningGridWidth * miningGridCellSize;
+const double miningGridSceneHeight = miningGridHeight * miningGridCellSize;
 
 /// Gold shared by the rig upgrade chip and the upgrade-target ring.
 const Color _upgradeGold = Color(0xFFF5B44C);
@@ -31,6 +34,9 @@ const double _rigChipLabelMaxWidth = miningGridCellSize - 7;
 /// small gap.
 const double miningRigChipClearance = miningRigChipHeight + 2;
 
+/// Minimum actionable depth-rail target.
+const double _depthRailTargetSize = 44;
+
 /// Oversized deposit art edge, keyed by the deposit's logical footprint in
 /// cells. The art is centered over the logical footprint so hit-testing and
 /// overlay rects stay on authored grid coordinates.
@@ -38,6 +44,7 @@ double depositVisualSize(int footprint) => switch (footprint) {
   1 => 80,
   2 => 120,
   3 => 168,
+  4 => 224,
   _ => throw ArgumentError.value(footprint),
 };
 
@@ -55,6 +62,9 @@ class MiningGridMap extends StatefulWidget {
     this.onMiningImpact,
     required this.reducedMotion,
     this.viewportInsets = EdgeInsets.zero,
+    this.railTop = 0,
+    this.railBottom = double.infinity,
+    this.railRight = 8,
   });
 
   final MineSiteView view;
@@ -63,25 +73,89 @@ class MiningGridMap extends StatefulWidget {
   final VoidCallback? onMiningImpact;
   final bool reducedMotion;
 
-  /// Screen-space chrome clearance around the map viewport. The pan
-  /// boundaries divide it by [miningGridMinScale] because
-  /// [InteractiveViewer.boundaryMargin] works in scene coordinates, so the
-  /// full clearance survives at the zoom floor.
+  /// Vertical scroll clearance around the map scene. The left/right values
+  /// are ignored: the map keeps the full viewport width so the 8-cell scene
+  /// can scale down instead of shrinking under HUD columns.
   final EdgeInsets viewportInsets;
+
+  /// Vertical span and right inset of the depth rail in the map's local
+  /// coordinates, supplied by the screen so the rail stays between the cargo
+  /// gauge and the Sell/bottom chrome.
+  final double railTop;
+  final double railBottom;
+  final double railRight;
 
   @override
   State<MiningGridMap> createState() => _MiningGridMapState();
 }
 
 class _MiningGridMapState extends State<MiningGridMap> {
-  final TransformationController _transformationController =
-      TransformationController();
-  bool _cameraPlaced = false;
+  final ScrollController _scrollController = ScrollController();
+  bool _framed = false;
+  double _sceneScale = 1;
+  final Map<MiningBand, FocusNode> _railFocusNodes = {
+    for (final band in MiningBand.values) band: FocusNode(),
+  };
 
   @override
   void dispose() {
-    _transformationController.dispose();
+    _scrollController.dispose();
+    for (final node in _railFocusNodes.values) {
+      node.dispose();
+    }
     super.dispose();
+  }
+
+  MiningBand _bandOf(MineSiteDepositView deposit) =>
+      bandForDeposit(deposit.definition);
+
+  Iterable<MineSiteDepositView> _depositsIn(MiningBand band) =>
+      widget.view.deposits.where((deposit) => _bandOf(deposit) == band);
+
+  bool _isBandOpen(MiningBand band) =>
+      _depositsIn(band).every((deposit) => deposit.isSurveyed);
+
+  int _bandRequirement(MiningBand band) =>
+      _depositsIn(band).first.definition.requiredSurveyingLevel;
+
+  /// Highest fully surveyed band: Motherlode on the all-5 late sites.
+  MiningBand _highestOpenBand() {
+    for (final band in MiningBand.values.reversed) {
+      if (_depositsIn(band).isNotEmpty && _isBandOpen(band)) return band;
+    }
+    return MiningBand.values.first;
+  }
+
+  /// One scroll path for the once-per-entry frame and every rail tap. The
+  /// offset is scaled: row `labelRow` sits `labelRow * 56 * scale` below the
+  /// scene's top, so an unscaled logical offset would overshoot on phones.
+  void _scrollToBand(MiningBand band, {required bool animate}) {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final target = (band.labelRow * miningGridCellSize * _sceneScale)
+        .clamp(0.0, math.max(0.0, position.maxScrollExtent))
+        .toDouble();
+    if (animate && !widget.reducedMotion) {
+      _scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      _scrollController.jumpTo(target);
+    }
+  }
+
+  /// Frames the highest open band once, after the scroll view has laid out.
+  /// Surveying purchases and one-second refreshes rebuild the view behind the
+  /// same key and never move the scroll position.
+  void _scheduleInitialFrame() {
+    if (_framed) return;
+    _framed = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollToBand(_highestOpenBand(), animate: false);
+    });
   }
 
   Widget _objectLayer() {
@@ -107,212 +181,371 @@ class _MiningGridMapState extends State<MiningGridMap> {
     );
   }
 
-  /// Scene-space point the initial 1.0x camera centers on: the placed rigs'
-  /// bounding box when the site is populated, otherwise the first surveyed
-  /// deposit that still has free perimeter slots. Null keeps the identity
-  /// transform.
-  Offset? _initialFocus() {
-    final view = widget.view;
-    if (view.rigs.isNotEmpty) {
-      var left = view.definition.gridWidth;
-      var top = view.definition.gridHeight;
-      var right = 0;
-      var bottom = 0;
-      for (final rig in view.rigs) {
-        final cell = rig.placement.cell;
-        left = math.min(left, cell.x);
-        top = math.min(top, cell.y);
-        right = math.max(right, cell.x + 1);
-        bottom = math.max(bottom, cell.y + 1);
-      }
-      return Offset(
-        (left + right) * miningGridCellSize / 2,
-        (top + bottom) * miningGridCellSize / 2,
-      );
-    }
-    for (final deposit in view.deposits) {
-      if (deposit.isSurveyed && deposit.minerCount < deposit.slotCount) {
-        final definition = deposit.definition;
-        return Offset(
-          (definition.x + definition.size / 2) * miningGridCellSize,
-          (definition.y + definition.size / 2) * miningGridCellSize,
-        );
-      }
-    }
-    return null;
+  /// Full-bleed repeating cavern behind the scroll view, so landscape,
+  /// tablet margins and vertical scroll padding never expose flat side bars.
+  Widget _background() {
+    return Image.asset(
+      widget.view.definition.cavernAsset,
+      key: const Key('mining-grid-background'),
+      fit: BoxFit.none,
+      alignment: Alignment.topLeft,
+      repeat: ImageRepeat.repeat,
+      errorBuilder: (context, error, stackTrace) => const DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF1D2B3D), Color(0xFF0B1420)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Center(
+          child: Icon(Icons.terrain_rounded, color: Colors.white24, size: 48),
+        ),
+      ),
+    );
   }
 
-  /// One camera axis: clamps [desired] into the pan interval, or defaults
-  /// to 0.0 when the bounds are reversed because the viewport is larger than
-  /// the grid (matching InteractiveViewer's translation clamp).
-  double _axisTranslation(double desired, double lower, double upper) =>
-      lower > upper ? 0.0 : desired.clamp(lower, upper).toDouble();
+  /// One static gold halo behind the object layer for every site. Reduced
+  /// motion removes it; the rail then jumps instead of animating.
+  Iterable<Widget> _motherlodeHalo() sync* {
+    if (widget.reducedMotion) return;
+    for (final deposit in widget.view.deposits) {
+      final definition = deposit.definition;
+      if (definition.size != MiningBand.motherlode.footprint) continue;
+      final size = depositVisualSize(definition.size) * 1.45;
+      yield Positioned(
+        key: const Key('mining-motherlode-halo'),
+        left:
+            (definition.x + definition.size / 2) * miningGridCellSize -
+            size / 2,
+        top:
+            (definition.y + definition.size / 2) * miningGridCellSize -
+            size / 2,
+        width: size,
+        height: size,
+        child: IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  _upgradeGold.withValues(alpha: .34),
+                  _upgradeGold.withValues(alpha: .12),
+                  _upgradeGold.withValues(alpha: 0),
+                ],
+                stops: const [0, .55, 1],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+  }
 
-  /// The 1.0x transform placed once, before the first InteractiveViewer
-  /// build: [focus] lands on the unoccluded viewport's center unless the
-  /// scale-aware pan bounds clamp it closer or zero the axis.
-  Matrix4 _initialCamera(Size viewport, Offset focus) {
-    final insets = widget.viewportInsets;
-    final margin = insets / miningGridMinScale;
-    final view = widget.view;
-    final childWidth = view.definition.gridWidth * miningGridCellSize;
-    final childHeight = view.definition.gridHeight * miningGridCellSize;
-    final center = Offset(
-      insets.left + (viewport.width - insets.horizontal) / 2,
-      insets.top + (viewport.height - insets.vertical) / 2,
+  /// Non-interactive band label and locked-band Surveying chip on the empty
+  /// gutter rows 0/7/13/18.
+  Iterable<Widget> _bandLabels() sync* {
+    for (final band in MiningBand.values) {
+      final open = _isBandOpen(band);
+      yield Positioned(
+        key: Key('mining-band-label-${band.name}'),
+        left: 0,
+        top: band.labelRow * miningGridCellSize,
+        width: miningGridSceneWidth,
+        height: miningGridCellSize,
+        child: IgnorePointer(
+          child: ExcludeSemantics(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color.fromRGBO(6, 10, 16, .58),
+                border: Border.symmetric(
+                  horizontal: BorderSide(
+                    color: Colors.white.withValues(alpha: .12),
+                  ),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${band.label.toUpperCase()} · '
+                        '${band.footprint}-cell ore',
+                        style: const TextStyle(
+                          color: MiningTheme.primaryText,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      if (!open) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Surveying ${_bandRequirement(band)} opens the '
+                          '${band.label.toLowerCase()}',
+                          key: Key('mining-band-lock-${band.name}'),
+                          style: const TextStyle(
+                            color: MiningTheme.warning,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Four depth-rail targets on the viewport's right edge. The column is
+  /// sized to its buttons so the rest of the rail region is pointer
+  /// transparent, and each target keeps a full 44dp hit region.
+  Widget _depthRail(double viewportHeight) {
+    final top = widget.railTop.clamp(0.0, viewportHeight);
+    final requestedBottom = widget.railBottom.isFinite
+        ? widget.railBottom
+        : viewportHeight;
+    final bottom = requestedBottom.clamp(top, viewportHeight);
+    final height = bottom - top;
+    // Four 44dp targets plus comfortable gaps need 224dp. A shorter clear
+    // band wraps to two columns instead of shrinking a target or growing into
+    // the cargo gauge/Sell column; the bottom row then stays tappable.
+    final vertical = height >= _depthRailTargetSize * 4 + 16 * 3;
+    final columns = vertical ? 1 : 2;
+    final gap = vertical ? 16.0 : 0.0;
+    final railWidth = columns * _depthRailTargetSize;
+    final railHeight = vertical
+        ? _depthRailTargetSize * 4 + gap * 3
+        : math.min(height, _depthRailTargetSize * 2);
+    return Positioned(
+      key: const Key('mining-depth-rail'),
+      top: top,
+      height: railHeight,
+      right: widget.railRight,
+      child: SizedBox(
+        width: railWidth,
+        height: railHeight,
+        child: Stack(
+          children: [
+            for (final (index, band) in MiningBand.values.indexed)
+              Positioned(
+                top:
+                    (vertical ? index : index ~/ 2) *
+                    (_depthRailTargetSize + gap),
+                left: (vertical ? 0 : index % 2) * _depthRailTargetSize,
+                child: _depthRailButton(band),
+              ),
+          ],
+        ),
+      ),
     );
-    final tx = _axisTranslation(
-      center.dx - focus.dx,
-      viewport.width - childWidth - margin.right,
-      margin.left,
+  }
+
+  Widget _depthRailButton(MiningBand band) {
+    final open = _isBandOpen(band);
+    final label = open
+        ? 'Jump to ${band.label} band'
+        : 'Jump to ${band.label} band. '
+              'Requires Surveying ${_bandRequirement(band)}.';
+    return Semantics(
+      key: Key('mining-depth-rail-${band.name}'),
+      container: true,
+      button: true,
+      enabled: true,
+      label: label,
+      onTap: () => _scrollToBand(band, animate: true),
+      excludeSemantics: true,
+      child: SizedBox(
+        width: _depthRailTargetSize,
+        height: _depthRailTargetSize,
+        child: Focus(
+          key: Key('mining-depth-rail-focus-${band.name}'),
+          focusNode: _railFocusNodes[band],
+          onKeyEvent: (node, event) {
+            if (event is! KeyDownEvent) return KeyEventResult.ignored;
+            final key = event.logicalKey;
+            if (key != LogicalKeyboardKey.enter &&
+                key != LogicalKeyboardKey.space) {
+              return KeyEventResult.ignored;
+            }
+            _scrollToBand(band, animate: true);
+            return KeyEventResult.handled;
+          },
+          child: IconButton(
+            padding: EdgeInsets.zero,
+            iconSize: 20,
+            onPressed: () => _scrollToBand(band, animate: true),
+            icon: Icon(
+              band == MiningBand.motherlode
+                  ? Icons.auto_awesome
+                  : Icons.link_rounded,
+              color: open ? MiningTheme.accent : Colors.white38,
+            ),
+          ),
+        ),
+      ),
     );
-    final ty = _axisTranslation(
-      center.dy - focus.dy,
-      viewport.height - childHeight - margin.bottom,
-      margin.top,
-    );
-    return Matrix4.translationValues(tx, ty, 0);
   }
 
   @override
   Widget build(BuildContext context) {
     final view = widget.view;
-    final width = view.definition.gridWidth * miningGridCellSize;
-    final height = view.definition.gridHeight * miningGridCellSize;
+    final insets = widget.viewportInsets;
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (!_cameraPlaced) {
-          _cameraPlaced = true;
-          final focus = _initialFocus();
-          if (focus != null) {
-            _transformationController.value = _initialCamera(
-              constraints.biggest,
-              focus,
-            );
-          }
-        }
-        return InteractiveViewer(
-          key: const Key('mining-grid-interactive'),
-          transformationController: _transformationController,
-          boundaryMargin: widget.viewportInsets / miningGridMinScale,
-          constrained: false,
-          alignment: Alignment.topLeft,
-          minScale: miningGridMinScale,
-          maxScale: miningGridMaxScale,
-          child: SizedBox(
-            key: const Key('mining-grid-surface'),
-            width: width,
-            height: height,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTapUp: (details) => widget.onCellTap(
-                MiningGridCell(
-                  details.localPosition.dx ~/ miningGridCellSize,
-                  details.localPosition.dy ~/ miningGridCellSize,
+        _sceneScale = math.min(
+          1.0,
+          constraints.maxWidth / miningGridSceneWidth,
+        );
+        _scheduleInitialFrame();
+        return Stack(
+          key: const Key('mining-grid-map'),
+          children: [
+            Positioned.fill(child: _background()),
+            Positioned.fill(
+              child: ScrollConfiguration(
+                // No glow/stretch: the scene is the map itself, and a
+                // transient overscroll scale would distort cell hit mapping.
+                behavior: ScrollConfiguration.of(
+                  context,
+                ).copyWith(overscroll: false),
+                child: SingleChildScrollView(
+                  key: const Key('mining-grid-scroll'),
+                  controller: _scrollController,
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      top: insets.top,
+                      bottom: insets.bottom,
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: SizedBox(
+                        key: const Key('mining-grid-surface'),
+                        width: miningGridSceneWidth,
+                        height: miningGridSceneHeight,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTapUp: (details) => widget.onCellTap(
+                            MiningGridCell(
+                              details.localPosition.dx ~/ miningGridCellSize,
+                              details.localPosition.dy ~/ miningGridCellSize,
+                            ),
+                          ),
+                          child: Stack(
+                            clipBehavior: Clip.hardEdge,
+                            children: [
+                              ..._motherlodeHalo(),
+                              Positioned.fill(
+                                child: IgnorePointer(child: _objectLayer()),
+                              ),
+                              ..._bandLabels(),
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: CustomPaint(
+                                    painter: MiningGridPainter(
+                                      width: view.definition.gridWidth,
+                                      height: view.definition.gridHeight,
+                                      deployableCells: view.deployableCells,
+                                      upgradeableCells: view.upgradeableCells,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Object overlays: exactly one semantics overlay per
+                              // authored deposit and at most one per deployed rig.
+                              // These are not tile widgets; empty cells render
+                              // nothing.
+                              for (final deposit in view.deposits)
+                                Positioned(
+                                  key: Key(
+                                    'mining-deposit-'
+                                    '${_depositKey(deposit.definition)}',
+                                  ),
+                                  left:
+                                      deposit.definition.x * miningGridCellSize,
+                                  top:
+                                      deposit.definition.y * miningGridCellSize,
+                                  width:
+                                      deposit.definition.size *
+                                      miningGridCellSize,
+                                  height:
+                                      deposit.definition.size *
+                                      miningGridCellSize,
+                                  child: IgnorePointer(
+                                    child: Semantics(
+                                      label: _depositLabel(deposit),
+                                      child: const SizedBox.expand(),
+                                    ),
+                                  ),
+                                ),
+                              for (final rig in view.rigs) ...[
+                                Positioned(
+                                  key: Key(
+                                    'mining-rig-chip-'
+                                    '${rig.placement.cell.x}-'
+                                    '${rig.placement.cell.y}',
+                                  ),
+                                  left:
+                                      rig.placement.cell.x * miningGridCellSize,
+                                  top:
+                                      rig.placement.cell.y * miningGridCellSize,
+                                  width: miningGridCellSize,
+                                  child: IgnorePointer(
+                                    child: ExcludeSemantics(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: _rigChip(rig),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  left:
+                                      rig.placement.cell.x * miningGridCellSize,
+                                  top:
+                                      rig.placement.cell.y * miningGridCellSize,
+                                  width: miningGridCellSize,
+                                  height: miningGridCellSize,
+                                  child: Semantics(
+                                    button: true,
+                                    enabled: view.selectedRig != null
+                                        ? rig.canUpgradeWithSelection
+                                        : rig.canRecall,
+                                    label: _rigLabel(rig),
+                                    onTap: () =>
+                                        widget.onCellTap(rig.placement.cell),
+                                    // IgnorePointer sits below the Semantics node
+                                    // so physical taps stay with the map-level
+                                    // gesture surface while the semantic tap
+                                    // action survives for assistive tech.
+                                    child: IgnorePointer(
+                                      child: const SizedBox.expand(),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-              child: Stack(
-                clipBehavior: Clip.hardEdge,
-                children: [
-                  Positioned.fill(
-                    child: Image.asset(
-                      view.definition.cavernAsset,
-                      fit: BoxFit.none,
-                      alignment: Alignment.topLeft,
-                      repeat: ImageRepeat.repeat,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Color(0xFF1D2B3D), Color(0xFF0B1420)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                            ),
-                            child: Center(
-                              child: Icon(
-                                Icons.terrain_rounded,
-                                color: Colors.white24,
-                                size: 48,
-                              ),
-                            ),
-                          ),
-                    ),
-                  ),
-                  Positioned.fill(child: IgnorePointer(child: _objectLayer())),
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: CustomPaint(
-                        painter: MiningGridPainter(
-                          width: view.definition.gridWidth,
-                          height: view.definition.gridHeight,
-                          deployableCells: view.deployableCells,
-                          upgradeableCells: view.upgradeableCells,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Object overlays: exactly one semantics overlay per authored
-                  // deposit and at most one per deployed rig. These are not
-                  // tile widgets; empty cells render nothing.
-                  for (final deposit in view.deposits)
-                    Positioned(
-                      key: Key(
-                        'mining-deposit-${_depositKey(deposit.definition)}',
-                      ),
-                      left: deposit.definition.x * miningGridCellSize,
-                      top: deposit.definition.y * miningGridCellSize,
-                      width: deposit.definition.size * miningGridCellSize,
-                      height: deposit.definition.size * miningGridCellSize,
-                      child: IgnorePointer(
-                        child: Semantics(
-                          label: _depositLabel(deposit),
-                          child: const SizedBox.expand(),
-                        ),
-                      ),
-                    ),
-                  for (final rig in view.rigs) ...[
-                    Positioned(
-                      key: Key(
-                        'mining-rig-chip-'
-                        '${rig.placement.cell.x}-${rig.placement.cell.y}',
-                      ),
-                      left: rig.placement.cell.x * miningGridCellSize,
-                      top: rig.placement.cell.y * miningGridCellSize,
-                      width: miningGridCellSize,
-                      child: IgnorePointer(
-                        child: ExcludeSemantics(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: _rigChip(rig),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: rig.placement.cell.x * miningGridCellSize,
-                      top: rig.placement.cell.y * miningGridCellSize,
-                      width: miningGridCellSize,
-                      height: miningGridCellSize,
-                      child: Semantics(
-                        button: true,
-                        enabled: view.selectedRig != null
-                            ? rig.canUpgradeWithSelection
-                            : rig.canRecall,
-                        label: _rigLabel(rig),
-                        onTap: () => widget.onCellTap(rig.placement.cell),
-                        // IgnorePointer sits below the Semantics node so
-                        // physical taps stay with the map-level gesture
-                        // surface while the semantic tap action survives for
-                        // assistive tech.
-                        child: IgnorePointer(child: const SizedBox.expand()),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
             ),
-          ),
+            _depthRail(constraints.maxHeight),
+          ],
         );
       },
     );

@@ -20,7 +20,6 @@ import 'package:horologium/mining/presentation/mining_visuals.dart';
 // MiningCashChip, _MineChromeButton, MiningNavigationBar, and the
 // horizontal FleetDock.
 const double _portraitCashChipTop = 54;
-const double _portraitCashChipHeight = MiningCashChip.height;
 const double _portraitBackTop = 146;
 const double _portraitBackLeft = 14;
 const double _portraitBackWidth = _MineChromeButton.width;
@@ -51,6 +50,10 @@ const double _portraitSellHexWidth = 64;
 const double _sellLabelGap = 5;
 const double _sellHexHeightPortrait = 70;
 const double _sellHexHeightLandscape = 62;
+
+/// Screen-space gap below the portrait Sell column that the map's bottom
+/// scroll padding and depth rail both clear.
+const double _portraitMapSellGap = 12;
 
 class MineSiteScreen extends StatelessWidget {
   const MineSiteScreen({
@@ -188,72 +191,83 @@ class _PortraitMineSite extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pad = MediaQuery.paddingOf(context);
-    final viewportInsets = EdgeInsets.fromLTRB(
-      pad.left + _portraitBackLeft + _portraitBackWidth,
-      pad.top + _portraitCashChipTop + _portraitCashChipHeight,
-      pad.right + _portraitCargoRight + _portraitCargoSize,
-      pad.bottom +
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Reserve well past the dock/nav: the Sell column sits above the dock,
+        // so the bottom scroll padding must clear its scaled label height too.
+        final sellTop = portraitMineSellTop(
+          constraints.maxHeight,
+          pad.bottom,
+          MediaQuery.textScalerOf(context),
+          Theme.of(context).textTheme.bodyMedium,
+        );
+        final viewportInsets = EdgeInsets.fromLTRB(
+          pad.left + _portraitBackLeft + _portraitBackWidth,
+          pad.top + _portraitCargoTop + _portraitCargoSize,
+          pad.right + _portraitCargoRight + _portraitCargoSize,
           math.max(
-            _portraitNavHeight,
-            _portraitDockBottom + _portraitDockHeight,
+            pad.bottom + _portraitNavHeight,
+            constraints.maxHeight - sellTop + _portraitMapSellGap,
           ),
-    );
-    return ColoredBox(
-      key: const Key('mine-site-screen'),
-      color: const Color(0xFF0A1218),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: _CavernScene(
-              view: view,
-              landscape: false,
-              reducedMotion: reducedMotion,
-              impactSequence: impactSequence,
-              onMiningImpact: onMiningImpact,
-              onGridCellTap: onGridCellTap,
-              onSellCargo: onSellCargo,
-              portraitTopInset: pad.top,
-              viewportInsets: viewportInsets,
-            ),
+        );
+        return ColoredBox(
+          key: const Key('mine-site-screen'),
+          color: const Color(0xFF0A1218),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: _CavernScene(
+                  view: view,
+                  landscape: false,
+                  reducedMotion: reducedMotion,
+                  impactSequence: impactSequence,
+                  onMiningImpact: onMiningImpact,
+                  onGridCellTap: onGridCellTap,
+                  onSellCargo: onSellCargo,
+                  portraitTopInset: pad.top,
+                  viewportInsets: viewportInsets,
+                ),
+              ),
+              Positioned(
+                top: _portraitCashChipTop + pad.top,
+                left: 0,
+                child: MiningCashChip(cash: cash),
+              ),
+              Positioned(
+                top: _portraitBackTop + pad.top,
+                left: _portraitBackLeft,
+                child: _MineChromeButton(
+                  key: const Key('mine-site-back'),
+                  icon: Icons.chevron_left_rounded,
+                  label: 'Back to Site Deck',
+                  onPressed: onBack,
+                ),
+              ),
+              Positioned(
+                left: _portraitDockHorizontalMargin,
+                right: _portraitDockHorizontalMargin,
+                bottom: _portraitDockBottom + pad.bottom,
+                child: FleetDock(
+                  view: fleetDock,
+                  axis: FleetDockAxis.horizontal,
+                  onBayTap: onBayTap,
+                  onSpawnRig: onSpawnRig,
+                  onBuildRig: onBuildRig,
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: pad.bottom,
+                child: MiningNavigationBar(
+                  selected: MiningNavigationDestination.siteDeck,
+                  onDestinationSelected: _navigate,
+                ),
+              ),
+            ],
           ),
-          Positioned(
-            top: _portraitCashChipTop + pad.top,
-            left: 0,
-            child: MiningCashChip(cash: cash),
-          ),
-          Positioned(
-            top: _portraitBackTop + pad.top,
-            left: _portraitBackLeft,
-            child: _MineChromeButton(
-              key: const Key('mine-site-back'),
-              icon: Icons.chevron_left_rounded,
-              label: 'Back to Site Deck',
-              onPressed: onBack,
-            ),
-          ),
-          Positioned(
-            left: _portraitDockHorizontalMargin,
-            right: _portraitDockHorizontalMargin,
-            bottom: _portraitDockBottom + pad.bottom,
-            child: FleetDock(
-              view: fleetDock,
-              axis: FleetDockAxis.horizontal,
-              onBayTap: onBayTap,
-              onSpawnRig: onSpawnRig,
-              onBuildRig: onBuildRig,
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: pad.bottom,
-            child: MiningNavigationBar(
-              selected: MiningNavigationDestination.siteDeck,
-              onDestinationSelected: _navigate,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -410,8 +424,17 @@ class _CavernScene extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
     return LayoutBuilder(
       builder: (context, constraints) {
+        final sellTop = landscape
+            ? null
+            : portraitMineSellTop(
+                constraints.maxHeight,
+                padding.bottom,
+                MediaQuery.textScalerOf(context),
+                Theme.of(context).textTheme.bodyMedium,
+              );
         return Stack(
           children: [
             Positioned.fill(
@@ -424,6 +447,16 @@ class _CavernScene extends StatelessWidget {
                 onGridCellTap: onGridCellTap,
                 viewportInsets: viewportInsets,
                 cavernWidth: constraints.maxWidth,
+                railTop: landscape
+                    ? math.max(
+                        padding.top,
+                        _landscapeCargoTop + _landscapeCargoSize,
+                      )
+                    : padding.top + _portraitCargoTop + _portraitCargoSize,
+                railBottom: landscape
+                    ? constraints.maxHeight - padding.bottom
+                    : sellTop! - _portraitMapSellGap,
+                railRight: landscape ? 8 : padding.right + 8,
               ),
             ),
             Positioned(
@@ -474,6 +507,9 @@ class _MineCavern extends StatelessWidget {
     required this.onGridCellTap,
     this.viewportInsets = EdgeInsets.zero,
     this.cavernWidth = 0,
+    this.railTop = 0,
+    this.railBottom = double.infinity,
+    this.railRight = 8,
   });
 
   final MineSiteView view;
@@ -484,6 +520,9 @@ class _MineCavern extends StatelessWidget {
   final ValueChanged<MiningGridCell> onGridCellTap;
   final EdgeInsets viewportInsets;
   final double cavernWidth;
+  final double railTop;
+  final double railBottom;
+  final double railRight;
 
   @override
   Widget build(BuildContext context) {
@@ -502,6 +541,9 @@ class _MineCavern extends StatelessWidget {
             onMiningImpact: onMiningImpact,
             reducedMotion: reducedMotion,
             viewportInsets: viewportInsets,
+            railTop: railTop,
+            railBottom: railBottom,
+            railRight: railRight,
           ),
           if (!landscape) ...[
             const Positioned(

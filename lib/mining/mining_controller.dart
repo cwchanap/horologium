@@ -258,21 +258,7 @@ class MiningController {
   });
 
   String _placementFailureMessage(MiningPlacementResult result) =>
-      switch (result.rejection!) {
-        MiningPlacementRejection.siteAtCapacity =>
-          'This site already has its maximum rigs.',
-        MiningPlacementRejection.outsideGrid => 'Choose a valid grid cell.',
-        MiningPlacementRejection.depositCell => 'Resources occupy this cell.',
-        MiningPlacementRejection.rigOccupied =>
-          'Grid cell is already occupied.',
-        MiningPlacementRejection.noAdjacentDeposit =>
-          'Place the rig next to a resource.',
-        MiningPlacementRejection.surveyingLocked =>
-          'Requires Surveying ${result.target!.requiredSurveyingLevel}.',
-        MiningPlacementRejection.ambiguousAdjacentDeposit => throw StateError(
-          'Authored mining grid has ambiguous adjacency.',
-        ),
-      };
+      miningPlacementRejectionMessage(result);
 
   Future<MiningActionResult> deployRig(
     DockBayId sourceBay,
