@@ -127,14 +127,17 @@ class _MiningGridMapState extends State<MiningGridMap> {
   }
 
   /// One scroll path for the once-per-entry frame and every rail tap. The
-  /// offset is scaled: row `labelRow` sits `labelRow * 56 * scale` below the
-  /// scene's top, so an unscaled logical offset would overshoot on phones.
+  /// target is the specified scale-aware row offset
+  /// `topPadding + labelRow * 56 * min(1, width / 448)`, clamped to the valid
+  /// scroll extent; an unscaled logical offset would overshoot on phones.
   void _scrollToBand(MiningBand band, {required bool animate}) {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
-    final target = (band.labelRow * miningGridCellSize * _sceneScale)
-        .clamp(0.0, math.max(0.0, position.maxScrollExtent))
-        .toDouble();
+    final target =
+        (widget.viewportInsets.top +
+                band.labelRow * miningGridCellSize * _sceneScale)
+            .clamp(0.0, math.max(0.0, position.maxScrollExtent))
+            .toDouble();
     if (animate && !widget.reducedMotion) {
       _scrollController.animateTo(
         target,
@@ -318,32 +321,34 @@ class _MiningGridMapState extends State<MiningGridMap> {
         : viewportHeight;
     final bottom = requestedBottom.clamp(top, viewportHeight);
     final height = bottom - top;
-    // Four 44dp targets plus comfortable gaps need 224dp. A shorter clear
-    // band wraps to two columns instead of shrinking a target or growing into
-    // the cargo gauge/Sell column; the bottom row then stays tappable.
-    final vertical = height >= _depthRailTargetSize * 4 + 16 * 3;
-    final columns = vertical ? 1 : 2;
-    final gap = vertical ? 16.0 : 0.0;
-    final railWidth = columns * _depthRailTargetSize;
-    final railHeight = vertical
-        ? _depthRailTargetSize * 4 + gap * 3
-        : math.min(height, _depthRailTargetSize * 2);
+    // One vertical column: 44dp targets plus gaps up to 16dp (224dp total).
+    // A shorter clear band reduces the gaps to zero and then overlaps the
+    // targets by the small minimum needed to stay inside the HUD bounds;
+    // targets are never shrunk, wrapped, or allowed over the cargo gauge/Sell.
+    // shortcut: below a 176dp clear band the 44dp targets overlap minimally,
+    // revisit with HPA-1244's depth rail if such a screen ships.
+    final gap = ((height - _depthRailTargetSize * 4) / 3).clamp(
+      -_depthRailTargetSize,
+      16.0,
+    );
+    final railHeight = math.min(
+      height,
+      _depthRailTargetSize * 4 + math.max(0.0, gap) * 3,
+    );
     return Positioned(
       key: const Key('mining-depth-rail'),
       top: top,
       height: railHeight,
       right: widget.railRight,
       child: SizedBox(
-        width: railWidth,
+        width: _depthRailTargetSize,
         height: railHeight,
         child: Stack(
           children: [
             for (final (index, band) in MiningBand.values.indexed)
               Positioned(
-                top:
-                    (vertical ? index : index ~/ 2) *
-                    (_depthRailTargetSize + gap),
-                left: (vertical ? 0 : index % 2) * _depthRailTargetSize,
+                top: index * (_depthRailTargetSize + gap),
+                left: 0,
                 child: _depthRailButton(band),
               ),
           ],

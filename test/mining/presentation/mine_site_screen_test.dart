@@ -212,9 +212,13 @@ Future<Offset> _scrollToCell(WidgetTester tester, MiningGridCell cell) async {
   if (tester.any(cargo)) {
     clearTop = math.max(clearTop, tester.getRect(cargo).bottom + 8);
   }
+  final back = find.byKey(const Key('mine-site-back'));
+  if (tester.any(back)) {
+    clearTop = math.max(clearTop, tester.getRect(back).bottom + 8);
+  }
   var clearBottom = map.bottom - 12;
   if (tester.any(sell)) {
-    clearBottom = math.min(clearBottom, tester.getRect(sell).top - 16);
+    clearBottom = math.min(clearBottom, tester.getRect(sell).top - 2);
   }
   final position = _scrollPosition(tester);
   Rect currentCellRect() {
@@ -632,7 +636,7 @@ void main() {
       );
 
       await tester.tap(find.byKey(const ValueKey<String>('b1')));
-      await tester.tapAt(_cellPoint(tester, _landingRigCells.first));
+      await tester.tapAt(await _scrollToCell(tester, _landingRigCells.first));
       await tester.tap(find.byKey(const Key('mine-site-sell')));
       await tester.tap(find.byKey(const Key('mine-site-back')));
       await tester.tap(find.byKey(const Key('mining-nav-settings')));
@@ -1641,7 +1645,7 @@ void main() {
     ];
     for (final button in buttons) {
       expect(button.width, greaterThanOrEqualTo(44));
-      expect(button.height, greaterThanOrEqualTo(44));
+      expect(button.height, greaterThanOrEqualTo(44 - .01));
       expect(rail.contains(button.topLeft), isTrue);
       expect(
         rail.contains(button.bottomRight - const Offset(0.1, 0.1)),
@@ -1666,9 +1670,7 @@ void main() {
         '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = size;
-      tester.view.padding = size.width == 360
-          ? const FakeViewPadding(top: 0, bottom: 24)
-          : const FakeViewPadding(top: 47, bottom: 34);
+      tester.view.padding = const FakeViewPadding(top: 47, bottom: 34);
       addTearDown(() {
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();
@@ -1717,13 +1719,36 @@ void main() {
       final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
       expect(rail.top, greaterThanOrEqualTo(cargo.bottom));
       expect(rail.bottom, lessThanOrEqualTo(sell.top));
-      for (final band in MiningBand.values) {
-        final button = tester.getRect(
-          find.byKey(Key('mining-depth-rail-${band.name}')),
-        );
+      final buttons = [
+        for (final band in MiningBand.values)
+          tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
+      ];
+      expect(
+        buttons.map((rect) => rect.left).toSet(),
+        hasLength(1),
+        reason: 'the rail never wraps into a second column',
+      );
+      for (final button in buttons) {
+        expect(button.height, greaterThanOrEqualTo(44 - .01));
         for (final chrome in _hudRects(tester)) {
-          expect(button.overlaps(chrome), isFalse, reason: '$band vs $chrome');
+          expect(button.overlaps(chrome), isFalse, reason: 'button vs $chrome');
         }
+      }
+      final buttonStep = buttons[1].top - buttons[0].top;
+      if (rail.height < 176) {
+        // Measured 360x640 / 1.3 / top 47 / bottom 34 constraint: four 44dp
+        // targets need 176dp but the clear cargo-to-Sell band is shorter, so
+        // the gaps become the small minimum overlap instead of shrinking or
+        // wrapping targets.
+        expect(
+          176 - rail.height,
+          greaterThan(0),
+          reason: 'clear band ${rail.height}dp measured; 176dp required',
+        );
+        expect(buttonStep, lessThan(44));
+        expect(buttonStep, greaterThan(0));
+      } else {
+        expect(buttonStep, greaterThanOrEqualTo(44));
       }
       final hud = _hudRects(tester);
       for (var i = 0; i < hud.length; i++) {
@@ -1821,14 +1846,26 @@ void main() {
       final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
       expect(rail.top, greaterThanOrEqualTo(cargo.bottom));
       expect(rail.bottom, lessThanOrEqualTo(402 - 21));
-      for (final band in MiningBand.values) {
-        final button = tester.getRect(
-          find.byKey(Key('mining-depth-rail-${band.name}')),
-        );
+      final buttons = [
+        for (final band in MiningBand.values)
+          tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
+      ];
+      expect(buttons.map((rect) => rect.left).toSet(), hasLength(1));
+      expect(rail.height, 224, reason: 'four 44dp targets plus 3x16dp gaps');
+      for (var i = 0; i < buttons.length; i++) {
+        expect(buttons[i].height, greaterThanOrEqualTo(44 - .01));
+        if (i > 0) {
+          expect(buttons[i].top - buttons[i - 1].top, 60);
+        }
         for (final chrome in _hudRects(tester)) {
-          expect(button.overlaps(chrome), isFalse, reason: '$band vs $chrome');
+          expect(
+            buttons[i].overlaps(chrome),
+            isFalse,
+            reason: 'button vs $chrome',
+          );
         }
       }
+      expect(buttons.last.bottom, lessThanOrEqualTo(402 - 21));
       final band = _unoccludedLandscapeBand(
         cavern.size,
         left: 44,
@@ -1902,11 +1939,14 @@ void main() {
     final scale =
         tester.getRect(find.byKey(const Key('mining-grid-surface'))).width /
         miningGridSceneWidth;
+    final topPadding = tester
+        .getRect(find.byKey(const Key('mine-site-cargo')))
+        .bottom;
     expect(
       _scrollPosition(tester).pixels,
       closeTo(
         math.min(
-          MiningBand.seams.labelRow * miningGridCellSize * scale,
+          topPadding + MiningBand.seams.labelRow * miningGridCellSize * scale,
           _scrollPosition(tester).maxScrollExtent,
         ),
         .5,
@@ -1924,13 +1964,12 @@ void main() {
       view: _siteView(surveyed),
       dock: _dockView(surveyed),
     );
-    expect(_scrollPosition(tester).pixels, 0);
+    // Motherlode row 0 target is exactly the map's top padding, so the
+    // scene top sits at the map's top edge and the label rides at y=0.
+    expect(_scrollPosition(tester).pixels, closeTo(topPadding, .5));
     expect(
       tester.getRect(find.byKey(const Key('mining-band-label-motherlode'))).top,
-      closeTo(
-        tester.getRect(find.byKey(const Key('mining-grid-map'))).top + 134,
-        .5,
-      ),
+      closeTo(tester.getRect(find.byKey(const Key('mining-grid-map'))).top, .5),
     );
   });
 

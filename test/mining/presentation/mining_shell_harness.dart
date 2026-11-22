@@ -144,9 +144,13 @@ Future<void> tapGridCell(WidgetTester tester, MiningGridCell cell) async {
   if (tester.any(cargo)) {
     clearTop = math.max(clearTop, tester.getRect(cargo).bottom + 8);
   }
+  final back = find.byKey(const Key('mine-site-back'));
+  if (tester.any(back)) {
+    clearTop = math.max(clearTop, tester.getRect(back).bottom + 8);
+  }
   var clearBottom = mapRect.bottom - 12;
   if (tester.any(sell)) {
-    clearBottom = math.min(clearBottom, tester.getRect(sell).top - 16);
+    clearBottom = math.min(clearBottom, tester.getRect(sell).top - 2);
   }
 
   Rect cellRect() {

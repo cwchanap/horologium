@@ -127,6 +127,9 @@ Future<void> _pumpMap(
   int impactSequence = 0,
   bool reducedMotion = true,
   double textScale = 1,
+  double railTop = 0,
+  double railBottom = double.infinity,
+  double railRight = 8,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -146,6 +149,9 @@ Future<void> _pumpMap(
           impactSequence: impactSequence,
           reducedMotion: reducedMotion,
           viewportInsets: viewportInsets,
+          railTop: railTop,
+          railBottom: railBottom,
+          railRight: railRight,
         ),
       ),
     ),
@@ -493,10 +499,10 @@ void main() {
       surface.height,
       closeTo(miningGridSceneHeight * 390 / miningGridSceneWidth, .01),
     );
-    // Highest open band is seams (row 13): its scaled offset puts the label
-    // row at the top padding instead of overshooting.
+    // Highest open band is seams (row 13): the specified target is
+    // topPadding + scaled row offset, clamped to the scroll extent.
     final expected = math.min(
-      13 * miningGridCellSize * 390 / miningGridSceneWidth,
+      insets.top + 13 * miningGridCellSize * 390 / miningGridSceneWidth,
       _position(tester).maxScrollExtent,
     );
     expect(_position(tester).pixels, closeTo(expected, .5));
@@ -1019,9 +1025,10 @@ void main() {
       _position(tester).pixels,
       closeTo(
         math.min(
-          18 *
-              miningGridCellSize *
-              (390 / miningGridSceneWidth).clamp(0.0, 1.0),
+          100 +
+              18 *
+                  miningGridCellSize *
+                  (390 / miningGridSceneWidth).clamp(0.0, 1.0),
           _position(tester).maxScrollExtent,
         ),
         .5,
@@ -1055,14 +1062,87 @@ void main() {
       _position(tester).pixels,
       closeTo(
         math.min(
-          MiningBand.pockets.labelRow *
-              miningGridCellSize *
-              (390 / miningGridSceneWidth).clamp(0.0, 1.0),
+          100 +
+              MiningBand.pockets.labelRow *
+                  miningGridCellSize *
+                  (390 / miningGridSceneWidth).clamp(0.0, 1.0),
           _position(tester).maxScrollExtent,
         ),
         .5,
       ),
     );
+  });
+
+  testWidgets('uses the scale-aware target from a nonzero top padding', (
+    tester,
+  ) async {
+    const insets = EdgeInsets.only(top: 50, bottom: 50);
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(430, 423),
+      viewportInsets: insets,
+    );
+
+    final scale = 430 / miningGridSceneWidth;
+    final maxExtent = _position(tester).maxScrollExtent;
+    final seamsTarget = 50 + MiningBand.seams.labelRow * 56 * scale;
+    expect(seamsTarget, lessThan(maxExtent), reason: 'target must be clear');
+    expect(_position(tester).pixels, closeTo(seamsTarget, .5));
+
+    // The Motherlode row 0 target is exactly the top padding, not zero.
+    await tester.tap(find.byKey(const Key('mining-depth-rail-motherlode')));
+    await tester.pump();
+    expect(_position(tester).pixels, 50);
+  });
+
+  testWidgets('keeps a vertical rail and reduces gaps before overlapping', (
+    tester,
+  ) async {
+    Future<List<Rect>> pumpRail(double top, double bottom) async {
+      await _pumpMap(
+        tester,
+        _view(MiningSiteId.landingBasin),
+        (_) {},
+        size: const Size(390, 844),
+        railTop: top,
+        railBottom: bottom,
+      );
+      return [
+        for (final band in MiningBand.values)
+          tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
+      ];
+    }
+
+    // 200dp clear band: still one column, gaps shrink from 16 to 8 so the
+    // four 44dp targets fit without touching the HUD.
+    var buttons = await pumpRail(100, 300);
+    expect(buttons.map((rect) => rect.left).toSet(), hasLength(1));
+    for (var i = 0; i < buttons.length; i++) {
+      expect(buttons[i].height, greaterThanOrEqualTo(44 - .01));
+      if (i > 0) {
+        expect(buttons[i].top - buttons[i - 1].bottom, 8);
+        expect(buttons[i].overlaps(buttons[i - 1]), isFalse);
+      }
+    }
+    expect(buttons.first.top, 100);
+    expect(buttons.last.bottom, 300);
+
+    // 155dp clear band (the measured 360x640 worst case): no wrap and no
+    // target shrink; the minimum 7dp overlap keeps all four inside the band.
+    buttons = await pumpRail(134, 289);
+    expect(buttons.map((rect) => rect.left).toSet(), hasLength(1));
+    for (final button in buttons) {
+      expect(button.height, greaterThanOrEqualTo(44 - .01));
+    }
+    expect(buttons.first.top, 134);
+    expect(buttons.last.bottom, closeTo(289, .01));
+    for (var i = 1; i < buttons.length; i++) {
+      expect(buttons[i].top, closeTo(buttons[i - 1].top + 37, .01));
+      final uniqueHeight = buttons[i].top - buttons[i - 1].top;
+      expect(uniqueHeight, greaterThanOrEqualTo(32));
+    }
   });
 
   testWidgets('reduced motion jumps the rail and hides the halo', (
@@ -1082,7 +1162,7 @@ void main() {
     await tester.pump();
     final after = _position(tester).pixels;
     expect(after, isNot(before));
-    expect(after, 0);
+    expect(after, 100);
   });
 
   testWidgets('draws the 4x4 Motherlode and one halo on every site', (
