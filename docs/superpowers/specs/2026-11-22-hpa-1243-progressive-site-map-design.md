@@ -7,7 +7,7 @@ Delivery: **one draft PR for the ticket**, initially planning-only; future imple
 
 ## Outcome and strict scope
 
-Replace the generated 50×50 / 100-deposit Mine Site field on **all fifteen sites** with the same compact, vertically navigable 8×21 / ten-mine map. The player sees pockets at the bottom, then seams, lodes and the Motherlode at the top. Locked bands remain visible and explain the *existing* Surveying requirement. A four-stop depth rail navigates between bands. The map fits the width of a phone, and scrolling (not pinch-zoom or free pan) exposes its height.
+Replace the generated 50×50 / 100-deposit Mine Site field on **all fifteen sites** with the same compact, vertically navigable 8×22 / ten-mine map. The player sees pockets at the bottom, then seams, lodes and the Motherlode at the top. Locked bands remain visible and explain the *existing* Surveying requirement. A four-stop depth rail navigates between bands. The map fits the width of a phone, and scrolling (not pinch-zoom or free pan) exposes its height.
 
 **Preserve the economy, controller actions, shared storage, rig rules, save shape, commissioning/mastery, tech prices, and public-action journey timing.** Size is presentation only here. HPA-1241 implements real HP/exhaustion/refill, HPA-1240 drag/drop and move, and HPA-1244 yield/HP economics, band-exhaustion gates and Site Deck depth. No painted art or sound is needed.
 
@@ -22,42 +22,48 @@ Replace the generated 50×50 / 100-deposit Mine Site field on **all fifteen site
 | `lib/mining/presentation/mine_site_screen.dart` | Preserve existing HUD, sell, dock, navigation, safe-area and portrait/landscape chrome; the cavern owns the map viewport. |
 | `lib/mining/presentation/animated_mining_grid_visual_layer.dart` | The three approved animated sites are Landing Basin, Carbon Ridge and Frozen Basin. Keep transient strike HP and cargo-stage frames until HPA-1241; handle 4×4 sizing without adding an economy clock. |
 | `lib/mining/mining_save_repository.dart` | Strict validation already rejects grid-outside / invalid persisted placements and triggers recovered-load behavior. Do not add migration or schema/version fields. |
-| `test/integration/merge_mining_journey_test.dart` | Public-action progression under injected time is the pacing oracle; update only placement selection, not its economics or milestones. |
+| `test/mining/presentation/mining_shell_harness.dart` | Shared `tapGridCell` currently hardcodes `50 * miningGridCellSize` and pans the `mining-grid-interactive`; it has many shell-test callers. Update it once for new width and later for scrolling rather than editing individual tests. The separate `_cellPoint` helper in `mine_site_screen_test.dart` also hardcodes 50. |
+| `test/integration/merge_mining_journey_test.dart` | Public-action progression under injected time is the pacing oracle. It already finds legal cells through `firstPlayableCell` / `deployableMiningCells`, so **run it unchanged** and require zero timing/regression diff. |
 
 One concrete required fix: `depositVisualSize` currently throws for footprint 4. Support the 4×4 Motherlode explicitly in the **existing** visual helper; preserve its existing 1–3 sizes and asset families.
 
-## Decision 1 — one stable layout and four band definitions
+## Decision 1 — one stable typed layout, four bands and four clear label rows
 
-Coordinates are logical (column, row, square size), row 0 at the top. Author this geometry **once** and reuse it across sites:
+A closed `enum MiningBand { pockets, seams, lodes, motherlode }` in `mining_content.dart` is the **single band identity** for content, UI, tests and later HPA-1244. Give it a display label and an authored label-row coordinate. Keep **one** immutable geometry map keyed by `MiningBand`, plus one **non-UI** lookup `bandForDeposit(MiningDepositDefinition)` derived from the author's unique footprint sizes 1–4. This avoids an extra stored field on `MiningDepositDefinition`, a second interpretation in the widget, a custom registry, and all schema/state changes. Its values are progression-ordered (pockets → seams → lodes → Motherlode), independent of the visual top-to-bottom order.
 
-| Band, low → high | Geometry `(x, y, size)` | Surveying requirement |
-| --- | --- | --- |
-| Pockets (4 × 1×1) | `(0,19,1)` `(2,19,1)` `(5,19,1)` `(7,19,1)` | The site's existing step 0 |
-| Seams (3 × 2×2) | `(0,14,2)` `(3,14,2)` `(6,14,2)` | Existing step 1 |
-| Lodes (2 × 3×3) | `(0,8,3)` `(5,8,3)` | Existing step 2 |
-| Motherlode (1 × 4×4) | `(2,1,4)` | Existing step 3 |
+The field is **8 columns × 22 rows**, row 0 at the top. This uses the ticket's allowed approximate geometry, adding one label row to remove the collision in the 8×22 draft. The exact authored geometry is:
 
-The 8×21 canvas leaves gutter rows for clear band titles. No mines overlap or extend out of bounds. Expose bands in stable **pockets → seams → lodes → Motherlode** progression order regardless of top-to-bottom painted order; future per-mine save state can use authored deposit order. A small immutable layout constant and derived labels/anchors are enough: do not add a configurable map engine, site-specific copy of the layout, persisted band state or a new repository.
+| Band, low → high | Geometry `(x, y, size)` | Full-width label row | Surveying requirement |
+| --- | --- | --- | --- |
+| Pockets (4 × 1×1) | `(0,20,1)` `(2,20,1)` `(5,20,1)` `(7,20,1)` | 18 | Existing step 0 |
+| Seams (3 × 2×2) | `(0,15,2)` `(3,15,2)` `(6,15,2)` | 13 | Existing step 1 |
+| Lodes (2 × 3×3) | `(0,9,3)` `(5,9,3)` | 7 | Existing step 2 |
+| Motherlode (1 × 4×4) | `(2,2,4)` | 0 | Existing step 3 |
 
-Required Surveying remains **[0,0,1,2] for Landing Basin**, **[3,3,4,5] for Frozen Basin** and each site's existing four-tuple for the rest. For the 12 sites with all four steps at Surveying 5, all bands are open at that level. A locked band uses one dim overlay/chip per band, not ten individual lock badges. The chip says, e.g., **“Surveying 1 opens the lodes”**, not “Exhaust 2 pockets” (reserved for HPA-1244). Each mine remains uniquely reachable by at least one legal orthogonally adjacent cell; assert this over all sites. Existing site cap of 4 rigs and the rule that a rig targets exactly one mine stay unchanged.
+Every label row (0, 7, 13, 18) is entirely clear of **both deposits and all legal unique rig-perimeter cells**. The 22nd row keeps bottom pocket perimeters in bounds. The map keeps every mine's unique legal perimeter intact; no overlapping deposits and no ambiguity about which mine a rig works. Derive `requiredSurveyingLevel` from `_surveyingProgressionLevels[siteId]![band.index]`; retain the existing per-deposit field as the **only** placement-legality input. No persisted unlock flags.
 
-## Decision 2 — width-fit scroll, not an alternative camera system
+Landing Basin remains `[0,0,1,2]`, Frozen Basin `[3,3,4,5]` and Titanium Highlands `[4,4,5,5]`. **Ten** late sites have all four steps at Surveying 5; when they unlock, all four bands are already open, no lock chip is shown, and first framing targets the Motherlode. A locked band shows dimmed mines and one chip reading the required Surveying level (for example, **“Surveying 1 opens the lodes”**); do not introduce HPA-1244's later “Exhaust 2 pockets” wording. The current site limit of four rigs and each rig's unique orthogonal target remain unchanged.
 
-Keep one `MiningGridMap` StatefulWidget. Replace `InteractiveViewer` / `TransformationController` with a single `ScrollController` and vertical `SingleChildScrollView`; no horizontal pan, pinch zoom or gesture-mode toggle.
+Keep this to an enum, its label/row, one geometry constant and one lookup. No configurable map engine, per-site layout copies, new controller state or extra save data.
 
-Reuse the current **56 dp logical cell** in existing static/animated painters and gesture coordinates. Scale the **entire scene** uniformly to `min(1.0, availableWidth / (8 × 56))` and give the surrounding sized box the **scaled** width/height. This preserves all existing logical cell math, painting and hit-test transforms without rewriting every painter. At 360 dp available width the displayed cell is 45 dp (≥44); at widths ≥448 dp it is capped at 56 dp and the map is centered. Do **not** subtract the existing left/right HUD clearance from the scene width, which would unnecessarily shrink the 360 dp case. Reserve the existing `viewportInsets`' vertical top/bottom chrome clearances in the scroll extent / target positioning, so cells and controls can be scrolled out from behind fixed HUD/dock overlays.
+## Decision 2 — a native vertical scroll with Flutter's existing scaling
 
-The four-node depth rail sits at the viewport's **right edge**, reflects unlocked/locked states derived from `MineSiteView` and uses normal accessible tap/semantic actions to scroll to the corresponding band. On narrow phones it may overlay a small edge strip, but only its actual node hit targets intercept taps; no permanently opaque rail may make an otherwise legal rig cell unreachable. Prove that cells behind the rail can be reached by scrolling. The initial scroll frames the **highest Surveying-unlocked band** (the furthest open band from the dock). Clamp to valid extents and visibly preserve the playable lower band. A new site / newly unlocked band can reframe once; an ordinary one-second `MineSiteView` refresh must **not** reset the user's scroll. Rail taps scroll smoothly normally and jump without animation under `reducedMotion` / `MediaQuery.disableAnimations`.
+Keep one `MiningGridMap` StatefulWidget. Replace `InteractiveViewer` / `TransformationController` with a `ScrollController` and `SingleChildScrollView`: scrolling vertically reveals the full map, while pinch zoom, free pan and horizontal scroll go away.
 
-Keep scene-level tap positions mapped back to integer logical grid coordinates using the transformed child and `miningGridCellSize`; do not multiply by scaling twice. Keep rig/accessibility semantics and the existing controller callback flow.
+Use Flutter's built-in `FittedBox(fit: BoxFit.scaleDown)`, centered inside the width-constrained scroll content, around the existing logical `SizedBox(width: 8 × 56, height: 22 × 56)`. This automatically scales the **entire scene**, including painter, labels, overlays and pointer transformation, without hand-building matrices or separately scaling hit tests. The fixed logical `miningGridCellSize = 56` and existing map-level `onTapUp` local position conversion remain authoritative. At 360 dp of map width, displayed cells are 45 dp (≥44); at viewport widths ≥448 dp, they stay ≤56 dp and the scene is centered. **Do not subtract the existing HUD's horizontal left/right clearance from available map width** or make a second zoom state. Verify `FittedBox` constraints, scroll extent and logical hit testing under the actual Flutter widget tests, rather than assuming the layout.
+
+Use the Mine Site's existing `viewportInsets` only for **vertical** top/bottom scroll padding and scroll target clearance, so cells can move out from behind fixed cash/cargo/Sell/dock/nav chrome. Four small depth-rail buttons sit at the viewport's right edge, reflect `MiningBand` and `MineSiteView`'s existing Surveying-derived lock status, and use normal semantic actions. Only actual buttons intercept taps; the rail's surrounding column is pass-through so right-edge rig cells are accessible. Test scrolling a right-edge cell out from behind any overlapping button before tapping.
+
+**Frame once**, after the scroll controller has laid out, at the **highest open band**; clamp the offset to valid scroll extents. Reuse a single `_scrollToBand(MiningBand, {required bool animate})` function for that initial jump and depth-rail taps. Remove old `_initialFocus`/rig-bounding-box focus and `_initialCamera` entirely. On a newly opened band **do not** auto-reframe; its rail becomes enabled/updated and the player may tap it. New site entry creates a fresh keyed state, while the one-second screen refresh preserves current scroll by construction. Rail buttons animate scroll normally and use `jumpTo` under `reducedMotion` / `MediaQuery.disableAnimations`.
 
 ## Decision 3 — present the authored hierarchy with existing assets
 
-- Label each band in its empty gutter row: **POCKETS / SEAMS / LODES / MOTHERLODE**; show which band is open on the rail. Use existing dark/mining theme typography and contrast. Keep cavern art repeating behind the whole map.
-- Render locked-band mines dimmed, retaining their visible silhouettes. Put **one** explicit Surveying requirement chip per locked band. Researching that level recomputes the view and reveals the band without closing/reopening the site.
-- Use current static node art for static sites and current approved frame families for the 3 animated sites. Add `4 => 224` (or smaller within the 224 dp logical footprint) to `depositVisualSize` and test animated/static rendering of 4×4. Keep the existing transient visual HP and impact SFX rules; no new resource-health state and no HPA-1241 exhausted/IDLE presentation.
-- The Motherlode has a small code-drawn gold halo/glow, disabled in reduced motion; do not add PNGs, shaders, particle systems, frame families or SFX.
-- Non-grid Mine Site HUD, Fleet Dock, Site Deck, Technology and navigation do not change. Frame D from the attached mockup is specifically **out of scope**.
+- Put the four band labels **only** on the dedicated, non-interactive gutter rows 0, 7, 13 and 18; map labels and locked-band chips are `IgnorePointer` overlays, with readable accessible rail labels separately. Keep cavern art repeating behind the map and the existing mining theme's contrast.
+- Dim mines in locked bands while retaining their silhouettes, and render **one** Surveying requirement chip per locked band. Reading the current `MineSiteView` after buying Surveying makes that band usable without leaving the site. For the ten all-5 late sites, there are no locked chips at their unlock level.
+- Reuse the existing node/cavern art and the three approved frame families. Add explicit `4 => 224` footprint support to `depositVisualSize` so the 4×4 Motherlode works in the static and animated layers; verify that overlays, rig/HP labels and hit regions stay visible.
+- Render the Motherlode's gold emphasis as **one static code-drawn `BoxShadow` or radial-gradient halo**, not a pulsing animation/ticker. Hide that decoration under reduced motion, and avoid animating rail movement in that mode.
+- Keep transient visual strike HP, cargo-driven frame stage and existing SFX/impact ownership on animated sites unchanged until HPA-1241. No real HP, exhausted/IDLE state, new sprites, shaders, particle system or new audio.
+- Keep Site Deck, Sell, Technology, Fleet Dock, navigation and the existing Mine Site chrome unchanged. Mockup frame D belongs to HPA-1244.
 
 ## Decision 4 — preserve gameplay and recovery
 
@@ -73,15 +79,15 @@ No changes to `MiningController`'s public actions, `MiningSimulation`, price/rat
 
 ## Acceptance contract (automated; no manual sign-off)
 
-1. **Topology:** all 15 sites use exactly the same in-bounds 8×21 map and ten unique deposits (4×1, 3×2, 2×3, 1×4) in stable authored order. Each has legal unique perimeters; four Surveying steps map by band, not by individual mine.
+1. **Topology:** all 15 sites use exactly the same in-bounds 8×22 map and ten unique deposits (4×1, 3×2, 2×3, 1×4) in stable authored order. Each has legal unique perimeters (at least four cells at each site's unlock level); four Surveying steps map by band, not by individual mine; labels in rows 0/7/13/18 overlap no legal cells.
 2. **Presentation:** 360×640, 390×844 and 430×932 portrait; 874×402 landscape; and a tablet-width viewport fit horizontally with zero pinch/free-pan. Displayed cell ≥44 dp at 360 dp, ≤56 dp at wide sizes. Landscape/tablet canvas is centered.
-3. **Interaction:** deterministic initial framing at highest unlocked band; depth rail jumps to all four bands, announces lock status and remains keyboard/semantic operable; no one-second recenter; locked bands cannot accept rigs; researching Surveying reveals the right band live; every legal target can be tapped after scrolling.
-4. **Visual:** browser-MCP screenshots of Mine Site at initial, intermediate and late Surveying states visually compared to the attached HPA-1243 **frames A–C** for layout, depth rail, labels, dimming, Motherlode glow and responsive chrome. Explicitly ignore “Exhaust 2 pockets”, true HP/IDLE and frame D: later tickets own those. No overflow/intersections or masked required controls.
+3. **Interaction:** frame **only on entry** at the highest open band; a research unlock refreshes rail/locks without stealing scroll. Depth rail navigates to all four bands and remains keyboard/semantic operable. Locked mines reject deployment; every legal target, including right-edge cells, stays tappable after scrolling. Shared shell tap helpers use actual grid width and scroll mechanics, not the old 50×50 InteractiveViewer.
+4. **Visual:** MCP-browser screenshots of Mine Site at Surveying 0/1/2 and landscape captured and compared to the attached HPA-1243 **frames A–C** for layout, depth rail, labels, dimming, Motherlode glow and responsive chrome. Explicitly ignore “Exhaust 2 pockets”, true HP/IDLE and frame D: later tickets own those. No overflow/intersections or masked required controls.
 5. **Animation/recovery:** existing animated sites still strike and show transient HP including 4×4; static sites remain static; reduced motion stops glow/animated rail movement. Off-field saved rig clean-recovers; new-layout save round-trips. No save migration.
-6. **Economy:** journey controller-action test under injected time passes **unchanged pacing bands and milestones** for both visit cadences and relaunch. Rates, capacity, site/planet costs, Surveying, unlock/mastery, rewards and storage alert timing are unchanged.
-7. **End to end:** MCP-driven browser automation of **Flutter web** on one platform, with a fresh save, places a rig on a pocket, rejects locked-band placement, researches Surveying, verifies the band opens, navigates with the depth rail, places on an unlocked band, sells, reloads, and checks persisted actions. Collect screenshots as test evidence, not committed artwork. Mobile-native e2e is unnecessary absent platform-specific behavior.
+6. **Economy:** existing journey controller-action test runs **without changes** under injected time and passes **unchanged pacing bands and milestones** for both visit cadences and relaunch. Rates, capacity, site/planet costs, Surveying, unlock/mastery, rewards and storage alert timing are unchanged.
+7. **End to end:** cover the full spawn → pocket deploy → locked lode rejection → Surveying 1 purchase → rail → lode deploy → sell/reload flow in **one reusable MiningShell widget test**. Also perform **one short MCP-driven Flutter-web E2E smoke** on a fresh save to prove real-screen touch/navigation/screenshot integration on a single platform. Record actual result and capture screenshot evidence without committing artifacts; no native acceptance is needed absent platform-specific changes.
 8. **Repo gates:** all commands in `CLAUDE.md` run as applicable: format, analyze, Flutter VM tests, coverage, Chrome tests, APK/web/iOS simulator builds. Record actual pass/fail/blocked results; do not pre-claim a pass.
 
 ## Documentation update
 
-After implementation, update `CLAUDE.md`'s current “Mine Site is an InteractiveViewer over a deterministic 50×50 grid” paragraph to the new deterministic 8×21 ten-mine scroll map. Leave historical specs untouched.
+After implementation, update `CLAUDE.md`'s current “Mine Site is an InteractiveViewer over a deterministic 50×50 grid” paragraph to the new deterministic 8×22 ten-mine scroll map. Leave historical specs untouched.
