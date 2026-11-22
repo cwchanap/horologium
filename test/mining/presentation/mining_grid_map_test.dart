@@ -1184,6 +1184,24 @@ void main() {
     expect(worstRail.top, 181);
     expect(worstRail.height, 44);
     expect(worstRail.bottom, lessThanOrEqualTo(289 - 44));
+
+    // The horizontal arrangement keeps the same semantic and keyboard path.
+    final handle = tester.ensureSemantics();
+    expect(
+      find.bySemanticsLabel('Jump to Lodes band. Requires Surveying 1.'),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel('Jump to Motherlode band. Requires Surveying 2.'),
+      findsOneWidget,
+    );
+    // The target widgets are the same shared focusable button used by the
+    // dedicated keyboard test; the horizontal layout only changes position.
+    expect(
+      find.byKey(const Key('mining-depth-rail-focus-motherlode')),
+      findsOneWidget,
+    );
+    handle.dispose();
   });
 
   testWidgets('reduced motion jumps the rail and hides the halo', (
