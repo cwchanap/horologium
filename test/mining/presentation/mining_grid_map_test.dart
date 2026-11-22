@@ -1097,7 +1097,7 @@ void main() {
     expect(_position(tester).pixels, 50);
   });
 
-  testWidgets('keeps a vertical rail and reduces gaps before overlapping', (
+  testWidgets('keeps a vertical rail with reduced gaps above 176dp', (
     tester,
   ) async {
     Future<List<Rect>> pumpRail(double top, double bottom) async {
@@ -1128,20 +1128,39 @@ void main() {
     }
     expect(buttons.first.top, 100);
     expect(buttons.last.bottom, 300);
+  });
 
-    // 155dp clear band (the measured 360x640 worst case): no wrap and no
-    // target shrink; the minimum 7dp overlap keeps all four inside the band.
-    buttons = await pumpRail(134, 289);
-    expect(buttons.map((rect) => rect.left).toSet(), hasLength(1));
-    for (final button in buttons) {
-      expect(button.height, greaterThanOrEqualTo(44 - .01));
-    }
-    expect(buttons.first.top, 134);
-    expect(buttons.last.bottom, closeTo(289, .01));
-    for (var i = 1; i < buttons.length; i++) {
-      expect(buttons[i].top, closeTo(buttons[i - 1].top + 37, .01));
-      final uniqueHeight = buttons[i].top - buttons[i - 1].top;
-      expect(uniqueHeight, greaterThanOrEqualTo(32));
+  testWidgets('uses four separate 44dp targets in a 2x2 grid below 176dp', (
+    tester,
+  ) async {
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+      railTop: 134,
+      railBottom: 289,
+    );
+    final buttons = [
+      for (final band in MiningBand.values)
+        tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
+    ];
+
+    // 155dp measured band: no overlap, no target shrink and no HUD growth.
+    expect(buttons.map((rect) => rect.left).toSet(), hasLength(2));
+    expect(buttons.map((rect) => rect.top).toSet(), hasLength(2));
+    for (var i = 0; i < buttons.length; i++) {
+      expect(buttons[i].width, greaterThanOrEqualTo(44 - .01));
+      expect(buttons[i].height, greaterThanOrEqualTo(44 - .01));
+      expect(buttons[i].left, greaterThanOrEqualTo(0));
+      expect(buttons[i].bottom, lessThanOrEqualTo(289 + .01));
+      for (var j = i + 1; j < buttons.length; j++) {
+        expect(
+          buttons[i].overlaps(buttons[j]),
+          isFalse,
+          reason: '2x2 targets $i and $j overlap',
+        );
+      }
     }
   });
 
