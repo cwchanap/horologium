@@ -71,13 +71,6 @@ Do not change the **public** `MiningController` API, `MiningSimulation`, `Mining
 3. Browser MCP screenshots: Surveying **0/1/2** at **390×844** and one **874×402** landscape shot, compared to Linear `map-mockup.png` frames **A–C** for four bands, collision-free labels, rail/HUD, full-bleed cavern, Motherlode halo, dimming and Sell clearance. Exhausted/IDLE, true HP, later “Exhaust 2 pockets” copy and frame D remain **out of scope**. Comparison is an automated acceptance evidence check with **no human sign-off**.
 4. Keep screenshots out of tracked Git. Correct any visual mismatch in PR #57 and repeat the screenshot.
 
-## Task 3 — Reusable user workflow and visual comparison
-
-1. Add **one `mining_shell_test.dart` workflow** using the existing shell harness, actual user actions and controller-owned persistence: fresh Landing Basin → spawn/select T1 → pocket deploy → locked lode rejection → research Surveying 1 → live unlock → rail navigation → deploy on lode → sell → reload. Reuse existing helper cases instead of duplicating the whole suite.
-2. Keep accessibility/touch semantics tests at the rail and rightmost rig cells. Specifically check that Surveying 1 research updates the rail/lock state but **does not** unexpectedly reframe.
-3. In browser MCP, collect screenshots for Surveying **0/1/2** at **390×844** and one **874×402** landscape shot. Compare the screenshots to Linear's attached `map-mockup.png` frames **A–C** for bands, labels, chips, rail, Motherlode emphasis and safe-area chrome. The mockup's “Exhaust 2 pockets”, true HP/IDLE and frame D belong to later tickets; **do not implement them**. Screenshot comparison is acceptance evidence—**no human approval criterion**.
-4. Keep screenshots out of the tracked repo. If the visual check finds a mismatch, fix within PR #57 and repeat capture.
-
 ## Task 4 — Save/economy regression and documentation
 
 1. Reuse save/controller tests; add only new-field round-trip, off-field old placement clean-recovery and locked/unlocked placement cases if existing suites lack them. The strict decoder already checks placement; do **not** add migration or a compatibility reader.
