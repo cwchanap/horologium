@@ -19,9 +19,15 @@ final _firstResourceCells = _landingSite
     .perimeterCellsByDeposit[_landingSite.deposits.first]!
     .toList();
 
-/// A cell adjacent to the third progression resource (Surveying 1).
-final _lockedCell =
-    _landingSite.perimeterCellsByDeposit[_landingSite.deposits[2]]!.first;
+/// The authored Surveying-1 resource: its perimeter is legal only once
+/// Surveying 1 is researched.
+final _lockedCell = _landingSite
+    .perimeterCellsByDeposit[_landingSite.deposits.firstWhere(
+      (deposit) =>
+          deposit.requiredSurveyingLevel == 1 &&
+          _landingSite.perimeterCellsByDeposit[deposit]!.isNotEmpty,
+    )]!
+    .first;
 
 class TestClock {
   TestClock(this.now);

@@ -9,7 +9,6 @@ import 'package:horologium/game/audio_manager.dart';
 import 'package:horologium/game/storage_alerts.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_controller.dart';
-import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
@@ -76,7 +75,10 @@ class DelayedAudioPrefsManager extends AudioManager {
 
 final _start = miningShellTestStart;
 
-const landingRigCell = MiningGridCell(3, 2);
+/// A legal Surveying-0 Landing Basin deploy cell.
+final landingRigCell = firstPlayableCell(
+  MiningContentRegistry.stellarMining().site(MiningSiteId.landingBasin),
+);
 
 MiningSave deployedLandingBasin(DateTime now) {
   final base = MiningSave.initial(nowUtc: now);
@@ -122,7 +124,10 @@ final _freeLandingDeployCell = deployableMiningCells(
   MiningContentRegistry.stellarMining().site(MiningSiteId.landingBasin),
 ).firstWhere((cell) => cell != landingRigCell);
 
-const frozenRigCell = MiningGridCell(4, 2);
+/// A legal Surveying-3 Frozen Basin deploy cell.
+final frozenRigCell = firstPlayableCell(
+  MiningContentRegistry.stellarMining().site(MiningSiteId.frozenBasin),
+);
 
 /// Homeworld mastered, Lunar Frontier unlocked and active at Surveying 3,
 /// with one T1 rig mining Frozen Basin from [frozenRigCell].
