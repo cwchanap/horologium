@@ -1749,15 +1749,16 @@ void main() {
       } else {
         // Measured 360x640 / 1.3 / top 47 / bottom 34 constraint: four 44dp
         // targets need 176dp but the clear cargo-to-Sell band is only 108dp
-        // (155dp with just the bottom inset). Keep the targets separate in a
-        // 2x2 grid instead of shrinking or overlapping them.
+        // (155dp with just the bottom inset). Keep four independent targets
+        // high in one horizontal row, leaving the band below clear.
         expect(
           176 - rail.height,
           greaterThan(0),
           reason: 'clear band ${rail.height}dp measured; 176dp required',
         );
-        expect(buttons.map((rect) => rect.left).toSet(), hasLength(2));
-        expect(buttons.map((rect) => rect.top).toSet(), hasLength(2));
+        expect(rail.height, 44);
+        expect(buttons.map((rect) => rect.top).toSet(), hasLength(1));
+        expect(buttons.map((rect) => rect.left).toSet(), hasLength(4));
       }
       final hud = _hudRects(tester);
       for (var i = 0; i < hud.length; i++) {
@@ -1788,22 +1789,45 @@ void main() {
         lessThan(sell.top),
         reason: 'the bottom row must clear Sell at maximum scroll',
       );
-      await tester.tapAt(
-        await _scrollToCell(tester, const MiningGridCell(7, 21)),
-      );
-      await tester.pump();
-      expect(taps, <MiningGridCell>[const MiningGridCell(7, 21)]);
-
-      // Right-edge physical tapping stays reachable beside the rail.
-      taps.clear();
       final surface = tester.getRect(
         find.byKey(const Key('mining-grid-surface')),
       );
       final scale = surface.width / miningGridSceneWidth;
       final cellSize = miningGridCellSize * scale;
-      await tester.tapAt(
-        Offset(surface.left + 8 * cellSize - 2, surface.top + 21.5 * cellSize),
+      final cellRect = Rect.fromCenter(
+        center: bottom,
+        width: cellSize,
+        height: cellSize,
       );
+      final visible = cellRect.intersect(
+        tester.getRect(find.byKey(const Key('mining-grid-map'))),
+      );
+      var blocked = 0.0;
+      for (final chrome in [..._hudRects(tester), rail]) {
+        final overlap = cellRect.intersect(chrome);
+        if (overlap.width > 0 && overlap.height > 0) {
+          blocked += overlap.width * overlap.height;
+        }
+      }
+      final unobstructed = visible.width * visible.height - blocked;
+      expect(
+        unobstructed,
+        greaterThanOrEqualTo(44 * 44 - .01),
+        reason:
+            'the bottom-right cell must expose a full 44dp interaction area, '
+            'not just a sliver: $cellRect',
+      );
+
+      // Direct center tap: the compact rail must not intercept the legal
+      // bottom-right cell's normal target.
+      taps.clear();
+      await tester.tapAt(bottom);
+      await tester.pump();
+      expect(taps, <MiningGridCell>[const MiningGridCell(7, 21)]);
+
+      // The right edge likewise remains reachable beside the rail.
+      taps.clear();
+      await tester.tapAt(Offset(cellRect.right - 2, bottom.dy));
       await tester.pump();
       expect(taps, <MiningGridCell>[const MiningGridCell(7, 21)]);
       expect(tester.takeException(), isNull);
