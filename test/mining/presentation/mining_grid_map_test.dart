@@ -521,6 +521,14 @@ void main() {
     );
     final framed = _position(tester).pixels;
 
+    // The locked lodes band is exposed on the rail and the label row.
+    final semantics = tester.ensureSemantics();
+    expect(
+      find.bySemanticsLabel('Jump to Lodes band. Requires Surveying 1.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('mining-band-lock-lodes')), findsOneWidget);
+
     _position(tester).jumpTo(framed + 120);
     await tester.pump();
     final scrolled = _position(tester).pixels;
@@ -537,6 +545,17 @@ void main() {
     expect(_position(tester).pixels, scrolled);
     expect(find.text('Surveying 1 opens the lodes'), findsNothing);
     expect(find.text('Surveying 2 opens the motherlode'), findsOneWidget);
+    expect(find.byKey(const Key('mining-band-lock-lodes')), findsNothing);
+    expect(
+      find.byKey(const Key('mining-band-lock-motherlode')),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('Jump to Lodes band'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Jump to Motherlode band. Requires Surveying 2.'),
+      findsOneWidget,
+    );
+    semantics.dispose();
   });
 
   testWidgets('centers the scene on wide viewports without horizontal pan', (

@@ -9,6 +9,7 @@ import 'package:horologium/game/audio_manager.dart';
 import 'package:horologium/game/storage_alerts.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_controller.dart';
+import 'package:horologium/mining/mining_grid.dart';
 import 'package:horologium/mining/mining_progression_views.dart';
 import 'package:horologium/mining/mining_save_repository.dart';
 import 'package:horologium/mining/mining_state.dart';
@@ -17,6 +18,7 @@ import 'package:horologium/mining/presentation/mining_hud.dart';
 import 'package:horologium/mining/presentation/mining_sheet_frame.dart';
 import 'package:horologium/mining/presentation/mining_navigation.dart';
 import 'package:horologium/mining/presentation/mine_site_screen.dart';
+import 'package:horologium/mining/presentation/mining_grid_map.dart';
 import 'package:horologium/mining/presentation/mining_shell.dart';
 import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
@@ -163,6 +165,23 @@ final _carbonRidgeCell = deployableMiningCells(
 
 final _graniteCraterDeployCell = graniteCraterDeployCell;
 final _osmiumDeployCell = osmiumDeployCell;
+
+/// The authored right-edge bottom pocket: tapping this cell after scrolling
+/// also proves the rightmost tap column stays reachable beside the rail.
+const _workflowPocketCell = MiningGridCell(7, 21);
+
+/// A shared-adjacency gap between pockets (0,20) and (2,20).
+const _workflowAmbiguousCell = MiningGridCell(1, 20);
+
+/// A unique perimeter cell of the left Surveying-1 lode at (0,9).
+const _workflowLodeCell = MiningGridCell(3, 10);
+
+/// Fresh Landing Basin with the minimum cash the ordered workflow needs:
+/// one spawned T1 plus the 300-cash Surveying 1 research. A pristine save
+/// starts at 100 cash, so the requested order would otherwise need a sale
+/// before research.
+MiningSave workflowStartState(DateTime now) =>
+    MiningSave.initial(nowUtc: now).copyWith(cash: 400);
 
 MiningSave deployedCarbonRidgeState(DateTime now) {
   final base = MiningSave.initial(nowUtc: now);
@@ -1353,6 +1372,215 @@ void main() {
       'audio/tap.wav',
       'audio/rig.wav',
     ]);
+  });
+
+  testWidgets('a reusable full shell workflow covers the progressive map', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final clock = TestClock(_start);
+    final repository = CountingMiningSaveRepository();
+    await repository.save(workflowStartState(_start));
+    await pumpShell(
+      tester,
+      repository: repository,
+      clock: clock,
+      viewport: const Size(390, 844),
+    );
+
+    final handles = shellHandles(tester);
+    var state = handles.controller.state;
+    final content = MiningContentRegistry.stellarMining();
+    final landing = state.sites[MiningSiteId.landingBasin]!;
+    expect(landing.unlocked, isTrue);
+    expect(landing.commissioned, isFalse);
+    expect(landing.rigPlacements, isEmpty);
+
+    await tester.tap(find.byKey(const Key('site-card-landingBasin-enter')));
+    await tester.pump();
+
+    // A fresh Landing Basin shows pockets and seams open, lodes locked, and
+    // the rail's semantic target carries the same lock state.
+    expect(find.text('Surveying 1 opens the lodes'), findsOneWidget);
+    expect(find.byKey(const Key('mining-band-lock-lodes')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Jump to Lodes band. Requires Surveying 1.'),
+      findsOneWidget,
+    );
+
+    // Spawn a T1 (the fresh save's b1/b2 stay untouched), then deploy it on
+    // the right-edge bottom pocket after a physical scroll.
+    var saves = repository.saveCount;
+    await tester.tap(find.byKey(const Key('fleet-dock-spawn')));
+    await tester.pump(const Duration(milliseconds: 300));
+    state = handles.controller.state;
+    expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b3], RigTier.t1);
+    expect(state.cash, 375);
+    expect(repository.saveCount, saves + 1);
+
+    saves = repository.saveCount;
+    await tapGridCell(tester, _workflowPocketCell);
+    await tester.pump(const Duration(milliseconds: 300));
+    state = handles.controller.state;
+    expect(state.sites[MiningSiteId.landingBasin]!.rigPlacements, [
+      const MiningRigPlacement(tier: RigTier.t1, cell: _workflowPocketCell),
+    ]);
+    expect(state.sites[MiningSiteId.landingBasin]!.commissioned, isTrue);
+    expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b3], isNull);
+    expect(repository.saveCount, saves + 1);
+    expect(
+      find.bySemanticsLabel(
+        RegExp(r'T1 rig at \(7,21\) mining deposit \(7,20\)'),
+      ),
+      findsOneWidget,
+    );
+
+    // Select a dock T1, then reject the shared-adjacency gap as ordinary
+    // feedback: no exception, no lost rig, cash, or save.
+    await tester.tap(find.byKey(const ValueKey<String>('b1')));
+    await tester.pump();
+    expect(
+      find.bySemanticsLabel('Dock bay B1: Selected T1 rig.'),
+      findsOneWidget,
+    );
+    saves = repository.saveCount;
+    await tapGridCell(tester, _workflowAmbiguousCell);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      find.text('Place the rig next to a single resource.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    state = handles.controller.state;
+    expect(state.sites[MiningSiteId.landingBasin]!.rigPlacements, hasLength(1));
+    expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b1], RigTier.t1);
+    expect(state.cash, 375);
+    expect(repository.saveCount, saves);
+
+    // The locked lode is a normal rejection while the same rig stays selected.
+    await tapGridCell(tester, _workflowLodeCell);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Requires Surveying 1.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    state = handles.controller.state;
+    expect(state.sites[MiningSiteId.landingBasin]!.rigPlacements, hasLength(1));
+    expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b1], RigTier.t1);
+    expect(repository.saveCount, saves);
+
+    // Research Surveying 1 through the real Technology sheet.
+    final scrollable = find
+        .descendant(
+          of: find.byKey(const Key('mining-grid-scroll')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    double scrollPixels() =>
+        tester.state<ScrollableState>(scrollable).position.pixels;
+    final beforeResearch = scrollPixels();
+    await tester.tap(find.byKey(const Key('mining-nav-technology')));
+    await pumpSheet(tester);
+    expect(find.byKey(const Key('mining-technology-sheet')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('technology-track-surveying')));
+    await tester.pump();
+    saves = repository.saveCount;
+    await tester.tap(find.byKey(const Key('mining-technology-buy-surveying')));
+    await tester.pump(const Duration(milliseconds: 400));
+    state = handles.controller.state;
+    expect(state.technology.surveying, 1);
+    expect(state.cash, 75);
+    expect(repository.saveCount, saves + 1);
+
+    await tester.tap(find.bySemanticsLabel('Close Technology'));
+    await pumpSheet(tester);
+    expect(find.byKey(const Key('mining-technology-sheet')), findsNothing);
+
+    // The purchase updates the rail and lock copy in place without reframing.
+    expect(scrollPixels(), beforeResearch);
+    expect(find.byKey(const Key('mining-band-lock-lodes')), findsNothing);
+    expect(
+      find.byKey(const Key('mining-band-lock-motherlode')),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('Jump to Lodes band'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Jump to Motherlode band. Requires Surveying 2.'),
+      findsOneWidget,
+    );
+
+    // Rail navigation moves to the newly opened band.
+    final surface = tester.getRect(
+      find.byKey(const Key('mining-grid-surface')),
+    );
+    final cargoBottom = tester
+        .getRect(find.byKey(const Key('mine-site-cargo')))
+        .bottom;
+    await tester.tap(find.byKey(const Key('mining-depth-rail-lodes')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(scrollPixels(), isNot(beforeResearch));
+    expect(
+      scrollPixels(),
+      closeTo(
+        cargoBottom +
+            MiningBand.lodes.labelRow *
+                miningGridCellSize *
+                surface.width /
+                miningGridSceneWidth,
+        0.5,
+      ),
+    );
+
+    // The still-selected dock rig deploys on the now-open lode.
+    saves = repository.saveCount;
+    await tapGridCell(tester, _workflowLodeCell);
+    await tester.pump(const Duration(milliseconds: 300));
+    state = handles.controller.state;
+    expect(state.sites[MiningSiteId.landingBasin]!.rigPlacements, hasLength(2));
+    expect(state.docks[MiningPlanetId.homeworld]![DockBayId.b1], isNull);
+    expect(state.cash, 75);
+    expect(repository.saveCount, saves + 1);
+
+    // Accrue both producers, sell once, and verify the persisted result.
+    clock.now = clock.now.add(const Duration(minutes: 5));
+    await tester.pump(const Duration(seconds: 1));
+    state = handles.controller.state;
+    expect(
+      state.storedCargo(content, MiningPlanetId.homeworld),
+      greaterThan(0),
+    );
+    final cashBeforeSale = state.cash;
+    saves = repository.saveCount;
+    await tester.tap(find.byKey(const Key('mine-site-sell')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('Sold '), findsOneWidget);
+    state = handles.controller.state;
+    expect(state.storedCargo(content, MiningPlanetId.homeworld), 0);
+    expect(state.cash, greaterThan(cashBeforeSale));
+    expect(repository.saveCount, saves + 1);
+
+    // Reload through a second repository and shell: controller-owned
+    // persistence restores the researched level, both rigs, and the sale.
+    final sold = state;
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    final reloadedRepository = CountingMiningSaveRepository();
+    await pumpShell(
+      tester,
+      repository: reloadedRepository,
+      clock: clock,
+      viewport: const Size(390, 844),
+    );
+    final reloaded = shellHandles(tester).controller.state;
+    expect(
+      reloaded.sites[MiningSiteId.landingBasin]!.rigPlacements,
+      sold.sites[MiningSiteId.landingBasin]!.rigPlacements,
+    );
+    expect(reloaded.technology.surveying, 1);
+    expect(reloaded.cash, sold.cash);
+    expect(reloaded.storedCargo(content, MiningPlanetId.homeworld), 0);
+    expect(find.byKey(const Key('site-deck-scroll')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
   });
 
   testWidgets('Mine Site upgrades a placed rig with a matching dock rig', (
