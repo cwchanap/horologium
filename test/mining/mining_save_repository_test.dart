@@ -14,8 +14,24 @@ final _landingSite = _content.site(MiningSiteId.landingBasin);
 final _firstResourceCells = _landingSite
     .perimeterCellsByDeposit[_landingSite.deposits.first]!
     .toList();
+
+/// A legal Surveying-0 Landing Basin deploy cell.
+final _landingRigCell = firstPlayableCell(_landingSite);
+
+/// The Surveying-1 resource, whose perimeter is legal only after research.
+final _surveyLockedDeposit = _landingSite.deposits.firstWhere(
+  (deposit) =>
+      deposit.requiredSurveyingLevel == 1 &&
+      _landingSite.perimeterCellsByDeposit[deposit]!.isNotEmpty,
+);
 final _surveyLockedCell =
-    _landingSite.perimeterCellsByDeposit[_landingSite.deposits[2]]!.first;
+    _landingSite.perimeterCellsByDeposit[_surveyLockedDeposit]!.first;
+final _carbonRidgeRigCell = firstPlayableCell(
+  _content.site(MiningSiteId.carbonRidge),
+);
+final _frozenBasinRigCell = firstPlayableCell(
+  _content.site(MiningSiteId.frozenBasin),
+);
 
 MiningSave _progressedState(DateTime now) {
   final initial = MiningSave.initial(nowUtc: now);
@@ -39,7 +55,7 @@ MiningSave _progressedState(DateTime now) {
     commissioned: true,
     storedAmount: 80,
     rigPlacements: [
-      MiningRigPlacement(tier: RigTier.t1, cell: const MiningGridCell(3, 2)),
+      MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCell),
     ],
   );
   sites[MiningSiteId.carbonRidge] = sites[MiningSiteId.carbonRidge]!.copyWith(
@@ -47,7 +63,7 @@ MiningSave _progressedState(DateTime now) {
     commissioned: true,
     storedAmount: 40,
     rigPlacements: [
-      MiningRigPlacement(tier: RigTier.t1, cell: const MiningGridCell(5, 1)),
+      MiningRigPlacement(tier: RigTier.t1, cell: _carbonRidgeRigCell),
     ],
   );
   sites[MiningSiteId.frozenBasin] = sites[MiningSiteId.frozenBasin]!.copyWith(
@@ -55,7 +71,7 @@ MiningSave _progressedState(DateTime now) {
     commissioned: true,
     storedAmount: 60,
     rigPlacements: [
-      MiningRigPlacement(tier: RigTier.t2, cell: const MiningGridCell(4, 2)),
+      MiningRigPlacement(tier: RigTier.t2, cell: _frozenBasinRigCell),
     ],
   );
 
@@ -297,10 +313,7 @@ void main() {
       );
       expect(
         () => result.state.sites[MiningSiteId.landingBasin]!.rigPlacements.add(
-          MiningRigPlacement(
-            tier: RigTier.t1,
-            cell: const MiningGridCell(3, 2),
-          ),
+          MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCell),
         ),
         throwsUnsupportedError,
       );
@@ -319,10 +332,7 @@ void main() {
                 commissioned: true,
                 storedAmount: 4000,
                 rigPlacements: [
-                  MiningRigPlacement(
-                    tier: RigTier.t1,
-                    cell: const MiningGridCell(3, 2),
-                  ),
+                  MiningRigPlacement(tier: RigTier.t1, cell: _landingRigCell),
                 ],
               ),
         },
@@ -465,7 +475,12 @@ void main() {
         ((extraPlacementField['sites']!
                 as Map<String, Object?>)['landingBasin']!
             as Map<String, Object?>)['rigPlacements'] = [
-          {'tier': 't1', 'x': 3, 'y': 2, 'extra': true},
+          {
+            'tier': 't1',
+            'x': _landingRigCell.x,
+            'y': _landingRigCell.y,
+            'extra': true,
+          },
         ];
         await expectRecovered(extraPlacementField);
       },
@@ -631,7 +646,11 @@ void main() {
             'commissioned': true,
             'storedAmount': 0,
             'rigPlacements': [
-              {'tier': 't1', 'x': 5, 'y': 10},
+              {
+                'tier': 't1',
+                'x': _surveyLockedCell.x,
+                'y': _surveyLockedCell.y,
+              },
             ],
           },
         },
@@ -705,8 +724,8 @@ void main() {
         );
         final invalid = <Map<String, Object?>>[
           rawWithLandingPlacements([
-            {'tier': 't1', 'x': 3, 'y': 2},
-            {'tier': 't2', 'x': 3, 'y': 2},
+            {'tier': 't1', 'x': _landingRigCell.x, 'y': _landingRigCell.y},
+            {'tier': 't2', 'x': _landingRigCell.x, 'y': _landingRigCell.y},
           ]),
           rawWithLandingPlacements([
             {'tier': 't1', 'x': -1, 'y': 0},
@@ -719,10 +738,10 @@ void main() {
               {'tier': 't1', 'x': cell.x, 'y': cell.y},
           ], surveying: 2),
           rawWithLandingPlacements([
-            {'tier': 't9', 'x': 3, 'y': 2},
+            {'tier': 't9', 'x': _landingRigCell.x, 'y': _landingRigCell.y},
           ]),
           rawWithLandingPlacements([
-            {'tier': 't1', 'x': 3.5, 'y': 2},
+            {'tier': 't1', 'x': _landingRigCell.x + .5, 'y': _landingRigCell.y},
           ]),
         ];
 

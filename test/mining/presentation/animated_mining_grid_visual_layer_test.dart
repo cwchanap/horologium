@@ -15,35 +15,74 @@ import '../../support/mining_visual_frames.dart';
 
 final _content = MiningContentRegistry.stellarMining();
 final _start = DateTime.utc(2026, 8, 26, 12);
-const _defaultCell = MiningGridCell(2, 3);
 
 final _landing = _content.site(MiningSiteId.landingBasin);
 
-/// The default rig at (2,3) uniquely mines the pinned first progression
-/// resource (1,1,2,0) from the content contract: an authored 2x2 at (1,1).
-final _minedDeposit = _landing.deposits.singleWhere(
-  (d) => d.x == 1 && d.y == 1 && d.size == 2,
+/// Legal Surveying-0 Landing Basin cells, row-major.
+final _deployableCells = deployableMiningCells(_landing);
+
+/// The default rig cell: the first legal deploy cell, and the one resource it
+/// uniquely mines.
+final _defaultCell = _deployableCells.first;
+final _minedDeposit = uniqueAdjacentDeposit(
+  deposits: _landing.deposits,
+  cell: _defaultCell,
+)!;
+
+/// The default target's resource HP, derived from its authored footprint.
+final _minedMaxHp = miningResourceMaxHp(_minedDeposit.size);
+
+String _hpValue(int value) => '$value/$_minedMaxHp';
+
+/// Another Surveying-0 resource with slots and no rig on it.
+final _unminedDeposit = _landing.deposits.firstWhere(
+  (deposit) =>
+      deposit != _minedDeposit &&
+      deposit.requiredSurveyingLevel == 0 &&
+      _landing.perimeterCellsByDeposit[deposit]!.isNotEmpty,
 );
 
-/// An authored deposit with no rig on it.
-final _unminedDeposit = _landing.deposits[1];
+/// A legal rig cell directly below its unique target resource.
+final _belowTargetCell = _deployableCells.firstWhere((cell) {
+  final target = uniqueAdjacentDeposit(deposits: _landing.deposits, cell: cell);
+  return target != null && cell.y == target.y + target.size;
+});
 
-final _deployableCells = deployableMiningCells(_landing);
+/// First authored perimeter cell matching a target relationship, independent
+/// of list position or literal coordinates.
+MiningGridCell _perimeterCellWhere(
+  bool Function(MiningGridCell cell, MiningDepositDefinition deposit) matches,
+) {
+  for (final deposit in _landing.deposits) {
+    for (final cell in _landing.perimeterCellsByDeposit[deposit]!) {
+      if (matches(cell, deposit)) return cell;
+    }
+  }
+  throw StateError('No authored perimeter cell matches the fixture.');
+}
 
 /// A legal rig cell directly beside an authored 1x1 resource, where the strike
 /// midpoint sits only half a cell below the rig cell's top edge — the exact
 /// geometry that drifts a damage label up into the top-anchored tier chip.
 MiningGridCell _sideRigCell({required bool targetOnRight}) =>
-    deployableMiningCells(_landing, surveyingLevel: 2).firstWhere((cell) {
-      final target = uniqueAdjacentDeposit(
-        deposits: _landing.deposits,
-        cell: cell,
-      );
-      return target != null &&
-          target.size == 1 &&
-          target.y == cell.y &&
-          (targetOnRight ? cell.x == target.x - 1 : cell.x == target.x + 1);
-    });
+    _perimeterCellWhere(
+      (cell, deposit) =>
+          deposit.size == 1 &&
+          deposit.y == cell.y &&
+          (targetOnRight ? cell.x == deposit.x - 1 : cell.x == deposit.x + 1),
+    );
+
+/// A rig cell directly above an authored resource of [footprint], with the
+/// oversized robot art overlapping that resource's HP bar.
+(MiningGridCell, MiningDepositDefinition) _rigAbove(int footprint) {
+  for (final deposit in _landing.deposits) {
+    if (deposit.size != footprint) continue;
+    for (final cell in _landing.perimeterCellsByDeposit[deposit]!) {
+      if (cell.y == deposit.y - 1) return (cell, deposit);
+    }
+  }
+  throw StateError('No authored $footprint-cell resource has an upper rig.');
+}
 
 Key _depositKey(MiningDepositDefinition deposit) =>
     Key('landing-basin-deposit-${deposit.x}-${deposit.y}-${deposit.size}');
@@ -90,16 +129,26 @@ Offset _damageTopLeft(WidgetTester tester, MiningGridCell cell) =>
       ),
     );
 
-/// Two legal perimeter cells of the default mined deposit, so two rigs can
-/// share one resource body (a break needs more damage than one T5 strike).
-final _sharedAdjacentCells = _deployableCells
+/// Every legal Surveying-0 perimeter cell of the default target.
+final _minedAdjacentCells = _deployableCells
     .where((cell) => _minedDeposit.isOrthogonallyAdjacent(cell))
-    .take(2)
     .toList();
+
+/// Two legal perimeter cells of the default mined deposit, so two rigs can
+/// share one resource body.
+final _sharedAdjacentCells = _minedAdjacentCells.take(2).toList();
+
+/// Enough T5 strikes to break the default target, derived from its HP.
+final _breakRigs = [
+  for (final cell in _minedAdjacentCells.take(
+    (_minedMaxHp / miningStrikeDamage(RigTier.t5)).ceil(),
+  ))
+    (RigTier.t5, cell),
+];
 
 MineSiteView _view({
   RigTier rigTier = RigTier.t1,
-  MiningGridCell cell = _defaultCell,
+  MiningGridCell? cell,
   bool withRig = true,
   double progress = 0,
   List<(RigTier, MiningGridCell)> rigs = const [],
@@ -109,7 +158,7 @@ MineSiteView _view({
     if (rigs.isNotEmpty)
       ...rigs.map((entry) => MiningRigPlacement(tier: entry.$1, cell: entry.$2))
     else if (withRig)
-      MiningRigPlacement(tier: rigTier, cell: cell),
+      MiningRigPlacement(tier: rigTier, cell: cell ?? _defaultCell),
   ];
   final initial = MiningSave.initial(nowUtc: _start);
   final tiers = placements.map((placement) => placement.tier).toList();
@@ -143,7 +192,7 @@ MineSiteView _view({
 Future<void> _pumpLayer(
   WidgetTester tester, {
   RigTier rigTier = RigTier.t1,
-  MiningGridCell cell = _defaultCell,
+  MiningGridCell? cell,
   bool withRig = true,
   double progress = 0,
   int impactSequence = 0,
@@ -250,6 +299,12 @@ String _robotCellKey(MiningGridCell cell) =>
 
 Key _robotKey(MiningGridCell cell) => Key(_robotCellKey(cell));
 
+Key _robotBodyKey(MiningGridCell cell) =>
+    Key('landing-basin-robot-body-transform-${cell.x}-${cell.y}');
+
+Key _robotArmKey(MiningGridCell cell) =>
+    Key('landing-basin-robot-arm-transform-${cell.x}-${cell.y}');
+
 MineSiteRigView _rig(
   RigTier tier,
   MiningGridCell cell,
@@ -274,14 +329,10 @@ Transform _robotFlipTransform(WidgetTester tester, MiningGridCell cell) =>
     );
 
 Transform _robotBodyTransform(WidgetTester tester, MiningGridCell cell) =>
-    tester.widget<Transform>(
-      find.byKey(Key('landing-basin-robot-body-transform-${cell.x}-${cell.y}')),
-    );
+    tester.widget<Transform>(find.byKey(_robotBodyKey(cell)));
 
 Transform _robotArmTransform(WidgetTester tester, MiningGridCell cell) =>
-    tester.widget<Transform>(
-      find.byKey(Key('landing-basin-robot-arm-transform-${cell.x}-${cell.y}')),
-    );
+    tester.widget<Transform>(find.byKey(_robotArmKey(cell)));
 
 /// The [Stack] directly hosting [finder]'s ancestor chain and the index of
 /// that hosted widget, so sibling paint order can be asserted.
@@ -469,8 +520,8 @@ void main() {
   testWidgets('animates only the mined deposit and keeps others static', (
     tester,
   ) async {
-    // The default rig at (2,3) mines the (1,1) deposit only: it runs its idle
-    // loop while unmined deposits stay on their static stage plate.
+    // The default rig mines its own target only: it runs its idle loop while
+    // unmined deposits stay on their static stage plate.
     await _pumpLayer(tester, reducedMotion: false);
     expect(_depositAsset(tester), MiningDepositFrames.gold.idle(1));
     expect(
@@ -758,14 +809,14 @@ void main() {
       );
       expect(
         find.descendant(
-          of: find.byKey(Key('landing-basin-robot-body-transform-2-3')),
+          of: find.byKey(_robotBodyKey(_defaultCell)),
           matching: find.byType(SizedBox),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
-          of: find.byKey(Key('landing-basin-robot-arm-transform-2-3')),
+          of: find.byKey(_robotArmKey(_defaultCell)),
           matching: find.byType(SizedBox),
         ),
         findsOneWidget,
@@ -789,7 +840,7 @@ void main() {
 
     await _pumpLayer(tester, impactSequence: 1, assetBundle: bundle);
     await tester.pump(const Duration(milliseconds: 200));
-    expect(_hpText(tester), '80/80');
+    expect(_hpText(tester), _hpValue(_minedMaxHp));
 
     bundle.failMining = false;
     await tester.runAsync(() async {
@@ -802,7 +853,7 @@ void main() {
     });
     await _pumpLayer(tester, impactSequence: 2, assetBundle: bundle);
     await tester.pump(const Duration(milliseconds: 470));
-    expect(_hpText(tester), '70/80');
+    expect(_hpText(tester), _hpValue(_minedMaxHp - 10));
   }, skip: kIsWeb);
 
   // A missing asset self-evicts through AssetBundleImageProvider, but a
@@ -826,7 +877,7 @@ void main() {
       // carries it through contact.
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 470));
-      expect(_hpText(tester), '70/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp - 10));
     },
     skip: kIsWeb,
   );
@@ -865,7 +916,7 @@ void main() {
       await _drainDecodes(tester);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 470));
-      expect(_hpText(tester), '70/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp - 10));
       for (final deposit in [_minedDeposit, _unminedDeposit]) {
         final rawImage = rawImageIn(_depositKey(deposit));
         expect(rawImage, findsOneWidget, reason: '$deposit');
@@ -909,14 +960,19 @@ void main() {
     await _pumpLayer(tester, impactSequence: 1);
     await tester.pump(const Duration(milliseconds: 300));
 
-    for (final key in [
-      'landing-basin-impact-2-3',
-      'landing-basin-sparks-2-3',
-      'landing-basin-rock-chips-2-3',
-      'landing-basin-dust-2-3',
-      'landing-basin-gold-glow-2-3',
+    for (final effect in [
+      'impact',
+      'sparks',
+      'rock-chips',
+      'dust',
+      'gold-glow',
     ]) {
-      expect(find.byKey(Key(key)), findsNothing);
+      expect(
+        find.byKey(
+          Key('landing-basin-$effect-${_defaultCell.x}-${_defaultCell.y}'),
+        ),
+        findsNothing,
+      );
     }
   });
 
@@ -939,13 +995,13 @@ void main() {
 
       final bodyImage = tester.widget<Image>(
         find.descendant(
-          of: find.byKey(Key('landing-basin-robot-body-transform-2-3')),
+          of: find.byKey(_robotBodyKey(_defaultCell)),
           matching: find.byType(Image),
         ),
       );
       final armImage = tester.widget<Image>(
         find.descendant(
-          of: find.byKey(Key('landing-basin-robot-arm-transform-2-3')),
+          of: find.byKey(_robotArmKey(_defaultCell)),
           matching: find.byType(Image),
         ),
       );
@@ -975,19 +1031,51 @@ void main() {
   testWidgets('mirrors the robot only when the deposit sits to its right', (
     tester,
   ) async {
-    // The default target occupies (1,1) with size 2, so its center-X is 2.0.
-    // The robot mirrors whenever that center sits right of the rig cell so
-    // the arm strikes toward the resource; the chassis never rotates
-    // vertically for deposits above or below.
+    // The robot mirrors whenever the target centre sits right of the rig cell
+    // so the arm strikes toward the resource; the chassis never rotates
+    // vertically for deposits above or below. Each case queries an authored
+    // perimeter relationship instead of a literal cell.
     final cases = <(MiningGridCell, bool)>[
-      // Right of the deposit: target center is left of the rig.
-      (const MiningGridCell(3, 1), false),
-      // Left of the deposit: target center is right of the rig.
-      (const MiningGridCell(0, 2), true),
-      // Above, rig center-X right of the deposit center.
-      (const MiningGridCell(2, 0), false),
-      // Below, rig center-X left of the deposit center.
-      (const MiningGridCell(1, 3), true),
+      // Right of the deposit: target centre is left of the rig.
+      (
+        _perimeterCellWhere(
+          (cell, deposit) =>
+              deposit.size > 1 &&
+              cell.x == deposit.x + deposit.size &&
+              cell.y >= deposit.y &&
+              cell.y < deposit.y + deposit.size,
+        ),
+        false,
+      ),
+      // Left of the deposit: target centre is right of the rig.
+      (
+        _perimeterCellWhere(
+          (cell, deposit) =>
+              deposit.size > 1 &&
+              cell.x == deposit.x - 1 &&
+              cell.y >= deposit.y &&
+              cell.y < deposit.y + deposit.size,
+        ),
+        true,
+      ),
+      // Above, rig centre-X right of the deposit centre.
+      (
+        _perimeterCellWhere(
+          (cell, deposit) =>
+              cell.y == deposit.y - 1 && cell.x == deposit.x + deposit.size - 1,
+        ),
+        false,
+      ),
+      // Below, rig centre-X left of the deposit centre.
+      (
+        _perimeterCellWhere(
+          (cell, deposit) =>
+              deposit.size > 1 &&
+              cell.y == deposit.y + deposit.size &&
+              cell.x == deposit.x,
+        ),
+        true,
+      ),
     ];
 
     for (final (cell, expectedMirror) in cases) {
@@ -1010,16 +1098,16 @@ void main() {
     ) async {
       await warmDepositFrames(tester, MiningDepositFrames.gold);
       await _pumpLayer(tester, impactSequence: 0);
-      expect(_hpText(tester), '80/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp));
 
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 450));
-      expect(_hpText(tester), '80/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp));
       await tester.pump(const Duration(milliseconds: 20));
-      expect(_hpText(tester), '70/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp - 10));
 
       await tester.pump(const Duration(seconds: 1));
-      expect(_hpText(tester), '70/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp - 10));
     }, skip: kIsWeb);
 
     testWidgets('a cargo update without a new impact keeps the struck HP', (
@@ -1029,23 +1117,23 @@ void main() {
       await _pumpLayer(tester, impactSequence: 0);
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 470));
-      expect(_hpText(tester), '70/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp - 10));
 
       await _pumpLayer(tester, impactSequence: 1, progress: .5);
-      expect(_hpText(tester), '70/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp - 10));
       await tester.pump(const Duration(seconds: 1));
-      expect(_hpText(tester), '70/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp - 10));
     }, skip: kIsWeb);
 
     // Cold on purpose and cross-platform: a dropped impact must never mutate
     // HP, mirroring the stalled-first-impact drop above.
     testWidgets('a cold-cache dropped impact keeps full HP', (tester) async {
       await _pumpLayer(tester, impactSequence: 0);
-      expect(_hpText(tester), '80/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp));
 
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 200));
-      expect(_hpText(tester), '80/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp));
     });
 
     testWidgets('a warmed late miss at or past 0.62 keeps full HP', (
@@ -1055,12 +1143,12 @@ void main() {
       await _pumpLayer(tester, impactSequence: 0);
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 450));
-      expect(_hpText(tester), '80/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp));
 
       await tester.pump(const Duration(milliseconds: 200));
-      expect(_hpText(tester), '80/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp));
       await tester.pump(const Duration(seconds: 1));
-      expect(_hpText(tester), '80/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp));
     }, skip: kIsWeb);
 
     testWidgets('remounting the layer resets visible HP', (tester) async {
@@ -1068,32 +1156,25 @@ void main() {
       await _pumpLayer(tester, impactSequence: 0);
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 470));
-      expect(_hpText(tester), '70/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp - 10));
 
       await tester.pumpWidget(const SizedBox.shrink());
       await _pumpLayer(tester, impactSequence: 1);
-      expect(_hpText(tester), '80/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp));
     }, skip: kIsWeb);
 
     testWidgets('paints HP chrome after an upper-row robot', (tester) async {
       // Rigs directly above mined 1x1 and 3x3 resources: the oversized robot
       // art overlaps the HP bar, so only paint order keeps the HP readable.
       final cases = [
-        (
-          const MiningGridCell(27, 0),
-          _landing.deposits.singleWhere(
-            (deposit) => deposit.x == 27 && deposit.y == 1 && deposit.size == 1,
-          ),
-        ),
-        (
-          const MiningGridCell(6, 0),
-          _landing.deposits.singleWhere(
-            (deposit) => deposit.x == 6 && deposit.y == 1 && deposit.size == 3,
-          ),
-        ),
+        for (final footprint in [1, 3]) _rigAbove(footprint),
       ];
       for (final (cell, deposit) in cases) {
-        await _pumpLayer(tester, cell: cell, surveying: 2);
+        await _pumpLayer(
+          tester,
+          cell: cell,
+          surveying: deposit.requiredSurveyingLevel,
+        );
         final robot = tester.getRect(find.byKey(_robotKey(cell)));
         final hp = tester.getRect(find.byKey(_hpKey(deposit)));
         expect(
@@ -1152,11 +1233,11 @@ void main() {
         await _pumpLayer(tester, impactSequence: 0, reducedMotion: true);
         await _pumpLayer(tester, impactSequence: 1, reducedMotion: true);
         await tester.pump(const Duration(milliseconds: 450));
-        expect(_hpText(tester), '80/80');
+        expect(_hpText(tester), _hpValue(_minedMaxHp));
         expect(find.byKey(_damageKey(_defaultCell)), findsNothing);
 
         await tester.pump(const Duration(milliseconds: 30));
-        expect(_hpText(tester), '70/80');
+        expect(_hpText(tester), _hpValue(_minedMaxHp - 10));
         expect(find.byKey(_damageKey(_defaultCell)), findsOneWidget);
         expect(_damageText(tester, _defaultCell), '-10');
         final restTopLeft = _damageTopLeft(tester, _defaultCell);
@@ -1174,51 +1255,59 @@ void main() {
     testWidgets('keeps a below-resource label above the rig chip clearance', (
       tester,
     ) async {
-      // The default rig at (2,3) mines the 2x2 at (1,1): the strike
-      // midpoint sits on the rig cell's top edge, where the map paints the
-      // top-anchored chip. Reduced motion keeps the label still.
+      // A rig directly below its resource: the strike midpoint sits on the rig
+      // cell's top edge, where the map paints the top-anchored chip. Reduced
+      // motion keeps the label still.
       await warmDepositFrames(tester, MiningDepositFrames.gold);
-      await _pumpLayer(tester, impactSequence: 0, reducedMotion: true);
-      await _pumpLayer(tester, impactSequence: 1, reducedMotion: true);
+      await _pumpLayer(
+        tester,
+        cell: _belowTargetCell,
+        impactSequence: 0,
+        reducedMotion: true,
+      );
+      await _pumpLayer(
+        tester,
+        cell: _belowTargetCell,
+        impactSequence: 1,
+        reducedMotion: true,
+      );
       await tester.pump(const Duration(milliseconds: 470));
 
-      final label = find.byKey(_damageKey(_defaultCell));
+      final label = find.byKey(_damageKey(_belowTargetCell));
       expect(label, findsOneWidget);
       final rect = tester.getRect(label);
       expect(
         rect.top,
-        _defaultCell.y * miningGridCellSize - miningRigChipClearance,
+        _belowTargetCell.y * miningGridCellSize - miningRigChipClearance,
       );
       expect(
         rect.bottom,
-        lessThanOrEqualTo(_defaultCell.y * miningGridCellSize),
+        lessThanOrEqualTo(_belowTargetCell.y * miningGridCellSize),
       );
     }, skip: kIsWeb);
 
     testWidgets(
       'drifts a below-1x1-resource label upward above the rig chip clearance',
       (tester) async {
-        final below1x1 = deployableMiningCells(_landing, surveyingLevel: 2)
-            .firstWhere((cell) {
-              final target = uniqueAdjacentDeposit(
-                deposits: _landing.deposits,
-                cell: cell,
-              );
-              return target != null &&
-                  target.size == 1 &&
-                  target.y + target.size == cell.y;
-            });
+        final below1x1 = _perimeterCellWhere(
+          (cell, deposit) =>
+              deposit.size == 1 && deposit.y + deposit.size == cell.y,
+        );
+        final below1x1Level = uniqueAdjacentDeposit(
+          deposits: _landing.deposits,
+          cell: below1x1,
+        )!.requiredSurveyingLevel;
         await warmDepositFrames(tester, MiningDepositFrames.gold);
         await _pumpLayer(
           tester,
           cell: below1x1,
-          surveying: 2,
+          surveying: below1x1Level,
           impactSequence: 0,
         );
         await _pumpLayer(
           tester,
           cell: below1x1,
-          surveying: 2,
+          surveying: below1x1Level,
           impactSequence: 1,
         );
         await tester.pump(const Duration(milliseconds: 470));
@@ -1247,19 +1336,26 @@ void main() {
         final targetOnRight = _sideRigCell(targetOnRight: true);
         final targetOnLeft = _sideRigCell(targetOnRight: false);
         final rigs = [(RigTier.t1, targetOnRight), (RigTier.t1, targetOnLeft)];
+        final surveying = [
+          for (final (_, cell) in rigs)
+            uniqueAdjacentDeposit(
+              deposits: _landing.deposits,
+              cell: cell,
+            )!.requiredSurveyingLevel,
+        ].reduce((a, b) => a > b ? a : b);
         await warmDepositFrames(tester, MiningDepositFrames.gold);
         await _pumpLayer(
           tester,
           rigs: rigs,
           impactSequence: 0,
-          surveying: 2,
+          surveying: surveying,
           textScale: textScale,
         );
         await _pumpLayer(
           tester,
           rigs: rigs,
           impactSequence: 1,
-          surveying: 2,
+          surveying: surveying,
           textScale: textScale,
         );
 
@@ -1299,10 +1395,7 @@ void main() {
     testWidgets('a breaking hit shows visible zero then the fresh max at end', (
       tester,
     ) async {
-      final rigs = [
-        (RigTier.t5, _sharedAdjacentCells[0]),
-        (RigTier.t5, _sharedAdjacentCells[1]),
-      ];
+      final rigs = _breakRigs;
       await warmDepositFrames(tester, MiningDepositFrames.gold);
       await _pumpLayer(
         tester,
@@ -1317,10 +1410,10 @@ void main() {
         reducedMotion: true,
       );
       await tester.pump(const Duration(milliseconds: 470));
-      expect(_hpText(tester), '0/80');
+      expect(_hpText(tester), _hpValue(0));
 
       await tester.pump(const Duration(seconds: 1));
-      expect(_hpText(tester), '80/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp));
     }, skip: kIsWeb);
 
     testWidgets('damage labels are gone at timeline end', (tester) async {
@@ -1343,7 +1436,7 @@ void main() {
       await _pumpLayer(tester, impactSequence: 1);
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.byKey(_damageKey(_defaultCell)), findsNothing);
-      expect(_hpText(tester), '80/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp));
     });
 
     testWidgets('a warmed late miss at or past 0.62 renders no damage labels', (
@@ -1357,7 +1450,7 @@ void main() {
 
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.byKey(_damageKey(_defaultCell)), findsNothing);
-      expect(_hpText(tester), '80/80');
+      expect(_hpText(tester), _hpValue(_minedMaxHp));
     }, skip: kIsWeb);
   });
 
