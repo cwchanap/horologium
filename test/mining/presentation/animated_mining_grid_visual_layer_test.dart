@@ -1034,24 +1034,25 @@ void main() {
     // The robot mirrors whenever the target centre sits right of the rig cell
     // so the arm strikes toward the resource; the chassis never rotates
     // vertically for deposits above or below. Each case queries an authored
-    // perimeter relationship instead of a literal cell.
+    // perimeter relationship instead of a literal cell, and horizontal cases
+    // stay at the unlock Surveying level so they remain real deployments.
     final cases = <(MiningGridCell, bool)>[
-      // Right of the deposit: target centre is left of the rig.
+      // Right of an unlocked resource: target centre is left of the rig.
       (
         _perimeterCellWhere(
           (cell, deposit) =>
-              deposit.size > 1 &&
+              deposit.requiredSurveyingLevel == 0 &&
               cell.x == deposit.x + deposit.size &&
               cell.y >= deposit.y &&
               cell.y < deposit.y + deposit.size,
         ),
         false,
       ),
-      // Left of the deposit: target centre is right of the rig.
+      // Left of an unlocked resource: target centre is right of the rig.
       (
         _perimeterCellWhere(
           (cell, deposit) =>
-              deposit.size > 1 &&
+              deposit.requiredSurveyingLevel == 0 &&
               cell.x == deposit.x - 1 &&
               cell.y >= deposit.y &&
               cell.y < deposit.y + deposit.size,
@@ -1062,7 +1063,8 @@ void main() {
       (
         _perimeterCellWhere(
           (cell, deposit) =>
-              cell.y == deposit.y - 1 && cell.x == deposit.x + deposit.size - 1,
+              cell.y == deposit.y - 1 &&
+              cell.x + .5 > deposit.x + deposit.size / 2,
         ),
         false,
       ),
@@ -1070,16 +1072,24 @@ void main() {
       (
         _perimeterCellWhere(
           (cell, deposit) =>
-              deposit.size > 1 &&
               cell.y == deposit.y + deposit.size &&
-              cell.x == deposit.x,
+              cell.x + .5 < deposit.x + deposit.size / 2,
         ),
         true,
       ),
     ];
 
     for (final (cell, expectedMirror) in cases) {
-      await _pumpLayer(tester, cell: cell, reducedMotion: true);
+      final target = uniqueAdjacentDeposit(
+        deposits: _landing.deposits,
+        cell: cell,
+      )!;
+      await _pumpLayer(
+        tester,
+        cell: cell,
+        reducedMotion: true,
+        surveying: target.requiredSurveyingLevel,
+      );
       final flip = _robotFlipTransform(tester, cell).transform.storage[0];
       expect(flip, expectedMirror ? -1 : 1, reason: '$cell');
     }
