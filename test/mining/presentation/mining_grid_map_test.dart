@@ -513,6 +513,42 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('re-syncs action hit areas after a resize clamps the scroll', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin, selectedBayId: DockBayId.b1),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: const EdgeInsets.fromLTRB(58, 134, 96, 303.5),
+    );
+    await tester.pump(); // initial clamped frame
+
+    const cell = MiningGridCell(7, 19);
+    void expectAligned() {
+      final node = tester.getSemantics(
+        find.byKey(const Key('mining-deploy-cell-7-19')),
+      );
+      final global = MatrixUtils.transformRect(node.transform!, node.rect);
+      final center = _cellPoint(tester, cell);
+      final size = miningGridCellSize * _sceneScale(tester);
+      expect(global.center.dx, closeTo(center.dx, .5));
+      expect(global.center.dy, closeTo(center.dy, .5));
+      expect(global.width, closeTo(size, .1));
+    }
+
+    expectAligned();
+    // Growing the viewport shrinks the scroll extent from 666 to 562 and
+    // clamps the offset during layout, without a normal scroll notification.
+    tester.view.physicalSize = const Size(390, 948);
+    await tester.pump();
+    await tester.pump();
+    expectAligned();
+    handle.dispose();
+  });
+
   testWidgets('keeps the whole-map tap action off merged deposit semantics', (
     tester,
   ) async {
