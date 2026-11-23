@@ -470,6 +470,12 @@ class _MiningGridMapState extends State<MiningGridMap> {
                 child: SingleChildScrollView(
                   key: const Key('mining-grid-scroll'),
                   controller: _scrollController,
+                  // This is a precise tap surface: a bounce would paint cells
+                  // past the extent while the screen-space action rects stay
+                  // clamped, so the visible cell and the hitbox would diverge.
+                  physics: const ClampingScrollPhysics(
+                    parent: RangeMaintainingScrollPhysics(),
+                  ),
                   child: Padding(
                     padding: EdgeInsets.only(
                       top: insets.top,
