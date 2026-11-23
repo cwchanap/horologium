@@ -93,102 +93,13 @@ class MineSiteScreen extends StatelessWidget {
   final int impactSequence;
   final VoidCallback? onMiningImpact;
 
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final landscape = constraints.maxWidth > constraints.maxHeight;
-        return landscape
-            ? _LandscapeMineSite(
-                view: view,
-                fleetDock: fleetDock,
-                cash: cash,
-                reducedMotion: reducedMotion,
-                impactSequence: impactSequence,
-                onMiningImpact: onMiningImpact,
-                onGridCellTap: onGridCellTap,
-                onBayTap: onBayTap,
-                onSpawnRig: onSpawnRig,
-                onBuildRig: onBuildRig,
-                onSellCargo: onSellCargo,
-                onBack: onBack,
-                onSettings: onSettings,
-                onDestinationSelected: onDestinationSelected,
-              )
-            : _PortraitMineSite(
-                view: view,
-                fleetDock: fleetDock,
-                cash: cash,
-                reducedMotion: reducedMotion,
-                impactSequence: impactSequence,
-                onMiningImpact: onMiningImpact,
-                onGridCellTap: onGridCellTap,
-                onBayTap: onBayTap,
-                onSpawnRig: onSpawnRig,
-                onBuildRig: onBuildRig,
-                onSellCargo: onSellCargo,
-                onBack: onBack,
-                onSettings: onSettings,
-                onDestinationSelected: onDestinationSelected,
-              );
-      },
-    );
-  }
-}
-
-class _PortraitMineSite extends StatelessWidget {
-  const _PortraitMineSite({
-    required this.view,
-    required this.fleetDock,
-    required this.cash,
-    required this.reducedMotion,
-    required this.impactSequence,
-    this.onMiningImpact,
-    required this.onGridCellTap,
-    required this.onBayTap,
-    required this.onSpawnRig,
-    required this.onBuildRig,
-    required this.onSellCargo,
-    required this.onBack,
-    required this.onSettings,
-    required this.onDestinationSelected,
-  });
-
-  final MineSiteView view;
-  final FleetDockView fleetDock;
-  final int cash;
-  final bool reducedMotion;
-  final int impactSequence;
-  final VoidCallback? onMiningImpact;
-  final ValueChanged<MiningGridCell> onGridCellTap;
-  final ValueChanged<DockBayId> onBayTap;
-  final VoidCallback onSpawnRig;
-  final ValueChanged<RigTier> onBuildRig;
-  final VoidCallback onSellCargo;
-  final VoidCallback onBack;
-  final VoidCallback onSettings;
-  final ValueChanged<MiningNavigationDestination>? onDestinationSelected;
-
   void _navigate(MiningNavigationDestination destination) {
     if (destination == MiningNavigationDestination.settings) {
       onSettings();
-      return;
-    }
-    final callback = onDestinationSelected;
-    if (callback != null) {
-      callback(destination);
-      return;
-    }
-    switch (destination) {
-      case MiningNavigationDestination.siteDeck:
-        onBack();
-        break;
-      case MiningNavigationDestination.settings:
-        onSettings();
-        break;
-      case MiningNavigationDestination.technology:
-      case MiningNavigationDestination.stellarMap:
-        break;
+    } else if (onDestinationSelected != null) {
+      onDestinationSelected!(destination);
+    } else if (destination == MiningNavigationDestination.siteDeck) {
+      onBack();
     }
   }
 
@@ -197,32 +108,55 @@ class _PortraitMineSite extends StatelessWidget {
     final pad = MediaQuery.paddingOf(context);
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Reserve well past the dock/nav: the Sell column sits above the dock,
-        // so the bottom scroll padding must clear its scaled label height too.
-        final sellTop = portraitMineSellTop(
-          constraints.maxHeight,
-          pad.bottom,
-          MediaQuery.textScalerOf(context),
-          Theme.of(context).textTheme.bodyMedium,
-        );
-        final viewportInsets = EdgeInsets.fromLTRB(
-          pad.left + _portraitBackLeft + _portraitBackWidth,
-          pad.top + _portraitCargoTop + _portraitCargoSize,
-          pad.right + _portraitCargoRight + _portraitCargoSize,
-          math.max(
-            pad.bottom + _portraitNavHeight,
-            constraints.maxHeight - sellTop + _portraitMapSellGap,
-          ),
-        );
+        final landscape = constraints.maxWidth > constraints.maxHeight;
+        final sellTop = landscape
+            ? 0.0
+            : portraitMineSellTop(
+                constraints.maxHeight,
+                pad.bottom,
+                MediaQuery.textScalerOf(context),
+                Theme.of(context).textTheme.bodyMedium,
+              );
+        // Reserve well past the dock/nav in portrait: the Sell column sits
+        // above the dock, so the bottom scroll padding must clear its scaled
+        // label height too.
+        final viewportInsets = landscape
+            ? EdgeInsets.fromLTRB(
+                pad.left,
+                math.max(pad.top, _landscapeCargoTop + _landscapeCargoSize),
+                _landscapeCargoRight + _landscapeCargoSize,
+                pad.bottom +
+                    math.max(
+                      _landscapeToolbarBottom + _landscapeToolbarHeight,
+                      _landscapeSellBottom + _landscapeSellHeight,
+                    ),
+              )
+            : EdgeInsets.fromLTRB(
+                pad.left + _portraitBackLeft + _portraitBackWidth,
+                pad.top + _portraitCargoTop + _portraitCargoSize,
+                pad.right + _portraitCargoRight + _portraitCargoSize,
+                math.max(
+                  pad.bottom + _portraitNavHeight,
+                  constraints.maxHeight - sellTop + _portraitMapSellGap,
+                ),
+              );
         return ColoredBox(
           key: const Key('mine-site-screen'),
-          color: const Color(0xFF0A1218),
+          color: landscape ? const Color(0xFF07111E) : const Color(0xFF0A1218),
           child: Stack(
             children: [
-              Positioned.fill(
+              // The map keeps this slot across the orientation breakpoint, so
+              // a rotation never remounts it, reframes the scroll, or resets
+              // the animated layer's transient strike state. Only the chrome
+              // around it changes layout.
+              Positioned(
+                left: 0,
+                top: 0,
+                right: landscape ? landscapeRightRailWidth + pad.right : 0,
+                bottom: 0,
                 child: _CavernScene(
                   view: view,
-                  landscape: false,
+                  landscape: landscape,
                   reducedMotion: reducedMotion,
                   impactSequence: impactSequence,
                   onMiningImpact: onMiningImpact,
@@ -232,173 +166,95 @@ class _PortraitMineSite extends StatelessWidget {
                   viewportInsets: viewportInsets,
                 ),
               ),
-              Positioned(
-                top: _portraitCashChipTop + pad.top,
-                left: 0,
-                child: MiningCashChip(cash: cash),
-              ),
-              Positioned(
-                top: _portraitBackTop + pad.top,
-                left: _portraitBackLeft,
-                child: _MineChromeButton(
-                  key: const Key('mine-site-back'),
-                  icon: Icons.chevron_left_rounded,
-                  label: 'Back to Site Deck',
-                  onPressed: onBack,
+              if (landscape) ...[
+                Positioned(
+                  top: _landscapeCashChipTop,
+                  left: pad.left,
+                  child: MiningCashChip(cash: cash, compact: true),
                 ),
-              ),
-              Positioned(
-                left: _portraitDockHorizontalMargin,
-                right: _portraitDockHorizontalMargin,
-                bottom: _portraitDockBottom + pad.bottom,
-                child: FleetDock(
-                  view: fleetDock,
-                  axis: FleetDockAxis.horizontal,
-                  onBayTap: onBayTap,
-                  onSpawnRig: onSpawnRig,
-                  onBuildRig: onBuildRig,
+                Positioned(
+                  left: _landscapeToolbarLeft + pad.left,
+                  bottom: _landscapeToolbarBottom + pad.bottom,
+                  width: _landscapeToolbarWidth,
+                  height: _landscapeToolbarHeight,
+                  child: SizedBox(
+                    key: const Key('mine-site-toolbar'),
+                    child: MiningNavigationBar(
+                      compact: true,
+                      selected: MiningNavigationDestination.siteDeck,
+                      onDestinationSelected: _navigate,
+                    ),
+                  ),
                 ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: pad.bottom,
-                child: MiningNavigationBar(
-                  selected: MiningNavigationDestination.siteDeck,
-                  onDestinationSelected: _navigate,
+                Positioned(
+                  key: const Key('mine-site-right-rail'),
+                  top: 0,
+                  right: pad.right,
+                  bottom: 0,
+                  width: landscapeRightRailWidth,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Color.fromRGBO(6, 10, 16, .92),
+                      border: Border(
+                        left: BorderSide(
+                          color: Color.fromRGBO(83, 212, 232, .24),
+                        ),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: pad.bottom),
+                      child: FleetDock(
+                        view: fleetDock,
+                        axis: FleetDockAxis.vertical,
+                        onBayTap: onBayTap,
+                        onSpawnRig: onSpawnRig,
+                        onBuildRig: onBuildRig,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ] else ...[
+                Positioned(
+                  top: _portraitCashChipTop + pad.top,
+                  left: 0,
+                  child: MiningCashChip(cash: cash),
+                ),
+                Positioned(
+                  top: _portraitBackTop + pad.top,
+                  left: _portraitBackLeft,
+                  child: _MineChromeButton(
+                    key: const Key('mine-site-back'),
+                    icon: Icons.chevron_left_rounded,
+                    label: 'Back to Site Deck',
+                    onPressed: onBack,
+                  ),
+                ),
+                Positioned(
+                  left: _portraitDockHorizontalMargin,
+                  right: _portraitDockHorizontalMargin,
+                  bottom: _portraitDockBottom + pad.bottom,
+                  child: FleetDock(
+                    view: fleetDock,
+                    axis: FleetDockAxis.horizontal,
+                    onBayTap: onBayTap,
+                    onSpawnRig: onSpawnRig,
+                    onBuildRig: onBuildRig,
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: pad.bottom,
+                  child: MiningNavigationBar(
+                    selected: MiningNavigationDestination.siteDeck,
+                    onDestinationSelected: _navigate,
+                  ),
+                ),
+              ],
             ],
           ),
         );
       },
-    );
-  }
-}
-
-class _LandscapeMineSite extends StatelessWidget {
-  const _LandscapeMineSite({
-    required this.view,
-    required this.fleetDock,
-    required this.cash,
-    required this.reducedMotion,
-    required this.impactSequence,
-    this.onMiningImpact,
-    required this.onGridCellTap,
-    required this.onBayTap,
-    required this.onSpawnRig,
-    required this.onBuildRig,
-    required this.onSellCargo,
-    required this.onBack,
-    required this.onSettings,
-    required this.onDestinationSelected,
-  });
-
-  final MineSiteView view;
-  final FleetDockView fleetDock;
-  final int cash;
-  final bool reducedMotion;
-  final int impactSequence;
-  final VoidCallback? onMiningImpact;
-  final ValueChanged<MiningGridCell> onGridCellTap;
-  final ValueChanged<DockBayId> onBayTap;
-  final VoidCallback onSpawnRig;
-  final ValueChanged<RigTier> onBuildRig;
-  final VoidCallback onSellCargo;
-  final VoidCallback onBack;
-  final VoidCallback onSettings;
-  final ValueChanged<MiningNavigationDestination>? onDestinationSelected;
-
-  void _navigate(MiningNavigationDestination destination) {
-    if (destination == MiningNavigationDestination.siteDeck) {
-      onBack();
-    } else if (destination == MiningNavigationDestination.settings) {
-      onSettings();
-    } else {
-      onDestinationSelected?.call(destination);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final pad = MediaQuery.paddingOf(context);
-    final viewportInsets = EdgeInsets.fromLTRB(
-      pad.left,
-      math.max(pad.top, _landscapeCargoTop + _landscapeCargoSize),
-      _landscapeCargoRight + _landscapeCargoSize,
-      pad.bottom +
-          math.max(
-            _landscapeToolbarBottom + _landscapeToolbarHeight,
-            _landscapeSellBottom + _landscapeSellHeight,
-          ),
-    );
-    return ColoredBox(
-      key: const Key('mine-site-screen'),
-      color: const Color(0xFF07111E),
-      child: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            top: 0,
-            right: landscapeRightRailWidth + pad.right,
-            bottom: 0,
-            child: _CavernScene(
-              view: view,
-              landscape: true,
-              reducedMotion: reducedMotion,
-              impactSequence: impactSequence,
-              onMiningImpact: onMiningImpact,
-              onGridCellTap: onGridCellTap,
-              onSellCargo: onSellCargo,
-              viewportInsets: viewportInsets,
-            ),
-          ),
-          Positioned(
-            top: _landscapeCashChipTop,
-            left: pad.left,
-            child: MiningCashChip(cash: cash, compact: true),
-          ),
-          Positioned(
-            left: _landscapeToolbarLeft + pad.left,
-            bottom: _landscapeToolbarBottom + pad.bottom,
-            width: _landscapeToolbarWidth,
-            height: _landscapeToolbarHeight,
-            child: SizedBox(
-              key: const Key('mine-site-toolbar'),
-              child: MiningNavigationBar(
-                compact: true,
-                selected: MiningNavigationDestination.siteDeck,
-                onDestinationSelected: _navigate,
-              ),
-            ),
-          ),
-          Positioned(
-            key: const Key('mine-site-right-rail'),
-            top: 0,
-            right: pad.right,
-            bottom: 0,
-            width: landscapeRightRailWidth,
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Color.fromRGBO(6, 10, 16, .92),
-                border: Border(
-                  left: BorderSide(color: Color.fromRGBO(83, 212, 232, .24)),
-                ),
-              ),
-              child: Padding(
-                padding: EdgeInsets.only(bottom: pad.bottom),
-                child: FleetDock(
-                  view: fleetDock,
-                  axis: FleetDockAxis.vertical,
-                  onBayTap: onBayTap,
-                  onSpawnRig: onSpawnRig,
-                  onBuildRig: onBuildRig,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
