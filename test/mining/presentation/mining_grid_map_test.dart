@@ -72,6 +72,10 @@ Finder _chips() => find.byWidgetPredicate(
       (widget.key! as ValueKey<String>).value.startsWith('mining-rig-chip-'),
 );
 
+/// Bands in map-depth order: the top row is the Motherlode.
+List<MiningBand> _depthOrder() =>
+    [...MiningBand.values]..sort((a, b) => a.labelRow.compareTo(b.labelRow));
+
 /// Every rig semantics widget, regardless of label: each rig owns exactly one.
 Finder _rigSemanticsNodes() => find.byWidgetPredicate(
   (widget) =>
@@ -1129,13 +1133,14 @@ void main() {
         railBottom: bottom,
       );
       return [
-        for (final band in MiningBand.values)
+        for (final band in _depthOrder())
           tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
       ];
     }
 
     // 200dp clear band: still one column, gaps shrink from 16 to 8 so the
-    // four 44dp targets fit without touching the HUD.
+    // four 44dp targets fit without touching the HUD. Map-depth order puts
+    // the Motherlode target first.
     var buttons = await pumpRail(100, 300);
     expect(buttons.map((rect) => rect.left).toSet(), hasLength(1));
     for (var i = 0; i < buttons.length; i++) {
@@ -1162,7 +1167,7 @@ void main() {
     );
     final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
     final buttons = [
-      for (final band in MiningBand.values)
+      for (final band in _depthOrder())
         tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
     ];
 
@@ -1174,6 +1179,10 @@ void main() {
     expect(rail.right, lessThanOrEqualTo(390 - 8 + .01));
     expect(buttons.map((rect) => rect.top).toSet(), hasLength(1));
     expect(buttons.map((rect) => rect.left).toSet(), hasLength(4));
+    // The horizontal row reads left-to-right in the same map-depth order.
+    for (var i = 1; i < buttons.length; i++) {
+      expect(buttons[i].left, greaterThan(buttons[i - 1].right));
+    }
     for (var i = 0; i < buttons.length; i++) {
       expect(buttons[i].width, greaterThanOrEqualTo(44 - .01));
       expect(buttons[i].height, greaterThanOrEqualTo(44 - .01));
@@ -1222,6 +1231,71 @@ void main() {
     );
     handle.dispose();
   });
+
+  testWidgets(
+    'rail markers identify every band in map-depth order and navigate',
+    (tester) async {
+      const insets = EdgeInsets.fromLTRB(58, 100, 96, 196);
+      await _pumpMap(
+        tester,
+        _view(MiningSiteId.landingBasin),
+        (_) {},
+        size: const Size(390, 844),
+        viewportInsets: insets,
+      );
+
+      final order = _depthOrder();
+      final buttons = [
+        for (final band in order)
+          tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
+      ];
+      for (var i = 1; i < buttons.length; i++) {
+        expect(
+          buttons[i].top,
+          greaterThan(buttons[i - 1].bottom),
+          reason: '${order[i].name} must sit below ${order[i - 1].name}',
+        );
+      }
+
+      final letters = <String>{};
+      for (final band in const [
+        MiningBand.pockets,
+        MiningBand.seams,
+        MiningBand.lodes,
+      ]) {
+        final marker = find.byKey(Key('mining-depth-marker-${band.name}'));
+        expect(marker, findsOneWidget, reason: band.name);
+        letters.add(tester.widget<Text>(marker).data!);
+      }
+      expect(letters, {'P', 'S', 'L'});
+      expect(
+        tester
+            .widget<Icon>(
+              find.byKey(const Key('mining-depth-marker-motherlode')),
+            )
+            .icon,
+        Icons.auto_awesome,
+      );
+
+      final surface = _surfaceRect(tester);
+      final scale = surface.width / miningGridSceneWidth;
+      for (final band in order) {
+        await tester.tap(find.byKey(Key('mining-depth-rail-${band.name}')));
+        await tester.pump();
+        expect(
+          _position(tester).pixels,
+          closeTo(
+            math.min(
+              insets.top + band.labelRow * miningGridCellSize * scale,
+              _position(tester).maxScrollExtent,
+            ),
+            .5,
+          ),
+          reason: '${band.name} rail target',
+        );
+      }
+    },
+  );
 
   testWidgets('reduced motion jumps the rail and hides the halo', (
     tester,

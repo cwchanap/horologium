@@ -1720,7 +1720,7 @@ void main() {
       expect(rail.top, greaterThanOrEqualTo(cargo.bottom));
       expect(rail.bottom, lessThanOrEqualTo(sell.top));
       final buttons = [
-        for (final band in MiningBand.values)
+        for (final band in MiningBand.values.reversed)
           tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
       ];
       for (final button in buttons) {
@@ -1893,7 +1893,7 @@ void main() {
       expect(rail.top, greaterThanOrEqualTo(cargo.bottom));
       expect(rail.bottom, lessThanOrEqualTo(402 - 21));
       final buttons = [
-        for (final band in MiningBand.values)
+        for (final band in MiningBand.values.reversed)
           tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
       ];
       expect(buttons.map((rect) => rect.left).toSet(), hasLength(1));

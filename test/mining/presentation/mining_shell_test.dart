@@ -176,10 +176,9 @@ const _workflowAmbiguousCell = MiningGridCell(1, 20);
 /// A unique perimeter cell of the left Surveying-1 lode at (0,9).
 const _workflowLodeCell = MiningGridCell(3, 10);
 
-/// Fresh Landing Basin with the minimum cash the ordered workflow needs:
-/// one spawned T1 plus the 300-cash Surveying 1 research. A pristine save
-/// starts at 100 cash, so the requested order would otherwise need a sale
-/// before research.
+/// Fresh Landing Basin with 400 seeded cash so the ordered workflow can spawn
+/// one T1 and buy the 300-cash Surveying 1 research before any sale. A
+/// pristine save starts at 100 cash.
 MiningSave workflowStartState(DateTime now) =>
     MiningSave.initial(nowUtc: now).copyWith(cash: 400);
 
