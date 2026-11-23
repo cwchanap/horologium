@@ -37,6 +37,15 @@ const double miningRigChipClearance = miningRigChipHeight + 2;
 /// Minimum actionable depth-rail target.
 const double _depthRailTargetSize = 44;
 
+/// Rail targets read top-to-bottom as the map scrolls: Motherlode at the top,
+/// pockets at the bottom. The compact horizontal row keeps that same order.
+const List<MiningBand> _depthRailBands = [
+  MiningBand.motherlode,
+  MiningBand.lodes,
+  MiningBand.seams,
+  MiningBand.pockets,
+];
+
 /// Oversized deposit art edge, keyed by the deposit's logical footprint in
 /// cells. The art is centered over the logical footprint so hit-testing and
 /// overlay rects stay on authored grid coordinates.
@@ -350,7 +359,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
         height: railHeight,
         child: Stack(
           children: [
-            for (final (index, band) in MiningBand.values.indexed)
+            for (final (index, band) in _depthRailBands.indexed)
               Positioned(
                 top: vertical ? index * (_depthRailTargetSize + gap) : 0,
                 left: vertical ? 0 : index * (_depthRailTargetSize + gap),
@@ -396,15 +405,43 @@ class _MiningGridMapState extends State<MiningGridMap> {
             padding: EdgeInsets.zero,
             iconSize: 20,
             onPressed: () => _scrollToBand(band, animate: true),
-            icon: Icon(
-              band == MiningBand.motherlode
-                  ? Icons.auto_awesome
-                  : Icons.link_rounded,
-              color: open ? MiningTheme.accent : Colors.white38,
-            ),
+            icon: _depthRailMarker(band, open),
           ),
         ),
       ),
+    );
+  }
+
+  /// One distinguishable marker per band; the Motherlode keeps its sparkle,
+  /// the other three use the mockup's compact letter badges. The dark disc
+  /// keeps every marker legible over the full-bleed cavern.
+  Widget _depthRailMarker(MiningBand band, bool open) {
+    final color = !open
+        ? Colors.white70
+        : band == MiningBand.motherlode
+        ? _upgradeGold
+        : MiningTheme.accent;
+    final key = Key('mining-depth-marker-${band.name}');
+    return Container(
+      width: 30,
+      height: 30,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xCC060A10),
+        border: Border.all(color: color.withValues(alpha: open ? .8 : .35)),
+      ),
+      child: band == MiningBand.motherlode
+          ? Icon(Icons.auto_awesome, key: key, size: 16, color: color)
+          : Text(
+              band.name[0].toUpperCase(),
+              key: key,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
     );
   }
 
