@@ -449,7 +449,6 @@ class _MiningGridMapState extends State<MiningGridMap> {
   Widget build(BuildContext context) {
     final view = widget.view;
     final insets = widget.viewportInsets;
-    final selectedRig = view.selectedRig;
     return LayoutBuilder(
       builder: (context, constraints) {
         _sceneScale = math.min(
@@ -515,66 +514,13 @@ class _MiningGridMapState extends State<MiningGridMap> {
                                   ),
                                 ),
                               ),
-                              // Object overlays: exactly one semantics overlay per
-                              // authored deposit and at most one per deployed rig.
-                              // These are not tile widgets; empty cells render
-                              // nothing.
-                              for (final deposit in view.deposits)
-                                Positioned(
-                                  key: Key(
-                                    'mining-deposit-'
-                                    '${_depositKey(deposit.definition)}',
-                                  ),
-                                  left:
-                                      deposit.definition.x * miningGridCellSize,
-                                  top:
-                                      deposit.definition.y * miningGridCellSize,
-                                  width:
-                                      deposit.definition.size *
-                                      miningGridCellSize,
-                                  height:
-                                      deposit.definition.size *
-                                      miningGridCellSize,
-                                  child: IgnorePointer(
-                                    child: Semantics(
-                                      label: _depositLabel(deposit),
-                                      child: const SizedBox.expand(),
-                                    ),
-                                  ),
-                                ),
-                              // A legal target owns its exact assistive-tech
-                              // action. The map gesture surface exposes no tap
-                              // action, so assistive activation can never fall
-                              // back to a meaningless surface-centre cell.
-                              if (selectedRig != null)
-                                for (final cell in view.deployableCells)
-                                  Positioned(
-                                    key: Key(
-                                      'mining-deploy-cell-'
-                                      '${cell.x}-${cell.y}',
-                                    ),
-                                    left: cell.x * miningGridCellSize,
-                                    top: cell.y * miningGridCellSize,
-                                    width: miningGridCellSize,
-                                    height: miningGridCellSize,
-                                    child: Semantics(
-                                      container: true,
-                                      button: true,
-                                      enabled: true,
-                                      label:
-                                          'Place '
-                                          '${selectedRig.name.toUpperCase()} '
-                                          'rig at (${cell.x},${cell.y}).',
-                                      onTap: () => widget.onCellTap(cell),
-                                      // Pointer transparency keeps physical
-                                      // taps on the map-level surface, exactly
-                                      // like the rig semantics overlays.
-                                      child: IgnorePointer(
-                                        child: const SizedBox.expand(),
-                                      ),
-                                    ),
-                                  ),
-                              for (final rig in view.rigs) ...[
+                              // Only visuals live inside the scaled scroll
+                              // content. Actionable semantics overlays are
+                              // positioned in screen space outside the
+                              // FittedBox, because Flutter web can report
+                              // scaled scrolled semantics hit areas away from
+                              // their visible cells.
+                              for (final rig in view.rigs)
                                 Positioned(
                                   key: Key(
                                     'mining-rig-chip-'
@@ -595,31 +541,6 @@ class _MiningGridMapState extends State<MiningGridMap> {
                                     ),
                                   ),
                                 ),
-                                Positioned(
-                                  left:
-                                      rig.placement.cell.x * miningGridCellSize,
-                                  top:
-                                      rig.placement.cell.y * miningGridCellSize,
-                                  width: miningGridCellSize,
-                                  height: miningGridCellSize,
-                                  child: Semantics(
-                                    button: true,
-                                    enabled: view.selectedRig != null
-                                        ? rig.canUpgradeWithSelection
-                                        : rig.canRecall,
-                                    label: _rigLabel(rig),
-                                    onTap: () =>
-                                        widget.onCellTap(rig.placement.cell),
-                                    // IgnorePointer sits below the Semantics node
-                                    // so physical taps stay with the map-level
-                                    // gesture surface while the semantic tap
-                                    // action survives for assistive tech.
-                                    child: IgnorePointer(
-                                      child: const SizedBox.expand(),
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
                         ),
@@ -629,12 +550,95 @@ class _MiningGridMapState extends State<MiningGridMap> {
                 ),
               ),
             ),
+            Positioned.fill(child: _screenSpaceSemantics(constraints.maxWidth)),
             _depthRail(constraints.maxHeight, constraints.maxWidth),
           ],
         );
       },
     );
   }
+
+  /// Actionable/deposit semantics in screen coordinates, above the scroll
+  /// view. Flutter web can misplace semantics hit areas that live under a
+  /// scaled [FittedBox] inside a scroll view, so keeping these overlays out of
+  /// that transform makes each action's browser hit area match its visible
+  /// cell at every scroll offset.
+  Widget _screenSpaceSemantics(double width) => AnimatedBuilder(
+    animation: _scrollController,
+    builder: (context, _) {
+      final view = widget.view;
+      final selectedRig = view.selectedRig;
+      final scale = _sceneScale;
+      final cellSize = miningGridCellSize * scale;
+      final sceneLeft = (width - miningGridSceneWidth * scale) / 2;
+      final scroll = _scrollController.hasClients
+          ? _scrollController.position.pixels
+          : 0.0;
+      final sceneTop = widget.viewportInsets.top - scroll;
+      double x(int cellX) => sceneLeft + cellX * cellSize;
+      double y(int cellY) => sceneTop + cellY * cellSize;
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // One label per authored deposit, exactly as inside the old overlay.
+          for (final deposit in view.deposits)
+            Positioned(
+              key: Key('mining-deposit-${_depositKey(deposit.definition)}'),
+              left: x(deposit.definition.x),
+              top: y(deposit.definition.y),
+              width: deposit.definition.size * cellSize,
+              height: deposit.definition.size * cellSize,
+              child: IgnorePointer(
+                child: Semantics(
+                  label: _depositLabel(deposit),
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
+          // A legal target owns its exact assistive-tech action. The map
+          // gesture surface exposes no tap action, so activation can never
+          // fall back to a meaningless surface-centre cell.
+          if (selectedRig != null)
+            for (final cell in view.deployableCells)
+              Positioned(
+                key: Key('mining-deploy-cell-${cell.x}-${cell.y}'),
+                left: x(cell.x),
+                top: y(cell.y),
+                width: cellSize,
+                height: cellSize,
+                child: Semantics(
+                  container: true,
+                  button: true,
+                  enabled: true,
+                  label:
+                      'Place ${selectedRig.name.toUpperCase()} rig at '
+                      '(${cell.x},${cell.y}).',
+                  onTap: () => widget.onCellTap(cell),
+                  // Pointer transparency keeps physical taps on the map-level
+                  // surface while the semantic action survives.
+                  child: IgnorePointer(child: const SizedBox.expand()),
+                ),
+              ),
+          for (final rig in view.rigs)
+            Positioned(
+              left: x(rig.placement.cell.x),
+              top: y(rig.placement.cell.y),
+              width: cellSize,
+              height: cellSize,
+              child: Semantics(
+                button: true,
+                enabled: selectedRig != null
+                    ? rig.canUpgradeWithSelection
+                    : rig.canRecall,
+                label: _rigLabel(rig),
+                onTap: () => widget.onCellTap(rig.placement.cell),
+                child: IgnorePointer(child: const SizedBox.expand()),
+              ),
+            ),
+        ],
+      );
+    },
+  );
 
   String _depositLabel(MineSiteDepositView deposit) {
     final definition = deposit.definition;
