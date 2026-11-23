@@ -101,8 +101,6 @@ class MiningGridMap extends StatefulWidget {
 class _MiningGridMapState extends State<MiningGridMap> {
   final ScrollController _scrollController = ScrollController();
   bool _framed = false;
-  bool _overlaySyncScheduled = false;
-  Size? _lastLayoutSize;
   double _sceneScale = 1;
   final Map<MiningBand, FocusNode> _railFocusNodes = {
     for (final band in MiningBand.values) band: FocusNode(),
@@ -169,20 +167,6 @@ class _MiningGridMapState extends State<MiningGridMap> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
       _scrollToBand(_highestOpenBand(), animate: false);
-    });
-  }
-
-  /// Rebuilds the screen-space action overlay after the scroll offset is
-  /// corrected by a viewport or metric change. Those corrections happen during
-  /// layout and do not necessarily notify the scroll controller, so schedule
-  /// one post-frame rebuild to read the corrected offset.
-  void _scheduleOverlaySync() {
-    if (_overlaySyncScheduled) return;
-    _overlaySyncScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _overlaySyncScheduled = false;
-      setState(() {});
     });
   }
 
@@ -467,13 +451,6 @@ class _MiningGridMapState extends State<MiningGridMap> {
     final insets = widget.viewportInsets;
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.biggest != _lastLayoutSize) {
-          _lastLayoutSize = constraints.biggest;
-          // A resize can clamp the scroll offset during layout without a
-          // scroll notification; rebuild the overlay against the new offset
-          // once the frame has settled.
-          _scheduleOverlaySync();
-        }
         _sceneScale = math.min(
           1.0,
           constraints.maxWidth / miningGridSceneWidth,
@@ -484,95 +461,87 @@ class _MiningGridMapState extends State<MiningGridMap> {
           children: [
             Positioned.fill(child: _background()),
             Positioned.fill(
-              child: NotificationListener<ScrollMetricsNotification>(
-                onNotification: (_) {
-                  _scheduleOverlaySync();
-                  return false;
-                },
-                child: ScrollConfiguration(
-                  // No glow/stretch: the scene is the map itself, and a
-                  // transient overscroll scale would distort cell hit mapping.
-                  behavior: ScrollConfiguration.of(
-                    context,
-                  ).copyWith(overscroll: false),
-                  child: SingleChildScrollView(
-                    key: const Key('mining-grid-scroll'),
-                    controller: _scrollController,
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        top: insets.top,
-                        bottom: insets.bottom,
-                      ),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: SizedBox(
-                          key: const Key('mining-grid-surface'),
-                          width: miningGridSceneWidth,
-                          height: miningGridSceneHeight,
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            // A gesture semantics tap is synthesized at this
-                            // surface's centre, so it can never carry the tapped
-                            // cell. Keep physical taps here and expose the exact
-                            // per-cell actions below instead.
-                            excludeFromSemantics: true,
-                            onTapUp: (details) => widget.onCellTap(
-                              MiningGridCell(
-                                details.localPosition.dx ~/ miningGridCellSize,
-                                details.localPosition.dy ~/ miningGridCellSize,
+              child: ScrollConfiguration(
+                // No glow/stretch: the scene is the map itself, and a
+                // transient overscroll scale would distort cell hit mapping.
+                behavior: ScrollConfiguration.of(
+                  context,
+                ).copyWith(overscroll: false),
+                child: SingleChildScrollView(
+                  key: const Key('mining-grid-scroll'),
+                  controller: _scrollController,
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      top: insets.top,
+                      bottom: insets.bottom,
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: SizedBox(
+                        key: const Key('mining-grid-surface'),
+                        width: miningGridSceneWidth,
+                        height: miningGridSceneHeight,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          // A gesture semantics tap is synthesized at this
+                          // surface's centre, so it can never carry the tapped
+                          // cell. Keep physical taps here and expose the exact
+                          // per-cell actions below instead.
+                          excludeFromSemantics: true,
+                          onTapUp: (details) => widget.onCellTap(
+                            MiningGridCell(
+                              details.localPosition.dx ~/ miningGridCellSize,
+                              details.localPosition.dy ~/ miningGridCellSize,
+                            ),
+                          ),
+                          child: Stack(
+                            clipBehavior: Clip.hardEdge,
+                            children: [
+                              ..._motherlodeHalo(),
+                              Positioned.fill(
+                                child: IgnorePointer(child: _objectLayer()),
                               ),
-                            ),
-                            child: Stack(
-                              clipBehavior: Clip.hardEdge,
-                              children: [
-                                ..._motherlodeHalo(),
-                                Positioned.fill(
-                                  child: IgnorePointer(child: _objectLayer()),
+                              ..._bandLabels(),
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: CustomPaint(
+                                    painter: MiningGridPainter(
+                                      width: view.definition.gridWidth,
+                                      height: view.definition.gridHeight,
+                                      deployableCells: view.deployableCells,
+                                      upgradeableCells: view.upgradeableCells,
+                                    ),
+                                  ),
                                 ),
-                                ..._bandLabels(),
-                                Positioned.fill(
+                              ),
+                              // Only visuals live inside the scaled scroll
+                              // content. Actionable semantics overlays are
+                              // positioned in screen space outside the
+                              // FittedBox, because Flutter web can report
+                              // scaled scrolled semantics hit areas away from
+                              // their visible cells.
+                              for (final rig in view.rigs)
+                                Positioned(
+                                  key: Key(
+                                    'mining-rig-chip-'
+                                    '${rig.placement.cell.x}-'
+                                    '${rig.placement.cell.y}',
+                                  ),
+                                  left:
+                                      rig.placement.cell.x * miningGridCellSize,
+                                  top:
+                                      rig.placement.cell.y * miningGridCellSize,
+                                  width: miningGridCellSize,
                                   child: IgnorePointer(
-                                    child: CustomPaint(
-                                      painter: MiningGridPainter(
-                                        width: view.definition.gridWidth,
-                                        height: view.definition.gridHeight,
-                                        deployableCells: view.deployableCells,
-                                        upgradeableCells: view.upgradeableCells,
+                                    child: ExcludeSemantics(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: _rigChip(rig),
                                       ),
                                     ),
                                   ),
                                 ),
-                                // Only visuals live inside the scaled scroll
-                                // content. Actionable semantics overlays are
-                                // positioned in screen space outside the
-                                // FittedBox, because Flutter web can report
-                                // scaled scrolled semantics hit areas away from
-                                // their visible cells.
-                                for (final rig in view.rigs)
-                                  Positioned(
-                                    key: Key(
-                                      'mining-rig-chip-'
-                                      '${rig.placement.cell.x}-'
-                                      '${rig.placement.cell.y}',
-                                    ),
-                                    left:
-                                        rig.placement.cell.x *
-                                        miningGridCellSize,
-                                    top:
-                                        rig.placement.cell.y *
-                                        miningGridCellSize,
-                                    width: miningGridCellSize,
-                                    child: IgnorePointer(
-                                      child: ExcludeSemantics(
-                                        child: FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          child: _rigChip(rig),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
+                            ],
                           ),
                         ),
                       ),
@@ -581,7 +550,12 @@ class _MiningGridMapState extends State<MiningGridMap> {
                 ),
               ),
             ),
-            Positioned.fill(child: _screenSpaceSemantics(constraints.maxWidth)),
+            Positioned.fill(
+              child: _screenSpaceSemantics(
+                constraints.maxWidth,
+                constraints.maxHeight,
+              ),
+            ),
             _depthRail(constraints.maxHeight, constraints.maxWidth),
           ],
         );
@@ -593,8 +567,10 @@ class _MiningGridMapState extends State<MiningGridMap> {
   /// view. Flutter web can misplace semantics hit areas that live under a
   /// scaled [FittedBox] inside a scroll view, so keeping these overlays out of
   /// that transform makes each action's browser hit area match its visible
-  /// cell at every scroll offset.
-  Widget _screenSpaceSemantics(double width) => AnimatedBuilder(
+  /// cell at every scroll offset. The offset is clamped to the extent the
+  /// current layout will adopt, so the first frame after a resize is already
+  /// correct even before the scroll view reports the corrected pixels.
+  Widget _screenSpaceSemantics(double width, double height) => AnimatedBuilder(
     animation: _scrollController,
     builder: (context, _) {
       final view = widget.view;
@@ -602,9 +578,15 @@ class _MiningGridMapState extends State<MiningGridMap> {
       final scale = _sceneScale;
       final cellSize = miningGridCellSize * scale;
       final sceneLeft = (width - miningGridSceneWidth * scale) / 2;
-      final scroll = _scrollController.hasClients
+      final contentHeight =
+          widget.viewportInsets.top +
+          miningGridSceneHeight * scale +
+          widget.viewportInsets.bottom;
+      final maxScroll = math.max(0.0, contentHeight - height);
+      final rawScroll = _scrollController.hasClients
           ? _scrollController.position.pixels
           : 0.0;
+      final scroll = rawScroll.clamp(0.0, maxScroll);
       final sceneTop = widget.viewportInsets.top - scroll;
       double x(int cellX) => sceneLeft + cellX * cellSize;
       double y(int cellY) => sceneTop + cellY * cellSize;

@@ -507,7 +507,11 @@ void main() {
     }
 
     expectAligned();
-    _position(tester).jumpTo(_position(tester).pixels + 120);
+    final target = math.min(
+      _position(tester).pixels + 120,
+      _position(tester).maxScrollExtent,
+    );
+    _position(tester).jumpTo(target);
     await tester.pump();
     expectAligned();
     handle.dispose();
@@ -542,8 +546,9 @@ void main() {
     expectAligned();
     // Growing the viewport shrinks the scroll extent from 666 to 562 and
     // clamps the offset during layout, without a normal scroll notification.
+    // The first frame after the resize must already carry aligned hit areas;
+    // do not wait for a later post-frame recovery.
     tester.view.physicalSize = const Size(390, 948);
-    await tester.pump();
     await tester.pump();
     expectAligned();
     handle.dispose();
