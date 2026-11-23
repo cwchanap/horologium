@@ -1837,6 +1837,55 @@ void main() {
   }
 
   testWidgets(
+    'keeps the zero-inset compact rail off the bottom-right cell centre',
+    (tester) async {
+      // 360x640 at 1.3x text with no safe-area insets leaves a clear band
+      // tall enough for four vertical targets, but the bottom-right legal
+      // cell scrolls into its lower edge. The rail must reserve that row
+      // instead of intercepting the cell's centre tap.
+      final taps = <MiningGridCell>[];
+      final state = _stateWith(
+        cash: 412,
+        landing: _progress(
+          commissioned: true,
+          rigs: const [
+            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(7, 21)),
+          ],
+        ),
+      );
+      await _pumpMineSite(
+        tester,
+        size: const Size(360, 640),
+        view: _siteView(state),
+        dock: _dockView(state),
+        onGridCellTap: taps.add,
+      );
+
+      final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+      expect(rail.height, 44, reason: 'the compact fallback row is horizontal');
+      expect(
+        tester.getRect(find.byKey(const Key('mining-depth-rail-pockets'))),
+        Rect.fromLTWH(rail.left + 3 * 52, 134, 44, 44),
+      );
+
+      final position = _scrollPosition(tester);
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pump();
+      final center = _cellPoint(tester, const MiningGridCell(7, 21));
+      expect(
+        rail.contains(center),
+        isFalse,
+        reason: 'rail $rail centre $center',
+      );
+
+      await tester.tapAt(center);
+      await tester.pump();
+      expect(taps, <MiningGridCell>[const MiningGridCell(7, 21)]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'keeps landscape edge rigs scrollable clear of the toolbar and rail',
     (tester) async {
       tester.view.devicePixelRatio = 1;
@@ -2142,6 +2191,41 @@ void main() {
     );
     expect(_scrollPosition(tester).pixels, closeTo(landingFrame, .5));
   });
+
+  testWidgets(
+    'keeps the map scroll and animated layer across an orientation change',
+    (tester) async {
+      final state = _stateWith(landing: _progress(commissioned: true));
+      await _pumpMineSite(
+        tester,
+        size: const Size(390, 844),
+        view: _siteView(state),
+        dock: _dockView(state),
+      );
+      final layerFinder = find.byKey(
+        const Key('landing-basin-grid-visual-layer'),
+      );
+      final layer = tester.state(layerFinder);
+      _scrollPosition(tester).jumpTo(100);
+      await tester.pump();
+
+      // Crossing the breakpoint must keep the map in its slot: a remount
+      // would reframe the highest open band and reset transient animation.
+      tester.view.physicalSize = const Size(844, 390);
+      await tester.pump();
+      expect(find.byKey(const Key('mine-site-right-rail')), findsOneWidget);
+      expect(find.byKey(const Key('mine-site-back')), findsNothing);
+      expect(identical(tester.state(layerFinder), layer), isTrue);
+      expect(_scrollPosition(tester).pixels, 100);
+
+      tester.view.physicalSize = const Size(390, 844);
+      await tester.pump();
+      expect(find.byKey(const Key('mine-site-back')), findsOneWidget);
+      expect(identical(tester.state(layerFinder), layer), isTrue);
+      expect(_scrollPosition(tester).pixels, 100);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('fits the scroll map at every supported viewport', (
     tester,

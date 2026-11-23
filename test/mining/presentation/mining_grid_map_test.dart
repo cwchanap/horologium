@@ -1311,40 +1311,62 @@ void main() {
     handle.dispose();
   });
 
-  testWidgets('depth rail targets take keyboard focus and activate', (
+  testWidgets('depth rail Tab traversal reaches each band once and activates', (
     tester,
   ) async {
+    const insets = EdgeInsets.fromLTRB(58, 100, 96, 196);
     await _pumpMap(
       tester,
       _view(MiningSiteId.landingBasin),
       (_) {},
       size: const Size(390, 844),
-      viewportInsets: const EdgeInsets.fromLTRB(58, 100, 96, 196),
+      viewportInsets: insets,
     );
 
-    final focusNode = tester
-        .widget<Focus>(find.byKey(const Key('mining-depth-rail-focus-pockets')))
-        .focusNode!;
-    expect(focusNode.canRequestFocus, isTrue);
-    focusNode.requestFocus();
-    await tester.pump();
-    expect(focusNode.hasFocus, isTrue);
+    MiningBand focusedBand() {
+      final context = FocusManager.instance.primaryFocus!.context!;
+      final focused = find.byElementPredicate(
+        (element) => identical(element, context),
+      );
+      for (final band in MiningBand.values) {
+        if (find
+            .ancestor(
+              of: focused,
+              matching: find.byKey(Key('mining-depth-rail-${band.name}')),
+            )
+            .evaluate()
+            .isNotEmpty) {
+          return band;
+        }
+      }
+      fail('no depth rail target owns the focused node');
+    }
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pumpAndSettle();
-    expect(
-      _position(tester).pixels,
-      closeTo(
-        math.min(
-          100 +
-              MiningBand.pockets.labelRow *
-                  miningGridCellSize *
-                  (390 / miningGridSceneWidth).clamp(0.0, 1.0),
-          _position(tester).maxScrollExtent,
-        ),
-        .5,
-      ),
+    double target(MiningBand band) => math.min(
+      insets.top +
+          band.labelRow *
+              miningGridCellSize *
+              (390 / miningGridSceneWidth).clamp(0.0, 1.0),
+      _position(tester).maxScrollExtent,
     );
+
+    final visited = <MiningBand>[];
+    for (var i = 0; i < MiningBand.values.length; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      final band = focusedBand();
+      expect(visited, isNot(contains(band)), reason: 'duplicate Tab stop');
+      visited.add(band);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(
+        _position(tester).pixels,
+        closeTo(target(band), .5),
+        reason: '${band.name} Enter activation',
+      );
+    }
+    expect(visited.toSet(), MiningBand.values.toSet());
   });
 
   testWidgets('uses the scale-aware target from a nonzero top padding', (
@@ -1371,9 +1393,8 @@ void main() {
     expect(_position(tester).pixels, 50);
   });
 
-  testWidgets('keeps a vertical rail with reduced gaps above 176dp', (
-    tester,
-  ) async {
+  testWidgets('keeps a vertical rail with reduced gaps above 176dp plus the '
+      'reserved bottom row', (tester) async {
     Future<List<Rect>> pumpRail(double top, double bottom) async {
       await _pumpMap(
         tester,
@@ -1389,10 +1410,10 @@ void main() {
       ];
     }
 
-    // 200dp clear band: still one column, gaps shrink from 16 to 8 so the
-    // four 44dp targets fit without touching the HUD. Map-depth order puts
-    // the Motherlode target first.
-    var buttons = await pumpRail(100, 300);
+    // A 248.75dp clear band leaves a 48.75dp bottom-row reserve and 200dp of
+    // rail room: one column, gaps shrink to 8 so the four 44dp targets fit.
+    // Map-depth order puts the Motherlode target first.
+    var buttons = await pumpRail(100, 348.75);
     expect(buttons.map((rect) => rect.left).toSet(), hasLength(1));
     for (var i = 0; i < buttons.length; i++) {
       expect(buttons[i].height, greaterThanOrEqualTo(44 - .01));
@@ -1403,6 +1424,23 @@ void main() {
     }
     expect(buttons.first.top, 100);
     expect(buttons.last.bottom, 300);
+    expect(
+      buttons.last.bottom,
+      lessThanOrEqualTo(
+        348.75 - miningGridCellSize * 390 / miningGridSceneWidth,
+      ),
+    );
+
+    // 200dp fits four vertical targets but not the reserved bottom row: the
+    // rail falls back to the high horizontal row instead of covering the
+    // bottom-right cell's scrollable strip.
+    buttons = await pumpRail(100, 300);
+    expect(buttons.map((rect) => rect.top).toSet(), hasLength(1));
+    expect(buttons.map((rect) => rect.left).toSet(), hasLength(4));
+    for (final button in buttons) {
+      expect(button.height, greaterThanOrEqualTo(44 - .01));
+      expect(button.bottom, lessThanOrEqualTo(100 + 44 + .01));
+    }
   });
 
   testWidgets('uses one high horizontal row of 44dp targets below 176dp', (
@@ -1477,7 +1515,7 @@ void main() {
     // The target widgets are the same shared focusable button used by the
     // dedicated keyboard test; the horizontal layout only changes position.
     expect(
-      find.byKey(const Key('mining-depth-rail-focus-motherlode')),
+      find.byKey(const Key('mining-depth-rail-button-motherlode')),
       findsOneWidget,
     );
     handle.dispose();

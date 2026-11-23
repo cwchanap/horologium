@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
 import 'package:horologium/mining/mining_grid.dart';
@@ -330,14 +329,24 @@ class _MiningGridMapState extends State<MiningGridMap> {
         : viewportHeight;
     final bottom = requestedBottom.clamp(top, viewportHeight);
     final height = bottom - top;
-    // Four 44dp targets need 176dp to sit in one column without overlap.
-    // Above that threshold the gaps shrink from 16dp to zero first. A shorter
-    // clear band keeps the targets high in a horizontal row, which leaves the
-    // bottom-right cell clear; both arrangements stay inside the HUD bounds
-    // and only the targets intercept pointers.
-    final vertical = height >= 176;
+    // On narrow viewports the scene reaches the rail's right-edge column, and
+    // the bottom row can scroll up to the band's lower edge. Reserve one full
+    // scaled cell there so the rail can never cover that row's legal centre;
+    // a wide viewport keeps the rail beside the scene and needs no reserve.
+    final railLeft = viewportWidth - widget.railRight - _depthRailTargetSize;
+    final sceneRight = (viewportWidth + miningGridSceneWidth * _sceneScale) / 2;
+    final bottomRowReserve = railLeft < sceneRight
+        ? miningGridCellSize * _sceneScale
+        : 0.0;
+    final targetHeight = math.max(0.0, height - bottomRowReserve);
+    // Four 44dp targets need 176dp of the reserved band to sit in one column
+    // without overlap. Above that threshold the gaps shrink from 16dp to zero
+    // first. A shorter clear band keeps the targets high in a horizontal row,
+    // which leaves the bottom-right cell clear; both arrangements stay inside
+    // the HUD bounds and only the targets intercept pointers.
+    final vertical = targetHeight >= 176;
     final gap = vertical
-        ? ((height - 176) / 3).clamp(0.0, 16.0)
+        ? ((targetHeight - 176) / 3).clamp(0.0, 16.0)
         : (viewportWidth - widget.railRight >= 4 * _depthRailTargetSize + 3 * 8
               ? 8.0
               : 0.0);
@@ -345,7 +354,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
         ? _depthRailTargetSize
         : 4 * _depthRailTargetSize + 3 * gap;
     final railHeight = vertical
-        ? math.min(height, 176 + gap * 3)
+        ? math.min(targetHeight, 176 + gap * 3)
         : _depthRailTargetSize;
     // shortcut: a clear band or viewport narrower than one 44dp row cannot
     // fit; no tested viewport reaches that, revisit with HPA-1244's rail.
@@ -388,25 +397,15 @@ class _MiningGridMapState extends State<MiningGridMap> {
       child: SizedBox(
         width: _depthRailTargetSize,
         height: _depthRailTargetSize,
-        child: Focus(
-          key: Key('mining-depth-rail-focus-${band.name}'),
+        // One focus stop per band: the IconButton owns traversal, the built-in
+        // focus highlight, and Enter/Space activation.
+        child: IconButton(
+          key: Key('mining-depth-rail-button-${band.name}'),
           focusNode: _railFocusNodes[band],
-          onKeyEvent: (node, event) {
-            if (event is! KeyDownEvent) return KeyEventResult.ignored;
-            final key = event.logicalKey;
-            if (key != LogicalKeyboardKey.enter &&
-                key != LogicalKeyboardKey.space) {
-              return KeyEventResult.ignored;
-            }
-            _scrollToBand(band, animate: true);
-            return KeyEventResult.handled;
-          },
-          child: IconButton(
-            padding: EdgeInsets.zero,
-            iconSize: 20,
-            onPressed: () => _scrollToBand(band, animate: true),
-            icon: _depthRailMarker(band, open),
-          ),
+          padding: EdgeInsets.zero,
+          iconSize: 20,
+          onPressed: () => _scrollToBand(band, animate: true),
+          icon: _depthRailMarker(band, open),
         ),
       ),
     );
