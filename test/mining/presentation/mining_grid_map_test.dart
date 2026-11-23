@@ -77,11 +77,13 @@ List<MiningBand> _depthOrder() =>
     [...MiningBand.values]..sort((a, b) => a.labelRow.compareTo(b.labelRow));
 
 /// Every rig semantics widget, regardless of label: each rig owns exactly one.
+/// Deploy-cell actions also mention a rig position, so exclude them.
 Finder _rigSemanticsNodes() => find.byWidgetPredicate(
   (widget) =>
       widget is Semantics &&
       widget.properties.button == true &&
-      (widget.properties.label?.contains('rig at (') ?? false),
+      (widget.properties.label?.contains('rig at (') ?? false) &&
+      !(widget.properties.label?.startsWith('Place ') ?? false),
 );
 
 String _chipLabel(WidgetTester tester, MiningGridCell cell) => tester
@@ -438,6 +440,82 @@ void main() {
     );
     expect(taps.single, const MiningGridCell(0, 14));
     handle.dispose();
+  });
+
+  testWidgets('exposes a deploy action with its own cell per legal cell', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    final taps = <MiningGridCell>[];
+    await _pumpMap(
+      tester,
+      _view(
+        MiningSiteId.landingBasin,
+        surveying: 1,
+        selectedBayId: DockBayId.b1,
+      ),
+      taps.add,
+    );
+
+    // Legal cells in the lodes and pockets bands each own their exact action.
+    for (final cell in const [MiningGridCell(3, 10), MiningGridCell(7, 21)]) {
+      final finder = find.semantics.byLabel(
+        'Place T1 rig at (${cell.x},${cell.y}).',
+      );
+      expect(finder, findsOneWidget, reason: 'cell $cell');
+      tester.semantics.performAction(finder, SemanticsAction.tap);
+    }
+    expect(taps, const [MiningGridCell(3, 10), MiningGridCell(7, 21)]);
+
+    // A legal but Surveying-locked Motherlode cell has no deploy action.
+    expect(find.bySemanticsLabel('Place T1 rig at (2,1).'), findsNothing);
+    handle.dispose();
+  });
+
+  testWidgets('keeps the whole-map tap action off merged deposit semantics', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await _pumpMap(
+      tester,
+      _view(
+        MiningSiteId.landingBasin,
+        surveying: 1,
+        selectedBayId: DockBayId.b1,
+      ),
+      (_) {},
+    );
+
+    final motherlode = tester.getSemantics(
+      find.bySemanticsLabel(RegExp(r'Gold resource 4x4, 0 miners')),
+    );
+    expect(
+      motherlode.getSemanticsData().hasAction(SemanticsAction.tap),
+      isFalse,
+      reason: 'the map must not expose a single centre tap over all resources',
+    );
+    handle.dispose();
+  });
+
+  testWidgets('physical taps still place at the exact cell with a rig '
+      'selected', (tester) async {
+    final taps = <MiningGridCell>[];
+    await _pumpMap(
+      tester,
+      _view(
+        MiningSiteId.landingBasin,
+        surveying: 1,
+        selectedBayId: DockBayId.b1,
+      ),
+      taps.add,
+    );
+
+    for (final cell in const [MiningGridCell(3, 10), MiningGridCell(7, 21)]) {
+      final point = await _revealCell(tester, cell);
+      await tester.tapAt(point);
+      await tester.pump();
+      expect(taps, contains(cell));
+    }
   });
 
   testWidgets('labels deposits with footprint, miners, and free slots', (

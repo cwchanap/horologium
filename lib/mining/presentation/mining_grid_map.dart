@@ -449,6 +449,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
   Widget build(BuildContext context) {
     final view = widget.view;
     final insets = widget.viewportInsets;
+    final selectedRig = view.selectedRig;
     return LayoutBuilder(
       builder: (context, constraints) {
         _sceneScale = math.min(
@@ -483,6 +484,11 @@ class _MiningGridMapState extends State<MiningGridMap> {
                         height: miningGridSceneHeight,
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
+                          // A gesture semantics tap is synthesized at this
+                          // surface's centre, so it can never carry the tapped
+                          // cell. Keep physical taps here and expose the exact
+                          // per-cell actions below instead.
+                          excludeFromSemantics: true,
                           onTapUp: (details) => widget.onCellTap(
                             MiningGridCell(
                               details.localPosition.dx ~/ miningGridCellSize,
@@ -536,6 +542,38 @@ class _MiningGridMapState extends State<MiningGridMap> {
                                     ),
                                   ),
                                 ),
+                              // A legal target owns its exact assistive-tech
+                              // action. The map gesture surface exposes no tap
+                              // action, so assistive activation can never fall
+                              // back to a meaningless surface-centre cell.
+                              if (selectedRig != null)
+                                for (final cell in view.deployableCells)
+                                  Positioned(
+                                    key: Key(
+                                      'mining-deploy-cell-'
+                                      '${cell.x}-${cell.y}',
+                                    ),
+                                    left: cell.x * miningGridCellSize,
+                                    top: cell.y * miningGridCellSize,
+                                    width: miningGridCellSize,
+                                    height: miningGridCellSize,
+                                    child: Semantics(
+                                      container: true,
+                                      button: true,
+                                      enabled: true,
+                                      label:
+                                          'Place '
+                                          '${selectedRig.name.toUpperCase()} '
+                                          'rig at (${cell.x},${cell.y}).',
+                                      onTap: () => widget.onCellTap(cell),
+                                      // Pointer transparency keeps physical
+                                      // taps on the map-level surface, exactly
+                                      // like the rig semantics overlays.
+                                      child: IgnorePointer(
+                                        child: const SizedBox.expand(),
+                                      ),
+                                    ),
+                                  ),
                               for (final rig in view.rigs) ...[
                                 Positioned(
                                   key: Key(
