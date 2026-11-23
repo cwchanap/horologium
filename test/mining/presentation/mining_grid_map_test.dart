@@ -554,6 +554,97 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('prevents bounce overscroll from displacing action hit areas', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final handle = tester.ensureSemantics();
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin, selectedBayId: DockBayId.b1),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: const EdgeInsets.fromLTRB(58, 134, 96, 303.5),
+    );
+    await tester.pump(); // initial clamped bottom frame
+    final position = _position(tester);
+    expect(position.pixels, closeTo(position.maxScrollExtent, .5));
+
+    // Drag upward past the bottom and hold: iOS bouncing physics would paint
+    // the grid past the extent while clamped action rects stay behind.
+    final gesture = await tester.startGesture(const Offset(195, 500));
+    for (var i = 0; i < 8; i++) {
+      await gesture.moveBy(const Offset(0, -20));
+      await tester.pump();
+    }
+
+    expect(
+      position.pixels,
+      lessThanOrEqualTo(position.maxScrollExtent + .5),
+      reason: 'the map must not overscroll; hitboxes cannot track a bounce',
+    );
+
+    final node = tester.getSemantics(
+      find.byKey(const Key('mining-deploy-cell-7-19')),
+    );
+    final action = MatrixUtils.transformRect(node.transform!, node.rect);
+    final scale = _sceneScale(tester);
+    final cellSize = miningGridCellSize * scale;
+    final expectedY =
+        _mapRect(tester).top + 134 + 19.5 * cellSize - position.pixels;
+    expect(action.center.dy, closeTo(expectedY, .5));
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    handle.dispose();
+  });
+
+  testWidgets('prevents bounce overscroll above the top from moving actions', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final handle = tester.ensureSemantics();
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin, selectedBayId: DockBayId.b1),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: const EdgeInsets.fromLTRB(58, 134, 96, 303.5),
+    );
+    final position = _position(tester);
+    position.jumpTo(0);
+    await tester.pump();
+
+    // Drag downward past the top and hold: iOS bouncing physics would paint
+    // the grid above the extent while clamped action rects stay behind.
+    final gesture = await tester.startGesture(const Offset(195, 300));
+    for (var i = 0; i < 8; i++) {
+      await gesture.moveBy(const Offset(0, 20));
+      await tester.pump();
+    }
+
+    expect(
+      position.pixels,
+      greaterThanOrEqualTo(-.5),
+      reason: 'the map must not overscroll; hitboxes cannot track a bounce',
+    );
+
+    final node = tester.getSemantics(
+      find.byKey(const Key('mining-deploy-cell-7-14')),
+    );
+    final action = MatrixUtils.transformRect(node.transform!, node.rect);
+    final scale = _sceneScale(tester);
+    final cellSize = miningGridCellSize * scale;
+    final expectedTop = _mapRect(tester).top + 134 + 14 * cellSize;
+    expect(action.top, closeTo(expectedTop, .5));
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    handle.dispose();
+  });
+
   testWidgets('keeps the whole-map tap action off merged deposit semantics', (
     tester,
   ) async {
