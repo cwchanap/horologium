@@ -42,17 +42,17 @@ MainMenu -> MiningShell -> MiningController -> MiningSimulation / MiningSaveRepo
 - Animated-site resource HP and strike-damage labels are transient visual-layer state driven by the existing valid-contact latch; they never feed persistence or production.
 - Add an animated site only with an approved frame family and a new `depositFramesFor` case; there is no visual registry.
 
-Mine Site is a Flutter InteractiveViewer over a deterministic 50×50 grid.
-Each site derives 100 1×1/2×2/3×3 resource bodies from its site ID; resources
-are not persisted. Rigs occupy one cell and mine their unique orthogonally
-adjacent resource. Free unique perimeter cells are the only resource-level
-placement capacity, sites remain capped at four rigs, static perimeter geometry
-is cached with content, placement legality stays centralized in mining_grid.dart,
-and production remains aggregate/deterministic in MiningSimulation. Animated
-sites share one visual layer and only mined resources participate in its
-per-frame animation builder. An invalid persisted
-placement resets the complete mining save through the existing recovery
-boundary; there is no migration.
+Mine Site is a native vertical scroll over a deterministic 8×22 grid.
+Each site derives ten 1×1/2×2/3×3/4×4 deposits in four Surveying-gated bands
+from its site ID; resources are not persisted. Rigs occupy one cell and mine
+their unique orthogonally adjacent resource. Free unique perimeter cells are the
+only resource-level placement capacity, sites remain capped at four rigs, static
+perimeter geometry is cached with content, placement legality stays centralized
+in mining_grid.dart, and production remains aggregate/deterministic in
+MiningSimulation. Animated sites share one visual layer and only mined resources
+participate in its per-frame animation builder. An invalid persisted placement
+resets the complete mining save through the existing recovery boundary; there is
+no migration.
 
 - old rigByNode saves intentionally recover fresh through the invalid-save boundary
 - `_displayNotifier` remains a shell rebuild channel for live modal HUDs, not state ownership

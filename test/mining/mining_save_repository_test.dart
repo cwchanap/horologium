@@ -805,6 +805,44 @@ void main() {
       },
     );
 
+    test(
+      'Surveying-gated placements round-trip at their required level',
+      () async {
+        final initial = MiningSave.initial(nowUtc: now);
+        for (final level in [1, 2]) {
+          final target = _landingSite.deposits.firstWhere(
+            (deposit) => deposit.requiredSurveyingLevel == level,
+          );
+          final cell = _landingSite.perimeterCellsByDeposit[target]!.first;
+          final state = initial.copyWith(
+            technology: TechnologyLevels(surveying: level),
+            sites: {
+              ...initial.sites,
+              MiningSiteId.landingBasin: initial
+                  .sites[MiningSiteId.landingBasin]!
+                  .copyWith(
+                    commissioned: true,
+                    rigPlacements: [
+                      MiningRigPlacement(tier: RigTier.t1, cell: cell),
+                    ],
+                  ),
+            },
+          );
+          final repository = MiningSaveRepository();
+
+          await repository.save(state);
+          final loaded = await repository.load(nowUtc: now);
+
+          expect(
+            loaded.recoveredFromInvalidSave,
+            isFalse,
+            reason: 'level $level',
+          );
+          expect(loaded.state, state, reason: 'level $level');
+        }
+      },
+    );
+
     test('valid placements decode in order into an immutable list', () async {
       final cells = _firstResourceCells;
       final raw = rawWithLandingPlacements([
