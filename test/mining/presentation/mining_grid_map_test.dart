@@ -495,6 +495,10 @@ void main() {
         find.byKey(const Key('mining-deploy-cell-3-10')),
       );
       final global = MatrixUtils.transformRect(node.transform!, node.rect);
+      // A hit area must not inherit the scene's FittedBox scale; that scale
+      // was what displaced the browser rect from the visible cell.
+      expect(node.transform!.entry(0, 0), closeTo(1, .001));
+      expect(node.transform!.entry(1, 1), closeTo(1, .001));
       final center = _cellPoint(tester, cell);
       final size = miningGridCellSize * _sceneScale(tester);
       expect(global.center.dx, closeTo(center.dx, .5));
