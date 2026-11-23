@@ -1073,6 +1073,8 @@ void main() {
 
     expect(find.text('Surveying 1'), findsNothing);
     expect(find.text('Surveying 2'), findsNothing);
+    // Each locked 3x3 lode keeps its own requirement label; the two lodes are
+    // separate semantics nodes rather than one merged map node.
     expect(
       find.bySemanticsLabel(
         RegExp(
@@ -1080,7 +1082,7 @@ void main() {
           r'free\. Requires Surveying 1\.',
         ),
       ),
-      findsOneWidget,
+      findsNWidgets(2),
     );
     expect(
       find.bySemanticsLabel(
