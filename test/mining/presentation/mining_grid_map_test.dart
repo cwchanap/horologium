@@ -472,6 +472,43 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('aligns deploy action hit areas with the visible cells', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await _pumpMap(
+      tester,
+      _view(
+        MiningSiteId.landingBasin,
+        surveying: 1,
+        selectedBayId: DockBayId.b1,
+      ),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: const EdgeInsets.fromLTRB(58, 134, 96, 196),
+    );
+    await tester.pump(); // let the initial frame and overlay settle
+
+    const cell = MiningGridCell(3, 10);
+    void expectAligned() {
+      final node = tester.getSemantics(
+        find.byKey(const Key('mining-deploy-cell-3-10')),
+      );
+      final global = MatrixUtils.transformRect(node.transform!, node.rect);
+      final center = _cellPoint(tester, cell);
+      final size = miningGridCellSize * _sceneScale(tester);
+      expect(global.center.dx, closeTo(center.dx, .5));
+      expect(global.center.dy, closeTo(center.dy, .5));
+      expect(global.width, closeTo(size, .1));
+    }
+
+    expectAligned();
+    _position(tester).jumpTo(_position(tester).pixels + 120);
+    await tester.pump();
+    expectAligned();
+    handle.dispose();
+  });
+
   testWidgets('keeps the whole-map tap action off merged deposit semantics', (
     tester,
   ) async {
