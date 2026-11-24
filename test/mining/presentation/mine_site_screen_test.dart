@@ -2028,14 +2028,15 @@ void main() {
   testWidgets('keeps the left-inset portrait compact rail clear of Sell', (
     tester,
   ) async {
-    // 360x640 portrait with a 40dp left safe-area inset: the top-anchored
-    // compact row covers a legal cell centre at maximum scroll, so the rail
-    // wants to drop into the strip below the grid — the same strip the
-    // portrait Sell column sits in, stacked above the map. Left-anchored at
-    // the safe edge the 200dp row would span x98..298, under Sell's x278
-    // column, so the rail must stay top-anchored rather than sell cargo on
-    // a rail tap.
+    // 360x640 portrait with a 20dp left safe-area inset: the top-anchored
+    // compact row covers legal seam centres at maximum scroll, so the rail
+    // drops into the strip below the grid — the same strip the portrait
+    // Sell column sits in, stacked above the map. The strip holds only
+    // 181.5dp beside Sell's x259.5 column edge, so the row relocates with
+    // shrunk gaps ending exactly at Sell's left edge, and the freed (6,17)
+    // centre takes a placement tap instead of feeding the rail.
     var sold = false;
+    final taps = <MiningGridCell>[];
     final state = _stateWith(
       landing: _progress(
         commissioned: true,
@@ -2048,20 +2049,42 @@ void main() {
     await _pumpMineSite(
       tester,
       size: const Size(360, 640),
-      padding: const EdgeInsets.only(left: 40),
+      padding: const EdgeInsets.only(left: 20),
       view: _siteView(state, selectedBayId: DockBayId.b1),
       dock: _dockView(state, selectedBayId: DockBayId.b1),
+      onGridCellTap: taps.add,
       onSellCargo: () => sold = true,
       textScale: 1.0,
     );
 
     final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
     expect(rail.height, 44, reason: 'the compact fallback row is horizontal');
+    final position = _scrollPosition(tester);
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pump();
+    final surface = tester.getRect(
+      find.byKey(const Key('mining-grid-surface')),
+    );
+    expect(
+      rail.top,
+      greaterThanOrEqualTo(surface.bottom - .01),
+      reason: 'the shrunk row must drop below the grid at maximum scroll',
+    );
     final sell = _sellControlRect(tester);
     expect(rail.overlaps(sell), isFalse, reason: 'rail $rail Sell $sell');
 
+    // The top row covered (6,17)'s centre at this scroll; relocated, the
+    // centre tap places the rig on the legal cell instead of hitting a
+    // rail target.
+    final center = _cellPoint(tester, const MiningGridCell(6, 17));
+    expect(rail.contains(center), isFalse, reason: 'rail $rail centre $center');
+    await tester.tapAt(center);
+    await tester.pump();
+    expect(taps, <MiningGridCell>[const MiningGridCell(6, 17)]);
+
     // A physical tap on the Pockets target's trailing edge — the strip the
-    // fallback row landed under — runs the band jump, never the Sell.
+    // full-width fallback row landed under — runs the band jump, never the
+    // Sell.
     final pockets = tester.getRect(
       find.byKey(const Key('mining-depth-rail-pockets')),
     );
