@@ -457,14 +457,19 @@ void main() {
       taps.add,
     );
 
-    // Legal cells in the lodes and pockets bands each own their exact action.
-    for (final cell in const [MiningGridCell(3, 10), MiningGridCell(7, 21)]) {
-      final finder = find.semantics.byLabel(
-        'Place T1 rig at (${cell.x},${cell.y}).',
-      );
-      expect(finder, findsOneWidget, reason: 'cell $cell');
-      tester.semantics.performAction(finder, SemanticsAction.tap);
-    }
+    // A legal cell in view owns its exact action; a cell scrolled out of the
+    // viewport exposes none until the map scrolls it back into view.
+    const offscreen = MiningGridCell(7, 21);
+    final inView = find.semantics.byLabel('Place T1 rig at (3,10).');
+    expect(inView, findsOneWidget);
+    tester.semantics.performAction(inView, SemanticsAction.tap);
+    expect(find.semantics.byLabel('Place T1 rig at (7,21).'), findsNothing);
+
+    await _revealCell(tester, offscreen);
+    await tester.pump();
+    final revealed = find.semantics.byLabel('Place T1 rig at (7,21).');
+    expect(revealed, findsOneWidget);
+    tester.semantics.performAction(revealed, SemanticsAction.tap);
     expect(taps, const [MiningGridCell(3, 10), MiningGridCell(7, 21)]);
 
     // A legal but Surveying-locked Motherlode cell has no deploy action.

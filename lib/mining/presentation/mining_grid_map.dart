@@ -628,6 +628,17 @@ class _MiningGridMapState extends State<MiningGridMap> {
       final sceneTop = widget.viewportInsets.top - scroll;
       double x(int cellX) => sceneLeft + cellX * cellSize;
       double y(int cellY) => sceneTop + cellY * cellSize;
+      // This overlay is not clipped by the scroll viewport, so a cell that
+      // scrolled out of view would keep an action that mutates a rig the
+      // player cannot see. Deposit labels stay unfiltered: they carry no
+      // action, and their keys anchor overlay geometry checks.
+      final viewport = Offset.zero & Size(width, height);
+      bool onscreen(MiningGridCell cell) => Rect.fromLTWH(
+        x(cell.x),
+        y(cell.y),
+        cellSize,
+        cellSize,
+      ).overlaps(viewport);
       return Stack(
         clipBehavior: Clip.none,
         children: [
@@ -650,7 +661,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
           // gesture surface exposes no tap action, so activation can never
           // fall back to a meaningless surface-centre cell.
           if (selectedRig != null)
-            for (final cell in view.deployableCells)
+            for (final cell in view.deployableCells.where(onscreen))
               Positioned(
                 key: Key('mining-deploy-cell-${cell.x}-${cell.y}'),
                 left: x(cell.x),
@@ -670,7 +681,9 @@ class _MiningGridMapState extends State<MiningGridMap> {
                   child: IgnorePointer(child: const SizedBox.expand()),
                 ),
               ),
-          for (final rig in view.rigs)
+          for (final rig in view.rigs.where(
+            (rig) => onscreen(rig.placement.cell),
+          ))
             Positioned(
               left: x(rig.placement.cell.x),
               top: y(rig.placement.cell.y),
