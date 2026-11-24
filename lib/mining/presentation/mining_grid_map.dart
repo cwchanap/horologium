@@ -74,6 +74,7 @@ class MiningGridMap extends StatefulWidget {
     this.railBottom = double.infinity,
     this.railRight = 8,
     this.railClearRight,
+    this.railBelowClearRight,
   });
 
   final MineSiteView view;
@@ -99,6 +100,12 @@ class MiningGridMap extends StatefulWidget {
   /// screen. A compact row shrinks its gaps to fit between the safe left edge
   /// and this limit instead of reaching the Sell.
   final double? railClearRight;
+
+  /// Right edge available to the below-grid fallback row: the Sell column's
+  /// left edge, whichever chrome shares that strip. The portrait Sell column
+  /// sits in it stacked above the map, so a row reaching under it would sell
+  /// cargo on a rail tap. Defaults to [railClearRight] when unset.
+  final double? railBelowClearRight;
 
   @override
   State<MiningGridMap> createState() => _MiningGridMapState();
@@ -407,8 +414,16 @@ class _MiningGridMapState extends State<MiningGridMap> {
     // A top-anchored row can also sit over a legal cell's centre at maximum
     // scroll (590x390 landscape ends the row at the Sell column, on top of
     // the Pockets band's right cells). When the strip below the grid can
-    // hold the row, prefer that clear spot; otherwise the cell stays
-    // rescuable by scrolling, the same contract as the rest of the chrome.
+    // hold the row clear of the HUD, prefer that spot; otherwise the cell
+    // stays rescuable by scrolling, the same contract as the rest of the
+    // chrome.
+    final stripClearRight =
+        widget.railBelowClearRight ??
+        widget.railClearRight ??
+        viewportWidth - widget.railRight;
+    final belowStripFits =
+        sceneBottom + _depthRailTargetSize <= viewportHeight &&
+        widget.viewportInsets.left + railWidth <= stripClearRight;
     final contentHeight =
         widget.viewportInsets.top +
         miningGridSceneHeight * _sceneScale +
@@ -426,7 +441,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
       _depthRailTargetSize,
     );
     final coversLegalCentre =
-        sceneBottom + _depthRailTargetSize <= viewportHeight &&
+        belowStripFits &&
         {
           ...widget.view.deployableCells,
           for (final rig in widget.view.rigs) rig.placement.cell,
@@ -435,11 +450,15 @@ class _MiningGridMapState extends State<MiningGridMap> {
     // (short landscape: 480x350 leaves 43.5dp between the cargo gauge and the
     // bottom row's centre) anchoring it at [top] would let its lower edge
     // cross the bottom row's centre. Drop it just below the grid's
-    // maximum-scroll bottom instead, where no cell reaches, and start it at
-    // the map's left safe edge so the HUD strip's Sell column and nav toolbar
-    // (both right of the left half) cannot cover it.
+    // maximum-scroll bottom instead, where no cell reaches, starting at the
+    // map's left safe edge. Only relocate when the row ends left of the
+    // HUD's clear-right edge: the portrait Sell column shares that strip and
+    // is stacked above the map, so a row reaching under it would sell cargo
+    // on a rail tap.
     final belowScene =
-        !vertical && (targetHeight < _depthRailTargetSize || coversLegalCentre);
+        !vertical &&
+        belowStripFits &&
+        (targetHeight < _depthRailTargetSize || coversLegalCentre);
     // shortcut: a clear band or viewport narrower than one 44dp row cannot
     // fit, and a viewport whose chrome leaves no strip below the grid or
     // beside its start edge cannot hold the compact row; no tested viewport

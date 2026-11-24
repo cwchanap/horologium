@@ -2025,6 +2025,61 @@ void main() {
     },
   );
 
+  testWidgets('keeps the left-inset portrait compact rail clear of Sell', (
+    tester,
+  ) async {
+    // 360x640 portrait with a 40dp left safe-area inset: the top-anchored
+    // compact row covers a legal cell centre at maximum scroll, so the rail
+    // wants to drop into the strip below the grid — the same strip the
+    // portrait Sell column sits in, stacked above the map. Left-anchored at
+    // the safe edge the 200dp row would span x98..298, under Sell's x278
+    // column, so the rail must stay top-anchored rather than sell cargo on
+    // a rail tap.
+    var sold = false;
+    final state = _stateWith(
+      landing: _progress(
+        commissioned: true,
+        storedAmount: 5,
+        rigs: const [
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
+        ],
+      ),
+    );
+    await _pumpMineSite(
+      tester,
+      size: const Size(360, 640),
+      padding: const EdgeInsets.only(left: 40),
+      view: _siteView(state, selectedBayId: DockBayId.b1),
+      dock: _dockView(state, selectedBayId: DockBayId.b1),
+      onSellCargo: () => sold = true,
+      textScale: 1.0,
+    );
+
+    final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+    expect(rail.height, 44, reason: 'the compact fallback row is horizontal');
+    final sell = _sellControlRect(tester);
+    expect(rail.overlaps(sell), isFalse, reason: 'rail $rail Sell $sell');
+
+    // A physical tap on the Pockets target's trailing edge — the strip the
+    // fallback row landed under — runs the band jump, never the Sell.
+    final pockets = tester.getRect(
+      find.byKey(const Key('mining-depth-rail-pockets')),
+    );
+    expect(pockets.overlaps(sell), isFalse);
+    _scrollPosition(tester).jumpTo(0);
+    await tester.pump();
+    await tester.tapAt(Offset(pockets.right - 4, pockets.center.dy));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(sold, isFalse, reason: 'the rail tap reached the Sell control');
+    expect(
+      _scrollPosition(tester).pixels,
+      closeTo(_scrollPosition(tester).maxScrollExtent, .5),
+      reason: 'the Pockets band action must run',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('keeps the zero-inset 480x350 rail off every legal cell centre', (
     tester,
   ) async {

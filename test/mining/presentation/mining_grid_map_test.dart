@@ -1467,6 +1467,13 @@ void main() {
     tester.view.physicalSize = const Size(480, 350);
     await tester.pump();
     await tester.pump(); // the retargeted animation's first tick
+
+    // A second resize during the retargeted flight must re-arm tracking
+    // again; a jumpTo retarget would cancel the animation, clear the band,
+    // and stop chasing.
+    tester.view.physicalSize = const Size(430, 500);
+    await tester.pump();
+    await tester.pump(); // the re-retargeted animation's first tick
     await tester.pump(const Duration(milliseconds: 400)); // finish the jump
 
     final position = _position(tester);
