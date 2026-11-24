@@ -1466,6 +1466,7 @@ void main() {
     // jump must not land on the stale 228.5dp offset.
     tester.view.physicalSize = const Size(480, 350);
     await tester.pump();
+    await tester.pump(); // the retargeted animation's first tick
     await tester.pump(const Duration(milliseconds: 400)); // finish the jump
 
     final position = _position(tester);

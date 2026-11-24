@@ -1852,21 +1852,26 @@ void main() {
             'not just a sliver: $cellRect',
       );
       // A thin blocked strip can leave area without a contiguous target:
-      // the clear width along the cell's vertical center must also reach 44.
-      final centerLine = Rect.fromCenter(
-        center: bottom,
-        width: visible.width,
-        height: 1,
-      );
-      var centerBlocked = 0.0;
-      for (final chrome in [..._hudRects(tester), rail]) {
-        final overlap = centerLine.intersect(chrome);
-        if (overlap.width > 0 && overlap.height > 0) {
-          centerBlocked += overlap.width;
-        }
+      // merge the blocked spans at the cell's vertical centre and require a
+      // contiguous 44dp clear span, not just 44dp of clear width in total.
+      final centerY = bottom.dy;
+      final spans = <({double left, double right})>[
+        for (final chrome in [..._hudRects(tester), rail])
+          if (chrome.top < centerY && chrome.bottom > centerY)
+            (
+              left: math.max(cellRect.left, chrome.left),
+              right: math.min(cellRect.right, chrome.right),
+            ),
+      ]..sort((a, b) => a.left.compareTo(b.left));
+      var clearSpan = 0.0;
+      var cursor = cellRect.left;
+      for (final span in spans) {
+        clearSpan = math.max(clearSpan, span.left - cursor);
+        cursor = math.max(cursor, span.right);
       }
+      clearSpan = math.max(clearSpan, cellRect.right - cursor);
       expect(
-        visible.width - centerBlocked,
+        clearSpan,
         greaterThanOrEqualTo(44 - .01),
         reason: 'no contiguous 44dp clear width at the cell centre: $cellRect',
       );
@@ -1977,6 +1982,45 @@ void main() {
       await tester.tapAt(center);
       await tester.pump();
       expect(taps, <MiningGridCell>[const MiningGridCell(7, 21)]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'drops the compact rail below the grid when it would cover a legal '
+    'centre',
+    (tester) async {
+      // 590x390 with no safe-area insets: anchoring the horizontal row at the
+      // Sell column's left edge lands it on legal cell (3,20)'s centre at
+      // maximum scroll. The strip below the grid can hold it, so it drops
+      // there and the cell's physical tap still resolves.
+      final taps = <MiningGridCell>[];
+      final state = _stateWith(landing: _progress(commissioned: true));
+      await _pumpMineSite(
+        tester,
+        size: const Size(590, 390),
+        view: _siteView(state, selectedBayId: DockBayId.b1),
+        dock: _dockView(state, selectedBayId: DockBayId.b1),
+        onGridCellTap: taps.add,
+      );
+
+      final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+      expect(rail.height, 44, reason: 'the compact fallback row is horizontal');
+
+      final position = _scrollPosition(tester);
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pump();
+      final center = _cellPoint(tester, const MiningGridCell(3, 20));
+      expect(
+        rail.contains(center),
+        isFalse,
+        reason: 'rail $rail centre $center',
+      );
+      _expectRailClearOfLegalCellCentres(tester, const [MiningGridCell(3, 20)]);
+
+      await tester.tapAt(center);
+      await tester.pump();
+      expect(taps, <MiningGridCell>[const MiningGridCell(3, 20)]);
       expect(tester.takeException(), isNull);
     },
   );
