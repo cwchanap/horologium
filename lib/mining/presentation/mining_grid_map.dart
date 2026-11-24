@@ -413,17 +413,28 @@ class _MiningGridMapState extends State<MiningGridMap> {
         : _depthRailTargetSize;
     // A top-anchored row can also sit over a legal cell's centre at maximum
     // scroll (590x390 landscape ends the row at the Sell column, on top of
-    // the Pockets band's right cells). When the strip below the grid can
-    // hold the row clear of the HUD, prefer that spot; otherwise the cell
+    // the Pockets band's right cells). The strip below the grid can be
+    // narrower than the row's own band — portrait's Sell column eats into
+    // it — so size a second row for the strip's space; when it holds the
+    // four targets clear of the HUD, prefer that spot, otherwise the cell
     // stays rescuable by scrolling, the same contract as the rest of the
     // chrome.
     final stripClearRight =
         widget.railBelowClearRight ??
         widget.railClearRight ??
         viewportWidth - widget.railRight;
+    final stripRowSpace = math.max(
+      0.0,
+      stripClearRight - widget.viewportInsets.left,
+    );
+    final belowGap = ((stripRowSpace - 4 * _depthRailTargetSize) / 3).clamp(
+      0.0,
+      8.0,
+    );
+    final belowRailWidth = 4 * _depthRailTargetSize + 3 * belowGap;
     final belowStripFits =
         sceneBottom + _depthRailTargetSize <= viewportHeight &&
-        widget.viewportInsets.left + railWidth <= stripClearRight;
+        widget.viewportInsets.left + belowRailWidth <= stripClearRight;
     final contentHeight =
         widget.viewportInsets.top +
         miningGridSceneHeight * _sceneScale +
@@ -476,14 +487,18 @@ class _MiningGridMapState extends State<MiningGridMap> {
           ? widget.railRight
           : viewportWidth - clearRight,
       child: SizedBox(
-        width: railWidth,
+        width: belowScene ? belowRailWidth : railWidth,
         height: railHeight,
         child: Stack(
           children: [
             for (final (index, band) in _depthRailBands.indexed)
               Positioned(
                 top: vertical ? index * (_depthRailTargetSize + gap) : 0,
-                left: vertical ? 0 : index * (_depthRailTargetSize + gap),
+                left: vertical
+                    ? 0
+                    : index *
+                          (_depthRailTargetSize +
+                              (belowScene ? belowGap : gap)),
                 child: _depthRailButton(band),
               ),
           ],
