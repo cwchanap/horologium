@@ -1886,6 +1886,49 @@ void main() {
   );
 
   testWidgets(
+    'keeps the zero-inset landscape rail off the bottom-right cell centre',
+    (tester) async {
+      // 590x360 with no safe-area insets is the narrow landscape case: the map
+      // column still reaches the rail's right-edge column, but the bottom
+      // scroll padding puts the last row's centre well above the rail band's
+      // lower edge. The rail must stay above that row at maximum scroll.
+      final taps = <MiningGridCell>[];
+      final state = _stateWith(
+        cash: 412,
+        landing: _progress(
+          commissioned: true,
+          rigs: const [
+            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(7, 21)),
+          ],
+        ),
+      );
+      await _pumpMineSite(
+        tester,
+        size: const Size(590, 360),
+        view: _siteView(state),
+        dock: _dockView(state),
+        onGridCellTap: taps.add,
+      );
+
+      final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+      final position = _scrollPosition(tester);
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pump();
+      final center = _cellPoint(tester, const MiningGridCell(7, 21));
+      expect(
+        rail.contains(center),
+        isFalse,
+        reason: 'rail $rail centre $center',
+      );
+
+      await tester.tapAt(center);
+      await tester.pump();
+      expect(taps, <MiningGridCell>[const MiningGridCell(7, 21)]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'keeps landscape edge rigs scrollable clear of the toolbar and rail',
     (tester) async {
       tester.view.devicePixelRatio = 1;
