@@ -108,6 +108,9 @@ class _MiningGridMapState extends State<MiningGridMap> {
   final ScrollController _scrollController = ScrollController();
   bool _framed = false;
   double _sceneScale = 1;
+  MiningBand? _railJumpBand;
+  int _railJumpSeq = 0;
+  Size? _layoutSize;
   final Map<MiningBand, FocusNode> _railFocusNodes = {
     for (final band in MiningBand.values) band: FocusNode(),
   };
@@ -154,14 +157,36 @@ class _MiningGridMapState extends State<MiningGridMap> {
             .clamp(0.0, math.max(0.0, position.maxScrollExtent))
             .toDouble();
     if (animate && !widget.reducedMotion) {
-      _scrollController.animateTo(
-        target,
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
-      );
+      // Track the in-flight jump so a mid-animation viewport change can
+      // re-target the band's new offset; completion or a canceled jump
+      // clears it, so an idle map never reframes on its own.
+      _railJumpBand = band;
+      final seq = ++_railJumpSeq;
+      _scrollController
+          .animateTo(
+            target,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+          )
+          .whenComplete(() {
+            if (seq == _railJumpSeq) _railJumpBand = null;
+          });
     } else {
       _scrollController.jumpTo(target);
     }
+  }
+
+  /// Re-targets an in-flight rail jump after a layout change: the band's
+  /// scale-aware offset moved, so the stale animation target would land the
+  /// label off-screen.
+  void _retargetPendingJump() {
+    final band = _railJumpBand;
+    if (band == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _railJumpBand == band) {
+        _scrollToBand(band, animate: false);
+      }
+    });
   }
 
   /// Frames the highest open band once, after the scroll view has laid out.
@@ -395,7 +420,13 @@ class _MiningGridMapState extends State<MiningGridMap> {
       top: belowScene ? math.max(top, sceneBottom) : top,
       height: railHeight,
       left: belowScene ? widget.viewportInsets.left : null,
-      right: belowScene ? null : widget.railRight,
+      // A horizontal row must stay inside the supplied right edge (the Sell
+      // column's left edge); the right inset only bounds vertical rails.
+      right: belowScene
+          ? null
+          : vertical
+          ? widget.railRight
+          : viewportWidth - clearRight,
       child: SizedBox(
         width: railWidth,
         height: railHeight,
@@ -488,6 +519,11 @@ class _MiningGridMapState extends State<MiningGridMap> {
           constraints.maxWidth / miningGridSceneWidth,
         );
         _scheduleInitialFrame();
+        final layoutSize = Size(constraints.maxWidth, constraints.maxHeight);
+        if (_layoutSize != layoutSize) {
+          _layoutSize = layoutSize;
+          _retargetPendingJump();
+        }
         return Stack(
           key: const Key('mining-grid-map'),
           children: [
@@ -685,6 +721,11 @@ class _MiningGridMapState extends State<MiningGridMap> {
             (rig) => onscreen(rig.placement.cell),
           ))
             Positioned(
+              key: Key(
+                'mining-rig-action-'
+                '${rig.placement.cell.x}-'
+                '${rig.placement.cell.y}',
+              ),
               left: x(rig.placement.cell.x),
               top: y(rig.placement.cell.y),
               width: cellSize,
