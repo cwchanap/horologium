@@ -2028,13 +2028,30 @@ void main() {
   testWidgets('keeps the left-inset portrait compact rail clear of Sell', (
     tester,
   ) async {
-    // 360x640 portrait with a 20dp left safe-area inset: the top-anchored
-    // compact row covers legal seam centres at maximum scroll, so the rail
-    // drops into the strip below the grid — the same strip the portrait
-    // Sell column sits in, stacked above the map. The strip holds only
-    // 181.5dp beside Sell's x259.5 column edge, so the row relocates with
-    // shrunk gaps ending exactly at Sell's left edge, and the freed (6,17)
-    // centre takes a placement tap instead of feeding the rail.
+    // 390x660 portrait with a left safe-area inset: the top-anchored compact
+    // row covers legal seam centres at maximum scroll, so the rail drops
+    // into the strip below the grid — the same strip the portrait Sell
+    // column sits in, stacked above the map. The inset leaves a 190dp strip
+    // beside Sell, so the row relocates with shrunk gaps ending exactly at
+    // Sell's left edge, and the freed cell centre takes a placement tap
+    // instead of feeding the rail. Sell's left edge is font-metric
+    // dependent (web's built-in test font measures wider than Orbitron), so
+    // derive it the same way the screen does and size the inset from it:
+    // viewportInsets.left is the inset plus the 58dp back chrome, leaving
+    // sellLeft - 58 - inset for the strip. 390dp is the narrowest portrait
+    // where both font metrics still leave the four targets room beside
+    // Sell.
+    const width = 390.0;
+    final bodyMedium = ThemeData(
+      brightness: Brightness.dark,
+      fontFamily: 'Orbitron',
+    ).textTheme.bodyMedium;
+    final sellLeft = portraitMineSellLeft(
+      width,
+      const TextScaler.linear(1),
+      bodyMedium,
+    );
+    final leftInset = math.max(0.0, sellLeft - 248);
     var sold = false;
     final taps = <MiningGridCell>[];
     final state = _stateWith(
@@ -2048,8 +2065,8 @@ void main() {
     );
     await _pumpMineSite(
       tester,
-      size: const Size(360, 640),
-      padding: const EdgeInsets.only(left: 20),
+      size: const Size(width, 660),
+      padding: EdgeInsets.only(left: leftInset),
       view: _siteView(state, selectedBayId: DockBayId.b1),
       dock: _dockView(state, selectedBayId: DockBayId.b1),
       onGridCellTap: taps.add,
@@ -2073,14 +2090,25 @@ void main() {
     final sell = _sellControlRect(tester);
     expect(rail.overlaps(sell), isFalse, reason: 'rail $rail Sell $sell');
 
-    // The top row covered (6,17)'s centre at this scroll; relocated, the
-    // centre tap places the rig on the legal cell instead of hitting a
-    // rail target.
-    final center = _cellPoint(tester, const MiningGridCell(6, 17));
+    // The row would otherwise sit right-anchored at the clear edge in the
+    // 44dp band at railTop. Find the deployable centre it was covering at
+    // maximum scroll — font metrics decide which row's centres land in the
+    // band — and check its physical tap now places the rig instead of
+    // feeding the rail.
+    const topRow = Rect.fromLTWH(182, 134, 200, 44);
+    final covered = _landingRigCells
+        .where((cell) => topRow.contains(_cellPoint(tester, cell)))
+        .toList();
+    expect(
+      covered,
+      isNotEmpty,
+      reason: 'the scenario needs a covered legal centre at maximum scroll',
+    );
+    final center = _cellPoint(tester, covered.first);
     expect(rail.contains(center), isFalse, reason: 'rail $rail centre $center');
     await tester.tapAt(center);
     await tester.pump();
-    expect(taps, <MiningGridCell>[const MiningGridCell(6, 17)]);
+    expect(taps, <MiningGridCell>[covered.first]);
 
     // A physical tap on the Pockets target's trailing edge — the strip the
     // full-width fallback row landed under — runs the band jump, never the
@@ -2107,11 +2135,22 @@ void main() {
     'keeps the portrait compact rail over the grid when the strip cannot '
     'hold it',
     (tester) async {
-      // 360x640 portrait with a 40dp left safe-area inset: the strip below
-      // the grid holds only 161.5dp beside Sell's x259.5 column edge —
-      // under the four targets' 176dp minimum — so the row cannot relocate
-      // and stays anchored over the grid, where scrolling still rescues the
-      // covered centre.
+      // 360x640 portrait with a left safe-area inset sized to leave a 160dp
+      // strip below the grid — under the four targets' 176dp minimum — so
+      // the row cannot relocate and stays anchored over the grid, where
+      // scrolling still rescues the covered centre. As in the test above,
+      // the inset derives from the font-dependent Sell edge (viewportInsets
+      // .left is the inset plus the 58dp back chrome).
+      final bodyMedium = ThemeData(
+        brightness: Brightness.dark,
+        fontFamily: 'Orbitron',
+      ).textTheme.bodyMedium;
+      final sellLeft = portraitMineSellLeft(
+        360,
+        const TextScaler.linear(1),
+        bodyMedium,
+      );
+      final leftInset = math.max(0.0, sellLeft - 218);
       final taps = <MiningGridCell>[];
       final state = _stateWith(
         landing: _progress(
@@ -2124,7 +2163,7 @@ void main() {
       await _pumpMineSite(
         tester,
         size: const Size(360, 640),
-        padding: const EdgeInsets.only(left: 40),
+        padding: EdgeInsets.only(left: leftInset),
         view: _siteView(state, selectedBayId: DockBayId.b1),
         dock: _dockView(state, selectedBayId: DockBayId.b1),
         onGridCellTap: taps.add,
@@ -2147,22 +2186,30 @@ void main() {
       final sell = _sellControlRect(tester);
       expect(rail.overlaps(sell), isFalse, reason: 'rail $rail Sell $sell');
 
-      // (6,17)'s centre stays under the row at maximum scroll; a short
-      // scroll back up moves it clear and the placement tap resolves.
-      var center = _cellPoint(tester, const MiningGridCell(6, 17));
+      // A deployable centre stays under the row at maximum scroll — font
+      // metrics decide which row's centres land in the band — and a short
+      // scroll back up moves it clear so the placement tap resolves.
+      final covered = _landingRigCells
+          .where((cell) => rail.contains(_cellPoint(tester, cell)))
+          .toList();
       expect(
-        rail.contains(center),
-        isTrue,
-        reason: 'rail $rail must still cover centre $center at max scroll',
+        covered,
+        isNotEmpty,
+        reason: 'the scenario needs a covered legal centre at maximum scroll',
       );
-      position.jumpTo(position.maxScrollExtent - 60);
-      await tester.pump();
-      center = _cellPoint(tester, const MiningGridCell(6, 17));
+      final cell = covered.first;
+      var center = _cellPoint(tester, cell);
+      var guard = 0;
+      while (rail.contains(center) && guard++ < 10) {
+        position.jumpTo(position.pixels - 40);
+        await tester.pump();
+        center = _cellPoint(tester, cell);
+      }
       expect(rail.contains(center), isFalse);
       expect(sell.contains(center), isFalse);
       await tester.tapAt(center);
       await tester.pump();
-      expect(taps, <MiningGridCell>[const MiningGridCell(6, 17)]);
+      expect(taps, <MiningGridCell>[cell]);
       expect(tester.takeException(), isNull);
     },
   );
