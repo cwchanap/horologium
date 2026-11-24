@@ -2074,11 +2074,11 @@ void main() {
       textScale: 1.0,
     );
 
-    final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
-    expect(rail.height, 44, reason: 'the compact fallback row is horizontal');
     final position = _scrollPosition(tester);
     position.jumpTo(position.maxScrollExtent);
     await tester.pump();
+    final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+    expect(rail.height, 44, reason: 'the compact fallback row is horizontal');
     final surface = tester.getRect(
       find.byKey(const Key('mining-grid-surface')),
     );
@@ -2170,11 +2170,11 @@ void main() {
         textScale: 1.0,
       );
 
-      final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
-      expect(rail.height, 44, reason: 'the compact fallback row is horizontal');
       final position = _scrollPosition(tester);
       position.jumpTo(position.maxScrollExtent);
       await tester.pump();
+      final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+      expect(rail.height, 44, reason: 'the compact fallback row is horizontal');
       final surface = tester.getRect(
         find.byKey(const Key('mining-grid-surface')),
       );
