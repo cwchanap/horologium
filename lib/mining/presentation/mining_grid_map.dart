@@ -329,14 +329,22 @@ class _MiningGridMapState extends State<MiningGridMap> {
         : viewportHeight;
     final bottom = requestedBottom.clamp(top, viewportHeight);
     final height = bottom - top;
-    // On narrow viewports the scene reaches the rail's right-edge column, and
-    // the bottom row can scroll up to the band's lower edge. Reserve one full
-    // scaled cell there so the rail can never cover that row's legal centre;
-    // a wide viewport keeps the rail beside the scene and needs no reserve.
+    // On narrow viewports the scene reaches the rail's right-edge column, so
+    // the rail must never cover the bottom row's legal centre at maximum
+    // scroll. Reserve one full scaled cell there; a wide viewport keeps the
+    // rail beside the scene and needs no reserve. Landscape puts the last row
+    // well above the band's lower edge because the bottom scroll padding ends
+    // the scene earlier, so reserve down to that row's actual centre instead
+    // of assuming it scrolls up to [railBottom].
     final railLeft = viewportWidth - widget.railRight - _depthRailTargetSize;
     final sceneRight = (viewportWidth + miningGridSceneWidth * _sceneScale) / 2;
+    final cellSize = miningGridCellSize * _sceneScale;
+    final sceneBottom = math.min(
+      widget.viewportInsets.top + miningGridSceneHeight * _sceneScale,
+      viewportHeight - widget.viewportInsets.bottom,
+    );
     final bottomRowReserve = railLeft < sceneRight
-        ? miningGridCellSize * _sceneScale
+        ? math.max(cellSize, bottom - (sceneBottom - cellSize / 2))
         : 0.0;
     final targetHeight = math.max(0.0, height - bottomRowReserve);
     // Four 44dp targets need 176dp of the reserved band to sit in one column
