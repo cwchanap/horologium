@@ -713,9 +713,12 @@ void main() {
     final deposit = tester.getRect(
       find.byKey(const Key('mining-deposit-2-2-4')),
     );
-    final scale = deposit.width / (2 * miningGridCellSize);
-    expect(deposit.width, closeTo(2 * miningGridCellSize * scale, .01));
-    expect(deposit.height, closeTo(2 * miningGridCellSize * scale, .01));
+    final surface = tester.getRect(
+      find.byKey(const Key('mining-grid-surface')),
+    );
+    final scale = surface.width / miningGridSceneWidth;
+    expect(deposit.width, closeTo(4 * miningGridCellSize * scale, .01));
+    expect(deposit.height, closeTo(4 * miningGridCellSize * scale, .01));
   });
 
   testWidgets('anchors the cash chip and cargo gauge over portrait art', (
@@ -1848,6 +1851,25 @@ void main() {
             'the bottom-right cell must expose a full 44dp interaction area, '
             'not just a sliver: $cellRect',
       );
+      // A thin blocked strip can leave area without a contiguous target:
+      // the clear width along the cell's vertical center must also reach 44.
+      final centerLine = Rect.fromCenter(
+        center: bottom,
+        width: visible.width,
+        height: 1,
+      );
+      var centerBlocked = 0.0;
+      for (final chrome in [..._hudRects(tester), rail]) {
+        final overlap = centerLine.intersect(chrome);
+        if (overlap.width > 0 && overlap.height > 0) {
+          centerBlocked += overlap.width;
+        }
+      }
+      expect(
+        visible.width - centerBlocked,
+        greaterThanOrEqualTo(44 - .01),
+        reason: 'no contiguous 44dp clear width at the cell centre: $cellRect',
+      );
 
       // Direct center tap: the compact rail must not intercept the legal
       // bottom-right cell's normal target.
@@ -2363,6 +2385,11 @@ void main() {
       dock: _dockView(state),
     );
 
+    // The entry frame clamps to the maximum extent at this size, so an
+    // upward drag cannot move from it. Drop to the top first: the drag then
+    // produces a measured offset that would reveal a reframe on rebuild.
+    _scrollPosition(tester).jumpTo(0);
+    await tester.pump();
     await tester.drag(
       find.byKey(const Key('mining-grid-scroll')),
       const Offset(0, -120),

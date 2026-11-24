@@ -442,6 +442,41 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('keeps a rig action bound to its rig as rigs scroll in', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    final taps = <MiningGridCell>[];
+    // The lode rig was placed first, so revealing it inserts it ahead of the
+    // seam rig's overlay node: without a stable key that node could be
+    // reused for the newly visible rig while the seam rig stays on screen.
+    await _pumpMap(
+      tester,
+      _view(
+        MiningSiteId.landingBasin,
+        rigs: const [
+          MiningRigPlacement(tier: RigTier.t2, cell: MiningGridCell(0, 8)),
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
+        ],
+      ),
+      taps.add,
+    );
+
+    // Only the seam rig is in view at this offset.
+    _position(tester).jumpTo(550);
+    await tester.pump();
+    final seam = tester.getSemantics(
+      _rigSemantics('rig at (0,14)', enabled: true),
+    );
+
+    // Scrolling up reveals the earlier-placed lode rig ahead of it.
+    _position(tester).jumpTo(450);
+    await tester.pump();
+    seam.owner!.performAction(seam.id, SemanticsAction.tap);
+    expect(taps.single, const MiningGridCell(0, 14));
+    handle.dispose();
+  });
+
   testWidgets('exposes a deploy action with its own cell per legal cell', (
     tester,
   ) async {
@@ -602,6 +637,9 @@ void main() {
 
     await gesture.up();
     await tester.pumpAndSettle();
+    // Reset in-body: the post-test foundation-variable check can run before
+    // tearDown callbacks on some platforms.
+    debugDefaultTargetPlatformOverride = null;
     handle.dispose();
   });
 
@@ -647,6 +685,7 @@ void main() {
 
     await gesture.up();
     await tester.pumpAndSettle();
+    debugDefaultTargetPlatformOverride = null;
     handle.dispose();
   });
 
@@ -789,9 +828,12 @@ void main() {
     );
     expect(find.byKey(const Key('mining-band-lock-lodes')), findsOneWidget);
 
-    _position(tester).jumpTo(framed + 120);
+    // The entry frame sits at the maximum extent here; jump in range toward
+    // the top so a reframe to the initial or newly opened band is detectable.
+    _position(tester).jumpTo(framed - 120);
     await tester.pump();
     final scrolled = _position(tester).pixels;
+    expect(scrolled, isNot(framed));
 
     // The same site key rebuilds with a newly opened lode band; the rail
     // updates but the player's scroll position stays put.
@@ -872,7 +914,9 @@ void main() {
       viewportInsets: insets,
     );
     final framed = _position(tester).pixels;
-    _position(tester).jumpTo(framed + 100);
+    // framed is the maximum extent here; an in-range offset keeps this
+    // deterministic and still differs from a fresh frame.
+    _position(tester).jumpTo(framed - 100);
     await tester.pump();
 
     // A site swap remounts the keyed map with its own fresh frame.
@@ -886,7 +930,7 @@ void main() {
     expect(_position(tester).pixels, closeTo(framed, .5));
 
     // Re-entry after the map unmounts also frames fresh.
-    _position(tester).jumpTo(framed + 100);
+    _position(tester).jumpTo(framed - 100);
     await tester.pump();
     await tester.pumpWidget(const SizedBox.shrink());
     await _pumpMap(
@@ -1398,6 +1442,36 @@ void main() {
     expect(_position(tester).pixels, 50);
   });
 
+  testWidgets('retargets an in-flight rail jump after a viewport change', (
+    tester,
+  ) async {
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+      reducedMotion: false,
+    );
+
+    // The entry frame already sits at the Pockets target (the maximum
+    // extent), which would no-op the jump; start from the top so the rail
+    // tap produces a real in-flight animation.
+    _position(tester).jumpTo(0);
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('mining-depth-rail-pockets')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100)); // mid-flight
+
+    // The band's scale-aware target moves with the new scale and extent; the
+    // jump must not land on the stale 228.5dp offset.
+    tester.view.physicalSize = const Size(480, 350);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400)); // finish the jump
+
+    final position = _position(tester);
+    expect(position.pixels, closeTo(position.maxScrollExtent, .5));
+  });
+
   testWidgets('keeps a vertical rail with reduced gaps above 176dp plus the '
       'reserved bottom row', (tester) async {
     Future<List<Rect>> pumpRail(double top, double bottom) async {
@@ -1712,7 +1786,9 @@ void main() {
       ),
       findsOneWidget,
     );
-    await tester.tapAt(await _revealCell(tester, cell));
+    await _revealCell(tester, cell);
+    // Tap the rendered chip itself (its top 18px), not the cell centre.
+    await tester.tapAt(tester.getCenter(find.byKey(_chipKey(cell))));
     await tester.pump();
     expect(taps.single, cell);
   });
