@@ -178,13 +178,14 @@ class _MiningGridMapState extends State<MiningGridMap> {
 
   /// Re-targets an in-flight rail jump after a layout change: the band's
   /// scale-aware offset moved, so the stale animation target would land the
-  /// label off-screen.
+  /// label off-screen. Re-animating re-arms tracking, so a multi-frame
+  /// resize keeps chasing the moving target until the jump finishes.
   void _retargetPendingJump() {
     final band = _railJumpBand;
     if (band == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _railJumpBand == band) {
-        _scrollToBand(band, animate: false);
+        _scrollToBand(band, animate: true);
       }
     });
   }
@@ -387,14 +388,6 @@ class _MiningGridMapState extends State<MiningGridMap> {
     // (see [belowScene]). Both compact arrangements stay inside the HUD bounds
     // and only the targets intercept pointers.
     final vertical = targetHeight >= 176;
-    // A compact row needs the whole 44dp clear band. When the band is shorter
-    // (short landscape: 480x350 leaves 43.5dp between the cargo gauge and the
-    // bottom row's centre) anchoring it at [top] would let its lower edge
-    // cross the bottom row's centre. Drop it just below the grid's
-    // maximum-scroll bottom instead, where no cell reaches, and start it at
-    // the map's left safe edge so the HUD strip's Sell column and nav toolbar
-    // (both right of the left half) cannot cover it.
-    final belowScene = !vertical && targetHeight < _depthRailTargetSize;
     // A horizontal row gets the space between the map's left safe edge and
     // the Sell column (when the screen supplies it) or the rail's right inset.
     // Four 44dp targets need 176dp; gaps shrink from 8dp to zero first, so a
@@ -411,6 +404,42 @@ class _MiningGridMapState extends State<MiningGridMap> {
     final railHeight = vertical
         ? math.min(targetHeight, 176 + gap * 3)
         : _depthRailTargetSize;
+    // A top-anchored row can also sit over a legal cell's centre at maximum
+    // scroll (590x390 landscape ends the row at the Sell column, on top of
+    // the Pockets band's right cells). When the strip below the grid can
+    // hold the row, prefer that clear spot; otherwise the cell stays
+    // rescuable by scrolling, the same contract as the rest of the chrome.
+    final contentHeight =
+        widget.viewportInsets.top +
+        miningGridSceneHeight * _sceneScale +
+        widget.viewportInsets.bottom;
+    final maxScroll = math.max(0.0, contentHeight - viewportHeight);
+    final sceneLeft = (viewportWidth - miningGridSceneWidth * _sceneScale) / 2;
+    Offset centreAtMaxScroll(MiningGridCell cell) => Offset(
+      sceneLeft + (cell.x + .5) * cellSize,
+      widget.viewportInsets.top + (cell.y + .5) * cellSize - maxScroll,
+    );
+    final topRowRect = Rect.fromLTWH(
+      clearRight - railWidth,
+      top,
+      railWidth,
+      _depthRailTargetSize,
+    );
+    final coversLegalCentre =
+        sceneBottom + _depthRailTargetSize <= viewportHeight &&
+        {
+          ...widget.view.deployableCells,
+          for (final rig in widget.view.rigs) rig.placement.cell,
+        }.any((cell) => topRowRect.contains(centreAtMaxScroll(cell)));
+    // A compact row needs the whole 44dp clear band. When the band is shorter
+    // (short landscape: 480x350 leaves 43.5dp between the cargo gauge and the
+    // bottom row's centre) anchoring it at [top] would let its lower edge
+    // cross the bottom row's centre. Drop it just below the grid's
+    // maximum-scroll bottom instead, where no cell reaches, and start it at
+    // the map's left safe edge so the HUD strip's Sell column and nav toolbar
+    // (both right of the left half) cannot cover it.
+    final belowScene =
+        !vertical && (targetHeight < _depthRailTargetSize || coversLegalCentre);
     // shortcut: a clear band or viewport narrower than one 44dp row cannot
     // fit, and a viewport whose chrome leaves no strip below the grid or
     // beside its start edge cannot hold the compact row; no tested viewport
