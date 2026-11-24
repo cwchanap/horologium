@@ -2103,6 +2103,70 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'keeps the portrait compact rail over the grid when the strip cannot '
+    'hold it',
+    (tester) async {
+      // 360x640 portrait with a 40dp left safe-area inset: the strip below
+      // the grid holds only 161.5dp beside Sell's x259.5 column edge —
+      // under the four targets' 176dp minimum — so the row cannot relocate
+      // and stays anchored over the grid, where scrolling still rescues the
+      // covered centre.
+      final taps = <MiningGridCell>[];
+      final state = _stateWith(
+        landing: _progress(
+          commissioned: true,
+          rigs: const [
+            MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(0, 14)),
+          ],
+        ),
+      );
+      await _pumpMineSite(
+        tester,
+        size: const Size(360, 640),
+        padding: const EdgeInsets.only(left: 40),
+        view: _siteView(state, selectedBayId: DockBayId.b1),
+        dock: _dockView(state, selectedBayId: DockBayId.b1),
+        onGridCellTap: taps.add,
+        textScale: 1.0,
+      );
+
+      final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+      expect(rail.height, 44, reason: 'the compact fallback row is horizontal');
+      final position = _scrollPosition(tester);
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pump();
+      final surface = tester.getRect(
+        find.byKey(const Key('mining-grid-surface')),
+      );
+      expect(
+        rail.top,
+        lessThan(surface.bottom),
+        reason: 'the strip cannot hold the row, so it must stay above Sell',
+      );
+      final sell = _sellControlRect(tester);
+      expect(rail.overlaps(sell), isFalse, reason: 'rail $rail Sell $sell');
+
+      // (6,17)'s centre stays under the row at maximum scroll; a short
+      // scroll back up moves it clear and the placement tap resolves.
+      var center = _cellPoint(tester, const MiningGridCell(6, 17));
+      expect(
+        rail.contains(center),
+        isTrue,
+        reason: 'rail $rail must still cover centre $center at max scroll',
+      );
+      position.jumpTo(position.maxScrollExtent - 60);
+      await tester.pump();
+      center = _cellPoint(tester, const MiningGridCell(6, 17));
+      expect(rail.contains(center), isFalse);
+      expect(sell.contains(center), isFalse);
+      await tester.tapAt(center);
+      await tester.pump();
+      expect(taps, <MiningGridCell>[const MiningGridCell(6, 17)]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('keeps the zero-inset 480x350 rail off every legal cell centre', (
     tester,
   ) async {
