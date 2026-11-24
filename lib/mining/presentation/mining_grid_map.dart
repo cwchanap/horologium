@@ -73,6 +73,7 @@ class MiningGridMap extends StatefulWidget {
     this.railTop = 0,
     this.railBottom = double.infinity,
     this.railRight = 8,
+    this.railClearRight,
   });
 
   final MineSiteView view;
@@ -92,6 +93,12 @@ class MiningGridMap extends StatefulWidget {
   final double railTop;
   final double railBottom;
   final double railRight;
+
+  /// Right edge available to a horizontal rail row in the map's local
+  /// coordinates: the landscape Sell column's left edge, supplied by the
+  /// screen. A compact row shrinks its gaps to fit between the safe left edge
+  /// and this limit instead of reaching the Sell.
+  final double? railClearRight;
 
   @override
   State<MiningGridMap> createState() => _MiningGridMapState();
@@ -363,11 +370,16 @@ class _MiningGridMapState extends State<MiningGridMap> {
     // the map's left safe edge so the HUD strip's Sell column and nav toolbar
     // (both right of the left half) cannot cover it.
     final belowScene = !vertical && targetHeight < _depthRailTargetSize;
+    // A horizontal row gets the space between the map's left safe edge and
+    // the Sell column (when the screen supplies it) or the rail's right inset.
+    // Four 44dp targets need 176dp; gaps shrink from 8dp to zero first, so a
+    // left safe-area inset cannot push the row under Sell.
+    final clearRight =
+        widget.railClearRight ?? viewportWidth - widget.railRight;
+    final rowSpace = math.max(0.0, clearRight - widget.viewportInsets.left);
     final gap = vertical
         ? ((targetHeight - 176) / 3).clamp(0.0, 16.0)
-        : (viewportWidth - widget.railRight >= 4 * _depthRailTargetSize + 3 * 8
-              ? 8.0
-              : 0.0);
+        : ((rowSpace - 4 * _depthRailTargetSize) / 3).clamp(0.0, 8.0);
     final railWidth = vertical
         ? _depthRailTargetSize
         : 4 * _depthRailTargetSize + 3 * gap;

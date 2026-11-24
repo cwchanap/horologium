@@ -127,6 +127,7 @@ Future<void> _pumpMineSite(
   required MineSiteView view,
   required FleetDockView dock,
   Size size = const Size(360, 640),
+  EdgeInsets padding = EdgeInsets.zero,
   bool disableAnimations = false,
   int impactSequence = 0,
   ValueChanged<MiningGridCell>? onGridCellTap,
@@ -152,6 +153,7 @@ Future<void> _pumpMineSite(
           Material(type: MaterialType.transparency, child: child!),
       home: MediaQuery(
         data: MediaQueryData(
+          padding: padding,
           disableAnimations: disableAnimations,
           textScaler: TextScaler.linear(textScale),
         ),
@@ -2013,6 +2015,99 @@ void main() {
     _expectRailClearOfLegalCellCentres(tester, const [MiningGridCell(5, 21)]);
     expect(tester.takeException(), isNull);
   });
+
+  for (final inset in const [44.0, 60.0]) {
+    testWidgets(
+      'keeps the ${inset.toInt()}dp-inset compact rail clear of Sell',
+      (tester) async {
+        // 480x350 with a left safe-area inset pushes the below-grid fallback
+        // row right of the map's clear left edge: at 44dp it spans x 44..244
+        // and at 60dp x 60..260, while the landscape Sell column starts at
+        // x=236. The row must size its gaps from the space between the safe
+        // left edge and Sell, keeping four 44dp targets and never covering
+        // Sell, so a Pockets tap cannot land on the Sell control.
+        final taps = <MiningGridCell>[];
+        var sold = false;
+        final state = _stateWith(
+          cash: 412,
+          landing: _progress(
+            commissioned: true,
+            storedAmount: 5,
+            rigs: const [
+              MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(5, 21)),
+            ],
+          ),
+        );
+        await _pumpMineSite(
+          tester,
+          size: const Size(480, 350),
+          padding: EdgeInsets.only(left: inset),
+          view: _siteView(state),
+          dock: _dockView(state),
+          onGridCellTap: taps.add,
+          onSellCargo: () => sold = true,
+        );
+
+        final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+        final sell = _sellControlRect(tester);
+        expect(
+          rail.height,
+          44,
+          reason: 'the compact fallback row is horizontal',
+        );
+        expect(rail.left, inset);
+        expect(rail.overlaps(sell), isFalse, reason: 'rail $rail Sell $sell');
+        for (final band in MiningBand.values) {
+          final target = tester.getRect(
+            find.byKey(Key('mining-depth-rail-${band.name}')),
+          );
+          expect(target.width, greaterThanOrEqualTo(44 - .01));
+          expect(target.height, greaterThanOrEqualTo(44 - .01));
+          expect(
+            target.overlaps(sell),
+            isFalse,
+            reason: '${band.name} $target covers Sell $sell',
+          );
+        }
+
+        // Tapping the Pockets target centre runs the band action, never the
+        // Sell control that shares this HUD strip.
+        final pockets = tester.getRect(
+          find.byKey(const Key('mining-depth-rail-pockets')),
+        );
+        final before = _scrollPosition(tester).pixels;
+        await tester.tapAt(pockets.center);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(
+          sold,
+          isFalse,
+          reason: 'Pockets centre ${pockets.center} hit Sell',
+        );
+        expect(taps, isEmpty, reason: 'the Pockets tap must not reach the map');
+        expect(
+          _scrollPosition(tester).pixels,
+          isNot(closeTo(before, .5)),
+          reason: 'the Pockets band action must run',
+        );
+
+        // The row also stays clear of every legal cell centre at max scroll.
+        final position = _scrollPosition(tester);
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pump();
+        final center = _cellPoint(tester, const MiningGridCell(5, 21));
+        expect(
+          rail.contains(center),
+          isFalse,
+          reason: 'rail $rail centre $center',
+        );
+        _expectRailClearOfLegalCellCentres(tester, const [
+          MiningGridCell(5, 21),
+        ]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'keeps landscape edge rigs scrollable clear of the toolbar and rail',

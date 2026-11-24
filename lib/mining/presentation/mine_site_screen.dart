@@ -386,6 +386,11 @@ class _MineCavern extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The compact rail row must stay left of the landscape Sell column, so
+    // hand the map the same anchor the Sell control is placed at.
+    final railClearRight = landscape
+        ? landscapeMineSellLeft(cavernWidth)
+        : null;
     return Container(
       key: const Key('mine-site-cavern'),
       clipBehavior: Clip.antiAlias,
@@ -404,6 +409,7 @@ class _MineCavern extends StatelessWidget {
             railTop: railTop,
             railBottom: railBottom,
             railRight: railRight,
+            railClearRight: railClearRight,
           ),
           if (!landscape) ...[
             const Positioned(
