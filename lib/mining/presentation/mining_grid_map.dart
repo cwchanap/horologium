@@ -319,9 +319,10 @@ class _MiningGridMapState extends State<MiningGridMap> {
     }
   }
 
-  /// Four depth-rail targets on the viewport's right edge. The column is
-  /// sized to its buttons so the rest of the rail region is pointer
-  /// transparent, and each target keeps a full 44dp hit region.
+  /// Four depth-rail targets on the viewport's right edge, or below the grid
+  /// when the HUD-clear band cannot hold the compact row. The column is sized
+  /// to its buttons so the rest of the rail region is pointer transparent,
+  /// and each target keeps a full 44dp hit region.
   Widget _depthRail(double viewportHeight, double viewportWidth) {
     final top = widget.railTop.clamp(0.0, viewportHeight);
     final requestedBottom = widget.railBottom.isFinite
@@ -349,10 +350,19 @@ class _MiningGridMapState extends State<MiningGridMap> {
     final targetHeight = math.max(0.0, height - bottomRowReserve);
     // Four 44dp targets need 176dp of the reserved band to sit in one column
     // without overlap. Above that threshold the gaps shrink from 16dp to zero
-    // first. A shorter clear band keeps the targets high in a horizontal row,
-    // which leaves the bottom-right cell clear; both arrangements stay inside
-    // the HUD bounds and only the targets intercept pointers.
+    // first. A shorter clear band keeps the targets high in a horizontal row;
+    // when the band cannot hold that row either, the row moves below the grid
+    // (see [belowScene]). Both compact arrangements stay inside the HUD bounds
+    // and only the targets intercept pointers.
     final vertical = targetHeight >= 176;
+    // A compact row needs the whole 44dp clear band. When the band is shorter
+    // (short landscape: 480x350 leaves 43.5dp between the cargo gauge and the
+    // bottom row's centre) anchoring it at [top] would let its lower edge
+    // cross the bottom row's centre. Drop it just below the grid's
+    // maximum-scroll bottom instead, where no cell reaches, and start it at
+    // the map's left safe edge so the HUD strip's Sell column and nav toolbar
+    // (both right of the left half) cannot cover it.
+    final belowScene = !vertical && targetHeight < _depthRailTargetSize;
     final gap = vertical
         ? ((targetHeight - 176) / 3).clamp(0.0, 16.0)
         : (viewportWidth - widget.railRight >= 4 * _depthRailTargetSize + 3 * 8
@@ -365,12 +375,15 @@ class _MiningGridMapState extends State<MiningGridMap> {
         ? math.min(targetHeight, 176 + gap * 3)
         : _depthRailTargetSize;
     // shortcut: a clear band or viewport narrower than one 44dp row cannot
-    // fit; no tested viewport reaches that, revisit with HPA-1244's rail.
+    // fit, and a viewport whose chrome leaves no strip below the grid or
+    // beside its start edge cannot hold the compact row; no tested viewport
+    // reaches either, revisit with HPA-1244's rail.
     return Positioned(
       key: const Key('mining-depth-rail'),
-      top: top,
+      top: belowScene ? math.max(top, sceneBottom) : top,
       height: railHeight,
-      right: widget.railRight,
+      left: belowScene ? widget.viewportInsets.left : null,
+      right: belowScene ? null : widget.railRight,
       child: SizedBox(
         width: railWidth,
         height: railHeight,

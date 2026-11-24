@@ -302,6 +302,33 @@ Rect _sellControlRect(WidgetTester tester) => tester.getRect(
       .first,
 );
 
+/// [extraLegalCells] are rig cells the test state adds on top of the site's
+/// legal deploy cells. At maximum scroll no depth-rail target may swallow the
+/// centre of a legal target, whatever arrangement the rail takes.
+void _expectRailClearOfLegalCellCentres(
+  WidgetTester tester,
+  Iterable<MiningGridCell> extraLegalCells,
+) {
+  final surface = tester.getRect(find.byKey(const Key('mining-grid-surface')));
+  final cellSize = surface.width / miningGridWidth;
+  final targets = [
+    for (final band in MiningBand.values)
+      tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
+  ];
+  for (final cell in {..._landingRigCells, ...extraLegalCells}) {
+    final center =
+        surface.topLeft +
+        Offset((cell.x + .5) * cellSize, (cell.y + .5) * cellSize);
+    for (final target in targets) {
+      expect(
+        target.contains(center),
+        isFalse,
+        reason: 'rail target $target covers legal cell $cell centre $center',
+      );
+    }
+  }
+}
+
 /// Animated-layer keys proving the top and bottom edge rigs and their mined
 /// resources stay on the unobscured cavern: each rig's robot plus the HP
 /// chrome of the deposit it mines.
@@ -1877,6 +1904,7 @@ void main() {
         isFalse,
         reason: 'rail $rail centre $center',
       );
+      _expectRailClearOfLegalCellCentres(tester, const [MiningGridCell(7, 21)]);
 
       await tester.tapAt(center);
       await tester.pump();
@@ -1920,6 +1948,7 @@ void main() {
         isFalse,
         reason: 'rail $rail centre $center',
       );
+      _expectRailClearOfLegalCellCentres(tester, const [MiningGridCell(7, 21)]);
 
       await tester.tapAt(center);
       await tester.pump();
@@ -1927,6 +1956,63 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('keeps the zero-inset 480x350 rail off every legal cell centre', (
+    tester,
+  ) async {
+    // 480x350 with no safe-area insets leaves 43.5dp between the cargo
+    // gauge (bottom 126) and the bottom row's centre (169.5) at maximum
+    // scroll: half a dp short of the 44dp compact row. Top-anchoring the row
+    // at 126 put its lower edge at 170, so the Lodes target swallowed the
+    // legal (5,21) centre tap at (258.5, 169.5).
+    final taps = <MiningGridCell>[];
+    final state = _stateWith(
+      cash: 412,
+      landing: _progress(
+        commissioned: true,
+        rigs: const [
+          MiningRigPlacement(tier: RigTier.t1, cell: MiningGridCell(5, 21)),
+        ],
+      ),
+    );
+    await _pumpMineSite(
+      tester,
+      size: const Size(480, 350),
+      view: _siteView(state),
+      dock: _dockView(state),
+      onGridCellTap: taps.add,
+    );
+
+    final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+    expect(rail.height, 44, reason: 'the compact fallback row is horizontal');
+    for (final band in MiningBand.values) {
+      final target = tester.getRect(
+        find.byKey(Key('mining-depth-rail-${band.name}')),
+      );
+      expect(target.width, greaterThanOrEqualTo(44 - .01));
+      expect(target.height, greaterThanOrEqualTo(44 - .01));
+    }
+    for (final chrome in _hudRects(tester)) {
+      expect(rail.overlaps(chrome), isFalse, reason: 'rail $rail vs $chrome');
+    }
+
+    final position = _scrollPosition(tester);
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pump();
+    final center = _cellPoint(tester, const MiningGridCell(5, 21));
+    expect(rail.contains(center), isFalse, reason: 'rail $rail centre $center');
+    await tester.tapAt(center);
+    await tester.pump();
+    expect(taps, <MiningGridCell>[const MiningGridCell(5, 21)]);
+    // The compact row fits below the grid's maximum-scroll bottom, so it
+    // cannot reach any legal target's centre.
+    final surface = tester.getRect(
+      find.byKey(const Key('mining-grid-surface')),
+    );
+    expect(rail.top, greaterThanOrEqualTo(surface.bottom - .01));
+    _expectRailClearOfLegalCellCentres(tester, const [MiningGridCell(5, 21)]);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'keeps landscape edge rigs scrollable clear of the toolbar and rail',
