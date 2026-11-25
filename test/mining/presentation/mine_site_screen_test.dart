@@ -2065,6 +2065,54 @@ void main() {
     },
   );
 
+  for (final scenario in const [
+    (band: MiningBand.pockets, cell: MiningGridCell(4, 20), surveying: 0),
+    (band: MiningBand.lodes, cell: MiningGridCell(4, 9), surveying: 1),
+  ]) {
+    testWidgets(
+      'keeps the ${scenario.band.label} jump clear of Sell for a placement tap',
+      (tester) async {
+        // 590x390 landscape with a sellable balance and a selected dock rig:
+        // the rail action must not leave these deployable centres under the
+        // landscape Sell control, where the placement tap sells cargo.
+        var sold = false;
+        final taps = <MiningGridCell>[];
+        final state = _stateWith(
+          landing: _progress(commissioned: true, storedAmount: 5),
+        ).copyWith(technology: TechnologyLevels(surveying: scenario.surveying));
+        await _pumpMineSite(
+          tester,
+          size: const Size(590, 390),
+          view: _siteView(state, selectedBayId: DockBayId.b1),
+          dock: _dockView(state, selectedBayId: DockBayId.b1),
+          onGridCellTap: taps.add,
+          onSellCargo: () => sold = true,
+        );
+
+        await tester.tap(
+          find.byKey(Key('mining-depth-rail-button-${scenario.band.name}')),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        final center = _cellPoint(tester, scenario.cell);
+        expect(
+          tester
+              .getRect(find.byKey(const Key('mining-grid-map')))
+              .contains(center),
+          isTrue,
+          reason: 'the jumped-to cell must be visible before the tap',
+        );
+        await tester.tapAt(center);
+        await tester.pump();
+
+        expect(sold, isFalse, reason: 'the placement tap reached Sell');
+        expect(taps, <MiningGridCell>[scenario.cell]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('keeps the left-inset portrait compact rail clear of Sell', (
     tester,
   ) async {

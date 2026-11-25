@@ -153,17 +153,44 @@ class _MiningGridMapState extends State<MiningGridMap> {
     return MiningBand.values.first;
   }
 
+  /// Deepest unique-perimeter row in [band]. This authored geometry stays
+  /// fixed while rig selection or occupancy changes, so jump targets do not
+  /// move underneath the pointer during a mutation.
+  int _bottomPlacementRow(MiningBand band) {
+    var row = 0;
+    for (final deposit in _depositsIn(band)) {
+      for (final cell
+          in widget.view.definition.perimeterCellsByDeposit[deposit
+              .definition]!) {
+        row = math.max(row, cell.y);
+      }
+    }
+    return row;
+  }
+
   /// One scroll path for the once-per-entry frame and every rail tap. The
-  /// target is the scale-aware row offset `labelRow * 56 *
-  /// min(1, width / 448)` in scroll-content coordinates, clamped to the valid
-  /// scroll extent. Because the scrollable child already starts after the top
-  /// padding, that target places the label at viewportInsets.top rather than
-  /// screen y=0.
+  /// preferred target is the scale-aware row offset `labelRow * 56 *
+  /// min(1, width / 448)` in scroll-content coordinates. Because the
+  /// scrollable child already starts after the top padding, that target
+  /// places the label at viewportInsets.top rather than screen y=0. When that
+  /// leaves the band's deepest placement row in the bottom HUD clearance,
+  /// scroll farther until that row clears it; on a short viewport the label
+  /// may leave the top clearance, but a visible placement tap cannot sell.
   void _scrollToBand(MiningBand band, {required bool animate}) {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
-    final target = (band.labelRow * miningGridCellSize * _sceneScale)
-        .clamp(0.0, math.max(0.0, position.maxScrollExtent))
+    final maxTarget = math.max(0.0, position.maxScrollExtent);
+    final cellSize = miningGridCellSize * _sceneScale;
+    final labelTarget = band.labelRow * cellSize;
+    final bottomClearY =
+        position.viewportDimension - widget.viewportInsets.bottom;
+    final placementBottomTarget =
+        widget.viewportInsets.top +
+        (_bottomPlacementRow(band) + 1) * cellSize -
+        bottomClearY;
+    final target = math
+        .max(labelTarget, placementBottomTarget)
+        .clamp(0.0, maxTarget)
         .toDouble();
     if (animate && !widget.reducedMotion) {
       // Track the in-flight jump so a mid-animation viewport change can
