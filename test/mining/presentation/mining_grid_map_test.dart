@@ -1450,7 +1450,7 @@ void main() {
     expect(visited.toSet(), MiningBand.values.toSet());
   });
 
-  testWidgets('uses the scale-aware target from a nonzero top padding', (
+  testWidgets('uses scale-aware top and bottom-clear band targets', (
     tester,
   ) async {
     const insets = EdgeInsets.only(top: 50, bottom: 50);
@@ -1473,14 +1473,18 @@ void main() {
       reason: 'the label row must land below the top scroll clearance',
     );
 
-    // The Motherlode row 0 target is zero: scroll-content padding already
-    // places it below the top clearance.
+    // The Motherlode prefers row 0, but must scroll far enough to lift its
+    // bottom placement row (row 6) out of the bottom clearance.
     await tester.tap(find.byKey(const Key('mining-depth-rail-motherlode')));
     await tester.pump();
-    expect(_position(tester).pixels, 0);
+    final cellSize = miningGridCellSize * scale;
+    final motherlodeTarget = insets.top + 7 * cellSize - (423 - insets.bottom);
+    expect(_position(tester).pixels, closeTo(motherlodeTarget, .5));
+    final bottomRowCenter = _cellPoint(tester, const MiningGridCell(2, 6));
     expect(
-      tester.getRect(find.byKey(const Key('mining-band-label-motherlode'))).top,
-      closeTo(insets.top, .5),
+      bottomRowCenter.dy + cellSize / 2,
+      closeTo(423 - insets.bottom, .5),
+      reason: 'the bottom placement row must end at the clear edge',
     );
   });
 
