@@ -1466,11 +1466,14 @@ void main() {
     final maxExtent = _position(tester).maxScrollExtent;
     final seamsTarget = MiningBand.seams.labelRow * 56 * scale;
     expect(seamsTarget, lessThan(maxExtent), reason: 'target must be clear');
-    expect(_position(tester).pixels, closeTo(seamsTarget, .5));
+    // The raw label target would leave the upper right Seams centre inside a
+    // vertical rail target. The nearest collision-free gap is 1dp above the
+    // Seams rail button, while the label remains visible at the top edge.
+    expect(_position(tester).pixels, closeTo(710.375, .5));
     expect(
-      tester.getRect(find.byKey(const Key('mining-band-label-seams'))).top,
-      closeTo(insets.top, .5),
-      reason: 'the label row must land below the top scroll clearance',
+      tester.getRect(find.byKey(const Key('mining-band-label-seams'))).bottom,
+      greaterThan(0),
+      reason: 'the label row must remain visible',
     );
 
     // The Motherlode prefers row 0 once Surveying opens it, but must scroll

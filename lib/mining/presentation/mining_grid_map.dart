@@ -121,6 +121,9 @@ class MiningGridMap extends StatefulWidget {
 
 class _MiningGridMapState extends State<MiningGridMap> {
   final ScrollController _scrollController = ScrollController();
+  final Map<MiningBand, GlobalKey> _railHitKeys = {
+    for (final band in _depthRailBands) band: GlobalKey(),
+  };
   bool _framed = false;
   double _sceneScale = 1;
   double _sceneLeft = 0;
@@ -175,6 +178,19 @@ class _MiningGridMapState extends State<MiningGridMap> {
     return row;
   }
 
+  Rect? _rectInMap(GlobalKey key, Offset mapOrigin) {
+    final box = key.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return null;
+    return (box.localToGlobal(Offset.zero) - mapOrigin) & box.size;
+  }
+
+  Iterable<Rect> _railHitRects(Offset mapOrigin) sync* {
+    for (final key in _railHitKeys.values) {
+      final rect = _rectInMap(key, mapOrigin);
+      if (rect != null) yield rect;
+    }
+  }
+
   /// One scroll path for the once-per-entry frame and every rail tap. The
   /// preferred target is the scale-aware row offset `labelRow * 56 *
   /// min(1, width / 448)` in scroll-content coordinates. Because the
@@ -184,9 +200,9 @@ class _MiningGridMapState extends State<MiningGridMap> {
   /// scroll farther until that row clears it; on a short viewport the label
   /// may leave the top clearance, but a visible placement tap cannot sell. A
   /// locked band has no deployable row to rescue, so it keeps the label and
-  /// its Surveying copy at the preferred frame. If the extra scroll drops a
-  /// placement centre over upper chrome that reaches below the top clearance,
-  /// keep scrolling far enough to lift that centre above the control instead.
+  /// its Surveying copy at the preferred frame. Open-band targets then prefer
+  /// the nearest clamped scroll offset whose placement centres clear the upper
+  /// chrome and the actual depth-rail target rectangles.
   void _scrollToBand(MiningBand band, {required bool animate}) {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
@@ -204,30 +220,68 @@ class _MiningGridMapState extends State<MiningGridMap> {
           bottomClearY;
       target = math.max(labelTarget, placementBottomTarget);
     }
-    final upperHudHitRect = widget.upperHudHitRect;
-    if (open && upperHudHitRect != null) {
-      final collisions = <({double start, double end})>[];
+    final mapBox = context.findRenderObject();
+    final mapOrigin = mapBox is RenderBox && mapBox.hasSize
+        ? mapBox.localToGlobal(Offset.zero)
+        : Offset.zero;
+    final hitRects = [
+      if (widget.upperHudHitRect != null) widget.upperHudHitRect!,
+      if (mapBox is RenderBox && mapBox.hasSize) ..._railHitRects(mapOrigin),
+    ];
+    if (open && hitRects.isNotEmpty) {
+      final centers = <Offset>[];
       for (final deposit in _depositsIn(band)) {
         for (final cell
             in widget.view.definition.perimeterCellsByDeposit[deposit
                 .definition]!) {
-          final centerX = _sceneLeft + (cell.x + .5) * cellSize;
-          if (centerX < upperHudHitRect.left ||
-              centerX >= upperHudHitRect.right) {
+          centers.add(
+            Offset(
+              _sceneLeft + (cell.x + .5) * cellSize,
+              widget.viewportInsets.top + (cell.y + .5) * cellSize,
+            ),
+          );
+        }
+      }
+      final collisions = <({double start, double end})>[];
+      for (final center in centers) {
+        for (final hitRect in hitRects) {
+          if (center.dx < hitRect.left || center.dx >= hitRect.right) {
             continue;
           }
-          final centerY = widget.viewportInsets.top + (cell.y + .5) * cellSize;
           collisions.add((
-            start: centerY - upperHudHitRect.bottom,
-            end: centerY - upperHudHitRect.top + 1,
+            start: center.dy - hitRect.bottom,
+            end: center.dy - hitRect.top + 1,
           ));
         }
       }
-      collisions.sort((a, b) => a.start.compareTo(b.start));
-      for (final collision in collisions) {
-        if (target > collision.start && target < collision.end) {
-          target = collision.end;
-        }
+      bool clearsCollisions(double value) => collisions.every(
+        (collision) => value <= collision.start || value >= collision.end,
+      );
+      final preferredTarget = target;
+      final candidates =
+          <double>{
+                0,
+                maxTarget,
+                preferredTarget,
+                for (final collision in collisions) ...[
+                  collision.start,
+                  collision.end,
+                ],
+              }
+              .map((value) => value.clamp(0.0, maxTarget).toDouble())
+              .where(clearsCollisions)
+              .toList()
+            ..sort();
+      final above = candidates.where((value) => value >= preferredTarget);
+      if (above.isNotEmpty) {
+        target = above.first;
+      } else if (candidates.isNotEmpty) {
+        target = candidates.last;
+      } else {
+        // shortcut: chrome collision intervals can theoretically cover every
+        // candidate scroll endpoint; no tested viewport reaches that case,
+        // revisit with a layout that reserves horizontal space for the rail.
+        target = preferredTarget.clamp(0.0, maxTarget).toDouble();
       }
     }
     final clampedTarget = target.clamp(0.0, maxTarget).toDouble();
@@ -503,48 +557,13 @@ class _MiningGridMapState extends State<MiningGridMap> {
     final belowStripFits =
         sceneBottom + _depthRailTargetSize <= viewportHeight &&
         stripRowSpace >= 4 * _depthRailTargetSize;
-    final contentHeight =
-        widget.viewportInsets.top +
-        miningGridSceneHeight * _sceneScale +
-        widget.viewportInsets.bottom;
-    final maxScroll = math.max(0.0, contentHeight - viewportHeight);
-    final sceneLeft = (viewportWidth - miningGridSceneWidth * _sceneScale) / 2;
-    Offset centreAtMaxScroll(MiningGridCell cell) => Offset(
-      sceneLeft + (cell.x + .5) * cellSize,
-      widget.viewportInsets.top + (cell.y + .5) * cellSize - maxScroll,
-    );
-    final topRowRect = Rect.fromLTWH(
-      clearRight - railWidth,
-      top,
-      railWidth,
-      _depthRailTargetSize,
-    );
-    // Selection and mutation state decide whether a perimeter cell is
-    // deployable right now, but the rail must not move under the pointer when
-    // they change. Test the stable authored perimeter of every surveyed
-    // deposit instead, plus placed rig cells.
-    final coversLegalCentre =
-        belowStripFits &&
-        {
-          for (final deposit in widget.view.deposits)
-            if (deposit.isSurveyed)
-              ...widget.view.definition.perimeterCellsByDeposit[deposit
-                  .definition]!,
-          for (final rig in widget.view.rigs) rig.placement.cell,
-        }.any((cell) => topRowRect.contains(centreAtMaxScroll(cell)));
-    // A compact row needs the whole 44dp clear band. When the band is shorter
-    // (short landscape: 480x350 leaves 43.5dp between the cargo gauge and the
-    // bottom row's centre) anchoring it at [top] would let its lower edge
-    // cross the bottom row's centre. Drop it just below the grid's
-    // maximum-scroll bottom instead, where no cell reaches, starting at the
-    // map's left safe edge. Only relocate when the row ends left of the
-    // HUD's clear-right edge: the portrait Sell column shares that strip and
-    // is stacked above the map, so a row reaching under it would sell cargo
-    // on a rail tap.
-    final belowScene =
-        !vertical &&
-        belowStripFits &&
-        (targetHeight < _depthRailTargetSize || coversLegalCentre);
+    // A compact row needs the whole 44dp clear band. Drop it just below the
+    // grid's maximum-scroll bottom whenever that strip can hold the targets:
+    // the top row can otherwise cover a legal centre or the locked-band
+    // Surveying copy framed at the same top edge. The portrait Sell column
+    // shares that strip and is stacked above the map, so a row reaching under
+    // it would sell cargo on a rail tap.
+    final belowScene = !vertical && belowStripFits;
     // shortcut: a clear band or viewport narrower than one 44dp row cannot
     // fit, and a viewport whose chrome leaves no strip below the grid or
     // beside its start edge cannot hold the compact row; no tested viewport
@@ -597,6 +616,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
       onTap: () => _scrollToBand(band, animate: true),
       excludeSemantics: true,
       child: SizedBox(
+        key: _railHitKeys[band],
         width: _depthRailTargetSize,
         height: _depthRailTargetSize,
         // One focus stop per band: the IconButton owns traversal, the built-in
