@@ -1520,13 +1520,16 @@ void main() {
     expect(
       scrollPixels(),
       closeTo(
-        cargoBottom +
-            MiningBand.lodes.labelRow *
-                miningGridCellSize *
-                surface.width /
-                miningGridSceneWidth,
+        MiningBand.lodes.labelRow *
+            miningGridCellSize *
+            surface.width /
+            miningGridSceneWidth,
         0.5,
       ),
+    );
+    expect(
+      tester.getRect(find.byKey(const Key('mining-band-label-lodes'))).top,
+      closeTo(cargoBottom, 0.5),
     );
 
     // The still-selected dock rig deploys on the now-open lode.

@@ -272,7 +272,9 @@ Future<Offset> _scrollToCell(WidgetTester tester, MiningGridCell cell) async {
         !rail.contains(point) &&
         point.dy > clearTop &&
         point.dy <= clearBottom,
-    orElse: () => cellRect.center,
+    orElse: () => throw TestFailure(
+      'no clear tap point for $cell in ${cellRect.toString()}',
+    ),
   );
 }
 
@@ -312,7 +314,7 @@ void _expectRailClearOfLegalCellCentres(
   Iterable<MiningGridCell> extraLegalCells,
 ) {
   final surface = tester.getRect(find.byKey(const Key('mining-grid-surface')));
-  final cellSize = surface.width / miningGridWidth;
+  final cellSize = surface.width / MiningContentRegistry.mineGridWidth;
   final targets = [
     for (final band in MiningBand.values)
       tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
@@ -1752,7 +1754,9 @@ void main() {
 
       final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
       expect(rail.top, greaterThanOrEqualTo(cargo.bottom));
-      expect(rail.bottom, lessThanOrEqualTo(sell.top));
+      // The compact fallback may share Sell's vertical strip when it moves
+      // below the grid, but it must remain geometrically clear of the control.
+      expect(rail.overlaps(sell), isFalse, reason: 'rail $rail Sell $sell');
       final buttons = [
         for (final band in MiningBand.values.reversed)
           tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
@@ -1985,6 +1989,42 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('keeps the compact rail in place as rig selection changes', (
+    tester,
+  ) async {
+    // 590x390 is the landscape case where the top-anchored row covers a
+    // surveyed perimeter cell at maximum scroll. Selection and mutation
+    // state change deployability, but they must not move the rail beneath
+    // the pointer.
+    final state = _stateWith(landing: _progress(commissioned: true));
+    final rects = <Rect>[];
+    for (final configuration in const [
+      (selected: false, busy: false),
+      (selected: true, busy: false),
+      (selected: true, busy: true),
+    ]) {
+      final selectedBayId = configuration.selected ? DockBayId.b1 : null;
+      await _pumpMineSite(
+        tester,
+        size: const Size(590, 390),
+        view: _siteView(
+          state,
+          selectedBayId: selectedBayId,
+          isBusy: configuration.busy,
+        ),
+        dock: _dockView(
+          state,
+          selectedBayId: selectedBayId,
+          isBusy: configuration.busy,
+        ),
+      );
+      rects.add(tester.getRect(find.byKey(const Key('mining-depth-rail'))));
+    }
+
+    expect(rects[1], rects[0], reason: 'selecting a rig moved the rail');
+    expect(rects[2], rects[0], reason: 'a busy mutation moved the rail');
+  });
 
   testWidgets(
     'drops the compact rail below the grid when it would cover a legal '
@@ -2522,7 +2562,7 @@ void main() {
       _scrollPosition(tester).pixels,
       closeTo(
         math.min(
-          topPadding + MiningBand.seams.labelRow * miningGridCellSize * scale,
+          MiningBand.seams.labelRow * miningGridCellSize * scale,
           _scrollPosition(tester).maxScrollExtent,
         ),
         .5,
@@ -2540,12 +2580,16 @@ void main() {
       view: _siteView(surveyed),
       dock: _dockView(surveyed),
     );
-    // Motherlode row 0 target is exactly the map's top padding, so the
-    // scene top sits at the map's top edge and the label rides at y=0.
-    expect(_scrollPosition(tester).pixels, closeTo(topPadding, .5));
+    // Motherlode row 0 target is zero: the scroll-content padding places
+    // the label below the HUD clearance instead of under it.
+    expect(_scrollPosition(tester).pixels, 0);
     expect(
       tester.getRect(find.byKey(const Key('mining-band-label-motherlode'))).top,
-      closeTo(tester.getRect(find.byKey(const Key('mining-grid-map'))).top, .5),
+      closeTo(
+        tester.getRect(find.byKey(const Key('mining-grid-map'))).top +
+            topPadding,
+        .5,
+      ),
     );
   });
 
@@ -2756,7 +2800,7 @@ void main() {
       );
       expect(find.byKey(const Key('mining-depth-rail')), findsOneWidget);
 
-      final cell = surface.width / miningGridWidth;
+      final cell = surface.width / MiningContentRegistry.mineGridWidth;
       expect(cell, lessThanOrEqualTo(miningGridCellSize + .01));
       if (size.width == 360) {
         expect(cell, greaterThanOrEqualTo(44), reason: '360 cell $cell');

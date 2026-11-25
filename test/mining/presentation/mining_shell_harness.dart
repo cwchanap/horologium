@@ -126,11 +126,10 @@ MiningSave nearFinalPlanetMasteryState(DateTime now) {
   );
 }
 
-/// Taps the center of a grid cell through the vertical map scroll. The cell
-/// is first scrolled into the map's clear band (below the cargo gauge and
-/// above the Sell column), then tapped at the first point in its displayed
-/// rect that is not under the depth rail. A timed drag keeps the end-of-
-/// gesture velocity realistic so the real scroll physics handles the move.
+/// Taps a grid cell through the vertical map scroll. The cell is first
+/// positioned in the map's clear band (below the cargo gauge and above the
+/// Sell column) with deterministic scroll jumps, then tapped at the first
+/// point in its displayed rect that is not under the depth rail.
 Future<void> tapGridCell(WidgetTester tester, MiningGridCell cell) async {
   final map = find.byKey(const Key('mining-grid-map'));
   final scrollable = find
@@ -195,7 +194,8 @@ Future<void> tapGridCell(WidgetTester tester, MiningGridCell cell) async {
         !rail.contains(candidate) &&
         candidate.dy > clearTop &&
         candidate.dy <= clearBottom,
-    orElse: () => rect.center,
+    orElse: () =>
+        throw TestFailure('no clear tap point for $cell in ${rect.toString()}'),
   );
   await tester.tapAt(point);
   await tester.pump();

@@ -73,7 +73,12 @@ void main() {
           find.text('RUN COMPLETE'),
           find.byKey(const Key('planet-mastery-multiplier')),
         ]);
-        expect(find.textContaining('×2'), findsOneWidget);
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('planet-mastery-multiplier')))
+              .data,
+          contains('×2'),
+        );
         expect(
           find.byKey(const Key('planet-mastery-relaunch')).hitTestable(),
           findsOneWidget,
@@ -185,7 +190,12 @@ void main() {
           find.text('RUN COMPLETE'),
           find.byKey(const Key('planet-mastery-multiplier')),
         ]);
-        expect(find.textContaining('×2'), findsOneWidget);
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('planet-mastery-multiplier')))
+              .data,
+          contains('×2'),
+        );
         expect(
           find.byKey(const Key('planet-mastery-relaunch')).hitTestable(),
           findsOneWidget,
