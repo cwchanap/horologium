@@ -422,6 +422,9 @@ class _MineCavern extends StatelessWidget {
                   ),
             railTop: railTop,
             railBottom: railBottom,
+            placementSafeY: landscape
+                ? null
+                : railBottom + _portraitRailSellGap,
             railRight: railRight,
             railClearRight: landscape ? sellLeft : null,
             railBelowClearRight: sellLeft,

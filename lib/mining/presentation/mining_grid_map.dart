@@ -74,6 +74,7 @@ class MiningGridMap extends StatefulWidget {
     this.upperHudHitRect,
     this.railTop = 0,
     this.railBottom = double.infinity,
+    this.placementSafeY,
     this.railRight = 8,
     this.railClearRight,
     this.railBelowClearRight,
@@ -101,6 +102,10 @@ class MiningGridMap extends StatefulWidget {
   /// gauge and the Sell/bottom chrome.
   final double railTop;
   final double railBottom;
+
+  /// Bottom edge of the lowest chrome a placement tap must clear. Portrait
+  /// passes the Sell top; other layouts use the bottom viewport inset.
+  final double? placementSafeY;
   final double railRight;
 
   /// Right edge available to a horizontal rail row in the map's local
@@ -216,12 +221,16 @@ class _MiningGridMapState extends State<MiningGridMap> {
         position.viewportDimension - widget.viewportInsets.bottom;
     final open = _isBandOpen(band);
     var placementBottomTarget = double.negativeInfinity;
+    var placementCenterTarget = double.negativeInfinity;
     var target = labelTarget;
     if (open) {
+      final bottomRow = _bottomPlacementRow(band);
       placementBottomTarget =
+          widget.viewportInsets.top + (bottomRow + 1) * cellSize - bottomClearY;
+      placementCenterTarget =
           widget.viewportInsets.top +
-          (_bottomPlacementRow(band) + 1) * cellSize -
-          bottomClearY;
+          (bottomRow + .5) * cellSize -
+          (widget.placementSafeY ?? bottomClearY);
       target = math.max(labelTarget, placementBottomTarget);
     }
     final mapBox = context.findRenderObject();
@@ -274,7 +283,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
             center.dy,
       ];
       bool keepsPlacementFrame(double value) {
-        if (value + tolerance < placementBottomTarget) return false;
+        if (value + tolerance < placementCenterTarget) return false;
         return visibleCenterDys.every((centerDy) {
           final y = centerDy - value;
           return y >= -tolerance && y <= position.viewportDimension + tolerance;
@@ -298,11 +307,14 @@ class _MiningGridMapState extends State<MiningGridMap> {
               )
               .toList()
             ..sort();
-      final above = candidates.where((value) => value >= preferredFrameTarget);
-      if (above.isNotEmpty) {
-        target = above.first;
-      } else if (candidates.isNotEmpty) {
-        target = candidates.last;
+      if (candidates.isNotEmpty) {
+        target = candidates.reduce(
+          (best, value) =>
+              (value - preferredFrameTarget).abs() <=
+                  (best - preferredFrameTarget).abs()
+              ? value
+              : best,
+        );
       } else {
         // No collision-free offset can keep the bottom-safe rows visible;
         // preserve that usable frame and let the player scroll manually
