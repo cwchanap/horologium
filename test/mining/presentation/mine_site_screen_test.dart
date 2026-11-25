@@ -1924,8 +1924,9 @@ void main() {
       final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
       expect(rail.height, 44, reason: 'the compact fallback row is horizontal');
       expect(
-        tester.getRect(find.byKey(const Key('mining-depth-rail-pockets'))),
-        Rect.fromLTWH(rail.left + 3 * 52, 134, 44, 44),
+        rail.top,
+        greaterThan(300),
+        reason: 'the strip below the grid is preferred over the label row',
       );
 
       final position = _scrollPosition(tester);
@@ -2157,6 +2158,51 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('keeps the Lodes jump clear of the rail for a placement tap', (
+    tester,
+  ) async {
+    // 390x714 portrait at Surveying 1: clearing Back moves the bottom-right
+    // Lodes placement centre up into the vertical rail. The physical tap must
+    // still deploy the rig instead of invoking the Pockets rail target.
+    final taps = <MiningGridCell>[];
+    final state = _stateWith(
+      landing: _progress(commissioned: true),
+    ).copyWith(technology: TechnologyLevels(surveying: 1));
+    await _pumpMineSite(
+      tester,
+      size: const Size(390, 714),
+      view: _siteView(state, selectedBayId: DockBayId.b1),
+      dock: _dockView(state, selectedBayId: DockBayId.b1),
+      onGridCellTap: taps.add,
+    );
+
+    await tester.tap(find.byKey(const Key('mining-depth-rail-button-lodes')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    const cell = MiningGridCell(7, 12);
+    final center = _cellPoint(tester, cell);
+    final map = tester.getRect(find.byKey(const Key('mining-grid-map')));
+    expect(
+      map.contains(center),
+      isTrue,
+      reason: 'the jumped-to cell must be visible before the tap',
+    );
+    final pockets = tester.getRect(
+      find.byKey(const Key('mining-depth-rail-pockets')),
+    );
+    expect(
+      pockets.contains(center),
+      isFalse,
+      reason: 'centre $center must clear Pockets $pockets after the jump',
+    );
+    await tester.tapAt(center);
+    await tester.pump();
+
+    expect(taps, <MiningGridCell>[cell]);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('keeps the locked Lodes unlock notice visible after the jump', (
     tester,
   ) async {
@@ -2184,6 +2230,40 @@ void main() {
       isTrue,
       reason: 'locked-band notice $notice must stay visible in map $map',
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('keeps the locked Lodes notice clear of the portrait rail', (
+    tester,
+  ) async {
+    // 390x640 portrait uses the compact horizontal rail at the same top edge
+    // as the locked-band label frame. The jump must keep the Surveying copy
+    // visible instead of parking its centre under a rail target.
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(390, 640),
+      view: _siteView(state),
+      dock: _dockView(state),
+    );
+
+    await tester.tap(find.byKey(const Key('mining-depth-rail-button-lodes')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final notice = tester.getRect(
+      find.byKey(const Key('mining-band-lock-lodes')),
+    );
+    for (final band in MiningBand.values) {
+      final button = tester.getRect(
+        find.byKey(Key('mining-depth-rail-button-${band.name}')),
+      );
+      expect(
+        button.contains(notice.center),
+        isFalse,
+        reason: 'locked notice $notice must clear ${band.name} rail $button',
+      );
+    }
     expect(tester.takeException(), isNull);
   });
 
@@ -2674,22 +2754,13 @@ void main() {
       view: _siteView(state),
       dock: _dockView(state),
     );
-    final scale =
-        tester.getRect(find.byKey(const Key('mining-grid-surface'))).width /
-        miningGridSceneWidth;
     final topPadding = tester
         .getRect(find.byKey(const Key('mine-site-cargo')))
         .bottom;
-    expect(
-      _scrollPosition(tester).pixels,
-      closeTo(
-        math.min(
-          MiningBand.seams.labelRow * miningGridCellSize * scale,
-          _scrollPosition(tester).maxScrollExtent,
-        ),
-        .5,
-      ),
-    );
+    // The preferred Seams label target would thread the right-column
+    // placement centres through the vertical rail. The jump uses the nearest
+    // collision-free gap instead while keeping the band framed.
+    expect(_scrollPosition(tester).pixels, closeTo(602.875, .5));
 
     // A fresh entry at Surveying 5 frames the all-open Motherlode instead.
     await tester.pumpWidget(const SizedBox.shrink());
