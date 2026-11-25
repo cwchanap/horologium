@@ -202,7 +202,10 @@ class _MiningGridMapState extends State<MiningGridMap> {
   /// locked band has no deployable row to rescue, so it keeps the label and
   /// its Surveying copy at the preferred frame. Open-band targets then prefer
   /// the nearest clamped scroll offset whose placement centres clear the upper
-  /// chrome and the actual depth-rail target rectangles.
+  /// chrome and the actual depth-rail target rectangles. Bottom clearance and
+  /// rows visible in that frame are hard constraints: when no rail-clear
+  /// offset satisfies them, the jump keeps the bottom-safe frame instead of
+  /// hiding a placement row or putting a placement tap on Sell.
   void _scrollToBand(MiningBand band, {required bool animate}) {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
@@ -212,9 +215,10 @@ class _MiningGridMapState extends State<MiningGridMap> {
     final bottomClearY =
         position.viewportDimension - widget.viewportInsets.bottom;
     final open = _isBandOpen(band);
+    var placementBottomTarget = double.negativeInfinity;
     var target = labelTarget;
     if (open) {
-      final placementBottomTarget =
+      placementBottomTarget =
           widget.viewportInsets.top +
           (_bottomPlacementRow(band) + 1) * cellSize -
           bottomClearY;
@@ -258,6 +262,25 @@ class _MiningGridMapState extends State<MiningGridMap> {
         (collision) => value <= collision.start || value >= collision.end,
       );
       final preferredTarget = target;
+      final preferredFrameTarget = preferredTarget
+          .clamp(0.0, maxTarget)
+          .toDouble();
+      const tolerance = 0.001;
+      final visibleCenterDys = <double>[
+        for (final center in centers)
+          if ((center.dy - preferredFrameTarget) >= -tolerance &&
+              (center.dy - preferredFrameTarget) <=
+                  position.viewportDimension + tolerance)
+            center.dy,
+      ];
+      bool keepsPlacementFrame(double value) {
+        if (value + tolerance < placementBottomTarget) return false;
+        return visibleCenterDys.every((centerDy) {
+          final y = centerDy - value;
+          return y >= -tolerance && y <= position.viewportDimension + tolerance;
+        });
+      }
+
       final candidates =
           <double>{
                 0,
@@ -269,19 +292,22 @@ class _MiningGridMapState extends State<MiningGridMap> {
                 ],
               }
               .map((value) => value.clamp(0.0, maxTarget).toDouble())
-              .where(clearsCollisions)
+              .where(
+                (value) =>
+                    clearsCollisions(value) && keepsPlacementFrame(value),
+              )
               .toList()
             ..sort();
-      final above = candidates.where((value) => value >= preferredTarget);
+      final above = candidates.where((value) => value >= preferredFrameTarget);
       if (above.isNotEmpty) {
         target = above.first;
       } else if (candidates.isNotEmpty) {
         target = candidates.last;
       } else {
-        // shortcut: chrome collision intervals can theoretically cover every
-        // candidate scroll endpoint; no tested viewport reaches that case,
-        // revisit with a layout that reserves horizontal space for the rail.
-        target = preferredTarget.clamp(0.0, maxTarget).toDouble();
+        // No collision-free offset can keep the bottom-safe rows visible;
+        // preserve that usable frame and let the player scroll manually
+        // around any remaining chrome overlap.
+        target = preferredFrameTarget;
       }
     }
     final clampedTarget = target.clamp(0.0, maxTarget).toDouble();
