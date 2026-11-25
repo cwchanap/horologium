@@ -44,16 +44,15 @@ const double _landscapeToolbarHeight = MiningNavigationBar.compactHeight;
 /// pass-through result panel keeps its rendered right edge left of the rail.
 const double landscapeRightRailWidth = 104;
 const double _landscapeSellBottom = 78;
-const double _landscapeSellHeight = 79;
 const double _portraitSellRight = 18;
 const double _portraitSellHexWidth = 64;
 const double _sellLabelGap = 5;
 const double _sellHexHeightPortrait = 70;
 const double _sellHexHeightLandscape = 62;
 
-/// Screen-space gap below the portrait Sell column that the map's bottom
-/// scroll padding clears.
-const double _portraitMapSellGap = 4;
+/// Screen-space gap below the Sell column that the map's bottom scroll
+/// padding clears.
+const double _mapSellGap = 4;
 
 /// Larger gap kept between the depth rail and the portrait Sell column, so
 /// the bottom map row stays reachable below the rail at maximum scroll.
@@ -109,14 +108,25 @@ class MineSiteScreen extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final landscape = constraints.maxWidth > constraints.maxHeight;
+        final textScaler = MediaQuery.textScalerOf(context);
+        final ambientTextStyle = Theme.of(context).textTheme.bodyMedium;
         final sellTop = landscape
             ? 0.0
             : portraitMineSellTop(
                 constraints.maxHeight,
                 pad.bottom,
-                MediaQuery.textScalerOf(context),
-                Theme.of(context).textTheme.bodyMedium,
+                textScaler,
+                ambientTextStyle,
               );
+        final landscapeSellClearance = landscape
+            ? constraints.maxHeight -
+                  landscapeMineSellTop(
+                    constraints.maxHeight,
+                    textScaler,
+                    ambientTextStyle,
+                  ) +
+                  _mapSellGap
+            : 0.0;
         // Reserve well past the dock/nav in portrait: the Sell column sits
         // above the dock, so the bottom scroll padding must clear its scaled
         // label height too.
@@ -128,7 +138,7 @@ class MineSiteScreen extends StatelessWidget {
                 pad.bottom +
                     math.max(
                       _landscapeToolbarBottom + _landscapeToolbarHeight,
-                      _landscapeSellBottom + _landscapeSellHeight,
+                      landscapeSellClearance,
                     ),
               )
             : EdgeInsets.fromLTRB(
@@ -137,7 +147,7 @@ class MineSiteScreen extends StatelessWidget {
                 pad.right + _portraitCargoRight + _portraitCargoSize,
                 math.max(
                   pad.bottom + _portraitNavHeight,
-                  constraints.maxHeight - sellTop + _portraitMapSellGap,
+                  constraints.maxHeight - sellTop + _mapSellGap,
                 ),
               );
         return ColoredBox(

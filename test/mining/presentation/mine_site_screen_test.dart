@@ -2106,6 +2106,46 @@ void main() {
     );
   }
 
+  testWidgets('keeps the Seams jump clear of enlarged landscape Sell', (
+    tester,
+  ) async {
+    // 576x495 landscape at enlarged text: Sell's label grows upward beyond
+    // the fixed bottom clearance, so the Seams jump must use the control's
+    // real top edge before cell (4,17) can take a placement tap.
+    var sold = false;
+    final taps = <MiningGridCell>[];
+    final state = _stateWith(
+      landing: _progress(commissioned: true, storedAmount: 5),
+    );
+    await _pumpMineSite(
+      tester,
+      size: const Size(576, 495),
+      textScale: 1.4,
+      view: _siteView(state, selectedBayId: DockBayId.b1),
+      dock: _dockView(state, selectedBayId: DockBayId.b1),
+      onGridCellTap: taps.add,
+      onSellCargo: () => sold = true,
+    );
+
+    await tester.tap(find.byKey(const Key('mining-depth-rail-button-seams')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    const cell = MiningGridCell(4, 17);
+    final center = _cellPoint(tester, cell);
+    expect(
+      tester.getRect(find.byKey(const Key('mining-grid-map'))).contains(center),
+      isTrue,
+      reason: 'the jumped-to cell must be visible before the tap',
+    );
+    await tester.tapAt(center);
+    await tester.pump();
+
+    expect(sold, isFalse, reason: 'the placement tap reached Sell');
+    expect(taps, <MiningGridCell>[cell]);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'keeps the Pockets jump bottom-safe when no rail-clear fallback fits',
     (tester) async {
