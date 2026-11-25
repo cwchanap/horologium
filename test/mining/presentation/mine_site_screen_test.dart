@@ -2156,6 +2156,39 @@ void main() {
     },
   );
 
+  testWidgets('keeps the Pockets jump clear of the rail at inset sizes', (
+    tester,
+  ) async {
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(390, 844),
+      padding: const EdgeInsets.only(top: 47, bottom: 34),
+      view: _siteView(state, selectedBayId: DockBayId.b1),
+      dock: _dockView(state, selectedBayId: DockBayId.b1),
+    );
+
+    await tester.tap(find.byKey(const Key('mining-depth-rail-button-pockets')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final map = tester.getRect(find.byKey(const Key('mining-grid-map')));
+    final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+    for (final cell in const [MiningGridCell(7, 19), MiningGridCell(7, 21)]) {
+      final center = _cellPoint(tester, cell);
+      expect(
+        map.contains(center),
+        isTrue,
+        reason: 'centre $cell must be visible',
+      );
+      expect(
+        rail.contains(center),
+        isFalse,
+        reason: 'centre $cell at $center must clear rail $rail',
+      );
+    }
+  });
+
   testWidgets('keeps both Seams placement rows visible after the jump', (
     tester,
   ) async {
