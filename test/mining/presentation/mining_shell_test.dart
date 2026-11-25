@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1511,8 +1512,61 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(scrollPixels(), isNot(beforeResearch));
     // The raw label-row target would park right-column lode centres under
-    // the portrait rail. The jump instead uses a collision-free offset;
-    // the deployment below is the behavioral check.
+    // the portrait rail. These destination assertions are the clearance
+    // check; the deployment below is the behavioral check.
+    final surface = tester.getRect(
+      find.byKey(const Key('mining-grid-surface')),
+    );
+    final cellSize = surface.width / MiningContentRegistry.mineGridWidth;
+    final railTargets = [
+      for (final band in MiningBand.values)
+        tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
+    ];
+    for (final cell in const [MiningGridCell(7, 8), MiningGridCell(7, 12)]) {
+      final center =
+          surface.topLeft +
+          Offset((cell.x + .5) * cellSize, (cell.y + .5) * cellSize);
+      for (final target in railTargets) {
+        expect(
+          target.contains(center),
+          isFalse,
+          reason: 'rail target $target covers lode cell $cell centre $center',
+        );
+      }
+    }
+
+    final lodeRect = Rect.fromLTWH(
+      surface.left + _workflowLodeCell.x * cellSize,
+      surface.top + _workflowLodeCell.y * cellSize,
+      cellSize,
+      cellSize,
+    );
+    final mapRect = tester.getRect(find.byKey(const Key('mining-grid-map')));
+    final cargo = tester.getRect(find.byKey(const Key('mine-site-cargo')));
+    final back = tester.getRect(find.byKey(const Key('mine-site-back')));
+    final cashChip = tester.getRect(find.byKey(const Key('mining-cash-chip')));
+    final sell = tester.getRect(
+      find
+          .ancestor(
+            of: find.byKey(const Key('mine-site-sell')),
+            matching: find.byType(Column),
+          )
+          .first,
+    );
+    final clearTop = math.max(
+      mapRect.top + 8,
+      math.max(cargo.bottom + 8, back.bottom + 8),
+    );
+    final clearBottom = math.min(mapRect.bottom - 12, sell.top - 2);
+    expect(lodeRect.top, greaterThanOrEqualTo(clearTop));
+    expect(lodeRect.bottom, lessThanOrEqualTo(clearBottom));
+    for (final chrome in [...railTargets, sell, cargo, back, cashChip]) {
+      expect(
+        lodeRect.overlaps(chrome),
+        isFalse,
+        reason: 'deployment cell $lodeRect overlaps chrome $chrome',
+      );
+    }
 
     // The still-selected dock rig deploys on the now-open lode.
     saves = repository.saveCount;
