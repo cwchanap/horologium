@@ -71,6 +71,7 @@ class MiningGridMap extends StatefulWidget {
     this.onMiningImpact,
     required this.reducedMotion,
     this.viewportInsets = EdgeInsets.zero,
+    this.upperHudHitRect,
     this.railTop = 0,
     this.railBottom = double.infinity,
     this.railRight = 8,
@@ -89,6 +90,11 @@ class MiningGridMap extends StatefulWidget {
   /// because the map keeps the full viewport width so the 8-cell scene can
   /// scale down instead of shrinking under HUD columns.
   final EdgeInsets viewportInsets;
+
+  /// Actionable upper-chrome bounds in the map's local coordinates. Chrome
+  /// inside [viewportInsets.top] is already clear of the preferred frame; this
+  /// rect is for a control such as portrait Back that reaches below it.
+  final Rect? upperHudHitRect;
 
   /// Vertical span and right inset of the depth rail in the map's local
   /// coordinates, supplied by the screen so the rail stays between the cargo
@@ -117,6 +123,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
   final ScrollController _scrollController = ScrollController();
   bool _framed = false;
   double _sceneScale = 1;
+  double _sceneLeft = 0;
   MiningBand? _railJumpBand;
   int _railJumpSeq = 0;
   Size? _layoutSize;
@@ -173,9 +180,13 @@ class _MiningGridMapState extends State<MiningGridMap> {
   /// min(1, width / 448)` in scroll-content coordinates. Because the
   /// scrollable child already starts after the top padding, that target
   /// places the label at viewportInsets.top rather than screen y=0. When that
-  /// leaves the band's deepest placement row in the bottom HUD clearance,
+  /// leaves an open band's deepest placement row in the bottom HUD clearance,
   /// scroll farther until that row clears it; on a short viewport the label
-  /// may leave the top clearance, but a visible placement tap cannot sell.
+  /// may leave the top clearance, but a visible placement tap cannot sell. A
+  /// locked band has no deployable row to rescue, so it keeps the label and
+  /// its Surveying copy at the preferred frame. If the extra scroll drops a
+  /// placement centre over upper chrome that reaches below the top clearance,
+  /// keep scrolling far enough to lift that centre above the control instead.
   void _scrollToBand(MiningBand band, {required bool animate}) {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
@@ -184,14 +195,42 @@ class _MiningGridMapState extends State<MiningGridMap> {
     final labelTarget = band.labelRow * cellSize;
     final bottomClearY =
         position.viewportDimension - widget.viewportInsets.bottom;
-    final placementBottomTarget =
-        widget.viewportInsets.top +
-        (_bottomPlacementRow(band) + 1) * cellSize -
-        bottomClearY;
-    final target = math
-        .max(labelTarget, placementBottomTarget)
-        .clamp(0.0, maxTarget)
-        .toDouble();
+    final open = _isBandOpen(band);
+    var target = labelTarget;
+    if (open) {
+      final placementBottomTarget =
+          widget.viewportInsets.top +
+          (_bottomPlacementRow(band) + 1) * cellSize -
+          bottomClearY;
+      target = math.max(labelTarget, placementBottomTarget);
+    }
+    final upperHudHitRect = widget.upperHudHitRect;
+    if (open && upperHudHitRect != null) {
+      final collisions = <({double start, double end})>[];
+      for (final deposit in _depositsIn(band)) {
+        for (final cell
+            in widget.view.definition.perimeterCellsByDeposit[deposit
+                .definition]!) {
+          final centerX = _sceneLeft + (cell.x + .5) * cellSize;
+          if (centerX < upperHudHitRect.left ||
+              centerX >= upperHudHitRect.right) {
+            continue;
+          }
+          final centerY = widget.viewportInsets.top + (cell.y + .5) * cellSize;
+          collisions.add((
+            start: centerY - upperHudHitRect.bottom,
+            end: centerY - upperHudHitRect.top + 1,
+          ));
+        }
+      }
+      collisions.sort((a, b) => a.start.compareTo(b.start));
+      for (final collision in collisions) {
+        if (target > collision.start && target < collision.end) {
+          target = collision.end;
+        }
+      }
+    }
+    final clampedTarget = target.clamp(0.0, maxTarget).toDouble();
     if (animate && !widget.reducedMotion) {
       // Track the in-flight jump so a mid-animation viewport change can
       // re-target the band's new offset; completion or a canceled jump
@@ -200,7 +239,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
       final seq = ++_railJumpSeq;
       _scrollController
           .animateTo(
-            target,
+            clampedTarget,
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic,
           )
@@ -208,7 +247,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
             if (seq == _railJumpSeq) _railJumpBand = null;
           });
     } else {
-      _scrollController.jumpTo(target);
+      _scrollController.jumpTo(clampedTarget);
     }
   }
 
@@ -618,6 +657,8 @@ class _MiningGridMapState extends State<MiningGridMap> {
           1.0,
           constraints.maxWidth / miningGridSceneWidth,
         );
+        _sceneLeft =
+            (constraints.maxWidth - miningGridSceneWidth * _sceneScale) / 2;
         _scheduleInitialFrame();
         final layoutSize = Size(constraints.maxWidth, constraints.maxHeight);
         if (_layoutSize != layoutSize) {

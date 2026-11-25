@@ -2113,6 +2113,80 @@ void main() {
     );
   }
 
+  testWidgets('keeps the Seams jump clear of Back for a placement tap', (
+    tester,
+  ) async {
+    // 390x640 portrait with no safe-area inset: the bottom-clearance jump
+    // used to put the upper-left Seams placement centre inside the Back
+    // hex, so tapping it left the mine instead of deploying the rig.
+    var backed = false;
+    final taps = <MiningGridCell>[];
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(390, 640),
+      view: _siteView(state, selectedBayId: DockBayId.b1),
+      dock: _dockView(state, selectedBayId: DockBayId.b1),
+      onGridCellTap: taps.add,
+      onBack: () => backed = true,
+    );
+
+    await tester.tap(find.byKey(const Key('mining-depth-rail-button-seams')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    const cell = MiningGridCell(0, 14);
+    final center = _cellPoint(tester, cell);
+    final map = tester.getRect(find.byKey(const Key('mining-grid-map')));
+    expect(
+      map.contains(center),
+      isTrue,
+      reason: 'the jumped-to cell must be visible before the tap',
+    );
+    final back = tester.getRect(find.byKey(const Key('mine-site-back')));
+    expect(
+      back.contains(center),
+      isFalse,
+      reason: 'centre $center must clear Back $back after the jump',
+    );
+    await tester.tapAt(center);
+    await tester.pump();
+
+    expect(backed, isFalse, reason: 'the placement tap reached Back');
+    expect(taps, <MiningGridCell>[cell]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('keeps the locked Lodes unlock notice visible after the jump', (
+    tester,
+  ) async {
+    // 590x390 landscape at Surveying 0: the bottom-placement adjustment is
+    // meaningless for the locked Lodes band, but it used to scroll the label
+    // row — including the touch player's only Surveying copy — offscreen.
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(590, 390),
+      view: _siteView(state),
+      dock: _dockView(state),
+    );
+
+    await tester.tap(find.byKey(const Key('mining-depth-rail-button-lodes')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final notice = tester.getRect(
+      find.byKey(const Key('mining-band-lock-lodes')),
+    );
+    final map = tester.getRect(find.byKey(const Key('mining-grid-map')));
+    expect(
+      map.contains(notice.center),
+      isTrue,
+      reason: 'locked-band notice $notice must stay visible in map $map',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('keeps the left-inset portrait compact rail clear of Sell', (
     tester,
   ) async {
