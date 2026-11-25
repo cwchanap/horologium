@@ -412,6 +412,14 @@ class _MineCavern extends StatelessWidget {
             onMiningImpact: onMiningImpact,
             reducedMotion: reducedMotion,
             viewportInsets: viewportInsets,
+            upperHudHitRect: landscape
+                ? null
+                : Rect.fromLTWH(
+                    _portraitBackLeft,
+                    _portraitBackTop + MediaQuery.paddingOf(context).top,
+                    _portraitBackWidth,
+                    _MineChromeButton.height,
+                  ),
             railTop: railTop,
             railBottom: railBottom,
             railRight: railRight,

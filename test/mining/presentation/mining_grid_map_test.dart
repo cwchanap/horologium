@@ -1473,8 +1473,16 @@ void main() {
       reason: 'the label row must land below the top scroll clearance',
     );
 
-    // The Motherlode prefers row 0, but must scroll far enough to lift its
-    // bottom placement row (row 6) out of the bottom clearance.
+    // The Motherlode prefers row 0 once Surveying opens it, but must scroll
+    // far enough to lift its bottom placement row (row 6) out of the bottom
+    // clearance. A locked band instead keeps its requirement label visible.
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin, surveying: 2),
+      (_) {},
+      size: const Size(430, 423),
+      viewportInsets: insets,
+    );
     await tester.tap(find.byKey(const Key('mining-depth-rail-motherlode')));
     await tester.pump();
     final cellSize = miningGridCellSize * scale;
