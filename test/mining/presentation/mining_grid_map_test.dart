@@ -1373,6 +1373,8 @@ void main() {
       findsOneWidget,
     );
 
+    _position(tester).jumpTo(0);
+    await tester.pump();
     tester.semantics.performAction(
       find.semantics.byLabel('Jump to Pockets band'),
       SemanticsAction.tap,
@@ -1534,6 +1536,38 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400)); // finish the jump
 
     final position = _position(tester);
+    expect(position.pixels, closeTo(position.maxScrollExtent, .5));
+  });
+
+  testWidgets('retargets an in-flight rail jump after HUD insets change', (
+    tester,
+  ) async {
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+      reducedMotion: false,
+    );
+
+    _position(tester).jumpTo(0);
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('mining-depth-rail-pockets')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: const EdgeInsets.only(bottom: 196),
+      reducedMotion: false,
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+
+    final position = _position(tester);
+    expect(position.maxScrollExtent, greaterThan(228.5));
     expect(position.pixels, closeTo(position.maxScrollExtent, .5));
   });
 

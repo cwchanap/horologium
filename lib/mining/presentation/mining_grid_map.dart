@@ -46,6 +46,18 @@ const List<MiningBand> _depthRailBands = [
   MiningBand.pockets,
 ];
 
+typedef _JumpInputs = ({
+  Size size,
+  EdgeInsets viewportInsets,
+  Rect? upperHudHitRect,
+  double railTop,
+  double railBottom,
+  double? placementSafeY,
+  double railRight,
+  double? railClearRight,
+  double? railBelowClearRight,
+});
+
 /// Oversized deposit art edge, keyed by the deposit's logical footprint in
 /// cells. The art is centered over the logical footprint so hit-testing and
 /// overlay rects stay on authored grid coordinates.
@@ -134,7 +146,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
   double _sceneLeft = 0;
   MiningBand? _railJumpBand;
   int _railJumpSeq = 0;
-  Size? _layoutSize;
+  _JumpInputs? _jumpInputs;
   final Map<MiningBand, FocusNode> _railFocusNodes = {
     for (final band in MiningBand.values) band: FocusNode(),
   };
@@ -718,9 +730,19 @@ class _MiningGridMapState extends State<MiningGridMap> {
         _sceneLeft =
             (constraints.maxWidth - miningGridSceneWidth * _sceneScale) / 2;
         _scheduleInitialFrame();
-        final layoutSize = Size(constraints.maxWidth, constraints.maxHeight);
-        if (_layoutSize != layoutSize) {
-          _layoutSize = layoutSize;
+        final jumpInputs = (
+          size: Size(constraints.maxWidth, constraints.maxHeight),
+          viewportInsets: insets,
+          upperHudHitRect: widget.upperHudHitRect,
+          railTop: widget.railTop,
+          railBottom: widget.railBottom,
+          placementSafeY: widget.placementSafeY,
+          railRight: widget.railRight,
+          railClearRight: widget.railClearRight,
+          railBelowClearRight: widget.railBelowClearRight,
+        );
+        if (_jumpInputs != jumpInputs) {
+          _jumpInputs = jumpInputs;
           _retargetPendingJump();
         }
         return Stack(
