@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -21,6 +20,7 @@ import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 import '../../support/mining_grid_fixtures.dart';
 import '../../support/mining_visual_frames.dart';
+import '../../support/test_fonts.dart';
 
 final _start = DateTime.utc(2026, 8, 26, 12);
 final _content = MiningContentRegistry.stellarMining();
@@ -393,16 +393,8 @@ Future<void> _expectEdgeCellsTappable(
 }
 
 void main() {
-  setUpAll(() async {
-    if (kIsWeb) return;
-    final loader = FontLoader('Orbitron')
-      ..addFont(
-        File(
-          'assets/fonts/Orbitron-Variable.ttf',
-        ).readAsBytes().then(ByteData.sublistView),
-      );
-    await loader.load();
-  });
+  setUpAll(loadProductionTestFonts);
+  tearDownAll(restoreProductionFontsInWebTests);
 
   testWidgets(
     'uses the Landing Basin grid layer for an occupied T1 rig',
@@ -2114,6 +2106,86 @@ void main() {
     );
   }
 
+  testWidgets(
+    'keeps the Pockets jump bottom-safe when no rail-clear fallback fits',
+    (tester) async {
+      // 390x676 portrait with a sellable balance and a selected dock rig:
+      // clearing the tightly packed vertical rail used to back the scroll
+      // off the bottom-safe frame, parking cell (7,21)'s centre inside Sell.
+      var sold = false;
+      final taps = <MiningGridCell>[];
+      final state = _stateWith(
+        landing: _progress(commissioned: true, storedAmount: 5),
+      );
+      await _pumpMineSite(
+        tester,
+        size: const Size(390, 676),
+        view: _siteView(state, selectedBayId: DockBayId.b1),
+        dock: _dockView(state, selectedBayId: DockBayId.b1),
+        onGridCellTap: taps.add,
+        onSellCargo: () => sold = true,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('mining-depth-rail-button-pockets')),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      const cell = MiningGridCell(7, 21);
+      final center = _cellPoint(tester, cell);
+      expect(
+        tester
+            .getRect(find.byKey(const Key('mining-grid-map')))
+            .contains(center),
+        isTrue,
+        reason: 'the jumped-to cell must be visible before the tap',
+      );
+      final sell = tester.getRect(find.byKey(const Key('mine-site-sell')));
+      expect(
+        sell.contains(center),
+        isFalse,
+        reason: 'centre $center must clear Sell $sell after the jump',
+      );
+      await tester.tapAt(center);
+      await tester.pump();
+
+      expect(sold, isFalse, reason: 'the placement tap reached Sell');
+      expect(taps, <MiningGridCell>[cell]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('keeps both Seams placement rows visible after the jump', (
+    tester,
+  ) async {
+    // 448x683 portrait has a tightly packed 177dp vertical rail. The first
+    // rail-clear forward scroll used to move the whole row-14 placement row
+    // above the viewport even though the preferred bottom-safe frame showed it.
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(448, 683),
+      view: _siteView(state, selectedBayId: DockBayId.b1),
+      dock: _dockView(state, selectedBayId: DockBayId.b1),
+    );
+
+    await tester.tap(find.byKey(const Key('mining-depth-rail-button-seams')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final map = tester.getRect(find.byKey(const Key('mining-grid-map')));
+    for (final cell in const [MiningGridCell(0, 14), MiningGridCell(0, 17)]) {
+      final center = _cellPoint(tester, cell);
+      expect(
+        map.contains(center),
+        isTrue,
+        reason: 'placement centre $cell at $center must stay visible in $map',
+      );
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('keeps the Seams jump clear of Back for a placement tap', (
     tester,
   ) async {
@@ -2277,12 +2349,11 @@ void main() {
     // beside Sell, so the row relocates with shrunk gaps ending exactly at
     // Sell's left edge, and the freed cell centre takes a placement tap
     // instead of feeding the rail. Sell's left edge is font-metric
-    // dependent (web's built-in test font measures wider than Orbitron), so
-    // derive it the same way the screen does and size the inset from it:
-    // viewportInsets.left is the inset plus the 58dp back chrome, leaving
-    // sellLeft - 58 - inset for the strip. 390dp is the narrowest portrait
-    // where both font metrics still leave the four targets room beside
-    // Sell.
+    // dependent, so derive it the same way the screen does and size the
+    // inset from it: viewportInsets.left is the inset plus the 58dp back
+    // chrome, leaving sellLeft - 58 - inset for the strip. 390dp is the
+    // narrowest portrait where the metrics still leave the four targets
+    // room beside Sell.
     const width = 390.0;
     final bodyMedium = ThemeData(
       brightness: Brightness.dark,
