@@ -257,9 +257,6 @@ class MiningController {
     return const MiningActionResult.success();
   });
 
-  String _placementFailureMessage(MiningPlacementResult result) =>
-      miningPlacementRejectionMessage(result);
-
   Future<MiningActionResult> deployRig(
     DockBayId sourceBay,
     MiningSiteId siteId,
@@ -295,7 +292,9 @@ class MiningController {
       maxRigCount: MiningContentRegistry.maxDeployedRigsPerSite,
     );
     if (!placement.isAllowed) {
-      return MiningActionResult.failure(_placementFailureMessage(placement));
+      return MiningActionResult.failure(
+        miningPlacementRejectionMessage(placement),
+      );
     }
 
     final docks = <MiningPlanetId, Map<DockBayId, RigTier?>>{

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
@@ -136,6 +137,8 @@ Future<void> _pumpMap(
   double railTop = 0,
   double railBottom = double.infinity,
   double railRight = 8,
+  double? railClearRight,
+  double? railBelowClearRight,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -158,6 +161,8 @@ Future<void> _pumpMap(
           railTop: railTop,
           railBottom: railBottom,
           railRight: railRight,
+          railClearRight: railClearRight,
+          railBelowClearRight: railBelowClearRight,
         ),
       ),
     ),
@@ -398,6 +403,13 @@ void main() {
         reason: band.name,
       );
     }
+    for (final band in MiningBand.values) {
+      expect(
+        find.text('${band.label.toUpperCase()} ×${band.footprint} ore'),
+        findsOneWidget,
+        reason: band.name,
+      );
+    }
     // Landing Basin is 0,0,1,2: pockets and seams are open, lodes and the
     // Motherlode each show exactly one Surveying chip.
     expect(find.text('Surveying 1 opens the lodes'), findsOneWidget);
@@ -607,9 +619,10 @@ void main() {
       size: const Size(390, 844),
       viewportInsets: const EdgeInsets.fromLTRB(58, 134, 96, 303.5),
     );
-    await tester.pump(); // initial clamped bottom frame
+    await tester.pump();
     final position = _position(tester);
-    expect(position.pixels, closeTo(position.maxScrollExtent, .5));
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pump();
 
     // Drag upward past the bottom and hold: iOS bouncing physics would paint
     // the grid past the extent while clamped action rects stay behind.
@@ -641,6 +654,27 @@ void main() {
     // tearDown callbacks on some platforms.
     debugDefaultTargetPlatformOverride = null;
     handle.dispose();
+  });
+
+  testWidgets('scrolls with a mouse drag', (tester) async {
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 500),
+    );
+    final position = _position(tester);
+    position.jumpTo(0);
+    await tester.pump();
+
+    await tester.drag(
+      find.byKey(const Key('mining-grid-scroll')),
+      const Offset(0, -80),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump();
+
+    expect(position.pixels, greaterThan(0));
   });
 
   testWidgets('prevents bounce overscroll above the top from moving actions', (
@@ -798,10 +832,10 @@ void main() {
       surface.height,
       closeTo(miningGridSceneHeight * 390 / miningGridSceneWidth, .01),
     );
-    // Highest open band is seams (row 13): the specified target is
-    // topPadding + scaled row offset, clamped to the scroll extent.
+    // Highest open band is seams (row 13): the target is the scaled row
+    // offset in scroll-content coordinates, clamped to the scroll extent.
     final expected = math.min(
-      insets.top + 13 * miningGridCellSize * 390 / miningGridSceneWidth,
+      13 * miningGridCellSize * 390 / miningGridSceneWidth,
       _position(tester).maxScrollExtent,
     );
     expect(_position(tester).pixels, closeTo(expected, .5));
@@ -1348,10 +1382,9 @@ void main() {
       _position(tester).pixels,
       closeTo(
         math.min(
-          100 +
-              18 *
-                  miningGridCellSize *
-                  (390 / miningGridSceneWidth).clamp(0.0, 1.0),
+          18 *
+              miningGridCellSize *
+              (390 / miningGridSceneWidth).clamp(0.0, 1.0),
           _position(tester).maxScrollExtent,
         ),
         .5,
@@ -1392,10 +1425,9 @@ void main() {
     }
 
     double target(MiningBand band) => math.min(
-      insets.top +
-          band.labelRow *
-              miningGridCellSize *
-              (390 / miningGridSceneWidth).clamp(0.0, 1.0),
+      band.labelRow *
+          miningGridCellSize *
+          (390 / miningGridSceneWidth).clamp(0.0, 1.0),
       _position(tester).maxScrollExtent,
     );
 
@@ -1432,14 +1464,24 @@ void main() {
 
     final scale = 430 / miningGridSceneWidth;
     final maxExtent = _position(tester).maxScrollExtent;
-    final seamsTarget = 50 + MiningBand.seams.labelRow * 56 * scale;
+    final seamsTarget = MiningBand.seams.labelRow * 56 * scale;
     expect(seamsTarget, lessThan(maxExtent), reason: 'target must be clear');
     expect(_position(tester).pixels, closeTo(seamsTarget, .5));
+    expect(
+      tester.getRect(find.byKey(const Key('mining-band-label-seams'))).top,
+      closeTo(insets.top, .5),
+      reason: 'the label row must land below the top scroll clearance',
+    );
 
-    // The Motherlode row 0 target is exactly the top padding, not zero.
+    // The Motherlode row 0 target is zero: scroll-content padding already
+    // places it below the top clearance.
     await tester.tap(find.byKey(const Key('mining-depth-rail-motherlode')));
     await tester.pump();
-    expect(_position(tester).pixels, 50);
+    expect(_position(tester).pixels, 0);
+    expect(
+      tester.getRect(find.byKey(const Key('mining-band-label-motherlode'))).top,
+      closeTo(insets.top, .5),
+    );
   });
 
   testWidgets('retargets an in-flight rail jump after a viewport change', (
@@ -1528,6 +1570,29 @@ void main() {
       expect(button.height, greaterThanOrEqualTo(44 - .01));
       expect(button.bottom, lessThanOrEqualTo(100 + 44 + .01));
     }
+  });
+
+  testWidgets('uses the strip width directly for the below-grid fit check', (
+    tester,
+  ) async {
+    // left 32.3 and clear-right 208.4 give the row 176.1dp, enough for four
+    // 44dp targets. Rebuilding that width through floating-point gaps and
+    // adding the inset back overshoots the clear edge by 2.8e-14, which must
+    // not keep the compact row over the grid.
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: const EdgeInsets.only(left: 32.3, bottom: 44),
+      railTop: 100,
+      railBottom: 140,
+      railBelowClearRight: 208.4,
+    );
+
+    final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+    expect(rail.left, closeTo(32.3, .001));
+    expect(rail.top, closeTo(800, .5));
   });
 
   testWidgets('uses one high horizontal row of 44dp targets below 176dp', (
@@ -1662,7 +1727,7 @@ void main() {
           _position(tester).pixels,
           closeTo(
             math.min(
-              insets.top + band.labelRow * miningGridCellSize * scale,
+              band.labelRow * miningGridCellSize * scale,
               _position(tester).maxScrollExtent,
             ),
             .5,
@@ -1690,7 +1755,7 @@ void main() {
     await tester.pump();
     final after = _position(tester).pixels;
     expect(after, isNot(before));
-    expect(after, 100);
+    expect(after, 0);
   });
 
   testWidgets('draws the 4x4 Motherlode and one halo on every site', (

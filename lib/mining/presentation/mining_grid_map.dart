@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:horologium/mining/mine_site_view.dart';
 import 'package:horologium/mining/mining_content.dart';
@@ -10,10 +11,10 @@ import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 const double miningGridCellSize = 56;
-const int miningGridWidth = 8;
-const int miningGridHeight = 22;
-const double miningGridSceneWidth = miningGridWidth * miningGridCellSize;
-const double miningGridSceneHeight = miningGridHeight * miningGridCellSize;
+const double miningGridSceneWidth =
+    MiningContentRegistry.mineGridWidth * miningGridCellSize;
+const double miningGridSceneHeight =
+    MiningContentRegistry.mineGridHeight * miningGridCellSize;
 
 /// Gold shared by the rig upgrade chip and the upgrade-target ring.
 const Color _upgradeGold = Color(0xFFF5B44C);
@@ -83,9 +84,10 @@ class MiningGridMap extends StatefulWidget {
   final VoidCallback? onMiningImpact;
   final bool reducedMotion;
 
-  /// Vertical scroll clearance around the map scene. The left/right values
-  /// are ignored: the map keeps the full viewport width so the 8-cell scene
-  /// can scale down instead of shrinking under HUD columns.
+  /// Vertical scroll clearance around the map scene. The left value is also
+  /// the compact depth rail's safe left edge; the right value is ignored
+  /// because the map keeps the full viewport width so the 8-cell scene can
+  /// scale down instead of shrinking under HUD columns.
   final EdgeInsets viewportInsets;
 
   /// Vertical span and right inset of the depth rail in the map's local
@@ -152,17 +154,17 @@ class _MiningGridMapState extends State<MiningGridMap> {
   }
 
   /// One scroll path for the once-per-entry frame and every rail tap. The
-  /// target is the specified scale-aware row offset
-  /// `topPadding + labelRow * 56 * min(1, width / 448)`, clamped to the valid
-  /// scroll extent; an unscaled logical offset would overshoot on phones.
+  /// target is the scale-aware row offset `labelRow * 56 *
+  /// min(1, width / 448)` in scroll-content coordinates, clamped to the valid
+  /// scroll extent. Because the scrollable child already starts after the top
+  /// padding, that target places the label at viewportInsets.top rather than
+  /// screen y=0.
   void _scrollToBand(MiningBand band, {required bool animate}) {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
-    final target =
-        (widget.viewportInsets.top +
-                band.labelRow * miningGridCellSize * _sceneScale)
-            .clamp(0.0, math.max(0.0, position.maxScrollExtent))
-            .toDouble();
+    final target = (band.labelRow * miningGridCellSize * _sceneScale)
+        .clamp(0.0, math.max(0.0, position.maxScrollExtent))
+        .toDouble();
     if (animate && !widget.reducedMotion) {
       // Track the in-flight jump so a mid-animation viewport change can
       // re-target the band's new offset; completion or a canceled jump
@@ -326,8 +328,8 @@ class _MiningGridMapState extends State<MiningGridMap> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        '${band.label.toUpperCase()} · '
-                        '${band.footprint}-cell ore',
+                        '${band.label.toUpperCase()} '
+                        '×${band.footprint} ore',
                         style: const TextStyle(
                           color: MiningTheme.primaryText,
                           fontSize: 12,
@@ -434,7 +436,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
     final belowRailWidth = 4 * _depthRailTargetSize + 3 * belowGap;
     final belowStripFits =
         sceneBottom + _depthRailTargetSize <= viewportHeight &&
-        widget.viewportInsets.left + belowRailWidth <= stripClearRight;
+        stripRowSpace >= 4 * _depthRailTargetSize;
     final contentHeight =
         widget.viewportInsets.top +
         miningGridSceneHeight * _sceneScale +
@@ -451,10 +453,17 @@ class _MiningGridMapState extends State<MiningGridMap> {
       railWidth,
       _depthRailTargetSize,
     );
+    // Selection and mutation state decide whether a perimeter cell is
+    // deployable right now, but the rail must not move under the pointer when
+    // they change. Test the stable authored perimeter of every surveyed
+    // deposit instead, plus placed rig cells.
     final coversLegalCentre =
         belowStripFits &&
         {
-          ...widget.view.deployableCells,
+          for (final deposit in widget.view.deposits)
+            if (deposit.isSurveyed)
+              ...widget.view.definition.perimeterCellsByDeposit[deposit
+                  .definition]!,
           for (final rig in widget.view.rigs) rig.placement.cell,
         }.any((cell) => topRowRect.contains(centreAtMaxScroll(cell)));
     // A compact row needs the whole 44dp clear band. When the band is shorter
@@ -577,6 +586,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
     final insets = widget.viewportInsets;
     return LayoutBuilder(
       builder: (context, constraints) {
+        final scrollBehavior = ScrollConfiguration.of(context);
         _sceneScale = math.min(
           1.0,
           constraints.maxWidth / miningGridSceneWidth,
@@ -595,9 +605,13 @@ class _MiningGridMapState extends State<MiningGridMap> {
               child: ScrollConfiguration(
                 // No glow/stretch: the scene is the map itself, and a
                 // transient overscroll scale would distort cell hit mapping.
-                behavior: ScrollConfiguration.of(
-                  context,
-                ).copyWith(overscroll: false),
+                behavior: scrollBehavior.copyWith(
+                  overscroll: false,
+                  dragDevices: {
+                    ...scrollBehavior.dragDevices,
+                    PointerDeviceKind.mouse,
+                  },
+                ),
                 child: SingleChildScrollView(
                   key: const Key('mining-grid-scroll'),
                   controller: _scrollController,
