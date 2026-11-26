@@ -611,6 +611,67 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('keeps a top-pinned locked band visible after rotation', (
+    tester,
+  ) async {
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+    );
+
+    await tester.tap(find.byKey(const Key('mining-depth-rail-motherlode')));
+    await tester.pump();
+    expect(_position(tester).pixels, 0);
+
+    tester.view.physicalSize = const Size(844, 390);
+    await tester.pump();
+    await tester.pump();
+
+    final notice = tester.getRect(
+      find.byKey(const Key('mining-band-lock-motherlode')),
+    );
+    final map = _mapRect(tester);
+    expect(
+      map.contains(notice.center),
+      isTrue,
+      reason: 'locked Motherlode notice $notice must stay in map $map',
+    );
+  });
+
+  testWidgets('restores the resize focal position before the first paint', (
+    tester,
+  ) async {
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 844),
+    );
+
+    final position = _position(tester);
+    position.jumpTo(100);
+    await tester.pump();
+    final focalSceneY =
+        (100 + 844 / 2) / (390 / miningGridSceneWidth).clamp(0.0, 1.0);
+    double? paintedPixels;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      paintedPixels = position.pixels;
+    });
+
+    tester.view.physicalSize = const Size(844, 390);
+    await tester.pump();
+
+    final expected = focalSceneY - 390 / 2;
+    expect(
+      paintedPixels,
+      closeTo(expected, .5),
+      reason: 'the first resized frame must already use the focal offset',
+    );
+    expect(position.pixels, closeTo(expected, .5));
+  });
+
   testWidgets('prevents bounce overscroll from displacing action hit areas', (
     tester,
   ) async {
@@ -1380,6 +1441,21 @@ void main() {
     expect(opacity(), 1);
   });
 
+  testWidgets('ignores grid taps until the initial frame is visible', (
+    tester,
+  ) async {
+    final taps = <MiningGridCell>[];
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      taps.add,
+      pumpAfterAttach: false,
+    );
+
+    await tester.tapAt(const Offset(100, 100));
+    expect(taps, isEmpty);
+  });
+
   testWidgets('keeps band targets map-local below a scaling ancestor', (
     tester,
   ) async {
@@ -1431,13 +1507,41 @@ void main() {
   testWidgets('does not clip oversized edge art to the logical grid', (
     tester,
   ) async {
-    await _pumpMap(tester, _view(MiningSiteId.landingBasin), (_) {});
+    // A 500dp viewport leaves horizontal margin around the 448dp scene, so
+    // the x=0 pocket's overscan is inside the map even though it crosses the
+    // logical grid edge.
+    await _pumpMap(
+      tester,
+      _view(staticMiningSiteId),
+      (_) {},
+      size: const Size(500, 500),
+    );
 
+    final surface = _surfaceRect(tester);
+    final edgeDeposit = find.byKey(const Key('static-deposit-0-20-1'));
+    expect(edgeDeposit, findsOneWidget);
+    final art = tester.getRect(
+      find.descendant(of: edgeDeposit, matching: find.byType(Image)),
+    );
+    final scale = surface.width / miningGridSceneWidth;
+    final logicalLeft = surface.left;
+    expect(scale, 1, reason: 'the fixture needs an unscaled scene');
+    expect(art.width, depositVisualSize(1));
+    expect(art.left, lessThan(logicalLeft));
+    expect(
+      art.left,
+      greaterThan(_mapRect(tester).left),
+      reason: 'the overscan must have room to remain visible in the viewport',
+    );
     expect(
       find.descendant(
         of: find.byKey(const Key('mining-grid-surface')),
         matching: find.byWidgetPredicate(
-          (widget) => widget is Stack && widget.clipBehavior == Clip.hardEdge,
+          (widget) =>
+              (widget is Stack && widget.clipBehavior != Clip.none) ||
+              (widget is ClipRect && widget.clipBehavior != Clip.none) ||
+              (widget is ClipRRect && widget.clipBehavior != Clip.none) ||
+              (widget is ClipPath && widget.clipBehavior != Clip.none),
         ),
       ),
       findsNothing,

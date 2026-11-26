@@ -1522,10 +1522,16 @@ void main() {
       for (final band in MiningBand.values)
         tester.getRect(find.byKey(Key('mining-depth-rail-${band.name}'))),
     ];
+    final mapRect = tester.getRect(find.byKey(const Key('mining-grid-map')));
     for (final cell in const [MiningGridCell(7, 8), MiningGridCell(7, 12)]) {
       final center =
           surface.topLeft +
           Offset((cell.x + .5) * cellSize, (cell.y + .5) * cellSize);
+      expect(
+        mapRect.contains(center),
+        isTrue,
+        reason: 'lode cell $cell centre $center must be visible in $mapRect',
+      );
       for (final target in railTargets) {
         expect(
           target.contains(center),
@@ -1541,7 +1547,6 @@ void main() {
       cellSize,
       cellSize,
     );
-    final mapRect = tester.getRect(find.byKey(const Key('mining-grid-map')));
     final cargo = tester.getRect(find.byKey(const Key('mine-site-cargo')));
     final back = tester.getRect(find.byKey(const Key('mine-site-back')));
     final cashChip = tester.getRect(find.byKey(const Key('mining-cash-chip')));

@@ -132,6 +132,13 @@ MiningSave nearFinalPlanetMasteryState(DateTime now) {
 /// point in its displayed rect that is not under the depth rail.
 Future<void> tapGridCell(WidgetTester tester, MiningGridCell cell) async {
   final map = find.byKey(const Key('mining-grid-map'));
+  final initialFrame = find.byKey(
+    const Key('mining-grid-initial-frame-opacity'),
+  );
+  for (var i = 0; i < 2; i++) {
+    if (tester.widget<Opacity>(initialFrame).opacity == 1) break;
+    await tester.pump();
+  }
   final scrollable = find
       .descendant(of: map, matching: find.byType(Scrollable))
       .first;

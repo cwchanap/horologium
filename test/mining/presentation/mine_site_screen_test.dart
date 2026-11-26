@@ -1994,6 +1994,75 @@ void main() {
     },
   );
 
+  testWidgets('keeps the compact portrait rail clear of Back', (tester) async {
+    // 390x530 with a 47dp status bar and 34dp home indicator: the compact
+    // row shares the upper chrome band, so its first target must not become
+    // a Back tap.
+    var backed = false;
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(390, 530),
+      padding: const EdgeInsets.only(top: 47, bottom: 34),
+      view: _siteView(state),
+      dock: _dockView(state),
+      onBack: () => backed = true,
+    );
+
+    final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+    final back = tester.getRect(find.byKey(const Key('mine-site-back')));
+    expect(rail.overlaps(back), isFalse, reason: 'rail $rail Back $back');
+
+    final motherlode = tester.getRect(
+      find.byKey(const Key('mining-depth-rail-motherlode')),
+    );
+    final before = _scrollPosition(tester).pixels;
+    await tester.tapAt(motherlode.center);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(backed, isFalse, reason: 'the rail tap reached Back');
+    expect(
+      _scrollPosition(tester).pixels,
+      isNot(closeTo(before, .5)),
+      reason: 'the Motherlode rail action must run',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('keeps the below-grid landscape rail above the compact toolbar', (
+    tester,
+  ) async {
+    // A 120dp bottom inset makes the toolbar clearance dominate Sell's. The
+    // strip below the grid then starts at the toolbar's top edge, so a 44dp
+    // fallback row cannot fit there; it must remain in the clear upper band.
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(590, 500),
+      padding: const EdgeInsets.only(bottom: 120),
+      view: _siteView(state),
+      dock: _dockView(state),
+    );
+
+    final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+    final toolbar = tester.getRect(find.byKey(const Key('mine-site-toolbar')));
+    expect(
+      rail.overlaps(toolbar),
+      isFalse,
+      reason: 'rail $rail overlaps toolbar $toolbar',
+    );
+    for (final band in MiningBand.values) {
+      final target = tester.getRect(
+        find.byKey(Key('mining-depth-rail-${band.name}')),
+      );
+      expect(
+        target.overlaps(toolbar),
+        isFalse,
+        reason: '${band.name} $target overlaps toolbar $toolbar',
+      );
+    }
+  });
+
   testWidgets('keeps the compact rail in place as rig selection changes', (
     tester,
   ) async {
@@ -2378,9 +2447,18 @@ void main() {
       onGridCellTap: taps.add,
     );
 
+    final position = _scrollPosition(tester);
+    position.jumpTo(0);
+    await tester.pump();
+    final beforeJump = position.pixels;
     await tester.tap(find.byKey(const Key('mining-depth-rail-button-lodes')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      position.pixels,
+      isNot(closeTo(beforeJump, .5)),
+      reason: 'the Lodes rail press must move the entry frame',
+    );
 
     final cargo = tester.getRect(find.byKey(const Key('mine-site-cargo')));
     final cash = tester.getRect(find.byKey(const Key('mining-cash-chip')));
