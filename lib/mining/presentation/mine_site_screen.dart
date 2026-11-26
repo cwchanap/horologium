@@ -14,7 +14,7 @@ import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 // Mine Site chrome placement shared by the Stack children and the
-// unoccluded pan band handed to MiningGridMap.viewportInsets: every offset
+// unoccluded scroll clearance handed to MiningGridMap.viewportInsets: every offset
 // that hides the cavern has exactly one constant, so chrome cannot silently
 // cover legal grid cells. Heights reference the fixed sizes owned by
 // MiningCashChip, _MineChromeButton, MiningNavigationBar, and the
@@ -58,7 +58,7 @@ const double _mapSellGap = 4;
 /// the bottom map row stays reachable below the rail at maximum scroll.
 const double _portraitRailSellGap = 12;
 
-class MineSiteScreen extends StatelessWidget {
+class MineSiteScreen extends StatefulWidget {
   const MineSiteScreen({
     super.key,
     required this.view,
@@ -92,18 +92,38 @@ class MineSiteScreen extends StatelessWidget {
   final int impactSequence;
   final VoidCallback? onMiningImpact;
 
+  @override
+  State<MineSiteScreen> createState() => _MineSiteScreenState();
+}
+
+class _MineSiteScreenState extends State<MineSiteScreen> {
+  final GlobalKey _cashChipHitKey = GlobalKey();
+  final GlobalKey _cargoGaugeHitKey = GlobalKey();
+
   void _navigate(MiningNavigationDestination destination) {
     if (destination == MiningNavigationDestination.settings) {
-      onSettings();
-    } else if (onDestinationSelected != null) {
-      onDestinationSelected!(destination);
+      widget.onSettings();
+    } else if (widget.onDestinationSelected != null) {
+      widget.onDestinationSelected!(destination);
     } else if (destination == MiningNavigationDestination.siteDeck) {
-      onBack();
+      widget.onBack();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final view = widget.view;
+    final fleetDock = widget.fleetDock;
+    final onGridCellTap = widget.onGridCellTap;
+    final onBayTap = widget.onBayTap;
+    final onSpawnRig = widget.onSpawnRig;
+    final onBuildRig = widget.onBuildRig;
+    final onSellCargo = widget.onSellCargo;
+    final onBack = widget.onBack;
+    final cash = widget.cash;
+    final reducedMotion = widget.reducedMotion;
+    final impactSequence = widget.impactSequence;
+    final onMiningImpact = widget.onMiningImpact;
     final pad = MediaQuery.paddingOf(context);
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -135,11 +155,12 @@ class MineSiteScreen extends StatelessWidget {
                 pad.left,
                 math.max(pad.top, _landscapeCargoTop + _landscapeCargoSize),
                 _landscapeCargoRight + _landscapeCargoSize,
-                pad.bottom +
-                    math.max(
-                      _landscapeToolbarBottom + _landscapeToolbarHeight,
-                      landscapeSellClearance,
-                    ),
+                math.max(
+                  pad.bottom +
+                      _landscapeToolbarBottom +
+                      _landscapeToolbarHeight,
+                  landscapeSellClearance,
+                ),
               )
             : EdgeInsets.fromLTRB(
                 pad.left + _portraitBackLeft + _portraitBackWidth,
@@ -174,13 +195,19 @@ class MineSiteScreen extends StatelessWidget {
                   onSellCargo: onSellCargo,
                   portraitTopInset: pad.top,
                   viewportInsets: viewportInsets,
+                  cashChipHitKey: _cashChipHitKey,
+                  cargoGaugeHitKey: _cargoGaugeHitKey,
                 ),
               ),
               if (landscape) ...[
                 Positioned(
                   top: _landscapeCashChipTop,
                   left: pad.left,
-                  child: MiningCashChip(cash: cash, compact: true),
+                  child: MiningCashChip(
+                    key: _cashChipHitKey,
+                    cash: cash,
+                    compact: true,
+                  ),
                 ),
                 Positioned(
                   left: _landscapeToolbarLeft + pad.left,
@@ -227,7 +254,7 @@ class MineSiteScreen extends StatelessWidget {
                 Positioned(
                   top: _portraitCashChipTop + pad.top,
                   left: 0,
-                  child: MiningCashChip(cash: cash),
+                  child: MiningCashChip(key: _cashChipHitKey, cash: cash),
                 ),
                 Positioned(
                   top: _portraitBackTop + pad.top,
@@ -280,6 +307,8 @@ class _CavernScene extends StatelessWidget {
     required this.onSellCargo,
     this.portraitTopInset = 0,
     this.viewportInsets = EdgeInsets.zero,
+    required this.cashChipHitKey,
+    required this.cargoGaugeHitKey,
   });
 
   final MineSiteView view;
@@ -291,6 +320,8 @@ class _CavernScene extends StatelessWidget {
   final VoidCallback onSellCargo;
   final double portraitTopInset;
   final EdgeInsets viewportInsets;
+  final GlobalKey cashChipHitKey;
+  final GlobalKey cargoGaugeHitKey;
 
   @override
   Widget build(BuildContext context) {
@@ -316,6 +347,8 @@ class _CavernScene extends StatelessWidget {
                 onMiningImpact: onMiningImpact,
                 onGridCellTap: onGridCellTap,
                 viewportInsets: viewportInsets,
+                cashChipHitKey: cashChipHitKey,
+                cargoGaugeHitKey: cargoGaugeHitKey,
                 cavernWidth: constraints.maxWidth,
                 railTop: landscape
                     ? math.max(
@@ -334,13 +367,16 @@ class _CavernScene extends StatelessWidget {
                   ? _landscapeCargoTop
                   : _portraitCargoTop + portraitTopInset,
               right: landscape ? _landscapeCargoRight : _portraitCargoRight,
-              child: MiningCargoGauge(
-                containerKey: const Key('mine-site-cargo'),
-                cargo: view.cargo,
-                capacity: view.capacity,
-                projectedValue: view.activePlanetProjectedSale,
-                size: landscape ? _landscapeCargoSize : _portraitCargoSize,
-                rate: view.rate,
+              child: KeyedSubtree(
+                key: cargoGaugeHitKey,
+                child: MiningCargoGauge(
+                  containerKey: const Key('mine-site-cargo'),
+                  cargo: view.cargo,
+                  capacity: view.capacity,
+                  projectedValue: view.activePlanetProjectedSale,
+                  size: landscape ? _landscapeCargoSize : _portraitCargoSize,
+                  rate: view.rate,
+                ),
               ),
             ),
             Positioned(
@@ -376,6 +412,8 @@ class _MineCavern extends StatelessWidget {
     this.onMiningImpact,
     required this.onGridCellTap,
     this.viewportInsets = EdgeInsets.zero,
+    required this.cashChipHitKey,
+    required this.cargoGaugeHitKey,
     this.cavernWidth = 0,
     this.railTop = 0,
     this.railBottom = double.infinity,
@@ -389,6 +427,8 @@ class _MineCavern extends StatelessWidget {
   final VoidCallback? onMiningImpact;
   final ValueChanged<MiningGridCell> onGridCellTap;
   final EdgeInsets viewportInsets;
+  final GlobalKey cashChipHitKey;
+  final GlobalKey cargoGaugeHitKey;
   final double cavernWidth;
   final double railTop;
   final double railBottom;
@@ -422,6 +462,7 @@ class _MineCavern extends StatelessWidget {
             onMiningImpact: onMiningImpact,
             reducedMotion: reducedMotion,
             viewportInsets: viewportInsets,
+            hudHitKeys: [cashChipHitKey, cargoGaugeHitKey],
             upperHudHitRect: landscape
                 ? null
                 : Rect.fromLTWH(
@@ -438,6 +479,7 @@ class _MineCavern extends StatelessWidget {
             railRight: railRight,
             railClearRight: landscape ? sellLeft : null,
             railBelowClearRight: sellLeft,
+            railBelowLeft: MediaQuery.paddingOf(context).left,
           ),
           if (!landscape) ...[
             const Positioned(
