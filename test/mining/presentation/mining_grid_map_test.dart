@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:horologium/mining/mine_site_view.dart';
@@ -141,6 +141,7 @@ Future<void> _pumpMap(
   double? railBelowClearRight,
   double ancestorScale = 1,
   bool pumpAfterAttach = true,
+  GlobalKey? repaintBoundaryKey,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -148,27 +149,28 @@ Future<void> _pumpMap(
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
   });
+  Widget map = MiningGridMap(
+    key: ValueKey(view.siteId),
+    view: view,
+    onCellTap: onCellTap,
+    impactSequence: impactSequence,
+    reducedMotion: reducedMotion,
+    viewportInsets: viewportInsets,
+    railTop: railTop,
+    railBottom: railBottom,
+    railRight: railRight,
+    railClearRight: railClearRight,
+    railBelowClearRight: railBelowClearRight,
+  );
+  if (repaintBoundaryKey != null) {
+    map = RepaintBoundary(key: repaintBoundaryKey, child: map);
+  }
   await tester.pumpWidget(
     MaterialApp(
       home: MediaQuery.withClampedTextScaling(
         minScaleFactor: textScale,
         maxScaleFactor: textScale,
-        child: Transform.scale(
-          scale: ancestorScale,
-          child: MiningGridMap(
-            key: ValueKey(view.siteId),
-            view: view,
-            onCellTap: onCellTap,
-            impactSequence: impactSequence,
-            reducedMotion: reducedMotion,
-            viewportInsets: viewportInsets,
-            railTop: railTop,
-            railBottom: railBottom,
-            railRight: railRight,
-            railClearRight: railClearRight,
-            railBelowClearRight: railBelowClearRight,
-          ),
-        ),
+        child: Transform.scale(scale: ancestorScale, child: map),
       ),
     ),
   );
@@ -606,6 +608,50 @@ void main() {
     // The first frame after the resize must already carry aligned hit areas;
     // do not wait for a later post-frame recovery.
     tester.view.physicalSize = const Size(390, 948);
+    await tester.pump();
+    expectAligned();
+    handle.dispose();
+  });
+
+  testWidgets('keeps action hit areas on the resize focal offset', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin, selectedBayId: DockBayId.b1),
+      (_) {},
+      size: const Size(390, 649),
+      viewportInsets: const EdgeInsets.fromLTRB(58, 134, 96, 303.5),
+    );
+    await tester.pump(); // initial clamped frame
+
+    const cell = MiningGridCell(7, 19);
+    void expectAligned() {
+      final node = tester.getSemantics(
+        find.byKey(const Key('mining-deploy-cell-7-19')),
+      );
+      final global = MatrixUtils.transformRect(node.transform!, node.rect);
+      final center = _cellPoint(tester, cell);
+      final size = miningGridCellSize * _sceneScale(tester);
+      expect(global.center.dx, closeTo(center.dx, .5));
+      expect(global.center.dy, closeTo(center.dy, .5));
+      expect(global.width, closeTo(size, .1));
+    }
+
+    _position(tester).jumpTo(650);
+    await tester.pump();
+    expectAligned();
+
+    // Growing the viewport to 844 moves the focal offset to 552.5 through the
+    // resize physics' correctPixels, which notifies no listener. The first
+    // resized frame must still place the action on the painted cell.
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pump();
+    expect(_position(tester).pixels, closeTo(552.5, .5));
+    expectAligned();
+
+    _position(tester).jumpTo(500);
     await tester.pump();
     expectAligned();
     handle.dispose();
@@ -1510,11 +1556,13 @@ void main() {
     // A 500dp viewport leaves horizontal margin around the 448dp scene, so
     // the x=0 pocket's overscan is inside the map even though it crosses the
     // logical grid edge.
+    final boundaryKey = GlobalKey();
     await _pumpMap(
       tester,
       _view(staticMiningSiteId),
       (_) {},
       size: const Size(500, 500),
+      repaintBoundaryKey: boundaryKey,
     );
 
     final surface = _surfaceRect(tester);
@@ -1545,6 +1593,66 @@ void main() {
         ),
       ),
       findsNothing,
+    );
+
+    // Image loading and canvas capture never complete on the browser test
+    // platform, so the paint assertion is VM-only; the layout checks above
+    // still run there.
+    if (kIsWeb) return;
+    final context = tester.element(find.byType(MiningGridMap));
+    await tester.runAsync(() async {
+      for (final image in tester.widgetList<Image>(find.byType(Image))) {
+        await precacheImage(image.image, context);
+      }
+    });
+    await tester.pump();
+
+    // Paint, not layout: only the deposit's overscan can paint left of the
+    // scene, because the cavern background is static and the scene content
+    // starts at its own edge. Scrolling the art away must change those pixels,
+    // so a clip anywhere above the surface fails here.
+    final map = _mapRect(tester);
+    final strip = Rect.fromLTRB(
+      art.left + 2,
+      art.center.dy - 16,
+      logicalLeft - 2,
+      art.center.dy + 16,
+    ).shift(-map.topLeft);
+    expect(strip.width, greaterThan(0), reason: 'fixture needs margin');
+    Future<List<int>> capture() async {
+      late List<int> rgba;
+      await tester.runAsync(() async {
+        final boundary =
+            boundaryKey.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        final image = await boundary.toImage();
+        final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+        rgba = data!.buffer.asUint8List().toList();
+        image.dispose();
+      });
+      return rgba;
+    }
+
+    final pixels = [
+      for (var y = strip.top.round(); y < strip.bottom.round(); y++)
+        for (var x = strip.left.round(); x < strip.right.round(); x++)
+          (y * map.width.round() + x) * 4,
+    ];
+    final painted = await capture();
+    final position = _position(tester);
+    position.jumpTo(position.pixels - miningGridCellSize * 3);
+    await tester.pump();
+    final cleared = await capture();
+
+    final changed = pixels
+        .where(
+          (i) => painted[i] != cleared[i] || painted[i + 1] != cleared[i + 1],
+        )
+        .length;
+    expect(
+      changed,
+      greaterThan(pixels.length ~/ 10),
+      reason: 'the pocket art must paint in the margin left of the grid',
     );
   });
 

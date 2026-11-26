@@ -879,6 +879,13 @@ class _MiningGridMapState extends State<MiningGridMap> {
                   !_initialFrameVisible
               ? null
               : _resizeScrollTarget(previousInputs, jumpInputs);
+          if (_pendingResizeScrollTarget != null) {
+            // The physics consumes this during the same frame's layout; a
+            // layout that never adopts it must not pin the overlay to it.
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _pendingResizeScrollTarget = null;
+            });
+          }
           _jumpInputs = jumpInputs;
           _retargetPendingJump();
         }
@@ -1017,8 +1024,9 @@ class _MiningGridMapState extends State<MiningGridMap> {
   /// scaled [FittedBox] inside a scroll view, so keeping these overlays out of
   /// that transform makes each action's browser hit area match its visible
   /// cell at every scroll offset. The offset is clamped to the extent the
-  /// current layout will adopt, so the first frame after a resize is already
-  /// correct even before the scroll view reports the corrected pixels.
+  /// current layout will adopt, and the pending resize focal offset is used
+  /// before the scroll view reports it, because the physics corrects pixels
+  /// during layout without notifying listeners.
   Widget _screenSpaceSemantics(double width, double height) => AnimatedBuilder(
     animation: _scrollController,
     builder: (context, _) {
@@ -1032,9 +1040,11 @@ class _MiningGridMapState extends State<MiningGridMap> {
           miningGridSceneHeight * scale +
           widget.viewportInsets.bottom;
       final maxScroll = math.max(0.0, contentHeight - height);
-      final rawScroll = _scrollController.hasClients
-          ? _scrollController.position.pixels
-          : 0.0;
+      final rawScroll =
+          _pendingResizeScrollTarget ??
+          (_scrollController.hasClients
+              ? _scrollController.position.pixels
+              : 0.0);
       final scroll = rawScroll.clamp(0.0, maxScroll);
       final sceneTop = widget.viewportInsets.top - scroll;
       double x(int cellX) => sceneLeft + cellX * cellSize;
