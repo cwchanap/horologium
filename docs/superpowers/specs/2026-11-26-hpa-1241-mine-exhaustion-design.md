@@ -1,0 +1,88 @@
+# HPA-1241 — Mine exhaustion, refill and parallel mining (design specification)
+
+Linear: https://linear.app/cwchanap/issue/HPA-1241/mining-mines-run-dry-and-refill-and-rigs-work-several-mines-at-once  
+Baseline: main at aee2a5acccdaa9bf6ebd9b87725182c82767073d (merged PR #57, HPA-1243).  
+Status: proposed; implementation and acceptance evidence belong on this same draft PR.
+
+## 1. Product contract and scope
+
+Mine HP becomes real, persisted simulation state. Each placed rig works exactly one uniquely adjacent deposit. Multiple deposits at a site can produce simultaneously; an exhausted deposit and its rigs stop contributing production, but other deposits continue. All cargo remains in one site pool. A full pool stops both production and HP drain; refill timers still run, even without rigs. A dry deposit refills automatically after exactly two hours, including while away. Selling cargo does not heal HP. Moving/recalling/redeploying/upgrading rigs never resets HP or the ever-exhausted fact. A dry mine remains a legal deployment target if it has an available slot; its rig is idle until refill (no additional placement rule).
+
+**Release boundary:** all ten deposits at each of the fifteen authored sites have null max HP in this PR. The finite-HP behavior is exercised with injected test content, not a player setting or a live economy change. No real HP curve, ore-size multiplier, progression gate, commissioning change, price change or pacing-band change here. HPA-1244 owns those decisions and depends on this PR; HPA-1240 owns drag/drop and move. Surveying, site/planet unlocks, deploy commissioning, mastery, relaunch, sell, existing storage capacity formula, 24-hour offline cap and existing costs remain. The current 8×22 field, ten deposits, four bands, rail/scroll, cavern art and dock stay. No new art or SFX, no separate mining screen, no save migration.
+
+## 2. Reuse survey / ownership
+
+| Current main | Change in place |
+| --- | --- |
+| `lib/mining/mining_grid.dart`: `MiningDepositDefinition`, `uniqueAdjacentDeposit`, `evaluateMiningPlacement` | Deposit layout index is identity within a site; derive rig assignments from existing geometry; enforce width cap once in the common validator. |
+| `mining_content.dart`: `MiningContentRegistry`, `MiningSiteDefinition.deposits`, tier/Extraction/Logistics multipliers | Add max HP and drain/refill hooks, not a new catalog or independently authored mine IDs. |
+| `mining_state.dart`: `SiteProgress`, `MiningSave.initial`, `_copySites` | Immutable ordered mine state inside each existing site. |
+| `mining_save_repository.dart`: exact-key decoder, placement validation, invalid recovery | Extend existing strict JSON contract and content-aware initialization. |
+| `mining_simulation.dart`: `MiningSimulation.accrue`, summary | Replace aggregate accrual with one pure site event kernel; use it for time-to-full projection. |
+| `mining_controller.dart`: mutation queue, refresh/checkpoint/resume/relaunch | Continue accruing before action and persisting once through repository; no new timers or mutation path. |
+| `site_deck_view.dart`: `SiteMetrics.of`, `nextStorageFull`; `mine_site_view.dart`; `mining_progression_views.dart` | Derive rate, capacity, dry state, slots and projections from same simulation/content, across all views. |
+| `presentation/mining_shell.dart`: foreground timer, impact sequence, alert lifecycle | Pass actual foreground work/exhaustion to presentation; reuse existing notification ownership and cancellation. |
+| `presentation/mining_grid_map.dart`, `animated_mining_grid_visual_layer.dart`, `site_deck_screen.dart`, `mine_site_screen.dart` | Shared HP/slot/idle chrome for animated/static layers; remove cosmetic HP state; retain frame cache, reduced motion and existing layout. |
+
+No second state owner, save key, wall-clock-driven simulation, per-mine timer, event queue service or generic scheduler. A fixed list of ten entries and at most four rigs per site is enough. No parallel test-only simulation.
+
+## 3. Content and save model
+
+Use an immutable value (proposed name `MineProgress`) in `SiteProgress.mines`, indexed exactly like `content.site(id).deposits`. Use authored deposit order, not screen order, sorting, geometry hashes or persisted rig-to-mine pointers. Rigs keep their current cell/tier records. Add only one site field to the exact JSON shape:
+
+```json
+"mines": [
+  {"remainingHp": null, "refillAtUtc": null, "everExhausted": false},
+  {"remainingHp": 900.0, "refillAtUtc": null, "everExhausted": true},
+  {"remainingHp": 0.0, "refillAtUtc": "2026-11-26T20:00:00.000Z", "everExhausted": true}
+]
+```
+
+Example entries only; actual list length is ten, and finite examples exist only in fixture content in this PR. Use double HP for fractional damage. Null max HP means unlimited: remaining HP null, deadline null, everExhausted false. Finite mine: positive finite max, 0 <= remaining <= max; positive HP has no deadline; zero requires a valid UTC deadline and everExhausted true; refilled finite HP retains everExhausted. No separate exhausted flag (derive from finite HP == 0). Keep exact keys/types and reject invalid/nonfinite HP, inconsistent deadlines/history, mismatched list length and unlimited/finite mismatch. Validate a dry deadline relative to saved lastAccruedAtUtc (strictly after that anchor, no later than anchor + refill duration), not current device time; a save loaded after its deadline is valid and accrues refill. Use existing strict UTC parsing style. Locked/uncommissioned sites have initialized mines; no progress on locked sites. Reset all mine state on recovered load or relaunch. Old saves missing mines are intentionally invalid; no migration.
+
+Require registry when constructing initial save so all sites (including unopened ones) get the right max HP; update controller relaunch, repository missing/invalid load, shell initial display and test fixtures to share the injected content. Preserve list defensive copying, copyWith (including nullable fields clearing correctly), JSON/equality/hashCode and `MiningSave._copySites` equivalent; never silently drop mine state on sales, unlock, recall or other site copies. Save timestamp and all root keys remain unchanged. Reuse repository validation of rig placements with new cap, including formerly valid over-cap saves resetting.
+
+Content contract:
+- `maxMineHp(siteId, depositIndex)` returns double? (production default null for all). Provide one narrowly scoped immutable finite-HP content injection at existing `stellarMining` factory for tests; no runtime flags or alternate registry state. HPA-1244 replaces the authored defaults there.
+- `mineDrainPerSecond(tier, extraction)` = 10 × existing `rigRateMultiplier(tier)` × existing `extractionRateMultipliers[extraction]`. T1–T5 = 10, 15, 22.5, 32.5, 45 at Extraction 0; Extraction 5 doubles. No old tier-index visual damage formula.
+- Refill duration constant 2h. Deposit capacity = width (1/2/3/4), defined on authored deposit definition (derived from size, no duplicate mapping). Keep site cap 4. Count all occupied slots even for dry mines; reject with a clear mine-at-capacity reason in `evaluateMiningPlacement`, used by controller, view highlights, journey and decoder. Slot UI reports this cap, not perimeter size; actual free cells still must pass all existing adjacency/bounds/Surveying rules. Existing geometric perimeter cache remains. No change to commission/gate rules.
+- Each rig's ore contribution uses existing site base rate, tier and Extraction; group rigs by deposit using uniqueAdjacentDeposit. Keep current effectiveSiteRate arithmetic, applied only to working rigs, and current effectiveSiteCapacity over **all** deployed rigs. HPA-1244 can change contribution by mine size in this same derivation, not add another simulation. Do not change current rate/capacity values for any authored unlimited configuration.
+
+## 4. Deterministic site accrual
+
+In `MiningSimulation`, factor one pure site advance routine returning updated immutable SiteProgress, produced ore and first fill instant (if reached); include compact ephemeral per-mine worked/exhausted sets for actual foreground impact presentation if needed. No I/O or Flutter. The outer accrue loop preserves the existing per-resource/per-planet totals, elapsed/capped summary, full-site IDs and unlocked-planet iteration. For unlocked sites with zero rigs or full cargo, still process due refills. Sites without active work do not create a fake production event.
+
+For a fixed technology/rig placement window, group once and derive each mine's ore rate and drain. Start at lastAccruedAtUtc; use elapsed in microseconds, not one-second ticks. Resolve deadlines <= cursor before calculating active rates. With free storage, a rig works iff its mine is unlimited or positive HP. Rate is the sum of working rig ore rates; drain per finite mine is sum of its working rig damage. Choose the earliest of:
+1. window end;
+2. next outstanding refill deadline (regardless of work/storage);
+3. next finite working mine reaching zero (remaining HP / drain);
+4. remaining cargo / total working ore rate (if positive).
+
+Advance all working mines and shared cargo for the same elapsed slice. Clamp cargo and HP only at their physical bounds; do not drain HP for the time after storage fills. At depletion set HP=0, everExhausted=true and refillAtUtc=event time + 2h. At refill clear deadline and restore exact authored max; all rigs resume automatically if there is storage space. Process all simultaneous events, including events exactly at end of window (no post-end production). Avoid zero-length loops: consume due boundaries first, use positive event durations; use consistent microsecond ceiling for timestamp conversion and a small documented floating-point tolerance, not per-tick HP/ore rounding. Test fractional damage, close/identical boundaries and split-window equivalence. If no work or future event in the window, jump to end. Complexity is proportional to actual depletion/refill/fill boundaries, not seconds away. All-unlimited cases have one cargo-fill/end interval.
+
+Offline: use the first min(rawElapsed,24h) from saved anchor, matching the existing capped amount contract. Refill timestamps are real UTC. For a longer absence, after that capped window, resolve any outstanding refill due by actual now without adding extra production or damage; advance lastAccruedAtUtc to actual now as today. A full store and a mine with no rig still refill. Nonpositive/backward elapsed leaves state unchanged. Exact equivalence to short refreshes applies within the same <=24h accrual window, not beyond the intentional cap. Refill itself does not change cargo, capacity or commissioning.
+
+Actions accrue under previous placement/technology before applying changes (including sell, deploy, upgrade, recall, research); keep existing controller persistence/rollback sequencing. Foreground refresh remains memory-only; checkpoint/reload preserve state; no wall-clock writes from views. Relaunch still resets directly.
+
+## 5. Rate and storage projection
+
+`SiteMetrics.of` currently computes aggregate rate from all rigs and `timeToFull` is straight-line; replace the rate input with working rigs and share the site simulation's assignment/activity derivation. Capacity remains all rigs; a site with a dry mine is still commissioned/operational with rigs, even at zero current rate. Distinguish available production rate from actual cargo increment: full cargo retains nominal working-mine rate as today, but produces/drains nothing. Dry rig is IDLE due to HP only, not full storage. Update Mine Site, Site Deck, Stellar Map totals, full-cargo checks/notification and any direct aggregate-rate readers to avoid drift. Add dry-mine count and idle-rig count to site metrics; include dry mines that currently have no rigs.
+
+`timeToFull` and `nextStorageFull` must use the **same event advance routine**, with a cloned/immutable input anchored at state.lastAccruedAtUtc, stopping at first fill. No linear estimate using current rate, no mutation, no alert-side arithmetic. Return null if locked, no rigs/capacity, already full, or fill not reached in the next 24h under unchanged rigs/technology/no selling. A currently fully idle but refilling site can have a real future fill. Chosen scope clarification: the 24h offline horizon is also the shared projection horizon, so hide FULL IN and do not arm alerts beyond it rather than predict an unaccruable offline fill. This is a conservative display decision, not a promise that longer foreground play cannot fill storage. Retain earliest across unlocked planets and deterministic tie order. Reuse existing single pending alert, scheduling/cancel ownership, checkpoint anchor and resume cancellation; no dry-mine notification. Projection test must accrue the same snapshot to its returned instant and show actual fill (within numeric tolerance), and just before is not full; no projection if insufficient within cap.
+
+## 6. UI and visual contract
+
+Use Linear's `exhaustion-mockup.png` / self-contained `exhaustion-mockup.html` frames E–H (HTML reviewed). The screenshots depict pre-map base screens, so match the state hierarchy, text, colours/placement and feedback on the merged HPA-1243 field rather than reverting its geometry. Keep header, dock, depth rail, band gating and scroll/tap behavior.
+
+- E: two separate working deposits show their own actual HP/max and occupied slots (e.g. RIGS 1/2, RIGS 1/1), with separate damage and total rate. Use existing number/duration formatters; labels must fit actual pocket footprint, with accessible semantics and no blocked taps. Show finite HP on surveyed mines, including those without rigs; unlimited mines never show fake HP/HP bars/damage numbers. Reuse shared HP chrome outside animation path on static/animated sites.
+- F: 0 HP, grey existing art/exhaust stage, EXHAUSTED · REFILLS IN countdown (ceil minutes; no stale zero), IDLE rig badge, other mine still animates and rate drops. Existing recall+deploy flow is available; do not imply drag/drop already exists. Use short hint when idle rigs exist, adapted to current actions. Use existing art, no new assets.
+- G: Site Deck card adds one compact line like "1 MINE DRY · 1 RIG IDLE" without hiding cargo/FULL IN/navigation; pluralize appropriately, omit absent dry warning, distinguish zero idle rigs.
+- H: on refill remove exhausted/countdown and idle cues, render restored HP/art; existing rigs resume on next productive slice with no tap. No replayed historical strikes/SFX on resume or navigation.
+
+Delete `miningResourceMaxHp`, `miningStrikeDamage`, visual `_remainingHp`, `_brokeOnContact`, cargo-based `_progressOf` and related cosmetic helpers/tests. Finite deposit frame stage derived from remaining/max HP, unlimited art stays healthy. Exhaust beat only on a foreground depletion transition, per deposit, not on 90% cargo; when dry, stage 4/rubble persists until refill. The shell's actual foreground accrue result tells the existing impact sequence which deposits did work and which exhausted; idle rigs on other deposits do not strike. A final productive strike may finish on the mine it just exhausted; no later strikes while dry. Pass only ephemeral per-tick facts (not HP replicas), invalidate deferred impact when old sequence/site/rig membership is stale, keep reduced-motion and existing cold-frame/contact/audio safeguards. Continue ordinary production animation on unlimited deposits; no fictional damage label. Static mine greying and IDLE chrome use same state. No separate animation timer for refill; one-second shell refresh updates countdown/HP. Reopening and offline return render authoritative state directly.
+
+## 7. Proposed decisions / handoff
+
+The ordered list, nullable unlimited HP, explicit UTC deadline, microsecond event loop, bounded shared FULL IN projection and placement-on-dry rule are implementation/design decisions to review in this draft. The cap handling is deliberate: refill is wall-clock recovery but mining work beyond 24h is discarded. No legacy save support. No player-visible finite HP until HPA-1244; browser and committed tests must therefore inject finite content and exercise actual controller/persistence/UI, not turn on live balance early. HPA-1244 will use everExhausted for progression and the content hooks for final numbers, not add new state ownership. HPA-1240 will reuse placement legality and the same accrued state for move.
+
+See companion implementation plan for test matrix, mockup parity and single-platform MCP E2E acceptance. No implementation or verification is claimed by this design-only commit.
