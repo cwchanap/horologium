@@ -139,6 +139,8 @@ Future<void> _pumpMap(
   double railRight = 8,
   double? railClearRight,
   double? railBelowClearRight,
+  double ancestorScale = 1,
+  bool pumpAfterAttach = true,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -151,23 +153,26 @@ Future<void> _pumpMap(
       home: MediaQuery.withClampedTextScaling(
         minScaleFactor: textScale,
         maxScaleFactor: textScale,
-        child: MiningGridMap(
-          key: ValueKey(view.siteId),
-          view: view,
-          onCellTap: onCellTap,
-          impactSequence: impactSequence,
-          reducedMotion: reducedMotion,
-          viewportInsets: viewportInsets,
-          railTop: railTop,
-          railBottom: railBottom,
-          railRight: railRight,
-          railClearRight: railClearRight,
-          railBelowClearRight: railBelowClearRight,
+        child: Transform.scale(
+          scale: ancestorScale,
+          child: MiningGridMap(
+            key: ValueKey(view.siteId),
+            view: view,
+            onCellTap: onCellTap,
+            impactSequence: impactSequence,
+            reducedMotion: reducedMotion,
+            viewportInsets: viewportInsets,
+            railTop: railTop,
+            railBottom: railBottom,
+            railRight: railRight,
+            railClearRight: railClearRight,
+            railBelowClearRight: railBelowClearRight,
+          ),
         ),
       ),
     ),
   );
-  await tester.pump();
+  if (pumpAfterAttach) await tester.pump();
 }
 
 Rect _surfaceRect(WidgetTester tester) =>
@@ -737,6 +742,8 @@ void main() {
       (_) {},
     );
 
+    _position(tester).jumpTo(0);
+    await tester.pump();
     final motherlode = tester.getSemantics(
       find.bySemanticsLabel(RegExp(r'Gold resource 4x4, 0 miners')),
     );
@@ -792,7 +799,10 @@ void main() {
       ),
       findsOneWidget,
     );
-    // Locked bands keep their Surveying requirement in semantics.
+    // Locked bands keep their Surveying requirement in semantics while they
+    // are visible; scroll each band into view before reading its label.
+    _position(tester).jumpTo(450);
+    await tester.pump();
     expect(
       find.bySemanticsLabel(
         RegExp(
@@ -802,6 +812,8 @@ void main() {
       ),
       findsWidgets,
     );
+    _position(tester).jumpTo(0);
+    await tester.pump();
     expect(
       find.bySemanticsLabel(
         RegExp(
@@ -1346,6 +1358,90 @@ void main() {
 
     await _pumpMap(tester, _view(MiningSiteId.landingBasin), (_) {});
     expect(find.byKey(const Key('mining-motherlode-halo')), findsNothing);
+  });
+
+  testWidgets('hides the grid until its initial band frame is applied', (
+    tester,
+  ) async {
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      pumpAfterAttach: false,
+    );
+
+    double opacity() => tester
+        .widget<Opacity>(
+          find.byKey(const Key('mining-grid-initial-frame-opacity')),
+        )
+        .opacity;
+    expect(opacity(), 0);
+    await tester.pump();
+    expect(opacity(), 1);
+  });
+
+  testWidgets('keeps band targets map-local below a scaling ancestor', (
+    tester,
+  ) async {
+    const insets = EdgeInsets.only(top: 50, bottom: 50);
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(430, 423),
+      viewportInsets: insets,
+      ancestorScale: 1.25,
+    );
+
+    // The scaling ancestor must not scale the rail collision rects in map
+    // coordinates: the jump target is the same as the unscaled 430x423 case.
+    expect(_position(tester).pixels, closeTo(710.375, .5));
+  });
+
+  testWidgets('keeps deposit semantics only while they are visible', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin),
+      (_) {},
+      size: const Size(390, 500),
+    );
+
+    _position(tester).jumpTo(_position(tester).maxScrollExtent);
+    await tester.pump();
+    expect(
+      find.bySemanticsLabel(RegExp(r'Gold resource 4x4')),
+      findsNothing,
+      reason: 'the Motherlode is scrolled out of view at maximum scroll',
+    );
+    expect(
+      find.bySemanticsLabel(RegExp(r'Gold resource 1x1')),
+      findsWidgets,
+      reason: 'visible pocket deposits keep their labels',
+    );
+
+    _position(tester).jumpTo(0);
+    await tester.pump();
+    expect(find.bySemanticsLabel(RegExp(r'Gold resource 4x4')), findsOneWidget);
+    handle.dispose();
+  });
+
+  testWidgets('does not clip oversized edge art to the logical grid', (
+    tester,
+  ) async {
+    await _pumpMap(tester, _view(MiningSiteId.landingBasin), (_) {});
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('mining-grid-surface')),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Stack && widget.clipBehavior == Clip.hardEdge,
+        ),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('depth rail exposes four semantic targets and scrolls bands', (

@@ -10,7 +10,7 @@ import 'package:horologium/mining/presentation/mining_theme.dart';
 import 'package:horologium/mining/presentation/mining_visuals.dart';
 
 /// Stable deposit key derived from authored geometry, matching the grid
-/// map's `x-y-size` contract for dense-field resources.
+/// map's `x-y-size` contract for banded-grid resources.
 String _depositKey(MiningDepositDefinition definition) =>
     '${definition.x}-${definition.y}-${definition.size}';
 

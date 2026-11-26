@@ -204,6 +204,15 @@ Rect _unoccludedLandscapeBand(
   double bottom = 70,
 }) => Rect.fromLTRB(left, 126, cavern.width - 88, cavern.height - bottom);
 
+/// Scene-row coordinate at the viewport centre, measured from rendered
+/// geometry so scale and chrome insets cannot drift apart in the test.
+double _sceneRowAtViewportCenter(WidgetTester tester) {
+  final map = tester.getRect(find.byKey(const Key('mining-grid-map')));
+  final surface = tester.getRect(find.byKey(const Key('mining-grid-surface')));
+  final rowHeight = surface.height / MiningContentRegistry.mineGridHeight;
+  return (map.center.dy - surface.top) / rowHeight;
+}
+
 /// Scrolls [cell] into the screen's clear band and returns the first point
 /// inside its displayed rect that is clear of the depth rail.
 Future<Offset> _scrollToCell(WidgetTester tester, MiningGridCell cell) async {
@@ -1110,6 +1119,8 @@ void main() {
       ),
       findsNWidgets(2),
     );
+    _scrollPosition(tester).jumpTo(0);
+    await tester.pump();
     expect(
       find.bySemanticsLabel(
         RegExp(
@@ -2348,6 +2359,51 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('keeps the Lodes jump clear of the cargo gauge for placement', (
+    tester,
+  ) async {
+    // 360x640 portrait with a 24dp status bar at Surveying 1: the bottom-safe
+    // Lodes frame otherwise parks the right deposit's upper perimeter centres
+    // inside the cargo gauge, so a placement tap never reaches the grid.
+    final taps = <MiningGridCell>[];
+    final state = _stateWith(
+      landing: _progress(commissioned: true),
+    ).copyWith(technology: const TechnologyLevels(surveying: 1));
+    await _pumpMineSite(
+      tester,
+      size: const Size(360, 640),
+      padding: const EdgeInsets.only(top: 24),
+      view: _siteView(state, selectedBayId: DockBayId.b1),
+      dock: _dockView(state, selectedBayId: DockBayId.b1),
+      onGridCellTap: taps.add,
+    );
+
+    await tester.tap(find.byKey(const Key('mining-depth-rail-button-lodes')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final cargo = tester.getRect(find.byKey(const Key('mine-site-cargo')));
+    final cash = tester.getRect(find.byKey(const Key('mining-cash-chip')));
+    for (final cell in const [MiningGridCell(6, 8), MiningGridCell(7, 8)]) {
+      final center = _cellPoint(tester, cell);
+      expect(
+        cargo.contains(center),
+        isFalse,
+        reason: 'centre $cell at $center must clear cargo $cargo',
+      );
+      expect(
+        cash.contains(center),
+        isFalse,
+        reason: 'centre $cell at $center must clear cash chip $cash',
+      );
+      await tester.tapAt(center);
+      await tester.pump();
+    }
+
+    expect(taps, const [MiningGridCell(6, 8), MiningGridCell(7, 8)]);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('keeps the locked Lodes unlock notice visible after the jump', (
     tester,
   ) async {
@@ -2517,6 +2573,52 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('measures the below-grid rail from the safe-area left edge', (
+    tester,
+  ) async {
+    // At large text scale the Sell label eats most of the strip. Starting at
+    // the Back button's right edge leaves far less than the four-target row,
+    // while the strip itself begins at the safe-area edge because Back does
+    // not reach this low band.
+    const width = 430.0;
+    const textScale = 1.4;
+    final bodyMedium = ThemeData(
+      brightness: Brightness.dark,
+      fontFamily: 'Orbitron',
+    ).textTheme.bodyMedium;
+    final sellLeft = portraitMineSellLeft(
+      width,
+      const TextScaler.linear(textScale),
+      bodyMedium,
+    );
+    final leftInset = math.max(0.0, sellLeft - 180);
+    final state = _stateWith(landing: _progress(commissioned: true));
+    await _pumpMineSite(
+      tester,
+      size: const Size(width, 640),
+      padding: EdgeInsets.only(left: leftInset),
+      view: _siteView(state),
+      dock: _dockView(state),
+      textScale: textScale,
+    );
+
+    final position = _scrollPosition(tester);
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pump();
+    final rail = tester.getRect(find.byKey(const Key('mining-depth-rail')));
+    final surface = tester.getRect(
+      find.byKey(const Key('mining-grid-surface')),
+    );
+    expect(rail.left, closeTo(leftInset, .5));
+    expect(
+      rail.top,
+      greaterThanOrEqualTo(surface.bottom - .5),
+      reason:
+          'the 180dp strip must hold the row below the grid instead of '
+          'leaving it over the locked-band notice',
+    );
+  });
+
   testWidgets(
     'keeps the portrait compact rail over the grid when the strip cannot '
     'hold it',
@@ -2524,9 +2626,8 @@ void main() {
       // 360x640 portrait with a left safe-area inset sized to leave a 160dp
       // strip below the grid — under the four targets' 176dp minimum — so
       // the row cannot relocate and stays anchored over the grid, where
-      // scrolling still rescues the covered centre. As in the test above,
-      // the inset derives from the font-dependent Sell edge (viewportInsets
-      // .left is the inset plus the 58dp back chrome).
+      // scrolling still rescues the covered centre. The inset derives from
+      // the font-dependent Sell edge and the strip's safe-area left edge.
       final bodyMedium = ThemeData(
         brightness: Brightness.dark,
         fontFamily: 'Orbitron',
@@ -2536,7 +2637,7 @@ void main() {
         const TextScaler.linear(1),
         bodyMedium,
       );
-      final leftInset = math.max(0.0, sellLeft - 218);
+      final leftInset = math.max(0.0, sellLeft - 160);
       final taps = <MiningGridCell>[];
       final state = _stateWith(
         landing: _progress(
@@ -2749,6 +2850,39 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'reserves landscape bottom chrome without double-counting insets',
+    (tester) async {
+      const padBottom = 21.0;
+      const size = Size(874, 402);
+      const textScale = 1.3;
+      final state = _stateWith(landing: _progress(commissioned: true));
+      await _pumpMineSite(
+        tester,
+        size: size,
+        padding: const EdgeInsets.only(bottom: padBottom),
+        view: _siteView(state),
+        dock: _dockView(state),
+        textScale: textScale,
+      );
+
+      final sellClearance = size.height - _sellControlRect(tester).top + 4;
+      final bottomInset = math.max(
+        padBottom + 16 + MiningNavigationBar.compactHeight,
+        sellClearance,
+      );
+      final expectedMax =
+          126 + miningGridSceneHeight + bottomInset - size.height;
+      expect(
+        _scrollPosition(tester).maxScrollExtent,
+        closeTo(expectedMax, .5),
+        reason:
+            'the bottom safe area is part of the toolbar clearance, not '
+            'added again when Sell is lower',
+      );
+    },
+  );
 
   testWidgets(
     'keeps landscape edge rigs scrollable clear of the toolbar and rail',
@@ -3044,7 +3178,14 @@ void main() {
       view: _siteView(state, siteId: MiningSiteId.carbonRidge),
       dock: _dockView(state),
     );
-    expect(_scrollPosition(tester).pixels, isNot(landingFrame + 100));
+    final carbonFrame = _scrollPosition(tester).pixels;
+    expect(carbonFrame, isNot(landingFrame + 100));
+    expect(carbonFrame, greaterThan(0));
+    expect(
+      carbonFrame,
+      closeTo(_scrollPosition(tester).maxScrollExtent, .5),
+      reason: 'Carbon Ridge opens only Pockets at Surveying 0',
+    );
 
     // Re-entry after the map unmounts also frames fresh.
     await tester.pumpWidget(const SizedBox.shrink());
@@ -3058,7 +3199,7 @@ void main() {
   });
 
   testWidgets(
-    'keeps the map scroll and animated layer across an orientation change',
+    'keeps the visible band and animated layer across an orientation change',
     (tester) async {
       final state = _stateWith(landing: _progress(commissioned: true));
       await _pumpMineSite(
@@ -3073,21 +3214,24 @@ void main() {
       final layer = tester.state(layerFinder);
       _scrollPosition(tester).jumpTo(100);
       await tester.pump();
+      final portraitRow = _sceneRowAtViewportCenter(tester);
 
       // Crossing the breakpoint must keep the map in its slot: a remount
       // would reframe the highest open band and reset transient animation.
+      // The scroll offset itself must be recomputed because the scene scale
+      // and chrome insets change with orientation.
       tester.view.physicalSize = const Size(844, 390);
       await tester.pump();
       expect(find.byKey(const Key('mine-site-right-rail')), findsOneWidget);
       expect(find.byKey(const Key('mine-site-back')), findsNothing);
       expect(identical(tester.state(layerFinder), layer), isTrue);
-      expect(_scrollPosition(tester).pixels, 100);
+      expect(_sceneRowAtViewportCenter(tester), closeTo(portraitRow, .05));
 
       tester.view.physicalSize = const Size(390, 844);
       await tester.pump();
       expect(find.byKey(const Key('mine-site-back')), findsOneWidget);
       expect(identical(tester.state(layerFinder), layer), isTrue);
-      expect(_scrollPosition(tester).pixels, 100);
+      expect(_sceneRowAtViewportCenter(tester), closeTo(portraitRow, .05));
       expect(tester.takeException(), isNull);
     },
   );

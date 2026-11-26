@@ -56,6 +56,7 @@ typedef _JumpInputs = ({
   double railRight,
   double? railClearRight,
   double? railBelowClearRight,
+  double? railBelowLeft,
 });
 
 /// Oversized deposit art edge, keyed by the deposit's logical footprint in
@@ -70,7 +71,7 @@ double depositVisualSize(int footprint) => switch (footprint) {
 };
 
 /// Stable overlay/visual key derived from the deposit's authored geometry:
-/// dense-field resources key by footprint, not by list position.
+/// banded-grid resources key by footprint, not by list position.
 String _depositKey(MiningDepositDefinition definition) =>
     '${definition.x}-${definition.y}-${definition.size}';
 
@@ -84,12 +85,14 @@ class MiningGridMap extends StatefulWidget {
     required this.reducedMotion,
     this.viewportInsets = EdgeInsets.zero,
     this.upperHudHitRect,
+    this.hudHitKeys = const [],
     this.railTop = 0,
     this.railBottom = double.infinity,
     this.placementSafeY,
     this.railRight = 8,
     this.railClearRight,
     this.railBelowClearRight,
+    this.railBelowLeft,
   });
 
   final MineSiteView view;
@@ -108,6 +111,11 @@ class MiningGridMap extends StatefulWidget {
   /// inside [viewportInsets.top] is already clear of the preferred frame; this
   /// rect is for a control such as portrait Back that reaches below it.
   final Rect? upperHudHitRect;
+
+  /// Actionable HUD controls measured in place, including controls fully inside
+  /// [viewportInsets.top]: deep scrolls can move placement centres underneath
+  /// them even when the preferred frame starts below the top chrome.
+  final List<GlobalKey> hudHitKeys;
 
   /// Vertical span and right inset of the depth rail in the map's local
   /// coordinates, supplied by the screen so the rail stays between the cargo
@@ -132,6 +140,11 @@ class MiningGridMap extends StatefulWidget {
   /// cargo on a rail tap. Defaults to [railClearRight] when unset.
   final double? railBelowClearRight;
 
+  /// Left edge available to the below-grid fallback row. The strip is below
+  /// the Back chrome, so it starts at the safe-area edge rather than the map
+  /// content's wider left clearance.
+  final double? railBelowLeft;
+
   @override
   State<MiningGridMap> createState() => _MiningGridMapState();
 }
@@ -142,6 +155,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
     for (final band in _depthRailBands) band: GlobalKey(),
   };
   bool _framed = false;
+  bool _initialFrameVisible = false;
   double _sceneScale = 1;
   double _sceneLeft = 0;
   MiningBand? _railJumpBand;
@@ -195,15 +209,22 @@ class _MiningGridMapState extends State<MiningGridMap> {
     return row;
   }
 
-  Rect? _rectInMap(GlobalKey key, Offset mapOrigin) {
+  Rect? _rectInMap(GlobalKey key, RenderBox mapBox) {
     final box = key.currentContext?.findRenderObject();
     if (box is! RenderBox || !box.hasSize) return null;
-    return (box.localToGlobal(Offset.zero) - mapOrigin) & box.size;
+    final topLeft = mapBox.globalToLocal(box.localToGlobal(Offset.zero));
+    final bottomRight = mapBox.globalToLocal(
+      box.localToGlobal(Offset(box.size.width, box.size.height)),
+    );
+    return Rect.fromPoints(topLeft, bottomRight);
   }
 
-  Iterable<Rect> _railHitRects(Offset mapOrigin) sync* {
-    for (final key in _railHitKeys.values) {
-      final rect = _rectInMap(key, mapOrigin);
+  Iterable<Rect> _measuredHitRects(
+    Iterable<GlobalKey> keys,
+    RenderBox mapBox,
+  ) sync* {
+    for (final key in keys) {
+      final rect = _rectInMap(key, mapBox);
       if (rect != null) yield rect;
     }
   }
@@ -246,12 +267,12 @@ class _MiningGridMapState extends State<MiningGridMap> {
       target = math.max(labelTarget, placementBottomTarget);
     }
     final mapBox = context.findRenderObject();
-    final mapOrigin = mapBox is RenderBox && mapBox.hasSize
-        ? mapBox.localToGlobal(Offset.zero)
-        : Offset.zero;
     final hitRects = [
       if (widget.upperHudHitRect != null) widget.upperHudHitRect!,
-      if (mapBox is RenderBox && mapBox.hasSize) ..._railHitRects(mapOrigin),
+      if (mapBox is RenderBox && mapBox.hasSize) ...[
+        ..._measuredHitRects(widget.hudHitKeys, mapBox),
+        ..._measuredHitRects(_railHitKeys.values, mapBox),
+      ],
     ];
     if (open && hitRects.isNotEmpty) {
       final centers = <Offset>[];
@@ -355,6 +376,35 @@ class _MiningGridMapState extends State<MiningGridMap> {
     }
   }
 
+  /// Scene-space vertical coordinate at the viewport centre before a layout
+  /// change. Keeping this coordinate fixed preserves the visible band when
+  /// orientation changes the scene scale, viewport height, and chrome insets.
+  double? _focalSceneY(_JumpInputs inputs) {
+    if (!_scrollController.hasClients) return null;
+    final scale = math.min(1.0, inputs.size.width / miningGridSceneWidth);
+    return (_scrollController.position.pixels +
+            inputs.size.height / 2 -
+            inputs.viewportInsets.top) /
+        scale;
+  }
+
+  void _restoreFocalSceneY(double sceneY) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients || _railJumpBand != null) {
+        return;
+      }
+      final position = _scrollController.position;
+      final target =
+          sceneY * _sceneScale +
+          widget.viewportInsets.top -
+          position.viewportDimension / 2;
+      final clamped = target.clamp(0.0, position.maxScrollExtent).toDouble();
+      if ((position.pixels - clamped).abs() > .5) {
+        position.jumpTo(clamped);
+      }
+    });
+  }
+
   /// Re-targets an in-flight rail jump after a layout change: the band's
   /// scale-aware offset moved, so the stale animation target would land the
   /// label off-screen. Re-animating re-arms tracking, so a multi-frame
@@ -378,6 +428,9 @@ class _MiningGridMapState extends State<MiningGridMap> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
       _scrollToBand(_highestOpenBand(), animate: false);
+      if (!_initialFrameVisible) {
+        setState(() => _initialFrameVisible = true);
+      }
     });
   }
 
@@ -597,7 +650,7 @@ class _MiningGridMapState extends State<MiningGridMap> {
         viewportWidth - widget.railRight;
     final stripRowSpace = math.max(
       0.0,
-      stripClearRight - widget.viewportInsets.left,
+      stripClearRight - (widget.railBelowLeft ?? widget.viewportInsets.left),
     );
     final belowGap = ((stripRowSpace - 4 * _depthRailTargetSize) / 3).clamp(
       0.0,
@@ -622,7 +675,9 @@ class _MiningGridMapState extends State<MiningGridMap> {
       key: const Key('mining-depth-rail'),
       top: belowScene ? math.max(top, sceneBottom) : top,
       height: railHeight,
-      left: belowScene ? widget.viewportInsets.left : null,
+      left: belowScene
+          ? (widget.railBelowLeft ?? widget.viewportInsets.left)
+          : null,
       // A horizontal row must stay inside the supplied right edge (the Sell
       // column's left edge); the right inset only bounds vertical rails.
       right: belowScene
@@ -740,107 +795,122 @@ class _MiningGridMapState extends State<MiningGridMap> {
           railRight: widget.railRight,
           railClearRight: widget.railClearRight,
           railBelowClearRight: widget.railBelowClearRight,
+          railBelowLeft: widget.railBelowLeft,
         );
         if (_jumpInputs != jumpInputs) {
+          final previousInputs = _jumpInputs;
+          final focalSceneY =
+              previousInputs == null ||
+                  _railJumpBand != null ||
+                  !_initialFrameVisible
+              ? null
+              : _focalSceneY(previousInputs);
           _jumpInputs = jumpInputs;
           _retargetPendingJump();
+          if (focalSceneY != null) _restoreFocalSceneY(focalSceneY);
         }
         return Stack(
           key: const Key('mining-grid-map'),
           children: [
             Positioned.fill(child: _background()),
             Positioned.fill(
-              child: ScrollConfiguration(
-                // No glow/stretch: the scene is the map itself, and a
-                // transient overscroll scale would distort cell hit mapping.
-                behavior: scrollBehavior.copyWith(
-                  overscroll: false,
-                  dragDevices: {
-                    ...scrollBehavior.dragDevices,
-                    PointerDeviceKind.mouse,
-                  },
-                ),
-                child: SingleChildScrollView(
-                  key: const Key('mining-grid-scroll'),
-                  controller: _scrollController,
-                  // This is a precise tap surface: a bounce would paint cells
-                  // past the extent while the screen-space action rects stay
-                  // clamped, so the visible cell and the hitbox would diverge.
-                  physics: const ClampingScrollPhysics(
-                    parent: RangeMaintainingScrollPhysics(),
+              child: Opacity(
+                key: const Key('mining-grid-initial-frame-opacity'),
+                opacity: _initialFrameVisible ? 1 : 0,
+                child: ScrollConfiguration(
+                  // No glow/stretch: the scene is the map itself, and a
+                  // transient overscroll scale would distort cell hit mapping.
+                  behavior: scrollBehavior.copyWith(
+                    overscroll: false,
+                    dragDevices: {
+                      ...scrollBehavior.dragDevices,
+                      PointerDeviceKind.mouse,
+                    },
                   ),
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      top: insets.top,
-                      bottom: insets.bottom,
+                  child: SingleChildScrollView(
+                    key: const Key('mining-grid-scroll'),
+                    controller: _scrollController,
+                    // This is a precise tap surface: a bounce would paint cells
+                    // past the extent while the screen-space action rects stay
+                    // clamped, so the visible cell and the hitbox would diverge.
+                    physics: const ClampingScrollPhysics(
+                      parent: RangeMaintainingScrollPhysics(),
                     ),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: SizedBox(
-                        key: const Key('mining-grid-surface'),
-                        width: miningGridSceneWidth,
-                        height: miningGridSceneHeight,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          // A gesture semantics tap is synthesized at this
-                          // surface's centre, so it can never carry the tapped
-                          // cell. Keep physical taps here and expose the exact
-                          // per-cell actions below instead.
-                          excludeFromSemantics: true,
-                          onTapUp: (details) => widget.onCellTap(
-                            MiningGridCell(
-                              details.localPosition.dx ~/ miningGridCellSize,
-                              details.localPosition.dy ~/ miningGridCellSize,
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        top: insets.top,
+                        bottom: insets.bottom,
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: SizedBox(
+                          key: const Key('mining-grid-surface'),
+                          width: miningGridSceneWidth,
+                          height: miningGridSceneHeight,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            // A gesture semantics tap is synthesized at this
+                            // surface's centre, so it can never carry the tapped
+                            // cell. Keep physical taps here and expose the exact
+                            // per-cell actions below instead.
+                            excludeFromSemantics: true,
+                            onTapUp: (details) => widget.onCellTap(
+                              MiningGridCell(
+                                details.localPosition.dx ~/ miningGridCellSize,
+                                details.localPosition.dy ~/ miningGridCellSize,
+                              ),
                             ),
-                          ),
-                          child: Stack(
-                            clipBehavior: Clip.hardEdge,
-                            children: [
-                              ..._motherlodeHalo(),
-                              Positioned.fill(
-                                child: IgnorePointer(child: _objectLayer()),
-                              ),
-                              ..._bandLabels(),
-                              Positioned.fill(
-                                child: IgnorePointer(
-                                  child: CustomPaint(
-                                    painter: MiningGridPainter(
-                                      width: view.definition.gridWidth,
-                                      height: view.definition.gridHeight,
-                                      deployableCells: view.deployableCells,
-                                      upgradeableCells: view.upgradeableCells,
-                                    ),
-                                  ),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                ..._motherlodeHalo(),
+                                Positioned.fill(
+                                  child: IgnorePointer(child: _objectLayer()),
                                 ),
-                              ),
-                              // Only visuals live inside the scaled scroll
-                              // content. Actionable semantics overlays are
-                              // positioned in screen space outside the
-                              // FittedBox, because Flutter web can report
-                              // scaled scrolled semantics hit areas away from
-                              // their visible cells.
-                              for (final rig in view.rigs)
-                                Positioned(
-                                  key: Key(
-                                    'mining-rig-chip-'
-                                    '${rig.placement.cell.x}-'
-                                    '${rig.placement.cell.y}',
-                                  ),
-                                  left:
-                                      rig.placement.cell.x * miningGridCellSize,
-                                  top:
-                                      rig.placement.cell.y * miningGridCellSize,
-                                  width: miningGridCellSize,
+                                ..._bandLabels(),
+                                Positioned.fill(
                                   child: IgnorePointer(
-                                    child: ExcludeSemantics(
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: _rigChip(rig),
+                                    child: CustomPaint(
+                                      painter: MiningGridPainter(
+                                        width: view.definition.gridWidth,
+                                        height: view.definition.gridHeight,
+                                        deployableCells: view.deployableCells,
+                                        upgradeableCells: view.upgradeableCells,
                                       ),
                                     ),
                                   ),
                                 ),
-                            ],
+                                // Only visuals live inside the scaled scroll
+                                // content. Actionable semantics overlays are
+                                // positioned in screen space outside the
+                                // FittedBox, because Flutter web can report
+                                // scaled scrolled semantics hit areas away from
+                                // their visible cells.
+                                for (final rig in view.rigs)
+                                  Positioned(
+                                    key: Key(
+                                      'mining-rig-chip-'
+                                      '${rig.placement.cell.x}-'
+                                      '${rig.placement.cell.y}',
+                                    ),
+                                    left:
+                                        rig.placement.cell.x *
+                                        miningGridCellSize,
+                                    top:
+                                        rig.placement.cell.y *
+                                        miningGridCellSize,
+                                    width: miningGridCellSize,
+                                    child: IgnorePointer(
+                                      child: ExcludeSemantics(
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: _rigChip(rig),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -850,9 +920,12 @@ class _MiningGridMapState extends State<MiningGridMap> {
               ),
             ),
             Positioned.fill(
-              child: _screenSpaceSemantics(
-                constraints.maxWidth,
-                constraints.maxHeight,
+              child: Opacity(
+                opacity: _initialFrameVisible ? 1 : 0,
+                child: _screenSpaceSemantics(
+                  constraints.maxWidth,
+                  constraints.maxHeight,
+                ),
               ),
             ),
             _depthRail(constraints.maxHeight, constraints.maxWidth),
@@ -891,14 +964,20 @@ class _MiningGridMapState extends State<MiningGridMap> {
       double y(int cellY) => sceneTop + cellY * cellSize;
       // This overlay is not clipped by the scroll viewport, so a cell that
       // scrolled out of view would keep an action that mutates a rig the
-      // player cannot see. Deposit labels stay unfiltered: they carry no
-      // action, and their keys anchor overlay geometry checks.
+      // player cannot see. Deposit keys stay mounted for overlay geometry,
+      // but their focusable labels follow the same visibility boundary.
       final viewport = Offset.zero & Size(width, height);
       bool onscreen(MiningGridCell cell) => Rect.fromLTWH(
         x(cell.x),
         y(cell.y),
         cellSize,
         cellSize,
+      ).overlaps(viewport);
+      bool depositOnscreen(MineSiteDepositView deposit) => Rect.fromLTWH(
+        x(deposit.definition.x),
+        y(deposit.definition.y),
+        deposit.definition.size * cellSize,
+        deposit.definition.size * cellSize,
       ).overlaps(viewport);
       return Stack(
         clipBehavior: Clip.none,
@@ -912,10 +991,12 @@ class _MiningGridMapState extends State<MiningGridMap> {
               width: deposit.definition.size * cellSize,
               height: deposit.definition.size * cellSize,
               child: IgnorePointer(
-                child: Semantics(
-                  label: _depositLabel(deposit),
-                  child: const SizedBox.expand(),
-                ),
+                child: depositOnscreen(deposit)
+                    ? Semantics(
+                        label: _depositLabel(deposit),
+                        child: const SizedBox.expand(),
+                      )
+                    : const SizedBox.expand(),
               ),
             ),
           // A legal target owns its exact assistive-tech action. The map
