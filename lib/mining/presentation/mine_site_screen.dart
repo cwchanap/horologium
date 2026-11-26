@@ -360,6 +360,12 @@ class _CavernScene extends StatelessWidget {
                     ? constraints.maxHeight - padding.bottom
                     : sellTop! - _portraitRailSellGap,
                 railRight: landscape ? 8 : padding.right + 8,
+                railBelowBottom: landscape
+                    ? constraints.maxHeight -
+                          padding.bottom -
+                          _landscapeToolbarBottom -
+                          _landscapeToolbarHeight
+                    : null,
               ),
             ),
             Positioned(
@@ -418,6 +424,7 @@ class _MineCavern extends StatelessWidget {
     this.railTop = 0,
     this.railBottom = double.infinity,
     this.railRight = 8,
+    this.railBelowBottom,
   });
 
   final MineSiteView view;
@@ -433,6 +440,7 @@ class _MineCavern extends StatelessWidget {
   final double railTop;
   final double railBottom;
   final double railRight;
+  final double? railBelowBottom;
 
   @override
   Widget build(BuildContext context) {
@@ -480,6 +488,7 @@ class _MineCavern extends StatelessWidget {
             railClearRight: landscape ? sellLeft : null,
             railBelowClearRight: sellLeft,
             railBelowLeft: MediaQuery.paddingOf(context).left,
+            railBelowBottom: railBelowBottom,
           ),
           if (!landscape) ...[
             const Positioned(
