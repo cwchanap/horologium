@@ -657,15 +657,16 @@ void main() {
 
     // Padding that trades top for bottom leaves the content height and the
     // viewport unchanged, so the viewport never asks the physics to correct.
-    // The scroll must still move with the padding and stay aligned.
+    // Assert on the first frame: a correction that arrives a frame late would
+    // leave that frame's actions on the old offset.
     await _pumpMap(
       tester,
       _view(MiningSiteId.landingBasin, selectedBayId: DockBayId.b1),
       (_) {},
       size: const Size(390, 844),
       viewportInsets: const EdgeInsets.fromLTRB(58, 154, 96, 283.5),
+      pumpAfterAttach: false,
     );
-    await tester.pump();
     expect(_position(tester).pixels, closeTo(520, .5));
     expectAligned();
     handle.dispose();
