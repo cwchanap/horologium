@@ -654,6 +654,20 @@ void main() {
     _position(tester).jumpTo(500);
     await tester.pump();
     expectAligned();
+
+    // Padding that trades top for bottom leaves the content height and the
+    // viewport unchanged, so the viewport never asks the physics to correct.
+    // The scroll must still move with the padding and stay aligned.
+    await _pumpMap(
+      tester,
+      _view(MiningSiteId.landingBasin, selectedBayId: DockBayId.b1),
+      (_) {},
+      size: const Size(390, 844),
+      viewportInsets: const EdgeInsets.fromLTRB(58, 154, 96, 283.5),
+    );
+    await tester.pump();
+    expect(_position(tester).pixels, closeTo(520, .5));
+    expectAligned();
     handle.dispose();
   });
 

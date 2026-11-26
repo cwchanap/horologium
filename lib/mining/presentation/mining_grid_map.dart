@@ -156,49 +156,6 @@ class MiningGridMap extends StatefulWidget {
   State<MiningGridMap> createState() => _MiningGridMapState();
 }
 
-/// Scroll physics that applies a resize focal correction while the viewport is
-/// laying out, so the first resized frame already paints the restored offset.
-class _ResizeFocalScrollPhysics extends ScrollPhysics {
-  const _ResizeFocalScrollPhysics({
-    required this.readTarget,
-    required this.clearTarget,
-    super.parent,
-  });
-
-  final double? Function() readTarget;
-  final VoidCallback clearTarget;
-
-  @override
-  _ResizeFocalScrollPhysics applyTo(ScrollPhysics? ancestor) =>
-      _ResizeFocalScrollPhysics(
-        readTarget: readTarget,
-        clearTarget: clearTarget,
-        parent: buildParent(ancestor),
-      );
-
-  @override
-  double adjustPositionForNewDimensions({
-    required ScrollMetrics oldPosition,
-    required ScrollMetrics newPosition,
-    required bool isScrolling,
-    required double velocity,
-  }) {
-    final target = readTarget();
-    if (target == null) {
-      return super.adjustPositionForNewDimensions(
-        oldPosition: oldPosition,
-        newPosition: newPosition,
-        isScrolling: isScrolling,
-        velocity: velocity,
-      );
-    }
-    clearTarget();
-    return target
-        .clamp(newPosition.minScrollExtent, newPosition.maxScrollExtent)
-        .toDouble();
-  }
-}
-
 class _MiningGridMapState extends State<MiningGridMap> {
   final ScrollController _scrollController = ScrollController();
   final Map<MiningBand, GlobalKey> _railHitKeys = {
@@ -211,14 +168,6 @@ class _MiningGridMapState extends State<MiningGridMap> {
   MiningBand? _railJumpBand;
   int _railJumpSeq = 0;
   _JumpInputs? _jumpInputs;
-  double? _pendingResizeScrollTarget;
-  late final ScrollPhysics _scrollPhysics = _ResizeFocalScrollPhysics(
-    parent: const ClampingScrollPhysics(
-      parent: RangeMaintainingScrollPhysics(),
-    ),
-    readTarget: () => _pendingResizeScrollTarget,
-    clearTarget: () => _pendingResizeScrollTarget = null,
-  );
   final Map<MiningBand, FocusNode> _railFocusNodes = {
     for (final band in MiningBand.values) band: FocusNode(),
   };
@@ -872,19 +821,19 @@ class _MiningGridMapState extends State<MiningGridMap> {
               previousInputs != null &&
               (previousInputs.size != jumpInputs.size ||
                   previousInputs.viewportInsets != jumpInputs.viewportInsets);
-          _pendingResizeScrollTarget =
+          final resizeTarget =
               previousInputs == null ||
                   !layoutChanged ||
                   _railJumpBand != null ||
                   !_initialFrameVisible
               ? null
               : _resizeScrollTarget(previousInputs, jumpInputs);
-          if (_pendingResizeScrollTarget != null) {
-            // The physics consumes this during the same frame's layout; a
-            // layout that never adopts it must not pin the overlay to it.
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) _pendingResizeScrollTarget = null;
-            });
+          if (resizeTarget != null && _scrollController.hasClients) {
+            // Apply here rather than in the physics: the viewport only asks
+            // the physics to correct when its extents or size change, but
+            // padding can trade space without either, and the overlay below
+            // must paint from the same offset as the scroll view.
+            _scrollController.position.correctPixels(resizeTarget);
           }
           _jumpInputs = jumpInputs;
           _retargetPendingJump();
@@ -915,7 +864,9 @@ class _MiningGridMapState extends State<MiningGridMap> {
                       // This is a precise tap surface: a bounce would paint cells
                       // past the extent while the screen-space action rects stay
                       // clamped, so the visible cell and the hitbox would diverge.
-                      physics: _scrollPhysics,
+                      physics: const ClampingScrollPhysics(
+                        parent: RangeMaintainingScrollPhysics(),
+                      ),
                       child: Padding(
                         padding: EdgeInsets.only(
                           top: insets.top,
@@ -1024,9 +975,9 @@ class _MiningGridMapState extends State<MiningGridMap> {
   /// scaled [FittedBox] inside a scroll view, so keeping these overlays out of
   /// that transform makes each action's browser hit area match its visible
   /// cell at every scroll offset. The offset is clamped to the extent the
-  /// current layout will adopt, and the pending resize focal offset is used
-  /// before the scroll view reports it, because the physics corrects pixels
-  /// during layout without notifying listeners.
+  /// current layout will adopt, and a resize correction is applied to the
+  /// scroll position during build, so this overlay and the scroll view always
+  /// read the same pixels.
   Widget _screenSpaceSemantics(double width, double height) => AnimatedBuilder(
     animation: _scrollController,
     builder: (context, _) {
@@ -1040,11 +991,9 @@ class _MiningGridMapState extends State<MiningGridMap> {
           miningGridSceneHeight * scale +
           widget.viewportInsets.bottom;
       final maxScroll = math.max(0.0, contentHeight - height);
-      final rawScroll =
-          _pendingResizeScrollTarget ??
-          (_scrollController.hasClients
-              ? _scrollController.position.pixels
-              : 0.0);
+      final rawScroll = _scrollController.hasClients
+          ? _scrollController.position.pixels
+          : 0.0;
       final scroll = rawScroll.clamp(0.0, maxScroll);
       final sceneTop = widget.viewportInsets.top - scroll;
       double x(int cellX) => sceneLeft + cellX * cellSize;
